@@ -1,4 +1,4 @@
-using Test, Masque, CairoMakie, Makie
+using Test, Masque, CairoMakie, Makie, JSON3
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
 @testset "Selection" begin
@@ -416,6 +416,14 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test cr([0.0, 0.4, 10.0, 20.0], 0.0, 15.0) == (0, 2)
         @test cr(asc, 50.0, 250.0) == (0, 1)
         @test cr(asc, 450.0, 500.0) === nothing
+    end
+
+    @testset "a box holds the marks on its edges, the same marks as the browser" begin
+        # Shared with frontend/test/boundaries.test.ts, which runs selection.ts's computeSelection
+        # on the same numbers: the starting value and a release at the same bounds must agree.
+        fx = JSON3.read(read(joinpath(@__DIR__, "..", "fixtures", "brush", "edges.json"), String))
+        box = Dict(String(k) => v for (k, v) in fx.box)
+        @test Masque._contained_indices(box, collect(Float64, fx.circles)) == collect(Int, fx.inside)
     end
 
     @testset "a selects box gives fields for the box and its point target; other layers keep their clicks" begin

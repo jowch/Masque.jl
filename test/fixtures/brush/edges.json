@@ -1,0 +1,23 @@
+{
+  "comment": "One box and marks exactly on, just inside and just outside each of its edges, in image px. Read by test/core/selection_tests.jl (bond.jl's _contained_indices) and frontend/test/boundaries.test.ts (selection.ts's computeSelection): the two must pick the same marks, so a starting value and a release at the same bounds agree. A mark on an edge or a corner is inside.",
+  "box": { "x": 100, "y": 100, "w": 200, "h": 100 },
+  "circles": [
+    200, 150, 5,
+    100, 150, 5,
+    300, 150, 5,
+    200, 100, 5,
+    200, 200, 5,
+    100, 100, 5,
+    300, 200, 5,
+    99.5, 150, 5,
+    300.5, 150, 5,
+    200, 99.5, 5,
+    200, 200.5, 5,
+    301, 201, 5,
+    100.5, 150, 5,
+    299.5, 150, 5,
+    200, 100.5, 5,
+    200, 199.5, 5
+  ],
+  "inside": [0, 1, 2, 3, 4, 5, 6, 12, 13, 14, 15]
+}
