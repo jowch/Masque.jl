@@ -5,7 +5,8 @@
 // change without failing.
 import { afterEach, describe, expect, it } from "vitest"
 import { readFileSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { mount as mountOverlay } from "../src/overlay"
 import { hitLayer, occludedAt, SEG_TOL } from "../src/geometry"
 import { computeSelection } from "../src/selection"
@@ -29,7 +30,7 @@ const layer = (kind: HitLayer["kind"], geometry: unknown): HitLayer =>
 
 describe("a box picks the marks on its edges (the same marks as Julia)", () => {
     // Shared with test/core/selection_tests.jl, which runs bond.jl's _contained_indices on it.
-    const fx = JSON.parse(readFileSync(join(__dirname, "..", "..", "test", "fixtures", "brush", "edges.json"), "utf8"))
+    const fx = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "test", "fixtures", "brush", "edges.json"), "utf8"))
 
     it("keeps every mark on an edge or a corner and none just outside", () => {
         const { items } = computeSelection(fx.box, layer("circles", fx.circles), tf)
@@ -130,6 +131,7 @@ describe("an ROI box moved past the plot area stops at its edge", () => {
         // 400 image px of a 1200 px, 0..10 x axis; 400 of an 800 px, 0..100 y axis, y up.
         expect(committed()!.xmin).toBeCloseTo(0)
         expect(committed()!.xmax).toBeCloseTo(10 * 400 / 1200)
+        expect(committed()!.ymin).toBeCloseTo(50)
         expect(committed()!.ymax).toBeCloseTo(100)
     })
 
@@ -137,6 +139,7 @@ describe("an ROI box moved past the plot area stops at its edge", () => {
         const { surface, box, committed } = mounted()
         drag(surface, [200, 200], [2000, 2000])
         expect([box.getAttribute("x"), box.getAttribute("y")]).toEqual(["800", "400"])
+        expect(committed()!.xmin).toBeCloseTo(10 * 800 / 1200)
         expect(committed()!.xmax).toBeCloseTo(10)
         expect(committed()!.ymin).toBeCloseTo(0)
     })
@@ -155,12 +158,13 @@ describe("undo and redo chords follow the platform", () => {
     const chord = (key: string, mod: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean }) =>
         historyKey({ key, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...mod })
 
-    it("on macOS: Cmd+Z undoes, Cmd+Shift+Z redoes, Cmd+Y and Ctrl+Z do nothing", () => {
+    it("on macOS: Cmd+Z undoes, Cmd+Shift+Z redoes, Cmd+Y, Ctrl+Z and Ctrl+Y do nothing", () => {
         onPlatform("macOS", () => {
             expect(chord("z", { metaKey: true })).toBe("undo")
             expect(chord("Z", { metaKey: true, shiftKey: true })).toBe("redo")
             expect(chord("y", { metaKey: true })).toBeNull()
             expect(chord("z", { ctrlKey: true })).toBeNull()
+            expect(chord("y", { ctrlKey: true })).toBeNull()
         })
     })
 

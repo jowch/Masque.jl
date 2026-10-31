@@ -363,6 +363,9 @@ Masque.interactables(ax, p::SeedHeatParts) = (
         @test occursin("as a tuple", msg(() -> masque(fig; bind = [s1, s2])))
         # A Bool is an Integer in Julia; `true` must not pass for index 1.
         @test occursin("must not be a Bool", msg(() -> masque(fig; bind = (left = s1,), selected = (left = true,))))
+        @test occursin("a Bool is not an element index", msg(() -> masque(fig; bind = (left = s1,), selected = true)))
+        @test occursin("must be an index, an event", msg(() -> masque(fig; bind = (left = s1,), selected = (left = [true],))))
+        @test occursin("a vector must be element indices or events", msg(() -> masque(fig; bind = (left = s1,), selected = [true])))
         # One object that builds several layers gives its parts.
         reg = RegionInteractable(ax, [(:circle, (1.0, 1.0), 0.5), (:rect, (5.0, 5.0), 1.0, 1.0)]; id = :cells)
         v = Masque.APD.Bonds.initial_value(masque(fig, reg; bind = reg))
