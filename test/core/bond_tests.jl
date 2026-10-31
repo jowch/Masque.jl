@@ -144,6 +144,47 @@ Masque.interactables(ax, p::SeedHeatParts) = (
         @test stamped isa LegendEvent && stamped.index == 1 && stamped.label == "trend"
     end
 
+    @testset "a colorbar click decodes through its interactable (#493)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
+        hm = heatmap!(ax, reshape(1.0:9.0, 3, 3))
+        cb = Colorbar(fig[1, 2], hm)
+        w = masque(fig, ColorbarInteractable(cb))
+        # The widget owns the colorbar's layer, so the click goes to its `transform_bond`, not
+        # to the manifest stamp.
+        @test haskey(w.owners, "colorbar")
+        ev = commit_field(w, Dict("layer" => "colorbar", "index" => 0, "payload" => Dict("value" => 4.25)))
+        @test ev === ColorbarEvent(:colorbar, 4.25)
+        @test_throws ArgumentError commit_field(w, Dict("layer" => "colorbar", "index" => 0, "payload" => Dict()))
+    end
+
+    @testset "each readout names its event type (#493)" begin
+        fig = Figure(); ax = Axis(fig[1, 1]); hm = heatmap!(ax, rand(3, 3))
+        cb = Colorbar(fig[1, 2], hm)
+        @test bondtype(AxisInteractable(ax)) === AxisEvent
+        @test bondtype(ColorbarInteractable(cb)) === ColorbarEvent
+        @test bondtype(ThresholdInteractable(ax; value = 0.5)) === ThresholdEvent
+        @test bondtype(ROIInteractable(ax; bounds = (0, 1, 0, 1))) === BoundsEvent
+
+        # An interactable of the user's that declares one of these types decodes through it,
+        # under its layer's id.
+        L = HitLayer(:mine, :axis, nothing, Any[], :ax1, (:click,))
+        @test transform_bond(AxisEvent, nothing, L, 1, Dict("x" => 1, "y" => 2)) == AxisEvent(:mine, 1.0, 2.0)
+        @test transform_bond(ColorbarEvent, nothing, L, 1, Dict("value" => 3)) === ColorbarEvent(:mine, 3.0)
+        @test transform_bond(ThresholdEvent, nothing, L, 1, 4) == ThresholdEvent(:mine, 4.0)
+        @test transform_bond(BoundsEvent, nothing, L, 1, Dict("xmin" => 0, "xmax" => 1, "ymin" => 2, "ymax" => 3)) ==
+            BoundsEvent(:mine, 0.0, 1.0, 2.0, 3.0)
+    end
+
+    @testset "propertynames lists a Dict or struct payload's names (#493)" begin
+        d = ElementEvent(:pts, 1, Dict(:city => "Delhi", "pop" => 32, 7 => "seven", "layer" => "x"))
+        @test Set(propertynames(d)) == Set([:layer, :index, :payload, :city, :pop])
+        # A payload key that is also an event field is listed once.
+        @test count(==(:layer), propertynames(d)) == 1
+        struct_pl = ElementEvent(:pts, 1, 1 + 2im)
+        @test (:re, :im) ⊆ propertynames(struct_pl)
+        @test struct_pl.re == 1
+    end
+
     @testset "a categorical axis commits the category's position and label" begin
         # The overlay sends the category label on a categorical dimension (geometry.ts `mapAxis`).
         # It used to reach Float64(::String) and throw, so `pick` never got a value.
