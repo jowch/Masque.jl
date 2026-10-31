@@ -126,10 +126,10 @@ bump(n; lo = -3, hi = 3) = (xs = range(lo, hi; length = n); (xs, xs, [exp(-(a^2 
         ev = Masque.transform_bond(si, L3, nothing, Dict("i" => 1, "j" => 1, "value" => Z[2, 2]))
         @test ev isa GridCellEvent && (ev.i, ev.j) == (2, 2) && ev.value == Z[2, 2]
         @test ev.name == "p22" && Z[ev] == Z[2, 2]
-        @test_throws ArgumentError SurfaceInteractable(a3, X, Y, Z; payloads = zeros(2, 2))
-        @test_throws ArgumentError SurfaceInteractable(a3, 1:3, 1:3, Z)
-        @test_throws ArgumentError SurfaceInteractable(a3, X, Y, Z; value = fill(:red, 4, 3))
-        @test_throws ArgumentError SurfaceInteractable(a3, X, Y, Z; tooltip = true)
+        @test_throws "ArgumentError: SurfaceInteractable: `payloads` must be a matrix the same shape as `z`" SurfaceInteractable(a3, X, Y, Z; payloads = zeros(2, 2))
+        @test_throws "ArgumentError: SurfaceInteractable: `x` must be a vector of length size(z, 1)" SurfaceInteractable(a3, 1:3, 1:3, Z)
+        @test_throws "ArgumentError: SurfaceInteractable: `value` must be a real matrix" SurfaceInteractable(a3, X, Y, Z; value = fill(:red, 4, 3))
+        @test_throws "ArgumentError: tooltip = true is not meaningful" SurfaceInteractable(a3, X, Y, Z; tooltip = true)
     end
 
     @testset "dense grids thin to a fixed stride" begin
@@ -178,7 +178,7 @@ bump(n; lo = -3, hi = 3) = (xs = range(lo, hi; length = n); (xs, xs, [exp(-(a^2 
         @test validate(SurfaceInteractable(a2, xs, ys, zs), ctx_for(f2)[3]) isa String
 
         # Templates are checked against the point's own fields.
-        @test_throws ArgumentError build_manifest(
+        @test_throws r"^ArgumentError: masque tooltip template references fields missing from the payload:.*no field `nope`"s build_manifest(
             [SurfaceInteractable(ax, xs, ys, zs; tooltip = masque"$(nope)")], ctx_for(fig)[3],
         )
         d = build_manifest([SurfaceInteractable(ax, xs, ys, zs; tooltip = masque"$(x), $(z)")], ctx_for(fig)[3])
