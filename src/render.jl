@@ -694,6 +694,7 @@ end
     masque(fig, xs...; auto = true, bind = nothing, kwargs...) -> MasqueWidget
 
 Overlay `fig` with JS hit-testing and return a Pluto `@bind` source. `fig` is not mutated.
+`fig` is a `Figure`, or what `scatter(x, y)` or `scatter(fig[1, 1], …)` returns.
 
 `masque(fig)` overlays the figure's defaults, the list [`interactables(fig)`](@ref
 interactables) returns. Each argument after `fig` adds to them: an interactable, a vector of
