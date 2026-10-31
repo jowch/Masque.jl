@@ -236,11 +236,25 @@ _state_input(state; settle = true) = Dict{String, Any}("onchange" => true, "stat
         @test !isempty(layer(r["manifest"], "a")["events"])
         back = w.render_frame(_state_input(Dict("b" => Dict("items" => Any[]), "cutoff" => cut(1.0))))
         @test "click" in layer(back["manifest"], "b")["events"]
-        # Without onchange a hidden plot keeps its layer as before.
+        # Without onchange a hidden plot is hidden the same way: nothing drawn takes the
+        # pointer or the fade (#484).
         b.visible = false
         w2 = masque(fig, (b = interactables(b),))
-        @test !isempty(layer(w2.manifest, "b")["events"])
+        @test isempty(layer(w2.manifest, "b")["events"]) && layer(w2.manifest, "b")["hidden"] === true
         b.visible = true
+    end
+
+    @testset "a plot hidden from the start is hidden in the manifest (#484)" begin
+        fig = Figure(size = (480, 320))
+        ax = Axis(fig[1, 1])
+        lines!(ax, 1:10, (1:10) .^ 0.5; label = "a", linewidth = 4)
+        lines!(ax, 1:10, (1:10) .^ 0.7; label = "b", linewidth = 4, visible = false)
+        axislegend(ax; position = :lt)
+        m = masque(fig; bind = :legend).manifest
+        ls = [l for l in m["layers"] if l["kind"] == "lines"]
+        @test length(ls) == 2
+        @test count(l -> get(l, "hidden", false) === true, ls) == 1
+        @test all(l -> get(l, "hidden", false) !== true || isempty(l["events"]), ls)
     end
 
     @testset "the docs examples run as written" begin

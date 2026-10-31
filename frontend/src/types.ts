@@ -270,7 +270,7 @@ export interface HitLayer {
     brush?: "elements" | "grid" // a `selects` box's target: its field holds what the box holds
     many?: true // a `select = :many` field: it holds { items: [...] }, and a click toggles one in or out
     group?: string // the `linked(...)` group this layer is a member of: its clicks edit the group's field
-    hidden?: true // `onchange` hid this plot: it takes no hover and no clicks, and draws no picks
+    hidden?: true // drawn with `visible = false`: it takes no hover and no clicks, and draws no picks or fade
     draw?: number // the plot's place in the backend's drawing order, larger on top; fade.ts reads which of two crossing marks is on top. Absent → the manifest's order (the plot drawn last first)
     // Bond stamp the Julia side reads back: element | legend | gridcell | axis | colorbar | threshold | bounds | control | none
     bond?: "element" | "legend" | "gridcell" | "axis" | "colorbar" | "threshold" | "bounds" | "control" | "none"

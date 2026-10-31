@@ -40,7 +40,7 @@ const OUTLINE_MIX = 0.45
 
 // A hit drawn by this look rather than by an SVG recipe: an element of a closed data layer.
 export function fadeLook(hit: Hit): boolean {
-    if (!FADE_KINDS.has(hit.layer.kind) || layoutSpaceLayer(hit.layer)) return false
+    if (!fadeLayer(hit.layer)) return false
     const g = hit.geom_
     return !!g && (g[0] === "circle" || g[0] === "rect" || g[0] === "poly" || (g[0] === "path" && hit.sample_ === undefined))
 }
@@ -60,10 +60,12 @@ export function fadesOthers(scope: HitLayer[], hits: Hit[]): boolean {
 
 // The line layers drawn on `axis`, which hovering one of them fades.
 export function lineScope(manifest: Manifest, axis: string): HitLayer[] {
-    return manifest.layers.filter((l) => l.kind === "lines" && l.axis === axis && !l.hidden && fadeLayer(l))
+    return manifest.layers.filter((l) => l.kind === "lines" && l.axis === axis && fadeLayer(l))
 }
 
-const fadeLayer = (l: HitLayer | undefined): l is HitLayer => !!l && FADE_KINDS.has(l.kind) && !layoutSpaceLayer(l)
+// A plot drawn with `visible = false` has nothing to fade: covering its path would erase what
+// is drawn under it, the gridlines (#484).
+const fadeLayer = (l: HitLayer | undefined): l is HitLayer => !!l && FADE_KINDS.has(l.kind) && !layoutSpaceLayer(l) && !l.hidden
 
 // The layers a legend entry's links can name, all of its entries together: picking or hovering
 // one series of a legend fades the legend's other series.
@@ -89,11 +91,11 @@ export function selectionScope(manifest: Manifest, sel: Map<string, FieldSelecti
         const own = manifest.layers.find((l) => l.id === field)
         if (own?.links?.length) for (const l of legendLayers(manifest, own)) out.add(l)
         // A linked group's picks fade every plot of the group, also one that holds none of them
-        // (#346), as a legend's pick fades its other series. A plot `onchange` hid stays out.
+        // (#346), as a legend's pick fades its other series.
         const group = s.rows_ ? manifest.groups?.find((g) => g.id === field) : undefined
         for (const id of group?.members ?? []) {
             const l = manifest.layers.find((x) => x.id === id)
-            if (fadeLayer(l) && !l.hidden) out.add(l)
+            if (fadeLayer(l)) out.add(l)
         }
         for (const h of s.hits_) if (fadeLook(h)) out.add(h.layer)
     }

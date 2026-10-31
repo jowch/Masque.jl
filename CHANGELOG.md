@@ -16,6 +16,10 @@ All notable changes to this project are documented here. The format is based on
   and typing a label's first letters work it from the keyboard (#429).
 
 ### Fixed
+- A plot drawn with `visible = false` is left alone when a series is picked or hovered: the
+  fade no longer covers its path, which left gaps in the gridlines under it. A hidden plot
+  also takes no hover or clicks now when the call has no `onchange`, as it already did with
+  one (#484).
 - A large block of cells picked on a grid of small cells is outlined inside its edge, like any
   other area 12 px or more across. Before, the outline went by the grid's smallest cell, so it
   sat on the edge and spilled onto the neighbouring cells. Lone cells and one-cell-wide strokes
