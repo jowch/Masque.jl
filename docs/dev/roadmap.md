@@ -55,7 +55,12 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 - *idea* — double-click resets the view to the figure's limits or camera.
 - *idea* — Escape aborts a drag and restores its start.
 - *idea* — links across layers and across figures; across widgets this needs a registry.
-- *idea* — range select on a colorbar; lasso select beside the box ROI.
+- #499 — drag a threshold on a `Colorbar`.
+- #500 — `SpanInteractable`: a two-handle `(lo, hi)` interval on an axis or a colorbar.
+- *idea* — lasso select beside the box ROI.
+- *idea* — more control shapes: a circle, an angle, a multi-level threshold, a persistent
+  polygon.
+- *idea* — default a threshold's `value` and an ROI's `bounds` from the axis limits.
 - *idea* — nearest-mark snapping within a radius.
 - *idea* — a 2D profile probe on a heatmap cell; a delta readout between two parked probes.
 
@@ -73,7 +78,9 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 ### Plot coverage
 - #91 — tracking issue for the recipes `masque(fig)` does not extract yet. Tick it and
   update `docs/src/support.md` when `_plotbase` grows a branch.
+- #502 — read out the position under the cursor on a line on `Axis3`.
 - *idea* — informative default payloads for `density!`, `band!`, and `voronoiplot!`.
+- *idea* — one element per edge for GraphMakie's `graphplot!` (today all edges are one).
 - *idea* — a legend entry that targets a `:grid` layer.
 - *idea* — `heatmap!`/`image!` and `surface!` designed together as dense cell fields;
   occlusion policy is in `architecture/07-scope.md`.
