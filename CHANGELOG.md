@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- `masque(scatter(x, y))` works: what a plain `scatter`, `lines` or other plot call returns,
+  and what `scatter(fig[1, 1], …)` returns, is taken as the figure it drew into. Before, it
+  failed with a Makie field error. Anything else that isn't a `Figure` gets a message saying
+  to pass the figure (#501).
+- A `ThresholdInteractable` on a `Colorbar` is refused with a message that names
+  `ColorbarInteractable` and a threshold on an axis, instead of a Makie field error (#498).
+
 ## [0.4.3] - 2026-10-31
 
 ### Changed

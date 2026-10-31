@@ -12,6 +12,17 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test ppw == 2 * 700 / 1400                   # = 1.0  → output 1400 px = 2× column
     end
 
+    @testset "masque takes what scatter(x, y) returns (#501)" begin
+        fap = scatter(1:3, 1:3)
+        w = masque(fap)
+        @test w isa MasqueWidget && any(l -> l["kind"] == "circles", w.manifest["layers"])
+        f = Figure(); ap = lines(f[1, 1], 1:3, 1:3)
+        @test ap isa Makie.AxisPlot
+        @test masque(ap) isa MasqueWidget
+        err = (@test_throws ArgumentError masque(Axis(Figure()[1, 1]))).value
+        @test occursin("must be a Figure", err.msg)
+    end
+
     @testset "backend = symbol, max_width and px_per_unit keywords (#236)" begin
         f = Figure(size = (600, 400)); scatter!(Axis(f[1, 1]), 1:3, 1:3)
         @test IP._resolve_backend(nothing) isa _CairoExt.CairoBackend      # the one loaded
