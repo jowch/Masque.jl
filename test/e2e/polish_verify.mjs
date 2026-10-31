@@ -733,8 +733,11 @@ try {
     const legend = layers.find((l) => l.links?.length);
     if (shown.length !== 2 || hidden.length !== 1 || !legend) throw new Error(`${key}: want two shown lines, one hidden line and a legend, got ${JSON.stringify(layers.map((l) => [l.id, l.kind, !!l.hidden]))}`);
     if (hidden[0].events.length) throw new Error(`${key}: the hidden line takes ${JSON.stringify(hidden[0].events)}`);
+    // Entry 0 names line a; the other shown line is c.
+    const a = shown.find((l) => l.id === legend.links[0][0]), c = shown.find((l) => l !== a);
+    if (!a) throw new Error(`${key}: legend entry 0 names ${JSON.stringify(legend.links[0])}, not a shown line`);
     const [x0, y, x1] = hidden[0].geometry[0];
-    const [, cy] = shown[1].geometry[0].slice(0, 2);
+    const [, cy] = c.geometry[0].slice(0, 2);
     const lw = hidden[0].linewidth ?? 8;
     // The first screenshot pixel along the hidden line's path, over its drawn width, that moved.
     const moved = (a, b) => {
@@ -769,7 +772,7 @@ try {
     await away();
     await page.waitForTimeout(400);
     const kept = (await inspect(key)).kept;
-    if (!kept.includes(`${shown[0].id}:0`)) throw new Error(`${key}: clicking legend entry "a" kept ${JSON.stringify(kept)}`);
+    if (!kept.includes(`${a.id}:0`)) throw new Error(`${key}: clicking legend entry "a" kept ${JSON.stringify(kept)}`);
     const picked = await screenOf(key);
     const cRest = lum(rest.mean(mid, cy, 1)), cNow = lum(picked.mean(mid, cy, 1));
     if (cNow - cRest < 0.4 * (255 - cRest)) throw new Error(`${key}/fade: line c reads ${cNow.toFixed(0)} with "a" picked (${cRest.toFixed(0)} at rest), want it faded`);

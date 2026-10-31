@@ -255,6 +255,12 @@ _state_input(state; settle = true) = Dict{String, Any}("onchange" => true, "stat
         @test length(ls) == 2
         @test count(l -> get(l, "hidden", false) === true, ls) == 1
         @test all(l -> get(l, "hidden", false) !== true || isempty(l["events"]), ls)
+        # A recipe with a hidden child of its own is still drawn.
+        fig3 = Figure()
+        ax3 = Axis3(fig3[1, 1])
+        arrows3d!(ax3, Point3f[(1, 1, 1), (3, 2, 1)], Vec3f[(1, 0, 0), (0, 1, 0.5)])
+        al = only(l for l in masque(fig3).manifest["layers"] if l["id"] == "arrows3d")
+        @test get(al, "hidden", false) !== true && !isempty(al["events"])
     end
 
     @testset "the docs examples run as written" begin
