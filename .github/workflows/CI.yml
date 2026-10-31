@@ -187,6 +187,24 @@ jobs:
         run: |
           npm install
           npx playwright install --with-deps chromium
+      # These two WebGL pages need no Pluto session. They ride the Pluto 1 bind job, which is
+      # short, instead of the WebGL kind sweep, the slowest job in the run (#492).
+      # A self-contained :webgl widget page (no Pluto): click scatter marker 0 in Chromium, assert
+      # the overlay emits the right bond value, then feed that exact emission through
+      # transform_value.
+      - name: WebGL widget page click
+        if: matrix.pluto == '1'
+        run: |
+          julia --color=yes test/e2e/make_page.jl "$RUNNER_TEMP/e2e"
+          (cd test/e2e && node click.mjs "$RUNNER_TEMP/e2e")
+          julia --color=yes test/e2e/verify_capture.jl "$RUNNER_TEMP/e2e"
+      # A WebGL widget outside Pluto fetches WGLMakie's script from Makie's release tag; the
+      # driver serves the installed copy at those URLs (#300).
+      - name: WebGL page outside Pluto
+        if: matrix.pluto == '1'
+        run: |
+          julia --color=yes --project="$MASQUE_DEV_ENV" test/e2e/standalone_webgl.jl "$RUNNER_TEMP/standalone-webgl"
+          cd test/e2e && node standalone_webgl.mjs "$RUNNER_TEMP/standalone-webgl"
       - name: Through-Pluto bind round-trip
         working-directory: test/e2e
         env:
@@ -261,22 +279,6 @@ jobs:
         run: |
           npm install
           npx playwright install --with-deps chromium
-      # A self-contained :webgl widget page (no Pluto): click scatter marker 0 in Chromium, assert
-      # the overlay emits the right bond value, then feed that exact emission through
-      # transform_value.
-      - name: WebGL widget page click
-        if: matrix.backend == 'webgl'
-        run: |
-          julia --color=yes test/e2e/make_page.jl "$RUNNER_TEMP/e2e"
-          (cd test/e2e && node click.mjs "$RUNNER_TEMP/e2e")
-          julia --color=yes test/e2e/verify_capture.jl "$RUNNER_TEMP/e2e"
-      # A WebGL widget outside Pluto fetches WGLMakie's script from Makie's release tag; the
-      # driver serves the installed copy at those URLs (#300).
-      - name: WebGL page outside Pluto
-        if: matrix.backend == 'webgl'
-        run: |
-          julia --color=yes --project="$MASQUE_DEV_ENV" test/e2e/standalone_webgl.jl "$RUNNER_TEMP/standalone-webgl"
-          cd test/e2e && node standalone_webgl.mjs "$RUNNER_TEMP/standalone-webgl"
       - name: Kind sweep + polish verify
         working-directory: test/e2e
         env:

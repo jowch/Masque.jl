@@ -7,6 +7,8 @@
 //
 //   node polish_verify.mjs <base-url> <notebook-abs-path> <cairo|webgl> [artifact-dir]
 import { chromium } from "playwright";
+import { PNG } from "pngjs";
+import { timedChecks } from "./check_timer.mjs";
 import { shutdownOpenSession } from "./fresh_session.mjs";
 import { surfacePoint } from "./kind_sweep_point.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -36,7 +38,7 @@ const browser = await chromium.launch({
   // silently evicted, regardless of which widgets this driver itself inspects.
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--max-active-webgl-contexts=64"],
 });
-const passed = [];
+const passed = timedChecks("polish_verify");
 const unexpected = [];
 let failed = null;
 let context, page;
@@ -112,6 +114,7 @@ try {
     await new Promise((r) => setTimeout(r, 1000));
   }
   if (!ready) throw new Error(`${backend} timed out`);
+  passed.mark("notebook ran");
 
   const inspect = (key) => page.evaluate(([k, haloCapture]) => {
     const haloOf = new Function("g", haloCapture);
@@ -293,17 +296,10 @@ try {
       const r = host.querySelector("img, canvas").getBoundingClientRect();
       return { left: r.left, top: r.top, width: r.width, height: r.height, s: r.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
     }, key);
-    const png = await page.screenshot({ clip: { x: box.left, y: box.top, width: box.width, height: box.height } });
-    const shot = await page.evaluate(async (b64) => {
-      const img = new Image();
-      img.src = `data:image/png;base64,${b64}`;
-      await img.decode();
-      const c = document.createElement("canvas");
-      c.width = img.width; c.height = img.height;
-      const cx = c.getContext("2d");
-      cx.drawImage(img, 0, 0);
-      return { w: img.width, h: img.height, data: Array.from(cx.getImageData(0, 0, img.width, img.height).data) };
-    }, png.toString("base64"));
+    const png = PNG.sync.read(await page.screenshot({ clip: { x: box.left, y: box.top, width: box.width, height: box.height } }));
+    // Decoded here, not in the page: sending millions of pixel values back from the page as an
+    // array took ~15 s per screenshot (#492). pngjs reads the same pixels.
+    const shot = { w: png.width, h: png.height, data: Array.from(png.data) };
     // Screenshot px -> image px: CSS px per screenshot px, then image px per CSS px.
     shot.perImg = shot.w / box.width * box.s;
     shot.mean = (x, y, r) => {
