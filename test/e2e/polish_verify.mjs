@@ -1,4 +1,4 @@
-// Overlay visual-fidelity driver (LOCAL — not CI). Required by
+// Overlay visual-fidelity driver, run locally and by CI's kind-sweep job. Required by
 // docs/dev/live-interaction-checklist.md together with kind_sweep.mjs.
 // Runs on the kind-sweep notebooks. Asserts wash/ring/hover (dodge fill + flat chrome edge
 // stroke)/overlay-pin, remount fade / no pulse, the split recipe on a dark figure too (not fixed
