@@ -722,6 +722,71 @@ try {
     passed.push(`${key}/control-ring-visible`);
   }
 
+  // A plot drawn with `visible = false` (#484): picking legend entry "a" fades line c and leaves
+  // the hidden line b's path alone, so the gridlines under it stay whole; hovering b's path
+  // shows nothing.
+  {
+    const key = "hidden_plot";
+    const layers = await layersOf(key);
+    const shown = layers.filter((l) => l.kind === "lines" && !l.hidden);
+    const hidden = layers.filter((l) => l.kind === "lines" && l.hidden);
+    const legend = layers.find((l) => l.links?.length);
+    if (shown.length !== 2 || hidden.length !== 1 || !legend) throw new Error(`${key}: want two shown lines, one hidden line and a legend, got ${JSON.stringify(layers.map((l) => [l.id, l.kind, !!l.hidden]))}`);
+    if (hidden[0].events.length) throw new Error(`${key}: the hidden line takes ${JSON.stringify(hidden[0].events)}`);
+    const [x0, y, x1] = hidden[0].geometry[0];
+    const [, cy] = shown[1].geometry[0].slice(0, 2);
+    const lw = hidden[0].linewidth ?? 8;
+    // The first screenshot pixel along the hidden line's path, over its drawn width, that moved.
+    const moved = (a, b) => {
+      for (let j = Math.ceil((y - lw) * a.perImg); j < (y + lw) * a.perImg; j++) {
+        for (let i = Math.ceil((x0 + 2) * a.perImg); i < (x1 - 2) * a.perImg; i++) {
+          const o = 4 * (j * a.w + i);
+          if ([0, 1, 2].some((c) => Math.abs(a.data[o + c] - b.data[o + c]) > 8)) {
+            return { x: i / a.perImg, y: j / a.perImg, was: a.data.slice(o, o + 3), now: b.data.slice(o, o + 3) };
+          }
+        }
+      }
+      return null;
+    };
+    const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const clickLegend = (k) => page.evaluate(([key, ix, iy]) => {
+      const span = document.querySelector(`#coords_${key}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      const o = { bubbles: true, composed: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, pointerId: 1, pointerType: "mouse", isPrimary: true };
+      const surface = sr.querySelector(".surface");
+      for (const t of ["pointermove", "pointerdown", "pointerup"]) surface.dispatchEvent(new PointerEvent(t, o));
+      surface.dispatchEvent(new MouseEvent("click", o));
+    }, [key, legend.geometry[4 * k], legend.geometry[4 * k + 1]]);
+    const away = () => hoverAt(key, 2, 2);
+    const mid = (x0 + x1) / 2;
+
+    await away();
+    const rest = await screenOf(key);
+    await clickLegend(0);
+    await away();
+    await page.waitForTimeout(400);
+    const kept = (await inspect(key)).kept;
+    if (!kept.includes(`${shown[0].id}:0`)) throw new Error(`${key}: clicking legend entry "a" kept ${JSON.stringify(kept)}`);
+    const picked = await screenOf(key);
+    const cRest = lum(rest.mean(mid, cy, 1)), cNow = lum(picked.mean(mid, cy, 1));
+    if (cNow - cRest < 0.4 * (255 - cRest)) throw new Error(`${key}/fade: line c reads ${cNow.toFixed(0)} with "a" picked (${cRest.toFixed(0)} at rest), want it faded`);
+    let bad = moved(rest, picked);
+    if (bad) throw new Error(`${key}/fade: the fade drew over the hidden line's path at ${JSON.stringify(bad)}`);
+    passed.push(`${key}/fade-skips-hidden`);
+
+    // The pointer on the hidden line's path finds no line: no ring, no tooltip, nothing moves.
+    const h = await hoverAt(key, mid, y);
+    if (h.show || [h.hi.fill, h.hi.edge, h.hi.plain].some((c) => c && !/masque-leave/.test(c.className ?? ""))) throw new Error(`${key}/hover: the hidden line took the pointer (tip ${JSON.stringify(h.text)})`);
+    bad = moved(picked, await screenOf(key));
+    if (bad) throw new Error(`${key}/hover: hovering the hidden line's path drew over it at ${JSON.stringify(bad)}`);
+    passed.push(`${key}/no-hover-hidden`);
+    await away();
+    await clickLegend(0); // deselect
+  }
+
   // Linked selections (#346): a pick in the left panel is drawn picked in both panels, and the
   // rest of each panel fades. Hovering an unpicked mark in the right panel outlines its partner
   // on the left with the same hover recipe as the hovered mark (dodge fill half, chrome edge)
