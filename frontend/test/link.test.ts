@@ -203,13 +203,14 @@ describe("legend links: fan-out across kinds", () => {
         move(surface, 50, 50)
         // The 2 circles go to the fade, kept; they are the legend's only closed series, so
         // nothing fades and nothing is drawn on them in g.link. 2 polyline segments (a 3-vertex
-        // polyline is 2 segments); an open kind (segments/polyline) in "selected" mode is
-        // unblended — a ring (highlight.ts's makeRing) in svg.masque-plain's g.link only, a <g>
-        // wrapping two <line>s, so each counts as one top-level g.link child = 2 <g> elements.
+        // polyline is 2 segments), each a selected halo cased along it in g.link, the two sharing
+        // one mask that keeps their bands off the lines.
         expect(fadeKept(shadow)).toEqual(["circ:0", "circ:1"])
         expect(shadow.querySelector('.masque-fade[data-axis="ax1"]')!.getAttribute("data-faded")).toBe("0")
-        const tags = [...shadow.querySelectorAll("g.link > *")].map((el) => el.tagName.toLowerCase())
-        expect(tags).toEqual(["g", "g"])
+        expect(shadow.querySelectorAll("g.link .masque-halo-line.masque-halo-selected").length).toBe(2)
+        const link = shadow.querySelector("svg.masque-edge g.link")!
+        expect(link.getAttribute("mask")).toMatch(/^url\(#masque-halo-\d+\)$/)
+        expect(shadow.querySelectorAll("g.link .masque-halo[mask]").length).toBe(0)
     })
 })
 
