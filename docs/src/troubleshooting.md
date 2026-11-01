@@ -356,9 +356,9 @@ page offline, use `backend = :cairo`. For what works outside Pluto, see
 carry a selection through a rebuild, see
 [Keep a selection when the figure rebuilds](@ref).
 
-### Adding a plot after `masque`
+### A plot added after `masque` doesn't show
 
-You can add a plot to the figure after `masque`, further down the same
+**Cause:** you can add a plot to the figure after `masque`, further down the same
 cell or in another cell, but it isn't recommended: the widget keeps
 showing the figure as it was when `masque` ran, so the new plot is
 missing, and so is a later `update!` of a plot. This holds on both
@@ -368,7 +368,7 @@ rotates it or because it has `onchange`, draws the new plot, or the
 change, at its next redraw, but a new plot may show no tooltip and take
 no clicks.
 
-Instead, make every plot in the cell that creates the figure. Changing
+**Fix:** make every plot in the cell that creates the figure. Changing
 that cell then runs the `masque` cell again, and the widget shows the
 new plot. To draw something that follows the reader's picks, such as a
 line through the selected points, create the plot before `masque` and
