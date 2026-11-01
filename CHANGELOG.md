@@ -14,6 +14,9 @@ All notable changes to this project are documented here. The format is based on
   that names `ColorbarInteractable`, instead of a Makie field error (#498).
 - After `masque(fig; backend = :webgl)`, plots can be added to the figure again. Before,
   `lines!` and the like failed with "Screen Session uninitialized" (#508).
+- The error for a figure with an `LScene` says how to get an `Axis3` instead:
+  `surface(z)`, `scatter(x, y, z)` and other 3D calls draw in an `LScene` unless given
+  `axis = (; type = Axis3)` (#521).
 
 ## [0.4.3] - 2026-10-31
 
