@@ -356,6 +356,22 @@ page offline, use `backend = :cairo`. For what works outside Pluto, see
 carry a selection through a rebuild, see
 [Keep a selection when the figure rebuilds](@ref).
 
+### A plot added after `masque` doesn't show
+
+**Cause:** the widget shows the figure as it was when `masque` ran. A
+plot added afterwards, further down the same cell or in another cell,
+is not in it, and neither is a later `update!` of a plot. This holds on
+both backends, although a WGLMakie figure shown on its own takes new
+plots in place. A widget that redraws, when the reader pans or with
+`onchange`, can draw the new plot at its next redraw, but the plot may
+show no tooltip and take no clicks.
+
+**Fix:** make every plot in the cell that creates the figure. Changing
+that cell then runs the `masque` cell again, and the widget shows the
+new plot. To draw something that follows the reader's picks, such as a
+line through the selected points, create the plot before `masque` and
+change it in `onchange`, as [Update the figure](@ref) shows.
+
 ### Hovering doesn't change the `@bind` value
 
 **Cause:** hovering shows the tooltip and highlight in the browser
