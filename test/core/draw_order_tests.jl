@@ -108,6 +108,18 @@ midpoint(a, b) = ((a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
         @test circle_hit(W, m...) == 1
     end
 
+    @testset "Axis3 scatter in markerspace = :data: the overlay picks the painted marker (#511)" begin
+        fig = Figure(; size = (500, 400))
+        ax = axis3(fig)
+        s = scatter!(ax, [front, back]; color = [:blue, :red], markerspace = :data, markersize = 0.5)
+        _, ppu, ctx = ctx_for(fig)
+        L = only(hitlayers(only(interactables(ax, s)), ctx))
+        m = midpoint(centre(L, 1), centre(L, 2))
+        c = colour_at(Makie.colorbuffer(fig; px_per_unit = ppu), m...)
+        @test isblue(c) || isred(c)
+        @test circle_hit(L, m...) == (isblue(c) ? 1 : 2)
+    end
+
     @testset "Axis3 meshscatter: Cairo paints spheres far to near (#331)" begin
         fig = Figure(; size = (500, 400))
         ax = axis3(fig)

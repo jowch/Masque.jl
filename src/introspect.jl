@@ -215,9 +215,14 @@ end
 
 function PointInteractable(ax, p::Makie.Scatter; id = :scatter, payloads = nothing, radius = nothing, colors = _resolve_scatter_colors(p), tooltip = nothing, label = _plot_label(p))
     pts = _conv(p)[1]
-    r = radius === nothing ? _marker_radius(p) : radius
-    kw = (; id, radius = r, colors, tooltip, label)
+    # On an Axis3 a data-sized marker faces the camera, so its outline is a sphere's.
+    r3 = radius === nothing && ax isa Makie.Axis3 && p.markerspace[] === :data ? _billboard_extents(p, length(pts)) : nothing
+    r = radius !== nothing ? radius : r3 !== nothing ? 9 : _marker_radius(p)
+    kw = (; id, radius = r, radius3d = r3, colors, tooltip, label)
     i = PointInteractable(ax, pts; kw..., payloads)
+    if r3 !== nothing
+        i = PointInteractable((f === :billboard ? true : getfield(i, f) for f in fieldnames(PointInteractable))...)
+    end
     # An explicit radius is the whole target; otherwise the outline adds to the marker.
     i = _with_marker_stroke(i, radius === nothing ? _stroke_width(p) : 0.0)
     p.markerspace[] === :data && return _shift_data_markers(ax, i, p.marker_offset[])
@@ -250,7 +255,7 @@ function _shift_data_markers(ax, i::PointInteractable, mo)
         Point3f(d[1], d[2], ax isa Makie.Axis3 ? d[3] : x[3])
     end
     return PointInteractable(
-        i.ax, pts, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.select,
+        i.ax, pts, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.billboard, i.select,
     )
 end
 function _marker_offset_vec(mo, n)
@@ -267,11 +272,23 @@ function _warn_no_inverse(id)
     return nothing
 end
 _with_offset(i::PointInteractable, o) = PointInteractable(
-    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, o, i.stroke, i.select,
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, o, i.stroke, i.billboard, i.select,
 )
 _with_marker_stroke(i::PointInteractable, s) = PointInteractable(
-    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, s, i.select,
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, s, i.billboard, i.select,
 )
+
+# A `markerspace = :data` scatter on an Axis3 draws camera-facing markers `markersize` wide in
+# world units, past the scene's model (which fits the limits into the axis box). A world-space
+# sphere of the marker's drawn radius has the same outline under the orthographic camera, so
+# the hit circle is that sphere's (`_world_extent_to_data` turns it into data units).
+function _billboard_extents(p, n)
+    f = _marker_extent_factor(p.marker[])
+    ms = p.markersize[]
+    ext(m) = (r = Float32(_ms_extent(m) * f / 2); Makie.Vec3f(r, r, r))
+    _per_point(ms) || return fill(ext(ms), n)
+    return Makie.Vec3f[ext(m) for m in ms]
+end
 
 # markersize is DATA-space (no markerspace attribute), so pixel radius is camera/depth-dependent;
 # normalize to per-element Vec3f half-extents (radius3d) and let hitlayers project the outline.
@@ -1271,7 +1288,7 @@ function _place(i::PointInteractable, f)
         [f.place(i.points[k], offs[k]) for k in eachindex(i.points)]
     end
     return PointInteractable(
-        i.ax, pts, i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.select,
+        i.ax, pts, i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.billboard, i.select,
     )
 end
 function _place(i::SegmentInteractable, f)
@@ -1396,6 +1413,8 @@ function _warn_skips(notes)
     return nothing
 end
 
+const _SUPPORT_PAGE = "What each axis supports: https://jowch.github.io/Masque.jl/stable/support/"
+
 # Other 2D recipes extract pixel-separable geometry that a 3D perspective projection
 # silently misaligns, and separable-edge / axis-aligned rect recipes assume Cartesian pixel
 # geometry (polar maps those into arcs and wedges). Skip loudly rather than construct.
@@ -1409,8 +1428,7 @@ function _skip_for_axis(ax, p)
         )
         _skip_note(
             "$(Makie.plotkey(p)) on Axis3 — only Scatter/Lines/LineSegments/MeshScatter/" *
-                "Wireframe/Arrows3D/ScatterLines/Surface/Text have 3D-valid extraction today; other kinds " *
-                "are roadmap scope (docs/dev/roadmap.md)"
+                "Wireframe/Arrows3D/ScatterLines/Surface/Text have 3D-valid extraction today. " * _SUPPORT_PAGE
         )
         return true
     end
@@ -1426,8 +1444,7 @@ function _skip_for_axis(ax, p)
         )
         _skip_note(
             "$(Makie.plotkey(p)) on PolarAxis — only Scatter/Lines/LineSegments/ScatterLines/" *
-                "Series have polar-valid extraction today; grid and rect recipes are roadmap " *
-                "scope (docs/dev/roadmap.md)"
+                "Series have polar-valid extraction today. " * _SUPPORT_PAGE
         )
         return true
     end

@@ -14,6 +14,10 @@ All notable changes to this project are documented here. The format is based on
   that names `ColorbarInteractable`, instead of a Makie field error (#498).
 - After `masque(fig; backend = :webgl)`, plots can be added to the figure again. Before,
   `lines!` and the like failed with "Screen Session uninitialized" (#508).
+- A `scatter!` sized in data units (`markerspace = :data`) on an `Axis3` responds to hover
+  and clicks. Before, it was skipped with a warning (#511).
+- When a plot on an `Axis3` or a `PolarAxis` is skipped, the warning links to the Supported
+  plots and axes page. Before, it pointed to a maintainer document (#511).
 
 ## [0.4.3] - 2026-10-31
 

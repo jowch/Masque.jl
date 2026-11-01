@@ -124,7 +124,8 @@ sized in data units (`markerspace = :data`) responds over each marker's
 drawn shape: a square over its square, a circle over its circle. To
 cover heatmap cells exactly, draw `marker = Rect` with `markersize = 1`;
 the `:rect` symbol draws a smaller square. Its layer has kind `:polygons`; pass `radius` to
-`interactables(plot; …)` to hit circles of that many pixels instead.
+`interactables(plot; …)` to hit circles of that many pixels instead. On an `Axis3`, the
+markers turn to face the camera, so each one responds over a circle the size of the marker.
 
 A recipe not in the table, such as `rainclouds!`, still gets each
 visible part the table knows, under that part's layer id: `rainclouds!`

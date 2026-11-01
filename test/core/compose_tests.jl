@@ -353,9 +353,9 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         @test only(masque(f, interactables(sc; radius = 5); auto = false).manifest["layers"])["kind"] == "circles"
 
         # A plot Masque can't build is skipped with a warning, and the rest still responds.
-        # An Axis3 scatter in data units has no pixel radius to derive.
+        # A scatter sized in clip space has no pixel radius to derive.
         f = Figure(); ax = Axis3(f[1, 1])
-        sc = scatter!(ax, [1.0, 2.0], [1.0, 2.0], [1.0, 2.0]; markerspace = :data, markersize = 0.3)
+        sc = scatter!(ax, [1.0, 2.0], [1.0, 2.0], [1.0, 2.0]; markerspace = :clip, markersize = 0.05)
         lines!(ax, [1.0, 2.0], [2.0, 1.0], [1.0, 1.0])
         built = @test_logs (:warn, r"skipping scatter;") match_mode = :any assemble(f)
         @test ids(built) == [:lines]
