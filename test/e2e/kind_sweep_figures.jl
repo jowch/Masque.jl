@@ -972,6 +972,18 @@ function build_kind_sweep()
         masque(fig; bind = :legend)
     end
 
+    # A plot added after the figure was shown once (#508): on WebGL, `lines!` used to throw
+    # because the first `masque` left its serialization screen on the axis scene. Shown again,
+    # the widget holds both plots. Not in kind_sweep_meta(); polish_verify.mjs checks it.
+    added_plot = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "added-plot", limits = (0, 10, 0, 10))
+        scatter!(ax, [2.0, 8.0], [8.0, 8.0]; markersize = 16)
+        masque(fig)
+        lines!(ax, [0.5, 9.5], [3.0, 3.0]; linewidth = 6)
+        masque(fig)
+    end
+
     scatter_sizes = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "scatter-sizes")
@@ -1692,7 +1704,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, arrows3d, arrows3d_shared, scatterlines3d,
+        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
