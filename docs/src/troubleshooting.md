@@ -362,9 +362,10 @@ carry a selection through a rebuild, see
 plot added afterwards, further down the same cell or in another cell,
 is not in it, and neither is a later `update!` of a plot. This holds on
 both backends, although a WGLMakie figure shown on its own takes new
-plots in place. A widget that redraws, when the reader pans or with
-`onchange`, can draw the new plot at its next redraw, but the plot may
-show no tooltip and take no clicks.
+plots in place. A widget that redraws, because the reader pans, zooms
+or rotates it or because it has `onchange`, draws the new plot, or the
+change, at its next redraw, but a new plot may show no tooltip and take
+no clicks.
 
 **Fix:** make every plot in the cell that creates the figure. Changing
 that cell then runs the `masque` cell again, and the widget shows the
