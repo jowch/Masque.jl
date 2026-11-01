@@ -19,6 +19,14 @@ All notable changes to this project are documented here. The format is based on
   `masque` isn't recommended, though: the widget may not show it. See "A plot added after
   `masque` doesn't show" in
   [Troubleshooting](https://jowch.github.io/Masque.jl/stable/troubleshooting/) (#508).
+- A `scatter!` sized in data units (`markerspace = :data`) on an `Axis3` responds to hover
+  and clicks. Before, it was skipped with a warning. One with a `marker_offset` is still
+  skipped, with a warning that says why (#511).
+- When a plot on an `Axis3` or a `PolarAxis` is skipped, the warning links to the Supported
+  plots and axes page. Before, it pointed to a maintainer document (#511).
+- The error for a figure with an `LScene` says how to get an `Axis3` instead:
+  `surface(z)`, `scatter(x, y, z)` and other 3D calls draw in an `LScene` unless given
+  `axis = (; type = Axis3)` (#521).
 
 ## [0.4.3] - 2026-10-31
 
