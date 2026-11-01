@@ -146,6 +146,19 @@ function inPlot(t: AxisTransform, x: number, y: number): boolean {
 // vertex 2s to 2s + 1, at its own x when the axis can place it, else the tread's middle.
 // null when the sample is not on screen (a NaN gap, or out of range), and with `visible`, when
 // it lies outside the plot area, past the axis limits.
+// Each drawn sample's vertex on a cut path, built once per `drawn` entry: the keyboard walks
+// every sample of a line, and a search per sample would be quadratic on a long one.
+const drawnVertices = new WeakMap<number[], Map<number, number>>()
+function drawnVertexOf(codes: number[]): Map<number, number> {
+    let m = drawnVertices.get(codes)
+    if (!m) {
+        m = new Map()
+        codes.forEach((c, k) => { if (c >= 0 && c % 2 === 0) m!.set(c / 2, k) })
+        drawnVertices.set(codes, m)
+    }
+    return m
+}
+
 export function samplePoint(layer: HitLayer, index: number, s: number, t?: AxisTransform, visible = false): { x: number; y: number } | null {
     const p = samplePosition(layer, index, s, t)
     return p && visible && t && !inPlot(t, p.x, p.y) ? null : p
@@ -157,8 +170,8 @@ function samplePosition(layer: HitLayer, index: number, s: number, t?: AxisTrans
     const at = (k: number) => (finitePair(verts[2 * k], verts[2 * k + 1]) ? { x: verts[2 * k], y: verts[2 * k + 1] } : null)
     const codes = layer.drawn?.[index]
     if (codes) { // a path cut by an Axis3's limits: the vertex that is sample s, if it is drawn
-        const k = codes.indexOf(2 * s)
-        return k < 0 ? null : at(k)
+        const k = drawnVertexOf(codes).get(s)
+        return k === undefined ? null : at(k)
     }
     if (layer.step === undefined) return at(s)
     if (layer.step !== "center") return at(2 * s)

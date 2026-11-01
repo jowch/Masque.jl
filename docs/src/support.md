@@ -53,8 +53,8 @@ A "no" in the last five rows, a scale outside that list (such as
 `Makie.pseudolog10` or `Makie.Symlog10`), or a categorical axis where ²
 requires a numeric one raises an `ArgumentError` when `masque` runs,
 instead of giving a wrong coordinate. The other "no" cells don't raise:
-a `surface!`
-is skipped with a warning. Orbiting an `Axis3` has no scale requirement.
+a `surface!` is skipped with a warning. Orbiting an `Axis3` has no
+scale requirement.
 `ViewInteractable` also raises an error when given a `Colorbar`.
 
 Legends, colorbars, and the sliders, toggles and menus of
