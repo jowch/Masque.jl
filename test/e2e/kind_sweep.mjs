@@ -1294,12 +1294,17 @@ try {
       const t = (await transformsOf(key))[layer.axis];
       const [, vy, , vh] = t.viewport;
       let st = await stamp();
-      // Down a little, then far past the top of the bar.
-      for (const [dy, what] of [[40, "drag-down"], [-400, "drag-past-end"]]) {
+      let out = await textOf(`#out_${key}`);
+      // Down a little, then up past the top of the bar (the line starts there, as the mount's
+      // frame already capped the data below it), staying on the figure: a release over the
+      // cell above lands on Pluto, which opens that cell's code and shifts the page. Each release also sets the value, and
+      // the wait for its readout keeps the page from reflowing under the next case's checks.
+      for (const [dy, what] of [[40, "drag-down"], [-30, "drag-past-end"]]) {
         const y0 = await lineY();
         const p = hitPoint(layer, 0);
         await drag(key, p.x, y0, p.x, y0 + dy, false);
         st = await waitFrame(st, what);
+        out = await waitChange(`#out_${key}`, out, `${key}/${what}`);
         let y = NaN;
         for (let i = 0; i < 20; i++) {
           y = await lineY();
@@ -1309,7 +1314,7 @@ try {
         if (!(Math.abs(y - vy) <= 1.5)) throw new Error(`${key}/${what}: line at y=${y}, want the top of the bar at ${vy.toFixed(1)} (bar ${vy.toFixed(1)}..${(vy + vh).toFixed(1)})`);
         passed.push(`${key}/${what}`);
       }
-      const v = await textOf(`#out_${key}`);
+      const v = out;
       if (!/ThresholdEvent\(:cut, value = /.test(v)) throw new Error(`${key}: value ${JSON.stringify(v)}`);
       passed.push(`${key}/value`);
       console.error(`OK  ${key} — ${v.slice(0, 100)}`);

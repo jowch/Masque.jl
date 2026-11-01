@@ -588,6 +588,14 @@ kind_sweep_meta() = [
         "control" => "cutoff", "controlStart" => 3.0, "line" => "lines", "fields" => ["cutoff", "scatter"],
     ),
     Dict(
+        # `onchange` on a colorbar threshold (#499): each frame caps the heatmap one below the
+        # cutoff, so the colorbar's range shrinks under the line. Every redraw must still land,
+        # with the line held at the end of the bar.
+        "key" => "onchange_colorbar", "layerId" => "cut", "layerKind" => "threshold",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "onchange_colorbar",
+    ),
+    Dict(
         # `onchange` (#334): the red level line sits at the threshold's value plus the number of
         # picked points, redrawn on every click and threshold drag without re-running the cell.
         # `bind = :pts`, so the drag moves the line but leaves the `@bind` value alone. The
@@ -596,14 +604,6 @@ kind_sweep_meta() = [
         "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 1,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "onchange", "field" => "*",
         "control" => "cutoff", "controlStart" => 3.0,
-    ),
-    Dict(
-        # `onchange` on a colorbar threshold (#499): each frame caps the heatmap one below the
-        # cutoff, so the colorbar's range shrinks under the line. Every redraw must still land,
-        # with the line held at the end of the bar.
-        "key" => "onchange_colorbar", "layerId" => "cut", "layerKind" => "threshold",
-        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
-        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "onchange_colorbar",
     ),
     Dict(
         # Makie blocks as controls (#345): a Slider, Toggle, IntervalSlider, Checkbox and Menu,
@@ -1757,7 +1757,7 @@ function build_kind_sweep()
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_colorbar, threshold_colorbar_h, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, legend, series_legend,
-        legend_overlap, legend_template, axis, composite, onchange, onchange_colorbar, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
+        legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
 
