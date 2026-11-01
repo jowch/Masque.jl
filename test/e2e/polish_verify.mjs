@@ -1204,7 +1204,7 @@ try {
       const b = host.querySelector("img, canvas").getBoundingClientRect();
       const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
       sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", {
-        bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: dy,
+        bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: dy, ctrlKey: true,
       }));
       // Read in the same turn as the wheel: the readout hides 150 ms after the last notch, and
       // on a loaded software-GL page two animation frames can take longer than that.

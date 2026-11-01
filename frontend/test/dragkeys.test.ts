@@ -387,6 +387,8 @@ describe("drag-layer tab stops", () => {
         const surface = shadow.querySelector(".surface") as HTMLElement
         // happy-dom's WheelEvent drops clientX/clientY, so set them on the instance.
         const we = new WheelEvent("wheel", { deltaY: -100, bubbles: true, cancelable: true })
+        // happy-dom drops ctrlKey from a WheelEvent init (#526).
+        Object.defineProperty(we, "ctrlKey", { value: true })
         Object.defineProperties(we, { clientX: { value: 300 }, clientY: { value: 200 } })
         surface.dispatchEvent(we)
         const stop = stopOf(shadow, "view")

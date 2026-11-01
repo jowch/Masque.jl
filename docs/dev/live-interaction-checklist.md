@@ -121,6 +121,11 @@ to the figure's edge. A
 resolvable per-element `colors` (today `scatter!`'s `color=`) adds a 3px tooltip accent border
 in that colour (`--masque-mark-border`); the text stays neutral.
 
+The wheel hint (#526): a plain wheel over a `wheel = :modifier` view shows "Ctrl + scroll to
+zoom" ("Cmd" on Apple platforms) in the ordinary tooltip at the pointer, with no accent, the same
+box a drag readout uses, and hides it 1.5 s after the last plain wheel. It adds no chrome of its
+own; a hover or zoom readout that replaces it keeps the tooltip.
+
 ROI chrome: 4 corner handles (7 CSS px, white fill, 1px chrome stroke, ~1.5 CSS px corner
 radius); a corner resizes two axes. The sides have no grip, but the manifest `handle` on each
 edge midpoint (8 logical px × scaling, at least 6 image px) still resizes that one edge, with the

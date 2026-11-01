@@ -1914,7 +1914,7 @@ end
 
 # ============================ ViewInteractable =============================
 """
-    ViewInteractable(ax; id=:view)
+    ViewInteractable(ax; id=:view, wheel=:modifier)
 
 Drag-to-pan and wheel zoom (2D `Axis`), or drag-to-orbit, wheel zoom and Shift+drag pan
 (`Axis3`). Produces one `:view` [`HitLayer`](@ref)
@@ -1925,6 +1925,12 @@ drag on those wins without a modifier — **Shift+drag** forces the view gesture
 # Arguments
 - `ax` — a `Makie.Axis` (pan) or `Makie.Axis3` (orbit). `id` — the layer id, used to route
   gesture-channel frame requests back to this axis. Default `:view`.
+- `wheel` — what the scroll wheel does over the axis. `:modifier` (default): Ctrl+scroll
+  (Cmd+scroll on macOS) and a trackpad pinch zoom, and a plain scroll scrolls the page, with a
+  short hint saying how to zoom. `:always`: any scroll over the axis zooms it and the page
+  stays put (Masque 0.4). `:none`: the wheel never zooms; `+`/`-` still do from the keyboard.
+  Left out, an axis whose scroll zoom is turned off in Makie (`deregister_interaction!(ax,
+  :scrollzoom)`, or both `xzoomlock` and `yzoomlock`) gets `:none`.
 
 **Commits nothing.** A camera is operational state, not an analysis value a notebook reads
 (docs/dev/architecture/12-gesture-channel.md §12.3) — the bond `masque` returns never carries a
@@ -1953,8 +1959,29 @@ ViewInteractable(ax)
 """
 struct ViewInteractable <: AbstractInteractable
     ax; id::Symbol
+    wheel::Union{Symbol, Nothing} # `nothing`: follow Makie's own scroll zoom, see `_view_wheel`
 end
-ViewInteractable(ax; id = :view) = ViewInteractable(ax, id)
+const _WHEEL_MODES = (:modifier, :always, :none)
+function ViewInteractable(ax; id = :view, wheel = nothing)
+    wheel === nothing || wheel in _WHEEL_MODES ||
+        throw(ArgumentError("ViewInteractable: wheel = $(repr(wheel)) is not one of :modifier, :always or :none."))
+    return ViewInteractable(ax, id, wheel)
+end
+# The wheel policy a view ships. An explicit `wheel` wins. Without one, an axis whose scroll
+# zoom the author turned off in Makie, with `deregister_interaction!(ax, :scrollzoom)` or (2D)
+# both `xzoomlock` and `yzoomlock`, doesn't zoom on the wheel either; any other axis takes the
+# Masque default, `:modifier` (#526).
+function _view_wheel(i::ViewInteractable)
+    i.wheel === nothing || return i.wheel
+    ax = i.ax
+    if hasproperty(ax, :interactions) && !haskey(ax.interactions, :scrollzoom)
+        return :none
+    end
+    if ax isa Makie.Axis && ax.xzoomlock[] && ax.yzoomlock[]
+        return :none
+    end
+    return :modifier
+end
 events(::ViewInteractable) = (:drag,)
 function validate(i::ViewInteractable, ctx::InteractionContext)
     i.ax isa Makie.Legend && return "ViewInteractable: ax is a Legend, not an Axis/Axis3 — a legend has no pan/orbit view."
@@ -2040,6 +2067,7 @@ function hitlayers(i::ViewInteractable, ctx)
         "x" => Float32(vx), "y" => Float32(vy),
         "w" => Float32(vw), "h" => Float32(vh),
         "mode" => t.is3d ? "orbit" : "pan",
+        "wheel" => String(_view_wheel(i)),
     )
     if !t.is3d && i.ax isa Makie.Axis
         geom["clip"], geom["fill"] = _pan_window(ctx, i.ax)

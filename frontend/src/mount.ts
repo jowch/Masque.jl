@@ -1,7 +1,7 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, surfaceSelection } from "./selection"
 import { emptyMask, maskHit } from "./gridmask"
-import { applyMove, onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip, replaceTip } from "./hover"
+import { applyMove, onLeave, hideTip, setMarkAccent, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip, replaceTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
 import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
@@ -24,7 +24,7 @@ import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx
 import type { HiGroups, HiSet, OverlayCtx } from "./state"
 import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
 import { axisFrame, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
-import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_IDLE_MS } from "./photo"
+import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_HINT_MS, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
 
 // Keys held for a Cmd/Ctrl/Shift/Alt-click; pressing one is not keyboard use.
@@ -1233,6 +1233,23 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         focusTo(ctx, state, null)
     }
 
+    // The hint wears the tooltip, so it follows the figure's tooltip theme. It hides only
+    // itself: a hover or zoom readout that has replaced it keeps the tooltip.
+    const wheelHint = () => `${isApplePlatform() ? "Cmd" : "Ctrl"} + scroll to zoom`
+    const showWheelHint = (e: WheelEvent) => {
+        const text = wheelHint()
+        setTipText(ctx, state, text)
+        setMarkAccent(ctx, null)
+        setTipVisible(ctx, true)
+        const tp = tipOffset(ctx, e)
+        placeTip(ctx, state, tp.x, tp.y)
+        if (state.wheelHintTimer_ !== null) clearTimeout(state.wheelHintTimer_)
+        state.wheelHintTimer_ = setTimeout(() => {
+            state.wheelHintTimer_ = null
+            if (state.tipHtml_ === text) hideTip(ctx, state)
+        }, WHEEL_HINT_MS)
+    }
+
     const onWheel = (e: WheelEvent) => {
         if (state.drag_) return
         // The axis viewport is in layout pixels. The zoom anchor is the content pixel
@@ -1241,6 +1258,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         let id = ""
         let axis = ""
         let limits3: Limits3 | null = null // an Axis3 view's limits, on screen now
+        let wheel: ViewGeometry["wheel"] = "modifier"
         for (const layer of ctx.manifest_.layers) {
             if (layer.kind !== "view" || !layer.events.includes("drag")) continue
             const g = layer.geometry as ViewGeometry
@@ -1249,14 +1267,23 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                 if (!g.limits) continue
                 id = layer.id
                 limits3 = g.limits
+                wheel = g.wheel ?? "modifier"
                 break
             }
             if (!ctx.manifest_.transforms[layer.axis]) continue
             id = layer.id
             axis = layer.axis
+            wheel = g.wheel ?? "modifier"
             break
         }
         if (!id) return
+        // #526: a plain wheel scrolls the page unless the view asked for `wheel = :always`.
+        // A trackpad pinch arrives as Ctrl+wheel in Chrome and Firefox, so it still zooms.
+        if (wheel === "none") return
+        if (wheel === "modifier" && !e.ctrlKey && !e.metaKey) {
+            showWheelHint(e)
+            return
+        }
         e.preventDefault()
         if (limits3) {
             const shown = limits3
@@ -1353,6 +1380,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         if (state.announceTimer_ != null) clearTimeout(state.announceTimer_)
         if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
         state.wheelTimer_ = null
+        if (state.wheelHintTimer_ !== null) clearTimeout(state.wheelHintTimer_)
+        state.wheelHintTimer_ = null
         state.photo_ = IDENTITY
         paintPhoto(IDENTITY)
         channel.dispose() // abandon anything in flight — a late response must not touch a dead DOM

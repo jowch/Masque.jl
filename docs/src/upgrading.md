@@ -6,6 +6,20 @@ break a call. The
 [changelog](https://github.com/jowch/Masque.jl/blob/main/CHANGELOG.md)
 has every change.
 
+## From 0.4 to 0.5
+
+On a plot with a [`ViewInteractable`](@ref), scrolling over the plot
+scrolls the page instead of zooming. To zoom, hold Ctrl (Cmd on a Mac)
+while scrolling, or pinch on a trackpad. To zoom on a plain scroll as
+0.4 did, pass `wheel = :always`:
+
+| 0.4 | 0.5 |
+|---|---|
+| `ViewInteractable(ax)`: scroll zooms | `ViewInteractable(ax)`: Ctrl+scroll or a pinch zooms, scroll moves the page |
+| | `ViewInteractable(ax; wheel = :always)`: scroll zooms |
+
+See [Pan and zoom a 2D axis](@ref).
+
 ## From 0.3 to 0.4
 
 Masque 0.4 changes two things a 0.3 notebook can notice, besides

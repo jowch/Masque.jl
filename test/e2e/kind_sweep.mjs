@@ -472,6 +472,43 @@ try {
     return null;
   };
 
+  // #526: on a default `wheel = :modifier` view a plain wheel scrolls the page, leaves the view
+  // alone, and shows the "Ctrl + scroll to zoom" hint in the tooltip. A real wheel (no
+  // modifier) at the view's center; scrolls up instead when the page is near its bottom.
+  const plainWheelScrolls = async (key, g, what) => {
+    if ((g.wheel ?? "modifier") !== "modifier") throw new Error(`${key}: expected the default wheel = modifier, got ${JSON.stringify(g.wheel)}`);
+    const at = await page.evaluate(([k, ix, iy]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      const se = document.scrollingElement;
+      return { x: b.left + ix * s, y: b.top + iy * s, top: se.scrollTop, room: se.scrollHeight - se.clientHeight - se.scrollTop, photo: host.dataset.masquePhoto || "" };
+    }, [key, g.x + g.w / 2, g.y + g.h / 2]);
+    await page.mouse.move(at.x, at.y);
+    const dy = at.room > 300 ? 200 : -200;
+    await page.mouse.wheel(0, dy);
+    await new Promise((r) => setTimeout(r, 150));
+    const after = await page.evaluate(([k]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const tip = sr.querySelector(".masque-tip");
+      return { top: document.scrollingElement.scrollTop, photo: host.dataset.masquePhoto || "", tip: tip?.textContent ?? "", shown: !!tip?.classList.contains("show") };
+    }, [key]);
+    if (Math.sign(after.top - at.top) !== Math.sign(dy)) throw new Error(`${key}-wheel: a plain wheel over the ${what} view did not scroll the page (${at.top} -> ${after.top})`);
+    if (after.photo !== at.photo) throw new Error(`${key}-wheel: a plain wheel zoomed the ${what} view (${JSON.stringify(after.photo)})`);
+    if (!after.shown || !/^(Ctrl|Cmd) \+ scroll to zoom$/.test(after.tip)) throw new Error(`${key}-wheel: no zoom hint after a plain wheel: ${JSON.stringify(after)}`);
+    await page.mouse.move(1, 1);
+    await dispatchAt(key, 1, 1, "pointermove");
+    // Let the hint lapse so later checks start from a hidden tooltip.
+    await new Promise((r) => setTimeout(r, 1700));
+    passed.push(`${key}/plain-wheel-scrolls`);
+    console.error(`OK  ${key} — a plain wheel scrolled the page by ${after.top - at.top} px and showed "${after.tip}"`);
+  };
+
   const dispatchAt = async (key, x, y, type, mod = {}) => page.evaluate(async ([k, ix, iy, typ, md, haloCapture]) => {
     const span = document.querySelector(`#coords_${k}`);
     const hosts = [...document.querySelectorAll(".ip-host")];
@@ -1951,7 +1988,7 @@ try {
           let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
           const b = host.querySelector("img, canvas").getBoundingClientRect();
           const sc = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
-          sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * sc, clientY: b.top + iy * sc, deltaY: -300 }));
+          sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * sc, clientY: b.top + iy * sc, deltaY: -300, ctrlKey: true }));
         }, [key, vg.x + vg.w / 2, vg.y + vg.h / 2]);
         for (let i = 0; i < tries; i++) {
           await new Promise((r) => setTimeout(r, delayMs));
@@ -2013,6 +2050,7 @@ try {
       const g = layer.geometry;
       const lim0 = g.limits;
       if (!Array.isArray(lim0) || lim0.length !== 6) throw new Error(`${key}: view geometry has no Axis3 limits: ${JSON.stringify(g)}`);
+      await plainWheelScrolls(key, g, "Axis3");
       const s0 = await stamp3();
       const prevented = await page.evaluate(([k, ix, iy]) => {
         const span = document.querySelector(`#coords_${k}`);
@@ -2021,11 +2059,11 @@ try {
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         const b = host.querySelector("img, canvas").getBoundingClientRect();
         const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
-        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -600 });
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -600, ctrlKey: true });
         sr.querySelector(".surface").dispatchEvent(ev);
         return ev.defaultPrevented;
       }, [key, g.x + g.w / 2, g.y + g.h / 2]);
-      if (!prevented) throw new Error(`${key}-wheel: the wheel was not taken by the Axis3 view`);
+      if (!prevented) throw new Error(`${key}-wheel: the Ctrl+wheel was not taken by the Axis3 view`);
       const w = (l, i) => l[2 * i + 1] - l[2 * i];
       const zs = await waitStamp(s0, "wheel", (st) => Array.isArray(st.limits) && [0, 1, 2].every((i) => w(st.limits, i) < 0.75 * w(lim0, i)));
       passed.push(`${key}/wheel-zoom`);
@@ -2126,6 +2164,7 @@ try {
       }
 
       if (layer.geometry && layer.geometry.mode === "pan") {
+        await plainWheelScrolls(key, layer.geometry, "pan");
         // #379: a mark on each axis off the pan axis. The drag above moved a linked axis's
         // marks off this page's manifest, so there the probe is its pick's ring, which the
         // overlay draws where that axis now has the mark; an unlinked axis's first mark has not
@@ -2150,7 +2189,7 @@ try {
           const s = b.width / vb.width;
           const ev = new WheelEvent("wheel", {
             bubbles: true, cancelable: true,
-            clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -120,
+            clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -120, ctrlKey: true,
           });
           surface.dispatchEvent(ev);
           const base = host.querySelector("img, canvas");

@@ -1,7 +1,8 @@
 # Pan, zoom and orbit
 
 Add a [`ViewInteractable`](@ref) to an axis to look closer: drag a 2D
-plot to pan it, scroll to zoom, or drag an `Axis3` to turn it. Moving
+plot to pan it, Ctrl+scroll (Cmd+scroll on a Mac) or pinch to zoom, or
+drag an `Axis3` to turn it. Moving
 the view does not change the `@bind` value, so cells that use it do not
 respond.
 
@@ -41,10 +42,23 @@ end
 @bind pick masque(fig, pan; bind = s)
 ```
 
-Drag the plot to pan, and scroll to zoom around the pointer. The axis
-frame stays in place while the data moves inside it, and you can hover
-over and click the points wherever they move to. `pick` changes only
-when you click a point, and the view has no field of its own.
+Drag the plot to pan. To zoom around the pointer, hold Ctrl (Cmd on a
+Mac) while you scroll, or pinch on a trackpad. A plain scroll over the
+plot scrolls the page and shows a short hint saying how to zoom. The
+axis frame stays in place while the data moves inside it, and you can
+hover over and click the points wherever they move to. `pick` changes
+only when you click a point, and the view has no field of its own.
+
+To zoom on a plain scroll instead, pass `wheel = :always`. The page then
+stops scrolling while the pointer is over the plot. `wheel = :none`
+turns wheel zoom off, and `+` / `-` still zoom from the keyboard. If you
+turned scroll zoom off in Makie, with `deregister_interaction!(ax,
+:scrollzoom)` or both `xzoomlock` and `yzoomlock`, the wheel does not
+zoom unless you pass `wheel`:
+
+```julia
+pan = ViewInteractable(ax; wheel = :always)
+```
 
 Panning and orbiting need a running notebook, so in a static HTML
 export the view does not move. The two backends show the moving view
@@ -115,8 +129,9 @@ end
 @bind pick masque(fig, orbit)
 ```
 
-Scroll to zoom in or out around the middle of the axis box, and
-Shift+drag to pan. The box keeps its size while the data grows or slides
+Ctrl+scroll (Cmd+scroll on a Mac) or pinch to zoom in or out around the
+middle of the axis box, and Shift+drag to pan. `wheel` works as it does
+on a 2D axis. The box keeps its size while the data grows or slides
 inside it, and marks that leave the box are hidden and no longer respond
 to hover or clicks. A line that crosses the edge of the box still
 responds along the part you can see. A sphere from `meshscatter` stops

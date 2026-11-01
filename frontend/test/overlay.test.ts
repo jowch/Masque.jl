@@ -4328,6 +4328,8 @@ describe("photographic pan / wheel zoom", () => {
         const ev = new WheelEvent("wheel", {
             bubbles: true, cancelable: true, deltaY, ctrlKey: true,
         })
+        // happy-dom drops ctrlKey from a WheelEvent init (#526).
+        Object.defineProperty(ev, "ctrlKey", { value: true })
         Object.defineProperty(ev, "clientX", { value: 300 })
         Object.defineProperty(ev, "clientY", { value: 200 })
         surface.dispatchEvent(ev)
@@ -4892,6 +4894,115 @@ describe("photographic pan / wheel zoom", () => {
         expect(host.dataset.masquePhoto).toBe("")
     })
 
+    // #526: what a wheel does depends on the view's `wheel` policy.
+    const plainWheel = (surface: HTMLElement, mods: { ctrlKey?: boolean; metaKey?: boolean } = {}) => {
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -120 })
+        Object.defineProperty(ev, "ctrlKey", { value: mods.ctrlKey ?? false })
+        Object.defineProperty(ev, "metaKey", { value: mods.metaKey ?? false })
+        Object.defineProperty(ev, "clientX", { value: 300 })
+        Object.defineProperty(ev, "clientY", { value: 200 })
+        surface.dispatchEvent(ev)
+        return ev
+    }
+    const withWheel = (mode: "pan" | "orbit", wheel?: "modifier" | "always" | "none"): Manifest => {
+        const m = viewManifest(mode)
+        const g = m.layers[0].geometry as unknown as Record<string, unknown>
+        if (wheel) g.wheel = wheel
+        if (mode === "orbit") Object.assign(g, { azimuth: 0.4, elevation: 0.5, limits: [0, 10, 0, 10, 0, 10] })
+        return m
+    }
+
+    for (const mode of ["pan", "orbit"] as const) {
+        it(`${mode}: with wheel = modifier (and by default) a plain wheel scrolls the page and shows a hint`, async () => {
+            vi.useFakeTimers()
+            try {
+                for (const wheel of ["modifier", undefined] as const) {
+                    const { host, script } = setup()
+                    const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+                    mount(script, withWheel(mode, wheel), undefined, requestFrame)
+                    const shadow = shadowOf(host)
+                    const surface = shadow.querySelector(".surface") as HTMLElement
+                    const tip = shadow.querySelector(".masque-tip") as HTMLElement
+                    const ev = plainWheel(surface)
+                    expect(ev.defaultPrevented).toBe(false)
+                    expect(host.dataset.masquePhoto ?? "").toBe("")
+                    expect(tip.textContent).toMatch(/^(Ctrl|Cmd) \+ scroll to zoom$/)
+                    expect(tip.classList.contains("show")).toBe(true)
+                    await vi.advanceTimersByTimeAsync(2000)
+                    expect(tip.classList.contains("show")).toBe(false)
+                    expect(requestFrame).not.toHaveBeenCalled()
+                }
+            } finally {
+                vi.useRealTimers()
+            }
+        })
+
+        it(`${mode}: with wheel = modifier, Ctrl+wheel (a trackpad pinch) and Cmd+wheel zoom`, async () => {
+            for (const mods of [{ ctrlKey: true }, { metaKey: true }]) {
+                const { host, script } = setup()
+                const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+                mount(script, withWheel(mode, "modifier"), undefined, requestFrame)
+                const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+                const ev = plainWheel(surface, mods)
+                expect(ev.defaultPrevented).toBe(true)
+                await Promise.resolve()
+                expect(requestFrame).toHaveBeenCalled()
+            }
+        })
+
+        it(`${mode}: with wheel = always a plain wheel zooms`, async () => {
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+            mount(script, withWheel(mode, "always"), undefined, requestFrame)
+            const shadow = shadowOf(host)
+            const surface = shadow.querySelector(".surface") as HTMLElement
+            const ev = plainWheel(surface)
+            expect(ev.defaultPrevented).toBe(true)
+            expect((shadow.querySelector(".masque-tip") as HTMLElement).textContent).not.toMatch(/scroll to zoom/)
+            await Promise.resolve()
+            expect(requestFrame).toHaveBeenCalled()
+        })
+
+        it(`${mode}: with wheel = none no wheel zooms and no hint shows`, async () => {
+            for (const mods of [{}, { ctrlKey: true }, { metaKey: true }]) {
+                const { host, script } = setup()
+                const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+                mount(script, withWheel(mode, "none"), undefined, requestFrame)
+                const shadow = shadowOf(host)
+                const surface = shadow.querySelector(".surface") as HTMLElement
+                const ev = plainWheel(surface, mods)
+                expect(ev.defaultPrevented).toBe(false)
+                expect(host.dataset.masquePhoto ?? "").toBe("")
+                expect((shadow.querySelector(".masque-tip") as HTMLElement).classList.contains("show")).toBe(false)
+                await Promise.resolve()
+                expect(requestFrame).not.toHaveBeenCalled()
+            }
+        })
+    }
+
+    it("the wheel hint hides only itself: a hover readout that replaced it stays", async () => {
+        vi.useFakeTimers()
+        try {
+            const { host, script } = setup()
+            mount(script, withWheel("pan", "modifier"), undefined, vi.fn(async () => ({})))
+            const shadow = shadowOf(host)
+            const surface = shadow.querySelector(".surface") as HTMLElement
+            const tip = shadow.querySelector(".masque-tip") as HTMLElement
+            plainWheel(surface)
+            expect(tip.textContent).toMatch(/scroll to zoom/)
+            // A Ctrl+wheel zoom replaces the hint with its limits readout. Notches every 100 ms
+            // keep that readout up past the hint's own timer, which must leave it alone.
+            for (let t = 0; t < 2000; t += 100) {
+                plainWheel(surface, { ctrlKey: true })
+                await vi.advanceTimersByTimeAsync(100)
+                expect(tip.textContent).not.toMatch(/scroll to zoom/)
+                expect(tip.classList.contains("show")).toBe(true)
+            }
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it("a second wheel notch stays on the cursor", () => {
         const { host, script } = setup()
         mount(script, viewManifest("pan"), undefined, vi.fn(async () => ({})))
@@ -4901,6 +5012,8 @@ describe("photographic pan / wheel zoom", () => {
         const layout = { x: 100 / 600 * 1200, y: 200 / 400 * 800 }
         const content = unmapPoint({ s: mid[0], tx: mid[1], ty: mid[2] }, layout)
         const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -120 })
+        // happy-dom drops ctrlKey from a WheelEvent init (#526).
+        Object.defineProperty(ev, "ctrlKey", { value: true })
         Object.defineProperty(ev, "clientX", { value: 100 })
         Object.defineProperty(ev, "clientY", { value: 200 })
         surface.dispatchEvent(ev)
@@ -5204,6 +5317,8 @@ describe("photographic pan / wheel zoom", () => {
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
         const zoom = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -800 })
+        // happy-dom drops ctrlKey from a WheelEvent init (#526).
+        Object.defineProperty(zoom, "ctrlKey", { value: true })
         Object.defineProperty(zoom, "clientX", { value: 100 })
         Object.defineProperty(zoom, "clientY", { value: 100 })
         surface.dispatchEvent(zoom)
@@ -5251,6 +5366,8 @@ describe("photographic pan / wheel zoom", () => {
             mount(script, make(), undefined, vi.fn(async () => ({})))
             const surface = shadowOf(host).querySelector(".surface") as HTMLElement
             const zoom = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -405 })
+            // happy-dom drops ctrlKey from a WheelEvent init (#526).
+            Object.defineProperty(zoom, "ctrlKey", { value: true })
             Object.defineProperty(zoom, "clientX", { value: 250 })
             Object.defineProperty(zoom, "clientY", { value: 250 })
             surface.dispatchEvent(zoom)
@@ -5339,6 +5456,8 @@ describe("photographic pan / wheel zoom", () => {
         mount(script, m, undefined, vi.fn(async () => ({})))
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
         const zoom = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -693 })
+        // happy-dom drops ctrlKey from a WheelEvent init (#526).
+        Object.defineProperty(zoom, "ctrlKey", { value: true })
         Object.defineProperty(zoom, "clientX", { value: 200 })
         Object.defineProperty(zoom, "clientY", { value: 100 })
         surface.dispatchEvent(zoom)

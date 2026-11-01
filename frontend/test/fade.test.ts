@@ -183,6 +183,8 @@ describe("the fade (closed-mark selected look)", () => {
         const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]), manifest: withFields(next) }))
         const { img, surface, wrap } = setup(m, requestFrame)
         const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -120, ctrlKey: true })
+        // happy-dom drops ctrlKey from a WheelEvent init (#526).
+        Object.defineProperty(ev, "ctrlKey", { value: true })
         Object.defineProperty(ev, "clientX", { value: 300 })
         Object.defineProperty(ev, "clientY", { value: 200 })
         surface.dispatchEvent(ev)
