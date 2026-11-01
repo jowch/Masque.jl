@@ -356,18 +356,19 @@ page offline, use `backend = :cairo`. For what works outside Pluto, see
 carry a selection through a rebuild, see
 [Keep a selection when the figure rebuilds](@ref).
 
-### A plot added after `masque` doesn't show
+### Adding a plot after `masque`
 
-**Cause:** the widget shows the figure as it was when `masque` ran. A
-plot added afterwards, further down the same cell or in another cell,
-is not in it, and neither is a later `update!` of a plot. This holds on
-both backends, although a WGLMakie figure shown on its own takes new
-plots in place. A widget that redraws, because the reader pans, zooms
-or rotates it or because it has `onchange`, draws the new plot, or the
+You can add a plot to the figure after `masque`, further down the same
+cell or in another cell, but it isn't recommended: the widget keeps
+showing the figure as it was when `masque` ran, so the new plot is
+missing, and so is a later `update!` of a plot. This holds on both
+backends, although a WGLMakie figure shown on its own takes new plots
+in place. A widget that redraws, because the reader pans, zooms or
+rotates it or because it has `onchange`, draws the new plot, or the
 change, at its next redraw, but a new plot may show no tooltip and take
 no clicks.
 
-**Fix:** make every plot in the cell that creates the figure. Changing
+Instead, make every plot in the cell that creates the figure. Changing
 that cell then runs the `masque` cell again, and the widget shows the
 new plot. To draw something that follows the reader's picks, such as a
 line through the selected points, create the plot before `masque` and
