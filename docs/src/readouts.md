@@ -213,10 +213,27 @@ end
 "$(count(>(level.value), z)) of $(length(z)) cells above $(round(level.value; digits = 2))"
 ```
 
+```@raw html
+<video id="masque-readout-colorbar-threshold-clip" title="Dragging a cutoff down and then up a colorbar while the readout counts the heatmap cells above it, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-readout-colorbar-threshold-clip");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "readout-colorbar-threshold.mp4";
+})();
+</script>
+```
+
 The line runs across the bar, so leave `orientation` out: it is
 horizontal on a vertical colorbar and vertical on a horizontal one.
 `value` must lie inside the colorbar's limits. Hovering the bar away
-from the line still shows the value under the pointer.
+from the line still shows the value under the pointer. With `onchange`
+(see [Update the figure](@ref)), a redraw that moves the colorbar's
+limits past the line leaves the line at the end of the bar until you
+drag it.
 
 ## Supported axes
 

@@ -2110,8 +2110,9 @@ value is in the colorbar's units, the same ones a [`ColorbarInteractable`](@ref)
 a data value — inversion is undefined), a `PolarAxis` (a straight line is neither a constant r nor
 a constant θ), or a `Legend`; if the dragged scale isn't client-invertible (`:horizontal` needs
 the y-scale, `:vertical` the x-scale, a `Colorbar` its own scale; supported: `identity`,
-`log10`, `log`); or, on a `Colorbar`, if `orientation` runs along the bar instead of across it
-or `value` lies outside the colorbar's limits.
+`log10`, `log`); or, on a `Colorbar`, if `orientation` runs along the bar instead of across it.
+On a `Colorbar`, a `value` outside the colorbar's limits raises `ArgumentError` here. If an
+`onchange` later moves the limits past the line, the line waits at the end of the bar.
 
 # Examples
 ```julia
@@ -2131,7 +2132,25 @@ ThresholdInteractable(ax, orientation::Symbol, value::Real, id::Symbol) = Thresh
 function ThresholdInteractable(ax; orientation = _threshold_orientation(ax), value, id = :threshold, update_while_dragging::Bool = true)
     orientation in (:horizontal, :vertical) ||
         throw(ArgumentError("ThresholdInteractable: orientation must be :horizontal or :vertical, got $(orientation)"))
-    return ThresholdInteractable(ax, orientation, _threshold_value(value), id, update_while_dragging)
+    v = _threshold_value(value)
+    ax isa Makie.Colorbar && _check_on_bar(ax, v)
+    return ThresholdInteractable(ax, orientation, v, id, update_while_dragging)
+end
+# Only the value the author writes is held to the colorbar's limits, as they are when it is
+# written. A value the browser sends back can sit a rounding error past the end of the bar, and
+# an `onchange` can move the limits under the line; a redraw then draws the line at the end of
+# the bar instead (`_colorbar_pos`).
+function _check_on_bar(cb, v)
+    lims = cb.limits[]
+    lims === nothing && return nothing
+    lo, hi = minmax(Float64(lims[1]), Float64(lims[2]))
+    lo <= v <= hi || throw(
+        ArgumentError(
+            "ThresholdInteractable: value = $(v) is outside the colorbar's limits ($(lo), $(hi)), " *
+                "so the line would sit off the bar. Pick a value inside them."
+        )
+    )
+    return nothing
 end
 # Across the bar on a colorbar; a horizontal line everywhere else.
 _threshold_orientation(ax) = ax isa Makie.Colorbar && !ax.vertical[] ? :vertical : :horizontal
@@ -2158,18 +2177,16 @@ function _validate_colorbar_threshold(i, t)
     sc = vertical ? t.yscale : t.xscale
     sc in _JS_INVERTIBLE || return "ThresholdInteractable: the colorbar's scale $(sc) is not " *
         "invertible client-side; supported: identity/log10/log."
-    lo, hi = minmax((vertical ? t.ylims : t.xlims)...)
-    lo <= i.value <= hi || return "ThresholdInteractable: value = $(i.value) is outside the " *
-        "colorbar's limits ($(lo), $(hi)), so the line would sit off the bar. Pick a value inside them."
     return nothing
 end
-# The pixel along a colorbar's value axis where `v` sits, the way geometry.ts `projectAxis` puts it.
+# The pixel along a colorbar's value axis where `v` sits, the way geometry.ts `projectAxis` puts
+# it, held to the bar.
 function _colorbar_pos(t, v)
     vx, vy, vw, vh = t.viewport
     vertical = t.valueaxis === :y
     lims = vertical ? t.ylims : t.xlims
     f = (vertical ? t.yscale : t.xscale) === :identity ? identity : log10
-    frac = (f(v) - f(lims[1])) / (f(lims[2]) - f(lims[1]))
+    frac = clamp((f(v) - f(lims[1])) / (f(lims[2]) - f(lims[1])), 0.0, 1.0)
     return vertical ? vy + (1 - frac) * vh : vx + frac * vw
 end
 function hitlayers(i::ThresholdInteractable, ctx)

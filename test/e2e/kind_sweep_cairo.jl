@@ -565,6 +565,17 @@ HTML(
         "<span id=\"axes_threshold_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar_h.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000188
+@bind ev_onchange_colorbar sweep.onchange_colorbar
+
+# ╔═╡ c1000000-0000-0000-0000-000000000189
+HTML(
+    "<span id=\"out_onchange_colorbar\">ONCHANGE_COLORBAR=$(sweep_field("onchange_colorbar", ev_onchange_colorbar))</span>" *
+        "<span id=\"bond_onchange_colorbar\" style=\"display:none\">$(repr(ev_onchange_colorbar))</span>" *
+        "<span id=\"coords_onchange_colorbar\" style=\"display:none\">$(JSON3.write(sweep.onchange_colorbar.manifest["layers"]))</span>" *
+        "<span id=\"axes_onchange_colorbar\" style=\"display:none\">$(JSON3.write(sweep.onchange_colorbar.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000119
 @bind ev_colorbar_owner sweep.colorbar_owner
 
@@ -1036,6 +1047,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000128
 # ╠═c1000000-0000-0000-0000-000000000160
 # ╠═c1000000-0000-0000-0000-000000000161
+# ╠═c1000000-0000-0000-0000-000000000188
+# ╟─c1000000-0000-0000-0000-000000000189
 # ╠═c1000000-0000-0000-0000-000000000170
 # ╠═c1000000-0000-0000-0000-000000000171
 # ╠═c1000000-0000-0000-0000-000000000129

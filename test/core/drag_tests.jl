@@ -75,10 +75,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         msg = validate(ThresholdInteractable(cb; orientation = :vertical, value = 4.0), ctx)
         @test msg isa String && occursin("vertical colorbar takes a horizontal line", msg) && occursin("Leave orientation out", msg)
         @test validate(ThresholdInteractable(cbh; orientation = :horizontal, value = 4.0), ctxh) isa String
-        msg = validate(ThresholdInteractable(cb; value = 99.0), ctx)
-        @test msg isa String && occursin("outside the colorbar's limits", msg)
-        err = (@test_throws ArgumentError masque(fig, (cut = ThresholdInteractable(cb; value = -5.0),))).value
+        # The value the author writes must lie on the bar; a value the browser sends back is not
+        # held to it (see the onchange tests).
+        err = (@test_throws ArgumentError ThresholdInteractable(cb; value = 99.0)).value
         @test occursin("outside the colorbar's limits", err.msg)
+        @test_throws ArgumentError ThresholdInteractable(cbh; value = -5.0)
+        @test validate(ThresholdInteractable(cb, :horizontal, 99.0, :cut), ctx) === nothing
 
         # A log colorbar puts the line where the browser's inversion reads the value back.
         figl = Figure(); axl = Axis(figl[1, 1])

@@ -1265,6 +1265,57 @@ try {
       continue;
     }
 
+    // `onchange` on a colorbar threshold (#499): the frame caps the heatmap one below the cutoff,
+    // so the colorbar's range ends below the line on every frame. Each drag must still bring a
+    // settled frame (a failed one never stamps), and the line must sit on the bar, at its top end.
+    if (spec.mode === "onchange_colorbar") {
+      const stamp = async () => {
+        const raw = await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          return host?.dataset.masqueGestureFrame ?? "";
+        }, key);
+        return raw ? JSON.parse(raw) : null;
+      };
+      const waitFrame = async (after, what) => {
+        for (let i = 0; i < (backend === "webgl" ? 60 : 40); i++) {
+          await new Promise((r) => setTimeout(r, 250));
+          const st = await stamp();
+          if (st && st.onchange && st.settle && st.n > (after?.n ?? 0)) return st;
+        }
+        throw new Error(`${key}/${what}: no settled onchange frame after ${JSON.stringify(after)}`);
+      };
+      const lineY = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        return Number(sr.querySelector(".masque-threshold-line")?.getAttribute("y1"));
+      }, key);
+      const t = (await transformsOf(key))[layer.axis];
+      const [, vy, , vh] = t.viewport;
+      let st = await stamp();
+      // Down a little, then far past the top of the bar.
+      for (const [dy, what] of [[40, "drag-down"], [-400, "drag-past-end"]]) {
+        const y0 = await lineY();
+        const p = hitPoint(layer, 0);
+        await drag(key, p.x, y0, p.x, y0 + dy, false);
+        st = await waitFrame(st, what);
+        let y = NaN;
+        for (let i = 0; i < 20; i++) {
+          y = await lineY();
+          if (Math.abs(y - vy) <= 1.5) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        if (!(Math.abs(y - vy) <= 1.5)) throw new Error(`${key}/${what}: line at y=${y}, want the top of the bar at ${vy.toFixed(1)} (bar ${vy.toFixed(1)}..${(vy + vh).toFixed(1)})`);
+        passed.push(`${key}/${what}`);
+      }
+      const v = await textOf(`#out_${key}`);
+      if (!/ThresholdEvent\(:cut, value = /.test(v)) throw new Error(`${key}: value ${JSON.stringify(v)}`);
+      passed.push(`${key}/value`);
+      console.error(`OK  ${key} — ${v.slice(0, 100)}`);
+      continue;
+    }
+
     // `select = :many` (#335, #358): a click adds a pick or takes it out, with or without Ctrl
     // (Linux Chromium, so Ctrl rather than Cmd), a click on empty plot space keeps them (#384),
     // and Escape on the focused figure clears them. Each step checks the printed `@bind` value,
