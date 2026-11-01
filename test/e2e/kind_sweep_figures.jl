@@ -1037,9 +1037,11 @@ function build_kind_sweep()
 
     scatter3d_data = let
         fig = Figure(size = (480, 320))
-        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "scatter3d-data")
+        # Limits and points chosen so no marker touches the axis frame's black lines, which
+        # polish_verify's drawn-mark probes would read as the marker's edge.
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "scatter3d-data", limits = (0, 4, 0, 5, 0, 4))
         scatter!(
-            ax, Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3)];
+            ax, Makie.Point3f[(2, 1.5, 2.5), (1, 3, 2), (3, 3.5, 3.5)];
             color = :gray, markerspace = :data, markersize = 0.15,
         )
         masque(fig; selected = Dict(:scatter => [2]))
