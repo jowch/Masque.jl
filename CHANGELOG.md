@@ -15,7 +15,10 @@ All notable changes to this project are documented here. The format is based on
 - A `ThresholdInteractable` or `ROIInteractable` on a `Colorbar` is refused with a message
   that names `ColorbarInteractable`, instead of a Makie field error (#498).
 - After `masque(fig; backend = :webgl)`, plots can be added to the figure again. Before,
-  `lines!` and the like failed with "Screen Session uninitialized" (#508).
+  `lines!` and the like failed with "Screen Session uninitialized". Adding a plot after
+  `masque` isn't recommended, though: the widget may not show it. See "A plot added after
+  `masque` doesn't show" in
+  [Troubleshooting](https://jowch.github.io/Masque.jl/stable/troubleshooting/) (#508).
 
 ## [0.4.3] - 2026-10-31
 
