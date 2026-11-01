@@ -612,7 +612,8 @@ HTML(
 HTML(
     "<span id=\"out_view\">VIEW=$(sweep_field("view", ev_view))</span>" *
         "<span id=\"bond_view\" style=\"display:none\">$(repr(ev_view))</span>" *
-        "<span id=\"coords_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["layers"]))</span>",
+        "<span id=\"coords_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["layers"]))</span>" *
+        "<span id=\"axes_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["transforms"]))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000146
@@ -622,7 +623,8 @@ HTML(
 HTML(
     "<span id=\"out_view_linked\">VIEW_LINKED=$(sweep_field("view_linked", ev_view_linked))</span>" *
         "<span id=\"bond_view_linked\" style=\"display:none\">$(repr(ev_view_linked))</span>" *
-        "<span id=\"coords_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["layers"]))</span>",
+        "<span id=\"coords_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["layers"]))</span>" *
+        "<span id=\"axes_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["transforms"]))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000172

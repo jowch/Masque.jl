@@ -756,9 +756,10 @@ function clickPoint(state: OverlayState, e: MouseEvent): { x: number, y: number 
 
 export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {
     const at = clickPoint(state, e)
-    if (state.justDragged_) { state.justDragged_ = false; return }
+    if (state.justDragged_) { state.justDragged_ = false; state.plainClicks_ = 0; return }
     // Chromium still dispatches click after a Mac ctrl-click.
     if (isMacContextClick(e)) return
+    state.plainClicks_ += 1
     const layout = layoutImagePx(ctx.base_, ctx.manifest_, at.x, at.y)
     const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_)
     if (!hit) {
@@ -776,6 +777,50 @@ export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): vo
     }
     const sample = layerPoint(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer, layout)
     commitClick(ctx, state, hit, sample.x, sample.y, isToggleClick(e))
+}
+
+// A double-click on an empty part of a view's plot puts the view back where it started (#524).
+// On a mark the two clicks are already two picks, and on a line, a box or a legend they are
+// that control's. The first click has already cleared a one-pick field there, as any click on
+// empty space does (#384): waiting to see whether a second click comes would slow every pick.
+export function onDoubleClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {
+    if (state.drag_ || state.plainClicks_ < 2 || isToggleClick(e)) return
+    const m = ctx.manifest_
+    const p = layoutImagePx(ctx.base_, m, e.clientX, e.clientY)
+    const under = hitTestAt(m, p.x, p.y, state.photo_, "drag", state.photoViewId_)
+    if (under?.layer.kind !== "view") return
+    if (hitTestAt(m, p.x, p.y, state.photo_, "click", state.photoViewId_)) return
+    if (hitTestAt(m, p.x, p.y, state.photo_, "hover", state.photoViewId_)) return
+    if (m.occluders?.some(([bx, by, bw, bh]) => p.x >= bx && p.x <= bx + bw && p.y >= by && p.y <= by + bh)) return
+    if (resetView(ctx, state, under.layer.id)) { e.preventDefault(); e.stopPropagation() }
+}
+
+// The views a reset of `id` puts back with it: itself, and each view on an axis tied to its
+// own by `linkaxes!` (either way round). Panels tied by `linkcameras!` are not listed in the
+// manifest; the reset's frame says where they are.
+function viewsResetWith(m: Manifest, id: string): string[] {
+    const own = m.layers.find((l) => l.id === id && l.kind === "view")
+    if (!own) return []
+    const linksOf = (g: ViewGeometry) => (g.links ?? []).map((k) => k.axis)
+    const ownLinks = linksOf(own.geometry as ViewGeometry)
+    return m.layers.filter((l) => l.kind === "view" &&
+        (l === own || ownLinks.includes(l.axis) || linksOf(l.geometry as ViewGeometry).includes(own.axis))).map((l) => l.id)
+}
+
+// Put the view `id` back where it started (#524): one request on the gesture channel, settled
+// at full resolution, with no bond write (§12.3). Julia holds where it started. The double-click,
+// the `0` key and the corner reset button (#525) all come here. False when the view has not
+// moved, so there is nothing to send.
+export function resetView(ctx: OverlayCtx, state: OverlayState, id: string): boolean {
+    if (state.drag_ || !state.viewMoved_.has(id)) return false
+    // A wheel's idle settle still to come would undo the reset.
+    if (state.wheelTimer_ !== null) { clearTimeout(state.wheelTimer_); state.wheelTimer_ = null }
+    hideTip(ctx, state)
+    for (const v of viewsResetWith(ctx.manifest_, id)) state.viewMoved_.delete(v)
+    // An Axis3 zoom or pan starts from the frame on screen again, not from the last ones asked for.
+    state.view3Last_ = null
+    void ctx.gesture_.settle({ id, reset: true, settle: true })
+    return true
 }
 
 // Single entry point for pointermove: while a drag owns the pointer, route to the

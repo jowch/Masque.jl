@@ -1,7 +1,7 @@
 import { invertAxis, matrixLimits, panLimits3, projectAxis } from "./geometry"
 import { hideTip, placeTip, setMarkAccent, setTipText, setTipVisible } from "./hover"
 import { scheduleAnnounce } from "./keyboard"
-import { settleCurrentPan } from "./bond"
+import { resetView, settleCurrentPan } from "./bond"
 import { fmt } from "./state"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
@@ -21,7 +21,7 @@ const PAGE_CSS = 10
 const VIEW_STEP = 0.1 // fraction of the axis viewport per arrow press, pan and orbit alike
 const ZOOM_NOTCH = 100 // one wheel notch, in wheelScale's pixel units
 
-const NUDGE_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", "+", "=", "-", "_"])
+const NUDGE_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", "+", "=", "-", "_", "0"])
 
 export interface DragStops {
     // Re-place each stop over its line, box, or viewport. Cheap: a handful of style writes.
@@ -34,8 +34,8 @@ const HINTS = {
     thresholdV: "Use Left or Right arrow to move the line, Page Up or Page Down for a larger step, Home or End for the ends.",
     roi: "Use arrow keys to move the box, Page Up or Page Down for a larger step. " +
         "Alt with an arrow grows that side; Alt and Shift with an arrow shrinks it.",
-    pan: "Use arrow keys to pan, plus or minus to zoom.",
-    orbit: "Use arrow keys to rotate the view, Shift with an arrow to pan, plus or minus to zoom.",
+    pan: "Use arrow keys to pan, plus or minus to zoom, 0 to reset.",
+    orbit: "Use arrow keys to rotate the view, Shift with an arrow to pan, plus or minus to zoom, 0 to reset.",
 }
 
 function layerById(ctx: OverlayCtx, id: string): HitLayer | undefined {
@@ -325,6 +325,18 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             const l = layerById(ctx, id)
             // A pointer drag owns the geometry until it is released.
             if (!l || state.drag_) return
+            // `0` puts a view back where it started (#524). A held key's settle would move it
+            // again, so it goes; the next key starts from the reset camera.
+            if (e.key === "0") {
+                if (l.kind !== "view") return
+                pending = null
+                held.clear()
+                state.keyView_ = false
+                orbitCam = null
+                resetView(ctx, state, id)
+                e.preventDefault(); e.stopPropagation()
+                return
+            }
             const before = pending
             const handled = l.kind === "threshold" ? nudgeThreshold(l, e)
                 : l.kind === "roi" ? nudgeROI(e)

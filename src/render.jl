@@ -846,6 +846,8 @@ function _masque(
     bg0 = fig.scene.backgroundcolor[]
     try
         fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
+        # Before anything draws: a view's home is the limits the author wrote (#524).
+        _record_view_homes!(interactables)
         _finalize!(fig)        # finalize once; render + context share it
         _pin_pan_ticklabelspace!(fig, interactables)
         ppu = something(px_per_unit, _ppu(backend, fig, max_width))
@@ -1270,7 +1272,9 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
     ax === nothing && throw(
         ArgumentError("Masque gesture channel: no ViewInteractable with id :$(id) on this widget"),
     )
-    if haskey(input, "azimuth") || haskey(input, "limits")
+    if get(input, "reset", false) === true
+        _reset_view!(ax)
+    elseif haskey(input, "azimuth") || haskey(input, "limits")
         if haskey(input, "azimuth")
             ax.azimuth[] = Float64(input["azimuth"])
             ax.elevation[] = Float64(input["elevation"])
@@ -1287,6 +1291,7 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
         ax.limits[] = (xlims..., ylims...)
         _pan_linked_axes!(ax, xlims, ylims)
     end
+    _note_view_left!(view_axes)
     live === nothing && return _render_gesture_frame(input, backend, fig, interactables, ppu, max_width)
     owners_out = Ref(Dict{String, LayerOwner}())
     frame = _render_gesture_frame(input, backend, fig, live.plan, ppu, max_width; owners_out)
@@ -1364,7 +1369,12 @@ _suspended_surface(i::SurfaceInteractable, ctx) =
 # one farther pose cover the compile a coalesced first drag otherwise still pays. `stop`
 # bails between frames when the cell is replaced; the camera is put back either way.
 function _warm_view_render_frame!(frame, view_axes; stop = () -> false, extra = ())
-    _warm_view_poses!(frame, view_axes, stop)
+    left = _view_left_snapshot(view_axes)
+    try
+        _warm_view_poses!(frame, view_axes, stop)
+    finally
+        _restore_view_left!(left)
+    end
     for input in extra
         stop() && break
         frame(input)

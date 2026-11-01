@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A moved view can go back to where it started: double-click an empty part of the plot, or
+  press `0` while the view has keyboard focus. Limits come back as written, so automatic
+  limits are automatic again, and an `Axis3` gets its azimuth and elevation back. Linked axes
+  and panels go back together. Re-running only the `masque` cell keeps the starting view (#524).
+
 ## [0.4.4] - 2026-11-01
 
 ### Fixed
