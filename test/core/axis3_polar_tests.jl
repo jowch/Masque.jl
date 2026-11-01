@@ -586,4 +586,31 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         gb = only(only(hitlayers(ln, ctxb)).geometry)
         @test red_near(imgb, (gb[1] + gb[3]) / 2, (gb[2] + gb[4]) / 2; tol = 3)
     end
+
+    @testset "Axis3 lines read out each point's x, y and z (#502)" begin
+        f = Figure(size = (500, 400)); ax = Axis3(f[1, 1]; azimuth = 0.4, elevation = 0.5)
+        ln = lines!(ax, [0.0, 1.0, 2.0], [0.0, 1.0, 0.0], [0.0, 0.25, 1.0])
+        sl = scatterlines!(ax, [0.0, 1.0], [1.0, 1.0], [0.5, 0.5])
+        contour3d!(ax, -1:0.25:1, -1:0.25:1, [x^2 + y^2 for x in -1:0.25:1, y in -1:0.25:1]; levels = [0.5])
+        w = masque(f)
+        lay(id) = only(l for l in w.manifest["layers"] if l["id"] == id)
+        L = lay("lines")
+        @test L["points"] == [Float32[0, 0, 1, 1, 2, 0]]
+        @test L["zpoints"] == [Float32[0, 0.25, 1]]
+        @test !haskey(L, "drawn")   # nothing cut: vertex k is sample k
+        @test length(only(L["geometry"])) == 6
+        @test only(lay("scatterlines.line")["zpoints"]) == Float32[0.5, 0.5]
+        # A contour3d! level is a `:lines` child: its points are its path's own vertices.
+        c = only(l for l in w.manifest["layers"] if l["kind"] == "lines" && !(l["id"] in ("lines", "scatterlines.line")))
+        @test length(only(c["zpoints"])) == length(only(c["geometry"])) ÷ 2
+        @test all(==(0.5f0), filter(isfinite, only(c["zpoints"])))
+        # The readout's fields: the default table and a template both see `z`.
+        @test occursin("lines: 1 line; hover; tooltip: index, x, y, z", repr(MIME"text/plain"(), w))
+        t = masque(f, SegmentInteractable(ax, ln; tooltip = masque"$(x) $(y) $(z) (point $(i))"); auto = false)
+        @test haskey(only(t.manifest["layers"]), "template")
+        @test_throws ArgumentError masque(f, SegmentInteractable(ax, ln; tooltip = masque"$(w)"); auto = false)
+        # A pick still names the whole line on an Axis3; its points are for the readout.
+        Lh = only(hitlayers(SegmentInteractable(ax, ln), (bk = Masque._resolve_backend(:cairo); Masque.context(bk, f, Masque._ppu(bk, f, 700), 700))))
+        @test Lh.zpoints !== nothing && !Masque._picks_points(Lh)
+    end
 end

@@ -20,7 +20,7 @@ radius under the pointer.
 | Select several marks (`select = :many`, see [Select several marks](@ref)) | yes | yes ⁴ | yes |
 | Drag a box to select marks (with `select = :many`) | yes ⁵ | yes ⁵ | yes |
 | Link selections across plots ([`linked`](@ref)) | yes | yes | yes |
-| Hover a line to read the nearest point you plotted | yes | no | yes |
+| Hover a line to read the nearest point you plotted | yes | yes ⁷ | yes |
 | Hover a surface to read its height | no ⁶ | yes | no |
 | Read `(x, y)` ([`AxisInteractable`](@ref)) | yes ¹ | no | yes ³ |
 | Drag a threshold ([`ThresholdInteractable`](@ref)) | yes ¹ | no | no |
@@ -46,12 +46,15 @@ turns the view, so hold Alt (Option on a Mac) to draw the box.
 
 ⁶ Draw the matrix with `heatmap!` to read its values on a 2D `Axis`.
 
+⁷ The tooltip shows `x`, `y` and `z`, but a click picks the whole
+line, not the point.
+
 A "no" in the last five rows, a scale outside that list (such as
 `Makie.pseudolog10` or `Makie.Symlog10`), or a categorical axis where ²
 requires a numeric one raises an `ArgumentError` when `masque` runs,
 instead of giving a wrong coordinate. The other "no" cells don't raise:
-a line on an `Axis3` still responds as one whole line, and a `surface!`
-is skipped with a warning. Orbiting an `Axis3` has no scale requirement.
+a `surface!` is skipped with a warning. Orbiting an `Axis3` has no
+scale requirement.
 `ViewInteractable` also raises an error when given a `Colorbar`.
 
 Legends, colorbars, and the sliders, toggles and menus of

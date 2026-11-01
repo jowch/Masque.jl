@@ -85,8 +85,8 @@ struct HitLayer
     label::Union{Nothing, String}
     colors::Any
     links::Union{Nothing, Vector{Vector{Symbol}}}
-    # :lines on a 2D axis: per element, the data samples `[x1, y1, x2, y2, …]` a hover readout
-    # snaps to, and the staircase `step` mode when the drawn path adds corners between them.
+    # :lines: per element, the data samples `[x1, y1, x2, y2, …]` a hover readout snaps to,
+    # and the staircase `step` mode when the drawn path adds corners between them.
     points::Union{Nothing, Vector}
     step::Union{Nothing, Symbol}
     # :circles/:rects: 0-based element indices, top first, that the overlay hit-tests in; an
@@ -94,7 +94,16 @@ struct HitLayer
     order::Union{Nothing, Vector{Int}}
     # :circles: per element, the drawn outline as an ellipse, `(sxx, sxy, syy)` (image px²).
     ellipses::Union{Nothing, Vector}
+    # :lines on an Axis3: per element, the `z` of each sample in `points`.
+    zpoints::Union{Nothing, Vector}
+    # :lines on a zoomed Axis3, whose limits cut the drawn path: per element, what each vertex
+    # of the drawn geometry is, `2k` for sample `k` (0-based), `2k + 1` for a point where the
+    # edge from sample `k` is cut, `-1` for a gap. `nothing` for a path drawn whole, whose
+    # vertex `k` is sample `k`.
+    drawn::Union{Nothing, Vector}
 end
+HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses) =
+    HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses, nothing, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order) =
     HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step) =
@@ -795,8 +804,10 @@ function _edge_px(ctx, ax, box, a, b)
     return t, at(t[1]), at(t[2])
 end
 _push_px!(g, q) = append!(g, (_q(q[1]), _q(q[2])))
-# One connected path (`:lines`): runs of visible edges, NaN-separated.
-function _clipped_path_px(ctx, ax, vs, box)
+# One connected path (`:lines`): runs of visible edges, NaN-separated. With `codes`, also
+# records what each vertex pushed is (see `HitLayer.drawn`): `2(k - 1)` for vertex `k` itself,
+# `2(k - 1) + 1` for a cut on the edge from vertex `k`, `-1` for a gap.
+function _clipped_path_px(ctx, ax, vs, box, codes = nothing)
     _needs_clip(box, vs) || return _flat_px(ctx, ax, vs, box)
     g = Real[]
     open = false   # g ends on the previous edge's far end, so the next edge continues from it
@@ -808,10 +819,15 @@ function _clipped_path_px(ctx, ax, vs, box)
         end
         (t0, t1), a, b = e
         if !(open && t0 == 0)
-            isempty(g) || isnan(g[end]) || append!(g, (NaN32, NaN32))
+            if !(isempty(g) || isnan(g[end]))
+                append!(g, (NaN32, NaN32))
+                codes === nothing || push!(codes, -1)
+            end
             _push_px!(g, a)
+            codes === nothing || push!(codes, t0 == 0 ? 2(k - 1) : 2(k - 1) + 1)
         end
         _push_px!(g, b)
+        codes === nothing || push!(codes, t1 == 1 ? 2k : 2(k - 1) + 1)
         open = t1 == 1
     end
     return g
@@ -843,6 +859,9 @@ function _flat_data(ax, vs, ::Type{T} = Float32) where {T}
     u = _unconvert_payloads(ax, Any[(; x = v[1], y = v[2]) for v in vs])
     return Any[c for pl in u for c in (pl.x, pl.y)]
 end
+# One line's sample `z`s, the third coordinate on an Axis3. Makie draws no category or date
+# axis on an Axis3, so they stay numbers.
+_flat_z(ax, vs, ::Type{T} = Float32) where {T} = T[v[3] for v in vs]
 _converts_dim(ax) = any((:dim1_conversion, :dim2_conversion)) do d
     hasproperty(ax, d) || return false
     c = getproperty(ax, d)[]
@@ -857,15 +876,11 @@ function hitlayers(i::SegmentInteractable, ctx)
             [vs]
         end
         box = _clipbox(i.ax)
-        geom = [_clipped_path_px(ctx, i.ax, path, box) for path in raw]
         aid = axis_id(ctx, i.ax)
-        # The readout's samples. Axis3 has no 2D sample to show the cursor's position on a path.
-        points, step = if ctx.transforms[aid].is3d
-            nothing, nothing
-        else
-            [_flat_data(i.ax, path) for path in _sample_paths(i, raw)], _step(i)
-        end
-        return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, step)]
+        ctx.transforms[aid].is3d && return _lines3d_layers(i, ctx, raw, box, aid)
+        geom = [_clipped_path_px(ctx, i.ax, path, box) for path in raw]
+        points = [_flat_data(i.ax, path) for path in _sample_paths(i, raw)]
+        return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, _step(i))]
     end
     vs = i.resolve === nothing ? i.vertices : [_pt3(v) for v in i.resolve(i.ax)]
     box = _clipbox(i.ax)
@@ -878,6 +893,33 @@ function hitlayers(i::SegmentInteractable, ctx)
     return [HitLayer(i.id, :segments, _clipped_pairs_px(ctx, i.ax, pairs, box), i.payloads, aid, events(i), i.label)]
 end
 
+# Lines on an Axis3. A pixel there is a ray, so the readout can't invert the cursor: each
+# sample's `x`, `y` and `z` ship, and the readout is the drawn vertex nearest the cursor along
+# the path, as on a 2D axis. Where the axis limits cut a path, `drawn` says which sample each
+# drawn vertex is. A staircase, or samples that aren't the path's vertices, ship no samples, so
+# the line reads out as a whole.
+function _lines3d_layers(i::SegmentInteractable, ctx, raw, box, aid)
+    samples = _sample_paths(i, raw)
+    ok = _step(i) === nothing && length(samples) == length(raw) && all(length.(samples) .== length.(raw))
+    drawn = Any[]
+    geom = map(raw) do path
+        ok && _needs_clip(box, path) || (push!(drawn, nothing); return _clipped_path_px(ctx, i.ax, path, box))
+        codes = Int[]
+        g = _clipped_path_px(ctx, i.ax, path, box, codes)
+        push!(drawn, codes)
+        return g
+    end
+    ok || return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label)]
+    points = [_flat_data(i.ax, path) for path in samples]
+    zpoints = [_flat_z(i.ax, path) for path in samples]
+    return [
+        HitLayer(
+            i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, nothing, nothing, nothing,
+            zpoints, all(isnothing, drawn) ? nothing : drawn,
+        ),
+    ]
+end
+
 # Each line's data samples, as plotted. A line built without samples reads them off its path.
 _sample_paths(i::SegmentInteractable, raw = nothing) = i.samples !== nothing ? i.samples[2] :
     raw !== nothing ? raw : i.paths !== nothing ? i.paths :
@@ -887,6 +929,9 @@ _step(i::SegmentInteractable) = i.samples === nothing ? nothing : i.samples[1]
 # owner isn't a line of data points.
 _line_data(i::SegmentInteractable, k) = i.unit === :line ? _flat_data(i.ax, _sample_paths(i)[k], Float64) : nothing
 _line_data(i, k) = nothing
+# Line `k`'s sample `z`s at full precision, on an Axis3; `nothing` elsewhere.
+_line_zdata(i::SegmentInteractable, k) = i.unit === :line && i.ax isa Makie.Axis3 ? _flat_z(i.ax, _sample_paths(i)[k], Float64) : nothing
+_line_zdata(i, k) = nothing
 
 # ============================ RectInteractable =============================
 """
