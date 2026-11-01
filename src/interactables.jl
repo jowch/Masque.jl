@@ -2081,19 +2081,20 @@ end
 
 # ============================ ThresholdInteractable ========================
 """
-    ThresholdInteractable(ax; orientation=:horizontal, value, id=:threshold, update_while_dragging=true)
+    ThresholdInteractable(ax; orientation, value, id=:threshold, update_while_dragging=true)
 
 A draggable horizontal or vertical line: drag for a live client-side readout, and the pixel
 position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up. Produces one
 `:threshold` [`HitLayer`](@ref).
 
 # Arguments
-- `ax` — a `Makie.Axis`.
+- `ax` — a `Makie.Axis`, or a `Makie.Colorbar` to drag a cutoff along its color scale.
 - `orientation` — `:horizontal` (constant-y line, dragged vertically) or `:vertical`
   (constant-x line, dragged horizontally). Any other value raises `ArgumentError`. Default
-  `:horizontal`.
+  `:horizontal` on an `Axis`. On a `Colorbar` the line runs across the bar, so it follows the
+  colorbar: `:horizontal` on a vertical colorbar, `:vertical` on a horizontal one; leave it out.
 - `value` — the line's initial data-space position (a y-value for `:horizontal`, x-value for
-  `:vertical`). Required, no default.
+  `:vertical`; on a `Colorbar`, a value on its scale, inside its limits). Required, no default.
 - `id` — the layer id; becomes `InteractionEvent.layer` on commit. Default `:threshold`.
 - `update_while_dragging` — with `onchange` on [`masque`](@ref), redraw the figure while the
   line moves, not only when it is let go. Default `true`, like Makie's `Slider`. The `@bind`
@@ -2102,18 +2103,23 @@ position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up.
 Payload on commit (client-side): the scalar data coordinate.
 
 Its field in the `@bind` value starts as a [`ThresholdEvent`](@ref) at `value` (with its
-`category` on a categorical axis, when `value` is a category's position).
+`category` on a categorical axis, when `value` is a category's position). On a `Colorbar` the
+value is in the colorbar's units, the same ones a [`ColorbarInteractable`](@ref) click reads.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
 a data value — inversion is undefined), a `PolarAxis` (a straight line is neither a constant r nor
-a constant θ), a `Colorbar` (use [`ColorbarInteractable`](@ref) to read a value off it, or put
-the threshold on an `Axis`, such as a histogram of the same values), or
-the dragged axis's scale isn't client-invertible (`:horizontal` needs the y-scale, `:vertical`
-the x-scale; supported: `identity`, `log10`, `log`).
+a constant θ), or a `Legend`; if the dragged scale isn't client-invertible (`:horizontal` needs
+the y-scale, `:vertical` the x-scale, a `Colorbar` its own scale; supported: `identity`,
+`log10`, `log`); or, on a `Colorbar`, if `orientation` runs along the bar instead of across it
+or `value` lies outside the colorbar's limits.
 
 # Examples
 ```julia
 ThresholdInteractable(ax; orientation = :horizontal, value = 5.0)
+
+# a cutoff on the colorbar of a heatmap `hm`
+cb = Colorbar(fig[1, 2], hm)
+ThresholdInteractable(cb; value = 0.5)
 ```
 """
 struct ThresholdInteractable <: AbstractInteractable
@@ -2122,18 +2128,18 @@ struct ThresholdInteractable <: AbstractInteractable
 end
 # The 0.3.0 positional form, before `update_while_dragging`.
 ThresholdInteractable(ax, orientation::Symbol, value::Real, id::Symbol) = ThresholdInteractable(ax, orientation, value, id, true)
-function ThresholdInteractable(ax; orientation = :horizontal, value, id = :threshold, update_while_dragging::Bool = true)
+function ThresholdInteractable(ax; orientation = _threshold_orientation(ax), value, id = :threshold, update_while_dragging::Bool = true)
     orientation in (:horizontal, :vertical) ||
         throw(ArgumentError("ThresholdInteractable: orientation must be :horizontal or :vertical, got $(orientation)"))
     return ThresholdInteractable(ax, orientation, _threshold_value(value), id, update_while_dragging)
 end
+# Across the bar on a colorbar; a horizontal line everywhere else.
+_threshold_orientation(ax) = ax isa Makie.Colorbar && !ax.vertical[] ? :vertical : :horizontal
 events(::ThresholdInteractable) = (:drag,)
 function validate(i::ThresholdInteractable, ctx::InteractionContext)
     i.ax isa Makie.Legend && return "ThresholdInteractable: ax is a Legend, not an Axis — a legend has no data-space scalar to drag."
-    i.ax isa Makie.Colorbar && return "ThresholdInteractable: ax is a Colorbar, not an Axis — a threshold " *
-        "can't be dragged on a colorbar yet. To read a value off the colorbar, use " *
-        "ColorbarInteractable(cb); to drag a cutoff, put the threshold on an Axis, such as a histogram of the same values."
     t = ctx.transforms[axis_id(ctx, i.ax)]
+    i.ax isa Makie.Colorbar && return _validate_colorbar_threshold(i, t)
     t.is3d && return "ThresholdInteractable: drag inverts a pixel to a data scalar via the axis " *
         "transform, which is undefined on an Axis3 (a screen pixel is a ray, not a data value)."
     t.ispolar && return "ThresholdInteractable: a threshold is not supported on PolarAxis (it drags a " *
@@ -2143,10 +2149,37 @@ function validate(i::ThresholdInteractable, ctx::InteractionContext)
         "invertible $(i.orientation === :horizontal ? "y" : "x")-scale ($(sc) is not; supported: identity/log10/log)."
     return nothing
 end
+function _validate_colorbar_threshold(i, t)
+    vertical = t.valueaxis === :y
+    across = vertical ? :horizontal : :vertical
+    i.orientation === across || return "ThresholdInteractable: a $(vertical ? "vertical" : "horizontal") " *
+        "colorbar takes a $(across) line, across the bar; got orientation = :$(i.orientation). " *
+        "Leave orientation out on a Colorbar and it follows the bar."
+    sc = vertical ? t.yscale : t.xscale
+    sc in _JS_INVERTIBLE || return "ThresholdInteractable: the colorbar's scale $(sc) is not " *
+        "invertible client-side; supported: identity/log10/log."
+    lo, hi = minmax((vertical ? t.ylims : t.xlims)...)
+    lo <= i.value <= hi || return "ThresholdInteractable: value = $(i.value) is outside the " *
+        "colorbar's limits ($(lo), $(hi)), so the line would sit off the bar. Pick a value inside them."
+    return nothing
+end
+# The pixel along a colorbar's value axis where `v` sits, the way geometry.ts `projectAxis` puts it.
+function _colorbar_pos(t, v)
+    vx, vy, vw, vh = t.viewport
+    vertical = t.valueaxis === :y
+    lims = vertical ? t.ylims : t.xlims
+    f = (vertical ? t.yscale : t.xscale) === :identity ? identity : log10
+    frac = (f(v) - f(lims[1])) / (f(lims[2]) - f(lims[1]))
+    return vertical ? vy + (1 - frac) * vh : vx + frac * vw
+end
 function hitlayers(i::ThresholdInteractable, ctx)
     t = ctx.transforms[axis_id(ctx, i.ax)]
     vx, vy, vw, vh = t.viewport
-    if i.orientation === :horizontal
+    if i.ax isa Makie.Colorbar
+        pos = _colorbar_pos(t, i.value)
+        span = i.orientation === :horizontal ? Float32[vx, vx + vw] : Float32[vy, vy + vh]
+        orient = i.orientation === :horizontal ? "h" : "v"
+    elseif i.orientation === :horizontal
         pos = _proj(ctx, i.ax, (t.xlims[1], i.value))[2]   # constant data-y → its pixel-y
         span = Float32[vx, vx + vw]; orient = "h"
     else

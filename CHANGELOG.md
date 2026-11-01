@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `ThresholdInteractable` takes a `Colorbar`: drag a line across the bar to set a cutoff on the
+  colorbar's scale, `identity`, `log10` or `log`. The line follows the bar, horizontal on a
+  vertical colorbar and vertical on a horizontal one, and hovering or clicking the rest of the
+  bar still reads its value (#499).
+
 ### Fixed
 - `masque` takes what `scatter(x, y)` or `scatter(fig[1, 1], …)` returns, as the figure it
   drew into. Before, it failed with a Makie field error. Anything else that isn't a `Figure`

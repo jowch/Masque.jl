@@ -187,7 +187,39 @@ positions, and moving one leaves the other's field as it was.
 
 To drag a box instead of a line, see [Brush a region](@ref).
 
+## Drag a cutoff on a colorbar
+
+Give [`ThresholdInteractable`](@ref) a `Colorbar` instead of an axis to
+drag a line across the bar. Its value is on the colorbar's scale, so
+you set a cutoff against the colors the heatmap shows:
+
+```julia
+begin
+    z = [sin(x / 3) * cos(y / 4) for x in 1:30, y in 1:20]
+    fig = Figure(size = (560, 320))
+    ax = Axis(fig[1, 1])
+    hm = heatmap!(ax, z)
+    cb = Colorbar(fig[1, 2], hm)
+    cut = ThresholdInteractable(cb; value = 0.5)
+    nothing
+end
+```
+
+```julia
+@bind level masque(fig; bind = cut)
+```
+
+```julia
+"$(count(>(level.value), z)) of $(length(z)) cells above $(round(level.value; digits = 2))"
+```
+
+The line runs across the bar, so leave `orientation` out: it is
+horizontal on a vertical colorbar and vertical on a horizontal one.
+`value` must lie inside the colorbar's limits. Hovering the bar away
+from the line still shows the value under the pointer.
+
 ## Supported axes
 
-The axis readout and the threshold need a 2D `Axis`; see
+The axis readout and the threshold need a 2D `Axis`; a threshold can
+also go on a `Colorbar`. See
 [Supported plots and axes](@ref) for which axes and scales.

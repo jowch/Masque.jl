@@ -58,7 +58,8 @@ Legends, colorbars, and the sliders, toggles and menus of
 [Sliders, toggles and menus](@ref) belong to the figure, not to an
 axis, so they work next to any `Axis`, `Axis3`, or `PolarAxis`. A
 [`ColorbarInteractable`](@ref) reads values on `identity`, `log10`, and
-`log` colorbars.
+`log` colorbars, and a [`ThresholdInteractable`](@ref) drags a cutoff
+along them.
 
 `LScene` is not supported: on both backends, `masque` raises an error
 for a figure that contains one, so nothing in that figure responds, not

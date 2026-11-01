@@ -38,6 +38,76 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test isempty(mt["payloads"]) && !haskey(mt, "tooltips")   # computed client-side, no payloads/tooltips
     end
 
+    @testset "ThresholdInteractable on a Colorbar (#499)" begin
+        fig = Figure(); ax = Axis(fig[1, 1]); hm = heatmap!(ax, reshape(collect(1.0:12.0), 4, 3))
+        cb = Colorbar(fig[1, 2], hm)
+        figh = Figure(); axh = Axis(figh[1, 1]); hmh = heatmap!(axh, reshape(collect(1.0:12.0), 4, 3))
+        cbh = Colorbar(figh[2, 1], hmh; vertical = false)
+        # The line runs across the bar unless told otherwise.
+        @test ThresholdInteractable(cb; value = 4.0).orientation === :horizontal
+        @test ThresholdInteractable(cbh; value = 4.0).orientation === :vertical
+        @test ThresholdInteractable(ax; value = 4.0).orientation === :horizontal
+        Makie.update_state_before_display!(fig); Makie.update_state_before_display!(figh)
+        _, _, ctx = ctx_for(fig); _, _, ctxh = ctx_for(figh)
+
+        th = ThresholdInteractable(cb; value = 4.0, id = :cut)
+        @test validate(th, ctx) === nothing
+        L = only(hitlayers(th, ctx))
+        t = ctx.transforms[L.axis]
+        @test L.axis == Masque.axis_id(ctx, cb) && L.kind === :threshold
+        vx, vy, vw, vh = t.viewport
+        lo, hi = t.ylims
+        @test L.geometry["orientation"] == "h"
+        @test L.geometry["pos"] ≈ vy + (1 - (4.0 - lo) / (hi - lo)) * vh   # where a click there reads 4.0
+        @test L.geometry["span"] ≈ [vx, vx + vw]                           # across the bar, inside its box
+        # The ends of the limits are the ends of the bar.
+        @test only(hitlayers(ThresholdInteractable(cb; value = lo), ctx)).geometry["pos"] ≈ vy + vh
+        @test only(hitlayers(ThresholdInteractable(cb; value = hi), ctx)).geometry["pos"] ≈ vy
+
+        Lh = only(hitlayers(ThresholdInteractable(cbh; value = 4.0), ctxh))
+        th_ = ctxh.transforms[Lh.axis]
+        hx, hy, hw, hh = th_.viewport
+        @test Lh.geometry["orientation"] == "v"
+        @test Lh.geometry["pos"] ≈ hx + (4.0 - th_.xlims[1]) / (th_.xlims[2] - th_.xlims[1]) * hw
+        @test Lh.geometry["span"] ≈ [hy, hy + hh]
+
+        # Along the bar, or off it, is refused with what to do instead.
+        msg = validate(ThresholdInteractable(cb; orientation = :vertical, value = 4.0), ctx)
+        @test msg isa String && occursin("vertical colorbar takes a horizontal line", msg) && occursin("Leave orientation out", msg)
+        @test validate(ThresholdInteractable(cbh; orientation = :horizontal, value = 4.0), ctxh) isa String
+        msg = validate(ThresholdInteractable(cb; value = 99.0), ctx)
+        @test msg isa String && occursin("outside the colorbar's limits", msg)
+        err = (@test_throws ArgumentError masque(fig, (cut = ThresholdInteractable(cb; value = -5.0),))).value
+        @test occursin("outside the colorbar's limits", err.msg)
+
+        # A log colorbar puts the line where the browser's inversion reads the value back.
+        figl = Figure(); axl = Axis(figl[1, 1])
+        hml = heatmap!(axl, reshape(10.0 .^ (0:11), 4, 3); colorscale = log10)
+        cbl = Colorbar(figl[1, 2], hml)
+        Makie.update_state_before_display!(figl)
+        _, _, ctxl = ctx_for(figl)
+        thl = ThresholdInteractable(cbl; value = 1000.0)
+        @test validate(thl, ctxl) === nothing
+        Ll = only(hitlayers(thl, ctxl)); tl = ctxl.transforms[Ll.axis]
+        a, b = log10.(tl.ylims)
+        @test Ll.geometry["pos"] ≈ tl.viewport[2] + (1 - (3 - a) / (b - a)) * tl.viewport[4]
+        # A scale the browser can't invert is refused, as for a colorbar click.
+        figp = Figure(); axp = Axis(figp[1, 1])
+        hmp = heatmap!(axp, rand(4, 3); colorscale = Makie.pseudolog10)
+        cbp = Colorbar(figp[1, 2], hmp)
+        Makie.update_state_before_display!(figp)
+        _, _, ctxp = ctx_for(figp)
+        @test validate(ThresholdInteractable(cbp; value = 0.5), ctxp) isa String
+
+        # On a whole figure the colorbar keeps its own click field next to the threshold's, and
+        # the threshold's field starts at its value.
+        w = masque(fig, (cut = ThresholdInteractable(cb; value = 4.0),))
+        layers = w.manifest["layers"]
+        @test count(l -> l["kind"] == "threshold" && l["axis"] == string(Masque.axis_id(ctx, cb)), layers) == 1
+        @test any(l -> l["kind"] == "axis" && l["id"] == "colorbar", layers)
+        @test w.manifest["initial"]["cut"]["payload"] == 4.0
+    end
+
     @testset "a pan axis keeps its box when tick labels grow (#171)" begin
         box(ax) = Tuple(Float64.((ax.scene.viewport[].origin..., ax.scene.viewport[].widths...)))
         # Reference: the same figure with no widget, to show masque() leaves the first picture as is.

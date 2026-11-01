@@ -2372,7 +2372,7 @@ try {
       const ends = catTarget
         ? [[p.x, catTarget.y]]
         : spec.layerKind === "threshold"
-        ? [[p.x, p.y - 50], [p.x, p.y + 50]]
+        ? (layer.geometry.orientation === "v" ? [[p.x - 50, p.y], [p.x + 50, p.y]] : [[p.x, p.y - 50], [p.x, p.y + 50]])
         : spec.layerKind === "roi"
           ? (() => {
             const pts = layers.find((l) => l.kind === "circles");
@@ -2488,6 +2488,33 @@ try {
           throw new Error(`${key}-drag: line at y=${lineY} after release, expected category ${catTarget.k} at y=${catTarget.y.toFixed(1)} (#199 snap)`);
         }
         passed.push(`${key}/line-snaps-to-category`);
+      }
+      // A threshold on a colorbar (#499) leaves the bar's own readout working off the line: a
+      // hover a quarter of the bar away from the line reads the value there.
+      if (spec.colorbarReadout) {
+        const cbl = layers.find((l) => l.id === spec.colorbarReadout);
+        if (!cbl || cbl.axis !== layer.axis) throw new Error(`${key}: no :${spec.colorbarReadout} layer on the threshold's colorbar`);
+        const t = (await transformsOf(key))[layer.axis];
+        const [vx, vy, vw, vh] = t.viewport;
+        const horiz = layer.geometry.orientation === "h";
+        const line = Number(await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const hosts = [...document.querySelectorAll(".ip-host")];
+          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          return sr.querySelector(".masque-threshold-line")?.getAttribute("x1") + "," + sr.querySelector(".masque-threshold-line")?.getAttribute("y1");
+        }, key).then((xy) => xy.split(",")[horiz ? 1 : 0]));
+        const lo = horiz ? vy : vx, len = horiz ? vh : vw;
+        const at = line - lo > len / 2 ? lo + len / 4 : lo + 3 * len / 4;
+        const hx = horiz ? vx + vw / 2 : at, hy = horiz ? at : vy + vh / 2;
+        const tip = await dispatchAt(key, hx, hy, "pointermove");
+        const want = invertAxisJs(t, hx, hy)[horiz ? "y" : "x"];
+        const num = /(-?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s*$/i.exec((tip?.text ?? "").trim());
+        if (!tip?.show || !num || Math.abs(Number(num[1]) - want) > 0.02 * Math.abs(want) + 1e-9) {
+          throw new Error(`${key}/colorbar-readout: hover at ${hx.toFixed(1)},${hy.toFixed(1)} showed ${JSON.stringify(tip?.text)}, want about ${want}`);
+        }
+        passed.push(`${key}/colorbar-readout`);
+        console.error(`OK  ${key}/colorbar-readout — ${JSON.stringify(tip.text)} (want ${want.toPrecision(4)})`);
       }
       console.error(`OK  ${key}/drag — ${after.slice(0, 100)}`);
       continue;

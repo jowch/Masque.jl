@@ -543,6 +543,28 @@ HTML(
         "<span id=\"axes_threshold_cat\" style=\"display:none\">$(JSON3.write(sweep.threshold_cat.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000184
+@bind ev_threshold_colorbar sweep.threshold_colorbar
+
+# ╔═╡ c1000000-0000-0000-0000-000000000185
+HTML(
+    "<span id=\"out_threshold_colorbar\">THRESHOLD_COLORBAR=$(sweep_field("threshold_colorbar", ev_threshold_colorbar))</span>" *
+        "<span id=\"bond_threshold_colorbar\" style=\"display:none\">$(repr(ev_threshold_colorbar))</span>" *
+        "<span id=\"coords_threshold_colorbar\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar.manifest["layers"]))</span>" *
+        "<span id=\"axes_threshold_colorbar\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar.manifest["transforms"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000186
+@bind ev_threshold_colorbar_h sweep.threshold_colorbar_h
+
+# ╔═╡ c1000000-0000-0000-0000-000000000187
+HTML(
+    "<span id=\"out_threshold_colorbar_h\">THRESHOLD_COLORBAR_H=$(sweep_field("threshold_colorbar_h", ev_threshold_colorbar_h))</span>" *
+        "<span id=\"bond_threshold_colorbar_h\" style=\"display:none\">$(repr(ev_threshold_colorbar_h))</span>" *
+        "<span id=\"coords_threshold_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar_h.manifest["layers"]))</span>" *
+        "<span id=\"axes_threshold_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar_h.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000119
 @bind ev_colorbar_owner sweep.colorbar_owner
 
@@ -974,6 +996,10 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000031
 # ╠═c1000000-0000-0000-0000-000000000062
 # ╠═c1000000-0000-0000-0000-000000000063
+# ╠═c1000000-0000-0000-0000-000000000184
+# ╟─c1000000-0000-0000-0000-000000000185
+# ╠═c1000000-0000-0000-0000-000000000186
+# ╟─c1000000-0000-0000-0000-000000000187
 # ╠═c1000000-0000-0000-0000-000000000119
 # ╟─c1000000-0000-0000-0000-000000000120
 # ╠═c1000000-0000-0000-0000-000000000121
