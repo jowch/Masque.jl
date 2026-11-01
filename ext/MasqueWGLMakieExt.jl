@@ -90,12 +90,18 @@ function _headless_screen(f, scene)
         return f(screen)
     finally
         try
-            Makie.delete_screen!(scene, screen)
+            _detach_screen!(scene, screen)
         catch e
             e isa _WGL_SHAPE_ERRORS || rethrow()
             _wgl_compat_error("delete_screen!", "`Makie.delete_screen!(scene, screen)` to detach a screen")
         end
     end
+end
+
+function _detach_screen!(scene, screen)
+    screen in scene.current_screens && Makie.delete_screen!(scene, screen)
+    foreach(c -> _detach_screen!(c, screen), scene.children)
+    return
 end
 
 # No public headless-serialization API exists in WGLMakie; this is the only way to turn a
