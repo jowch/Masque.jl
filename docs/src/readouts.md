@@ -93,7 +93,8 @@ for the heatmap.
 
 A [`ThresholdInteractable`](@ref) draws a line across the axis for you
 to drag. Use it for a cutoff you would otherwise set with a slider, so
-that you set it against the data itself. The line starts at `value`.
+that you set it against the data itself. The line starts at `value`,
+or halfway along the axis if you leave `value` out.
 With `orientation = :horizontal` it sits at constant `y` and you drag
 it up and down, and with `:vertical` it sits at constant `x`:
 

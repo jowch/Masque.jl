@@ -473,6 +473,10 @@ function build_manifest(
         overlay_style = nothing, owners_out = nothing, suspend_surfaces = false, with_initial = true,
     )
     plan = interactables
+    # A threshold or box with no start takes it from the limits. `masque` sets it once at mount;
+    # a direct call (tests, a backend) sets it here. Before `validate`, which reads the value; an
+    # axis `validate` refuses keeps an unset start (`_start_transform`).
+    interactables = _pin_starts(interactables, ctx)
     pairs = Tuple{Any, HitLayer}[]
     for i in interactables
         msg = validate(i, ctx)
@@ -853,6 +857,8 @@ function _masque(
             ArgumentError("masque: `px_per_unit = $ppu` makes the picture less than 1 pixel wide"),
         )
         ctx = context(backend, fig, ppu, max_width)
+        # A threshold or box with no start takes it from the limits now, and keeps it.
+        interactables = _pin_starts(interactables, ctx)
         owners_out = Ref(Dict{String, LayerOwner}())
         build() = build_manifest(
             interactables, ctx; selected, tip_style, tip_digits,

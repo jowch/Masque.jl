@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `ThresholdInteractable(ax)` and `ROIInteractable(ax)` work without a `value` or `bounds`.
+  The line starts halfway along the axis, and the box over the middle half of it, as the
+  axis is when `masque` runs: the middle on screen for a log scale, and the middle category
+  on a categorical axis. A `value` or `bounds` given still sets the start (#513).
+
 ### Fixed
 - `masque` takes what `scatter(x, y)` or `scatter(fig[1, 1], …)` returns, as the figure it
   drew into. Before, it failed with a Makie field error. Anything else that isn't a `Figure`
