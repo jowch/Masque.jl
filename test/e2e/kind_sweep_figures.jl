@@ -186,10 +186,13 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
-        # `lines!` on Axis3: one element, so nothing is baked selected and hover takes it.
+        # `lines!` on Axis3: one element, so nothing is baked selected and hover takes it. A
+        # hover reads out the nearest plotted point's x, y and z (#502); a click still picks
+        # the whole line.
         "key" => "lines3d", "layerId" => "lines", "layerKind" => "lines",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
+        "readout" => Dict("vertex" => 2, "text" => ["x2", "y4", "z3"]),
     ),
     Dict(
         # `meshscatter!` on Axis3: each sphere's hit circle comes from its data-space size.

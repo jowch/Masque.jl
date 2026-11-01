@@ -67,8 +67,9 @@ Hovering a line shows the point you plotted nearest the pointer (see
 other picks, until you name the line in `bind`. A click then picks that
 same point, and a ring marks it. `pick.index` is the point's position
 in your data, so `xs[pick]` reads it, and `pick.x` and `pick.y` hold it
-too. With `select = :many`, each click adds a point. A line on an
-`Axis3` has no points to pick, so a click there picks the whole line.
+too. With `select = :many`, each click adds a point. A click on a line
+on an `Axis3` picks the whole line, though its tooltip shows the
+nearest point.
 To read every line at the same `x`, use a [`SliceInteractable`](@ref)
 instead.
 

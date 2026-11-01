@@ -468,6 +468,12 @@ Masque.interactables(ax, p::SeedHeatParts) = (
         # Hand-built payloads: a Dict keeps its keys but `index`; anything else rides as `value`.
         @test Masque._point_payload(Dict(:index => 1, :tag => "a"), 2, 0.5, 1.5) == Dict(:line => 2, :x => 0.5, :y => 1.5, :tag => "a")
         @test Masque._point_payload("note", 1, 0.5, 1.5) == (; line = 1, x = 0.5, y = 1.5, value = "note")
+        # On an Axis3 the point has its z too.
+        @test Masque._point_payload((; index = 1), 2, 0.5, 1.5, 2.5) == (; line = 2, x = 0.5, y = 1.5, z = 2.5)
+        @test Masque._point_payload(Dict(:index => 1), 2, 0.5, 1.5, 2.5) == Dict(:line => 2, :x => 0.5, :y => 1.5, :z => 2.5)
+        d3 = Dict{String, Any}("points" => [Float32[0, 0, 1, 1]], "zpoints" => [Float32[0.4, 2]])
+        @test Masque._line_point(ElementEvent(:p, 1, (; index = 1)), d3, 1).payload == (; line = 1, x = 0.0, y = 0.0, z = 0.4)
+        @test Masque._line_point(ElementEvent(:p, 1, (; index = 1)), d3, 2, [0.0, 0.0, 1.0, 1.0], [0.1, 2.5]).payload.z == 2.5
         @test_throws ArgumentError Masque._line_point(ElementEvent(:fit, 1, (; index = 1)), Dict{String, Any}(), 1)
 
         # A recipe's line part picks a point too.
@@ -485,11 +491,12 @@ Masque.interactables(ax, p::SeedHeatParts) = (
         v = tv(wm, Dict("lines" => Dict("items" => [pick("lines", 0, 1)])))
         @test only(v).index == 2 && only(v).line == 1 && only(v).y == 2.0
 
-        # A line on an Axis3 has no points to pick: its pick stays the whole line.
+        # A line on an Axis3 ships its points for the hover readout (#502), but its pick stays
+        # the whole line.
         f3 = Figure(size = (400, 300)); a3 = Axis3(f3[1, 1])
         l3 = lines!(a3, [0.0, 1.0, 2.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0])
         w3 = masque(f3; bind = (path = l3,))
-        @test !haskey(only(w3.manifest["layers"]), "points")
+        @test haskey(only(w3.manifest["layers"]), "zpoints")
         @test commit_field(w3, Dict{String, Any}("layer" => "path", "index" => 0)).index == 1
         @test iv(masque(f3; bind = (path = l3,), selected = (path = [1],))).path.index == 1
     end

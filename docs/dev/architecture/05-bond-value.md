@@ -18,7 +18,8 @@ A layer's role decides its field:
   the `ElementEvent`'s `index` is the 1-based sample, its payload the line's plus `line`, `x`,
   `y`. The overlay rings the point (the selected-open ring around a circle of the line's hit
   slack). `selected=` indices on such a layer are samples, for one line only. A line without
-  `points` (an `Axis3` line) still picks the whole line.
+  `points`, or an `Axis3` line (which has `zpoints`, for the readout only), still picks the
+  whole line: a point pick there changes what `pick.index` means, so it waits for a minor.
 - **Control**: a threshold (stamp `"threshold"`) or an ROI box (stamp `"bounds"`, with or
   without `selects`). Always holds its event, starting at the constructor's `value` or
   `bounds`.
