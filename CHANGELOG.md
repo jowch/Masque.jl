@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-11-01
+
 ### Fixed
 - `masque` takes what `scatter(x, y)` or `scatter(fig[1, 1], …)` returns, as the figure it
   drew into. Before, it failed with a Makie field error. Anything else that isn't a `Figure`
@@ -748,7 +750,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/jowch/Masque.jl/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/jowch/Masque.jl/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/jowch/Masque.jl/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/jowch/Masque.jl/compare/v0.4.0...v0.4.1
