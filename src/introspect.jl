@@ -216,13 +216,13 @@ end
 function PointInteractable(ax, p::Makie.Scatter; id = :scatter, payloads = nothing, radius = nothing, colors = _resolve_scatter_colors(p), tooltip = nothing, label = _plot_label(p))
     pts = _conv(p)[1]
     # On an Axis3 a data-sized marker faces the camera, so its outline is a sphere's.
-    r3 = radius === nothing && ax isa Makie.Axis3 && p.markerspace[] === :data ? _billboard_extents(p, length(pts)) : nothing
-    r = radius !== nothing ? radius : r3 !== nothing ? 9 : _marker_radius(p)
+    billboard = radius === nothing && ax isa Makie.Axis3 && p.markerspace[] === :data
+    billboard && _check_billboard_offset(p, length(pts))
+    r3 = billboard ? _billboard_extents(p, length(pts)) : nothing
+    r = radius !== nothing ? radius : billboard ? 9 : _marker_radius(p)
     kw = (; id, radius = r, radius3d = r3, colors, tooltip, label)
     i = PointInteractable(ax, pts; kw..., payloads)
-    if r3 !== nothing
-        i = PointInteractable((f === :billboard ? true : getfield(i, f) for f in fieldnames(PointInteractable))...)
-    end
+    billboard && (i = _with_billboard(i))
     # An explicit radius is the whole target; otherwise the outline adds to the marker.
     i = _with_marker_stroke(i, radius === nothing ? _stroke_width(p) : 0.0)
     p.markerspace[] === :data && return _shift_data_markers(ax, i, p.marker_offset[])
@@ -274,6 +274,21 @@ end
 _with_offset(i::PointInteractable, o) = PointInteractable(
     i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, o, i.stroke, i.billboard, i.select,
 )
+_with_billboard(i::PointInteractable) = PointInteractable(
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke, true, i.select,
+)
+# On an Axis3, Makie adds a `markerspace = :data` scatter's `marker_offset` after the scene's
+# model, in the axis box's units, so where a marker lands in data depends on the current
+# limits. The hit circles are built once, and a zoom changes the limits, so an offset marker
+# would lose its circle. Refused, so `masque` skips the plot with a warning.
+function _check_billboard_offset(p, n)
+    all(iszero, _marker_offset_vec(p.marker_offset[], n)) && return nothing
+    return error(
+        "PointInteractable: a scatter on an Axis3 with markerspace = :data and a marker_offset " *
+            "isn't supported; Makie moves each marker in the axis box's units, which change with " *
+            "the limits. Drop the marker_offset and shift the points instead."
+    )
+end
 _with_marker_stroke(i::PointInteractable, s) = PointInteractable(
     i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, s, i.billboard, i.select,
 )

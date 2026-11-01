@@ -15,7 +15,8 @@ All notable changes to this project are documented here. The format is based on
 - After `masque(fig; backend = :webgl)`, plots can be added to the figure again. Before,
   `lines!` and the like failed with "Screen Session uninitialized" (#508).
 - A `scatter!` sized in data units (`markerspace = :data`) on an `Axis3` responds to hover
-  and clicks. Before, it was skipped with a warning (#511).
+  and clicks. Before, it was skipped with a warning. One with a `marker_offset` is still
+  skipped, with a warning that says why (#511).
 - When a plot on an `Axis3` or a `PolarAxis` is skipped, the warning links to the Supported
   plots and axes page. Before, it pointed to a maintainer document (#511).
 

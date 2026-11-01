@@ -362,6 +362,14 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         # Replaced by the caller: no warning, and the replacement is built.
         built = @test_logs assemble(f, interactables(sc; radius = 5))
         @test sort(ids(built)) == [:lines, :scatter]
+
+        # A recipe an Axis3 or a PolarAxis can't take is skipped with a warning that links
+        # to the Supported plots and axes page.
+        support = r"jowch\.github\.io/Masque\.jl/stable/support/"
+        f = Figure(); ax = Axis3(f[1, 1]); barplot!(ax, [1.0, 2.0], [1.0, 2.0])
+        @test_logs (:warn, support) match_mode = :any assemble(f)
+        f = Figure(); ax = PolarAxis(f[1, 1]); heatmap!(ax, rand(3, 3))
+        @test_logs (:warn, support) match_mode = :any assemble(f)
     end
 
     @testset "a recipe method need not take `id` (#270)" begin

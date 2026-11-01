@@ -912,6 +912,15 @@ end
                 @test maximum(d) > r - 1.5
             end
         end
+        @testset "Axis3 scatter in markerspace = :data with a marker_offset is skipped (#511)" begin
+            # Makie adds the offset in the axis box's units, which move with the limits.
+            f = Figure(size = (480, 320))
+            a = Axis3(f[1, 1]; limits = (0, 10, 0, 5, 0, 20))
+            scatter!(a, [Point3f(5, 2.5, 10)]; markerspace = :data, markersize = 0.15, marker_offset = Vec3f(0.3, 0, 0))
+            lines!(a, [1.0, 2.0], [1.0, 2.0], [1.0, 2.0])
+            w = @test_logs (:warn, r"skipping scatter;") match_mode = :any masque(f)
+            @test [L["id"] for L in w.manifest["layers"]] == ["lines"]
+        end
         @testset "a meshscatter's hit follows scale! in size, not rotate!" begin
             for (move!, factor) in ((p -> scale!(p, 2, 2, 2), 2), (p -> rotate!(p, π / 4), 1))
                 f = Figure(size = (500, 500)); a = Axis(f[1, 1]; limits = (-3, 3, -3, 3), aspect = DataAspect())
