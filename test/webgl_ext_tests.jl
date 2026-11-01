@@ -198,6 +198,15 @@ end
     n0 = length(fig.scene.current_screens)
     _WGLExt.scene_payload(fig)
     @test length(fig.scene.current_screens) == n0   # the serialization screen is cleaned up
+    @test isempty(ax.scene.current_screens)          # on the axis scene too (#508)
+end
+
+@testset "a plot can be added after masque on :webgl (#508)" begin
+    fig = Figure(; size = (300, 200)); ax = Axis(fig[1, 1]); scatter!(ax, 1:5, 1:5)
+    w = masque(fig; backend = :webgl)
+    @test w isa _WGLExt.WebGLWidget
+    @test lines!(ax, 1:5, 5:-1:1) isa Lines
+    @test masque(fig; backend = :webgl) isa _WGLExt.WebGLWidget
 end
 
 @testset "backend wiring" begin

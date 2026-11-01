@@ -813,6 +813,21 @@ try {
     await clickLegend(1); // deselect
   }
 
+  // A plot added after the figure was shown once (#508): the second widget holds the scatter and
+  // the added line, and hovering the line shows its tooltip with the ring on the line.
+  {
+    const key = "added_plot";
+    const layers = await layersOf(key);
+    const line = layers.find((l) => l.kind === "lines"), pts = layers.find((l) => l.id === "scatter");
+    if (!line || !pts) throw new Error(`${key}: want a scatter and the added line, got ${JSON.stringify(layers.map((l) => [l.id, l.kind]))}`);
+    const [x0, y0, x1] = line.geometry[0];
+    const t = await hoverAt(key, (x0 + x1) / 2, y0);
+    if (!t?.show) throw new Error(`${key}: no tooltip on the added line ${JSON.stringify(t)}`);
+    if (!(t.hi.fill || t.hi.edge || t.hi.plain)) throw new Error(`${key}: no hover ring on the added line`);
+    await hoverAt(key, 2, 2);
+    passed.push(`${key}/added-line-hovers`);
+  }
+
   // Linked selections (#346): a pick in the left panel is drawn picked in both panels, and the
   // rest of each panel fades. Hovering an unpicked mark in the right panel outlines its partner
   // on the left with the same hover recipe as the hovered mark (dodge fill half, chrome edge)

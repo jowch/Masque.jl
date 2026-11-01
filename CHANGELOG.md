@@ -12,6 +12,8 @@ All notable changes to this project are documented here. The format is based on
   gets a message saying to pass the figure (#501).
 - A `ThresholdInteractable` or `ROIInteractable` on a `Colorbar` is refused with a message
   that names `ColorbarInteractable`, instead of a Makie field error (#498).
+- After `masque(fig; backend = :webgl)`, plots can be added to the figure again. Before,
+  `lines!` and the like failed with "Screen Session uninitialized" (#508).
 
 ## [0.4.3] - 2026-10-31
 

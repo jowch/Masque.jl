@@ -243,6 +243,16 @@ HTML(
         "<span id=\"coords_hidden_plot\" style=\"display:none\">$(JSON3.write(sweep.hidden_plot.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000182
+@bind ev_added_plot sweep.added_plot
+
+# ╔═╡ d1000000-0000-0000-0000-000000000183
+HTML(
+    "<span id=\"out_added_plot\">ADDED_PLOT=$(sweep_field("added_plot", ev_added_plot))</span>" *
+        "<span id=\"bond_added_plot\" style=\"display:none\">$(repr(ev_added_plot))</span>" *
+        "<span id=\"coords_added_plot\" style=\"display:none\">$(JSON3.write(sweep.added_plot.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000072
 @bind ev_poly_shapes sweep.poly_shapes
 
@@ -905,6 +915,8 @@ HTML(
 # ╟─d1000000-0000-0000-0000-0000000000e8
 # ╠═d1000000-0000-0000-0000-0000000000e9
 # ╟─d1000000-0000-0000-0000-0000000000ea
+# ╠═d1000000-0000-0000-0000-000000000182
+# ╟─d1000000-0000-0000-0000-000000000183
 # ╠═d1000000-0000-0000-0000-000000000072
 # ╟─d1000000-0000-0000-0000-000000000073
 # ╠═d1000000-0000-0000-0000-000000000026
