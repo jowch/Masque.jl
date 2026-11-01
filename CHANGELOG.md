@@ -19,6 +19,9 @@ All notable changes to this project are documented here. The format is based on
   skipped, with a warning that says why (#511).
 - When a plot on an `Axis3` or a `PolarAxis` is skipped, the warning links to the Supported
   plots and axes page. Before, it pointed to a maintainer document (#511).
+- The error for a figure with an `LScene` says how to get an `Axis3` instead:
+  `surface(z)`, `scatter(x, y, z)` and other 3D calls draw in an `LScene` unless given
+  `axis = (; type = Axis3)` (#521).
 
 ## [0.4.3] - 2026-10-31
 
