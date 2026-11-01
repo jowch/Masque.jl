@@ -251,8 +251,9 @@ a normal `Axis`.
 
 **Fix:** put interactive 3D in an `Axis3`, which both backends
 support. A 3D call such as `surface(z)` or `scatter(x, y, z)` draws in
-an `LScene` unless you pass `axis = (; type = Axis3)`. To show an `LScene` without interaction, display the figure
-itself instead of `masque(fig)`.
+an `LScene` unless you pass `axis = (; type = Axis3)`. To show an
+`LScene` without interaction, display the figure itself instead of
+`masque(fig)`.
 
 ### `selected=` on a layer that cannot start selected
 
