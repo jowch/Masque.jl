@@ -108,11 +108,11 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
         if (readout === null) return // still a click
         text = readout
     } else if (d.kind === "threshold") {
-        text = thresholdDrag.move(d, content, ctx.tipDigits_)
+        text = thresholdDrag.move(d, content, ctx.tipDigits_, ctx.tipExplicit_)
         if (liveDrag(ctx, d.id_)) requestState(ctx, { [d.id_]: thresholdDrag.envelopeAt(d, content) })
     } else if (d.kind === "view") {
         if (d.g_.mode === "orbit") {
-            text = viewDrag.tip(d, layout, ctx.tipDigits_)
+            text = viewDrag.tip(d, layout, ctx.tipDigits_, ctx.tipExplicit_)
             if (Math.hypot(layout.x - d.x0_, layout.y - d.y0_) >= viewDrag.VIEW_MIN_PX) {
                 const input = viewDrag.requestInput(d, layout, false)
                 ctx.gesture_.request(input)
@@ -126,7 +126,7 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
             const anchor = state.photoAnchor_ ?? unmapPoint(state.photo_, { x: d.x0_, y: d.y0_ })
             const next = panTo(anchor, cur, state.photo_.s)
             const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), next)
-            text = lim ? viewDrag.limitsTip(lim, ctx.tipDigits_) : viewDrag.tip(d, layout, ctx.tipDigits_)
+            text = lim ? viewDrag.limitsTip(lim, ctx.tipDigits_, d.t_, ctx.tipExplicit_) : viewDrag.tip(d, layout, ctx.tipDigits_, ctx.tipExplicit_)
             if (Math.hypot(cur.x - d.x0_, cur.y - d.y0_) >= viewDrag.VIEW_MIN_PX && lim) {
                 state.photo_ = next
                 ctx.photoPaint_(next)

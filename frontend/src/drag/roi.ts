@@ -1,7 +1,8 @@
 import { invertAxis } from "../geometry"
 import { computeSelection } from "../selection"
 import { SVG_NS, DEFAULT_STYLE, renderSelection } from "../highlight"
-import { clampX, clampY, fmt } from "../state"
+import { clampX, clampY } from "../state"
+import { fmtCoord } from "../template"
 import type { Drag, OverlayCtx, OverlayState, ROIBox } from "../state"
 import type { HitLayer, Manifest, ROIGeometry } from "../types"
 
@@ -141,8 +142,10 @@ export function move(ctx: OverlayCtx, state: OverlayState, d: Extract<Drag, { ki
         return `${sel.items.length} selected`
     }
     const b = roiBounds(box)
-    const n = ctx.tipDigits_
-    return `x:[${fmt(b.xmin, n)}, ${fmt(b.xmax, n)}] y:[${fmt(b.ymin, n)}, ${fmt(b.ymax, n)}]`
+    const t = box.t_
+    const n = ctx.tipDigits_, ex = ctx.tipExplicit_
+    const x = (v: number) => fmtCoord(v, t?.xfmt, n, ex, true), y = (v: number) => fmtCoord(v, t?.yfmt, n, ex, true)
+    return `x:[${x(b.xmin)}, ${x(b.xmax)}] y:[${y(b.ymin)}, ${y(b.ymax)}]`
 }
 
 // The fields a release here would set, without touching the selection: what an in-drag

@@ -614,7 +614,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         },
     })
     const ctx: OverlayCtx = {
-        manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
+        manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, tipExplicit_: manifest.tipDigits !== undefined, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
         hiFixed_: hiFixed, selFixed_: selFixed, linkGroup_: linkGroup, fade_: fade,
         thresholdLines_: thresholdLines, roiBoxes_: roiBoxes, chromeAt_: chromeAt,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
@@ -1264,7 +1264,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             // their center; the idle timer settles the last ones at full resolution.
             const lim = viewDrag.zoom3(state, id, shown, wheelScale(e.deltaY, e.deltaMode))
             ctx.gesture_.request({ id, limits: lim, settle: false })
-            setTipText(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_))
+            setTipText(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
             setTipVisible(ctx, true)
             const tp = tipOffset(ctx, e)
             placeTip(ctx, state, tp.x, tp.y)
@@ -1285,7 +1285,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const lim = matrixLimits(ctx.manifest_.transforms[axis], next)
         if (lim) {
             ctx.gesture_.request({ id, ...lim, settle: false, s: next.s, tx: next.tx, ty: next.ty })
-            setTipText(ctx, state, limitsTip(lim, ctx.tipDigits_))
+            setTipText(ctx, state, limitsTip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
             setTipVisible(ctx, true)
             const tp = tipOffset(ctx, e)
             placeTip(ctx, state, tp.x, tp.y)

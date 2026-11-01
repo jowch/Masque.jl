@@ -7,11 +7,11 @@ function _css_color(c)
 end
 
 # Only set kwargs are emitted; unset ones fall through to the overlay's built-in defaults.
-# Significant figures for a tooltip number with no format spec (the frontend's DEFAULT_SIGDIGITS).
-# Past 17 a Float64 has no more digits to show.
-const _DEFAULT_SIGDIGITS = 4
+# `tooltip_sigdigits`: `nothing` (unset) leaves the frontend's DEFAULT_SIGDIGITS of 4, below an
+# axis format string's own precision. Past 17 a Float64 has no more digits to show.
 
 function _check_sigdigits(n)
+    n === nothing && return nothing
     n isa Integer && !(n isa Bool) && 1 <= n <= 17 && return Int(n)
     throw(ArgumentError("tooltip_sigdigits must be an integer from 1 to 17, got $(repr(n))"))
 end
@@ -172,6 +172,16 @@ function _payload_keys(payloads)
     return ks
 end
 
+# The field sets of Masque's own default payloads that carry a mark's coordinates: points,
+# text and arrows. A layer whose every payload has one of these sets is flagged `coords`, and its
+# default tooltip prints `x`, `y` and `z` in the axis's format (#510). A user's own `payloads =`
+# change the set (theirs merge in first), so their fields print as plain numbers, as they did.
+const _COORD_PAYLOAD_KEYS = (
+    (:index, :x, :y), (:index, :x, :y, :z), (:text, :index, :x, :y), (:text, :index, :x, :y, :z),
+    (:index, :x, :y, :u, :v), (:index, :x, :y, :z, :u, :v, :w),
+)
+_coord_payloads(pls) = !isempty(pls) && all(pl -> pl isa NamedTuple && keys(pl) in _COORD_PAYLOAD_KEYS, pls)
+
 function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     hs = hoverstyle(i)
     style = Dict{String, Any}("width" => hs.width)
@@ -182,6 +192,7 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         "events" => [string(e) for e in L.events],
         "style" => style,
     )
+    _coord_payloads(L.payloads) && (d["coords"] = true)
     if L.kind in (:segments, :polyline, :lines, :rects, :polygons)
         t = hit_tol(i)
         t === nothing || (d["tol"] = round(Int, t * ctx.scaling))
@@ -444,6 +455,7 @@ _transform_dict(t::AxisTransform) = Dict{String, Any}(
     "is3d" => t.is3d,
     "ispolar" => t.ispolar,
     "polar" => _polar_dict(t.polar),
+    (k => f for (k, f) in ("xfmt" => t.xfmt, "yfmt" => t.yfmt, "zfmt" => t.zfmt) if f !== nothing)...,
 )
 
 _polar_dict(::Nothing) = nothing
@@ -469,7 +481,7 @@ the published manifest.
 """
 function build_manifest(
         interactables, ctx::InteractionContext;
-        selected = nothing, tip_style = nothing, tip_digits = _DEFAULT_SIGDIGITS, background = nothing,
+        selected = nothing, tip_style = nothing, tip_digits = nothing, background = nothing,
         overlay_style = nothing, owners_out = nothing, suspend_surfaces = false, with_initial = true,
     )
     plan = interactables
@@ -578,7 +590,9 @@ function build_manifest(
     initial === nothing || (m["initial"] = initial)
     (tip_style === nothing || isempty(tip_style)) || (m["tipStyle"] = tip_style)
     (overlay_style === nothing || isempty(overlay_style)) || (m["overlayStyle"] = overlay_style)
-    tip_digits == _DEFAULT_SIGDIGITS || (m["tipDigits"] = tip_digits)
+    # Sent only when the user set it: a set `tooltip_sigdigits` outranks a Makie format string's
+    # precision, and Masque's default does not (#510).
+    tip_digits === nothing || (m["tipDigits"] = tip_digits)
     background === nothing || (m["background"] = _css_color(background))
     # An axis whose empty plot area is not the figure's colour ships that colour as `fill`: the
     # selected look fades unpicked marks toward it (#394).
@@ -774,11 +788,12 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   shows at; on `:webgl`, `2`. A larger number gives a sharper, heavier picture. Neither this
   nor `max_width` follows `CairoMakie.activate!` or `WGLMakie.activate!`.
 - `tooltip_sigdigits` — significant figures for a tooltip number that has no format spec.
-  Default `4`, so `0.30000000000000004` shows as `0.3` and `2.71828` as `2.718`; integers,
-  and the whole-number part of a value at or above `10^tooltip_sigdigits`, show in full.
-  Readouts and drag labels keep their trailing zeros (`2.500`), so they don't change width as
-  the pointer moves. A template field with a spec, such as `\$(x:.2f)`, ignores it, and the
-  `@bind` value is never rounded.
+  Unset, it is 4, so `0.30000000000000004` shows as `0.3` and `2.71828` as `2.718`;
+  integers, and the whole-number part of a value at or above `10^tooltip_sigdigits`, show in
+  full. Readouts and drag labels keep their trailing zeros (`2.500`), so they don't change
+  width as the pointer moves. A coordinate on an axis with a format string, such as
+  `ytickformat = "{:.1f} mV"`, shows that format's precision unless you set this. A template
+  field with a spec, such as `\$(x:.2f)`, ignores it, and the `@bind` value is never rounded.
 - `tooltipstyle` — the look of the tooltip card, as a `NamedTuple`:
   `tooltipstyle = (; bg = :black, color = :white, radius = 6)`. Keys: `bg`, `color`, `accent`,
   `font`, `font_size`, `radius`, `caret`. Each key you leave out keeps the built-in look. See
@@ -835,7 +850,7 @@ _check_onchange(f) = f === nothing || f isa Function || throw(
 function _masque(
         fig, interactables::AbstractVector; backend::Union{Nothing, Symbol, AbstractBackend} = nothing,
         max_width = nothing, px_per_unit = nothing, selected = nothing, onchange = nothing,
-        tooltipstyle = nothing, tooltip_sigdigits = _DEFAULT_SIGDIGITS, overlaystyle = nothing,
+        tooltipstyle = nothing, tooltip_sigdigits = nothing, overlaystyle = nothing,
     )
     tip_digits = _check_sigdigits(tooltip_sigdigits)
     _check_onchange(onchange)
