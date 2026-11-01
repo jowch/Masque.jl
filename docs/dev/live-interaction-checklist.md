@@ -203,7 +203,7 @@ bake it; hover/click or drag only.
 | Scatter (dark figure) | `:circles` | fade toward the dark background | tip, click `@bind`, persist, flat `#c8c8c8` edge stroke + dodge fill brightens the marker's interior (screenshot) on the dark figure too, still readable |
 | Arrows3D | `:segments` | ring | tip, click `@bind`, persist |
 | Axis3 scatter / meshscatter | `:circles` | fade, `r` from the projected mark | tip, click `@bind`, persist, hover highlight on the projected mark |
-| Axis3 lines | `:lines` | none (one element) | tip, readout `x`/`y`/`z` (#502), click `@bind` (whole line) |
+| Axis3 lines | `:lines` | point ring (`selected = [1]`) | tip, readout `x`/`y`/`z` (#502), click `@bind` picks the point, with `z` (#518) |
 | Axis3 wireframe | `:segments` (one per edge) | ring | tip, click `@bind`, persist, ring on the edge |
 | Axis3 overlapping pair | `:circles` over `:circles` | none | the plot drawn last answers where both claim the pixel (its layer sorts first), highlight takes its circle |
 | Text | `:rects` | fade | tip, click `@bind`, persist |

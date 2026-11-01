@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Breaking:** a click on a bound line on an `Axis3` picks the point you plotted nearest
+  the click, as on a 2D `Axis`, where it used to pick the whole line. `pick.index` is now
+  that point's position in your data, `pick.line` says which line it is on, and `pick.x`,
+  `pick.y` and `pick.z` hold it. `selected=` indices on such a line name points too. To
+  upgrade, code that read `pick.index` as the line now reads `pick.line` (#518).
+
 ### Added
 - Hovering a line on an `Axis3` shows `x`, `y` and `z` of the point you plotted nearest the
   pointer, as a line on a 2D `Axis` does, and a tooltip template can name `z`. This covers

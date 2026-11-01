@@ -3697,10 +3697,8 @@ try {
       // A closed mark's pick is drawn by the fade and keeps its hover fill and halo (#394); any
       // other pick, a picked point on a line included, is the hovered mark itself (the line's
       // hover dot sits on the sample just picked), which draws no hover chrome once selected.
-      // An Axis3 line (#502) is picked whole but reads out a point, so the hover dot at that
-      // point stays over the picked line, as the line hover recipe draws it.
       const fadePick = echo.picked.includes(`${layer.id}:${clickIdx}`);
-      const wantHi = fadePick ? 2 : layer.kind === "lines" && layer.zpoints ? 1 : 0;
+      const wantHi = fadePick ? 2 : 0;
       if (echo.hi !== wantHi) throw new Error(`${key}/click-echo: g.hi=${echo.hi} over the echo, expected ${wantHi}`);
       const expectSel = closedHover ? 2 : 1;
       if (echo.sel !== expectSel) {

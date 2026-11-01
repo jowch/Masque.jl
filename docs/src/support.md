@@ -20,7 +20,7 @@ radius under the pointer.
 | Select several marks (`select = :many`, see [Select several marks](@ref)) | yes | yes ⁴ | yes |
 | Drag a box to select marks (with `select = :many`) | yes ⁵ | yes ⁵ | yes |
 | Link selections across plots ([`linked`](@ref)) | yes | yes | yes |
-| Hover a line to read the nearest point you plotted | yes | yes ⁷ | yes |
+| Hover a line to read the nearest point you plotted | yes | yes | yes |
 | Hover a surface to read its height | no ⁶ | yes | no |
 | Read `(x, y)` ([`AxisInteractable`](@ref)) | yes ¹ | no | yes ³ |
 | Drag a threshold ([`ThresholdInteractable`](@ref)) | yes ¹ | no | no |
@@ -45,9 +45,6 @@ axes must be numeric, so a categorical axis is refused.
 turns the view, so hold Alt (Option on a Mac) to draw the box.
 
 ⁶ Draw the matrix with `heatmap!` to read its values on a 2D `Axis`.
-
-⁷ The tooltip shows `x`, `y` and `z`, but a click picks the whole
-line, not the point.
 
 A "no" in the last five rows, a scale outside that list (such as
 `Makie.pseudolog10` or `Makie.Symlog10`), or a categorical axis where ²
@@ -117,9 +114,10 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | `Legend` (block) | `:legend` | `:rects` | yes | yes |
 
 Each `lines!` and `stairs!` plot is one element for its whole line, and
-`series!` has one element per series. On a 2D `Axis` or a
-`PolarAxis`, hovering a line shows the point you plotted nearest the
-pointer, and a click on a line named in `bind` picks that point. Only
+`series!` has one element per series. Hovering a line shows the point
+you plotted nearest the pointer, and a click on a line named in `bind`
+picks that point. A `stairs!` on an `Axis3` responds as one whole line.
+Only
 the body of a `boxplot!` responds, not its whiskers or outliers, and an
 `annotation!` responds on its text. In a `contourf!` plot, hovering inside a hole of a filled
 level reaches nothing unless another level is drawn there. A `scatter!`

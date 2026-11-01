@@ -491,14 +491,22 @@ Masque.interactables(ax, p::SeedHeatParts) = (
         v = tv(wm, Dict("lines" => Dict("items" => [pick("lines", 0, 1)])))
         @test only(v).index == 2 && only(v).line == 1 && only(v).y == 2.0
 
-        # A line on an Axis3 ships its points for the hover readout (#502), but its pick stays
-        # the whole line.
+        # A line on an Axis3 picks a point too (#518), and the pick has its z.
         f3 = Figure(size = (400, 300)); a3 = Axis3(f3[1, 1])
         l3 = lines!(a3, [0.0, 1.0, 2.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0])
         w3 = masque(f3; bind = (path = l3,))
         @test haskey(only(w3.manifest["layers"]), "zpoints")
-        @test commit_field(w3, Dict{String, Any}("layer" => "path", "index" => 0)).index == 1
-        @test iv(masque(f3; bind = (path = l3,), selected = (path = [1],))).path.index == 1
+        p3 = commit_field(w3, Dict{String, Any}("layer" => "path", "index" => 0, "sample" => 2))
+        @test p3.index == 3 && p3.line == 1 && (p3.x, p3.y, p3.z) == (2.0, 0.0, 1.0)
+        s3 = iv(masque(f3; bind = (path = l3,), selected = (path = [2],))).path
+        @test s3.index == 2 && (s3.x, s3.y, s3.z) == (1.0, 1.0, 0.0)
+        @test_throws ArgumentError masque(f3; bind = (path = l3,), selected = (path = [4],))
+        # A staircase on an Axis3 ships no points, so it is still picked whole.
+        f4 = Figure(size = (400, 300)); a4 = Axis3(f4[1, 1])
+        st = stairs!(a4, [0.0, 1.0, 2.0], [0.0, 1.0, 0.0])
+        w4 = masque(f4; bind = (st = st,))
+        @test !haskey(only(w4.manifest["layers"]), "points")
+        @test commit_field(w4, Dict{String, Any}("layer" => "st", "index" => 0)).index == 1
     end
 
     @testset "recipes nest: parts under the plot's name (#335)" begin

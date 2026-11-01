@@ -193,11 +193,12 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
-        # `lines!` on Axis3: one element, so nothing is baked selected and hover takes it. A
-        # hover reads out the nearest plotted point's x, y and z (#502); a click still picks
-        # the whole line.
+        # `lines!` on Axis3: a hover reads out the nearest plotted point's x, y and z (#502),
+        # and a click picks that point, as on a 2D axis (#518): `selected = [1]` rings the
+        # first point, and the click lands on the third.
         "key" => "lines3d", "layerId" => "lines", "layerKind" => "lines",
-        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "selected" => "point", "circle" => false, "selectedIndex" => 0, "selectedSample" => 0,
+        "clickIndex" => 0, "clickSample" => 2,
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
         "readout" => Dict("vertex" => 2, "text" => ["x2", "y4", "z3"]),
     ),
@@ -1055,7 +1056,7 @@ function build_kind_sweep()
         ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "lines3d")
         ln = lines!(ax, Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3), (4, 4, 2)]; color = :gray, linewidth = 4)
         # Bound, so the Axis3 line takes clicks; a default line is hover-only (#335).
-        masque(fig; bind = (ln,))
+        masque(fig; bind = (ln,), selected = Dict(:lines => [1]))
     end
 
     meshscatter3d = let
