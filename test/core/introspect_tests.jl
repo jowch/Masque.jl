@@ -892,6 +892,36 @@ end
             cols = [x for y in axes(img, 1), x in axes(img, 2) if Float64(Makie.red(img[y, x])) < 0.5]
             return isempty(cols) ? 0 : maximum(cols) - minimum(cols) + 1
         end
+        @testset "Axis3 scatter in markerspace = :data: the hit circle is the drawn marker (#511)" begin
+            # Sized in world units, so the marker keeps its pixel size whatever the limits.
+            for lims in ((0, 4, 0, 4, 0, 4), (0, 10, 0, 5, 0, 20))
+                f = Figure(size = (480, 320))
+                a = Axis3(f[1, 1]; azimuth = 0.4, elevation = 0.5, limits = lims)
+                p = scatter!(a, [Point3f(2, 2, 2)]; color = :red, markerspace = :data, markersize = 0.15)
+                w = @test_logs masque(f)
+                L = only(w.manifest["layers"])
+                @test L["kind"] == "circles"
+                cx, cy, r = Float64.(L["geometry"])
+                img = Makie.colorbuffer(f; px_per_unit = w.manifest["width"] / 480)
+                red = [
+                    (k[2], k[1]) for k in CartesianIndices(img)
+                        if Float64(Makie.red(img[k])) > 0.8 && Float64(Makie.green(img[k])) < 0.3
+                ]
+                @test length(red) > 100
+                d = [hypot(x - cx, y - cy) for (x, y) in red]
+                @test maximum(d) < r + 1.5
+                @test maximum(d) > r - 1.5
+            end
+        end
+        @testset "Axis3 scatter in markerspace = :data with a marker_offset is skipped (#511)" begin
+            # Makie adds the offset in the axis box's units, which move with the limits.
+            f = Figure(size = (480, 320))
+            a = Axis3(f[1, 1]; limits = (0, 10, 0, 5, 0, 20))
+            scatter!(a, [Point3f(5, 2.5, 10)]; markerspace = :data, markersize = 0.15, marker_offset = Vec3f(0.3, 0, 0))
+            lines!(a, [1.0, 2.0], [1.0, 2.0], [1.0, 2.0])
+            w = @test_logs (:warn, r"skipping scatter;") match_mode = :any masque(f)
+            @test [L["id"] for L in w.manifest["layers"]] == ["lines"]
+        end
         @testset "a meshscatter's hit follows scale! in size, not rotate!" begin
             for (move!, factor) in ((p -> scale!(p, 2, 2, 2), 2), (p -> rotate!(p, π / 4), 1))
                 f = Figure(size = (500, 500)); a = Axis(f[1, 1]; limits = (-3, 3, -3, 3), aspect = DataAspect())
