@@ -818,7 +818,7 @@ try {
   {
     const key = "added_plot";
     const layers = await layersOf(key);
-    const line = layers.find((l) => l.kind === "lines"), pts = layers.find((l) => l.kind === "scatter");
+    const line = layers.find((l) => l.kind === "lines"), pts = layers.find((l) => l.id === "scatter");
     if (!line || !pts) throw new Error(`${key}: want a scatter and the added line, got ${JSON.stringify(layers.map((l) => [l.id, l.kind]))}`);
     const [x0, y0, x1] = line.geometry[0];
     const t = await hoverAt(key, (x0 + x1) / 2, y0);
