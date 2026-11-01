@@ -1,0 +1,1015 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Overlapping species scatter; legend click fades the other classes</title>
+  <script src="shared/ecbdf1ffef919f206bac.js"></script>
+  <script>
+{
+  function isDocDark() {
+  var c = (window.parent && window.parent.document.documentElement.className) || "";
+  if (!c) return false;
+  if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
+  return /(^|\s)theme--/.test(c);
+}
+  try { if (isDocDark()) document.documentElement.classList.add("pluto-dark"); } catch (e) {}
+}
+</script>
+
+  <style>
+:root {
+  --pluto-cell-spacing: 17px;
+  --pluto-operator-ligatures: none;
+  --julia-mono-font-stack: JuliaMono, Menlo, "Roboto Mono", "Lucida Sans Typewriter", "Source Code Pro", monospace;
+  --lato-ui-font-stack: "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Cantarell, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", system-ui, sans-serif;
+  --custom-code-font-stack: "";
+  --code-font-stack: var(--julia-mono-font-stack);
+}
+html:not(.pluto-dark) { color-scheme: light; }
+html.pluto-dark { color-scheme: dark; }
+html { font-size: 16px; }
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  overflow: hidden;
+  background-color: var(--main-bg-color);
+  color: var(--pluto-output-color);
+  font-family: var(--lato-ui-font-stack);
+}
+body { position: relative; padding: 2.25rem 0; }
+pluto-notebook {
+  display: block;
+  overflow: hidden;
+  background: var(--main-bg-color);
+  --code-font-stack: var(--custom-code-font-stack), var(--julia-mono-font-stack);
+  padding-left: 25px;
+  padding-right: 6px;
+}
+pluto-output {
+  font-family: "Alegreya Sans", "Trebuchet MS", sans-serif;
+  font-size: 14.5px;
+  font-weight: 400;
+  color: var(--pluto-output-color);
+  display: block;
+  padding-left: 10px;
+  padding-right: 10px;
+  align-items: baseline;
+  overflow: hidden;
+  background-color: var(--pluto-output-bg-color);
+}
+pluto-output pre {
+  display: inline-block;
+  margin: 0px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  tab-size: 4;
+  font-family: var(--julia-mono-font-stack);
+  font-size: 0.8rem;
+  font-variant-ligatures: none;
+}
+pluto-cell {
+  display: block;
+  min-height: calc(23px + 1px + 1px);
+  margin-top: var(--pluto-cell-spacing);
+  position: relative;
+}
+pluto-cell:first-child { margin-top: 0; }
+pluto-output:not(.rich_output) {
+  display: flex;
+  flex-wrap: wrap;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+pluto-output > assignee {
+  font-family: var(--julia-mono-font-stack);
+  font-size: 0.75rem;
+  font-variant-ligatures: none;
+  color: var(--cm-color-variable) !important;
+  font-weight: 700;
+}
+pluto-output > assignee::after {
+  content: "\a0=\a0";
+  opacity: 0.6;
+}
+pluto-output > assignee:empty { display: none; }
+pluto-output > div {
+  flex-shrink: 0;
+  overflow-y: hidden;
+}
+pluto-trafficlight {
+  box-sizing: content-box;
+  width: 4px;
+  position: absolute;
+  left: -4px;
+  top: 0px;
+  bottom: 0px;
+  pointer-events: none;
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+  border-left-color: var(--normal-cell-color);
+  background: var(--normal-cell-color);
+  overflow: hidden;
+}
+.ip-host { isolation: isolate; max-width: 100%; }
+.masque-sim-chip {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--pluto-output-color) 28%, transparent);
+  background: transparent;
+  color: var(--pluto-output-color);
+  font-family: var(--lato-ui-font-stack);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  cursor: help;
+  user-select: none;
+}
+.masque-sim-chip-icon {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+.masque-sim-chip-label code {
+  font-family: var(--julia-mono-font-stack);
+  font-size: 0.92em;
+  font-weight: 600;
+}
+.masque-sim-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: max-content;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--pluto-output-color) 22%, transparent);
+  background: var(--pluto-output-bg-color);
+  color: var(--pluto-output-color);
+  box-shadow: 0 6px 18px color-mix(in srgb, #000 16%, transparent);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-align: left;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity 80ms ease, visibility 80ms ease, transform 80ms ease;
+}
+.masque-sim-chip:hover .masque-sim-tip,
+.masque-sim-chip:focus-visible .masque-sim-tip {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+pluto-input {
+  display: block;
+  position: relative;
+}
+/* Unfolded source stands in for Pluto's CodeMirror box: same border, same token colors. */
+pre.masque-src {
+  display: block;
+  margin: 0;
+  padding: 2px 6px 2px 4px;
+  overflow-x: auto;
+  white-space: pre;
+  tab-size: 4;
+  font-family: var(--code-font-stack);
+  font-size: 15px;
+  line-height: 1.45;
+  font-variant-ligatures: none;
+  background: transparent;
+  color: var(--cm-color-editor-text);
+  border: 1px solid var(--normal-cell-color);
+  border-left: none;
+  border-bottom-right-radius: 4px;
+  min-height: 25px;
+}
+/* Same mapping as Pluto frontend/highlightjs.css: token classes onto the editor palette. */
+pre.masque-src .hljs-keyword { color: var(--cm-color-keyword); }
+pre.masque-src .hljs-built_in,
+pre.masque-src .hljs-type { color: var(--cm-color-builtin); }
+pre.masque-src .hljs-literal,
+pre.masque-src .hljs-number { color: var(--cm-color-literal); }
+pre.masque-src .hljs-string { color: var(--cm-color-string); }
+pre.masque-src .hljs-symbol { color: var(--cm-color-symbol); }
+pre.masque-src .hljs-comment { color: var(--cm-color-comment); }
+pre.masque-src .hljs-meta { color: var(--cm-color-macro); font-weight: 700; }
+pluto-cell.masque-note pluto-output {
+  font-family: var(--lato-ui-font-stack);
+  font-size: 15px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+pluto-cell.masque-note pluto-output p {
+  margin: 0.4em 0;
+}
+
+html:not(.pluto-dark) {
+        --image-filters: none;
+        --out-of-focus-opacity: 0.25;
+
+        /* Color scheme */
+        --main-bg-color: white;
+        --rule-color: rgba(0, 0, 0, 0.15);
+        --kbd-border-color: #b3b3b3;
+        --header-bg-color: white;
+        --header-border-color: rgba(0, 0, 0, 0.1);
+        --ui-button-color: #2a2a2b;
+        --cursor-color: black;
+
+        /* Cells */
+        --normal-cell: 0, 0, 0;
+        --code-differs: 160, 130, 28;
+        --error-color: 240, 168, 168;
+        --normal-cell-color: rgba(var(--normal-cell), 0.1);
+        --dark-normal-cell-color: rgba(var(--normal-cell), 0.2);
+        --selected-cell-color: rgba(40, 78, 189, 0.4);
+        --code-differs-cell-color: rgba(var(--code-differs), 0.68);
+        --error-cell-color: rgba(var(--error-color), 0.7);
+        --bright-error-cell-color: rgb(var(--error-color));
+        --light-error-cell-color: rgba(var(--error-color), 0.05);
+
+        /*Export styling*/
+        --export-bg-color: rgb(60, 67, 101);
+        --export-color: rgb(228, 228, 228);
+        --export-card-bg-color: rgba(255, 255, 255, 0.8);
+        --export-card-title-color: rgba(0, 0, 0, 0.7);
+        --export-card-text-color: rgba(0, 0, 0, 0.5);
+        --export-card-shadow-color: #00000029;
+
+        /*Frontmatter styling*/
+        --frontmatter-button-bg-color: white;
+        --frontmatter-outline-color: hsl(230, 14%, 11%);
+        --frontmatter-input-bg-color: #fbfbfb;
+        --frontmatter-input-border-color: hsl(207deg 24% 87%);
+
+        /* PlutoLand upload styling */
+        --plutoland-bg-color: white;
+        --plutoland-bigbutton-bg-color: white;
+        --plutoland-url-fg: #375bbd;
+        --plutoland-url-bg: #f7fbff;
+        --plutoland-or-bg-color: hsl(210 20% 83% / 1);
+
+        /*Pluto output styling */
+        --pluto-schema-types-color: rgba(0, 0, 0, 0.4);
+        --pluto-schema-types-border-color: rgba(0, 0, 0, 0.2);
+        /* --pluto-dim-output-color */
+        --pluto-output-color: hsl(0, 0%, 25%);
+        --pluto-output-h-color: hsl(0, 0%, 12%);
+        --pluto-output-bg-color: white;
+        --a-underline: #00000059;
+        --blockquote-color: #555;
+        --blockquote-bg: #f2f2f2;
+        --admonition-title-color: white;
+        --jl-message-color: rgb(219 233 212);
+        --jl-message-accent-color: rgb(158, 200, 137);
+        --jl-info-color: rgb(214 227 244);
+        --jl-info-accent-color: rgb(148, 182, 226);
+        --jl-warn-color: rgb(236 234 213);
+        --jl-warn-accent-color: rgb(207, 199, 138);
+        --jl-danger-color: rgb(245 218 215);
+        --jl-danger-accent-color: rgb(226, 157, 148);
+        --jl-debug-color: rgb(245 218 215);
+        --jl-debug-accent-color: rgb(226, 157, 148);
+        --footnote-border-color: rgba(23, 115, 119, 0.15);
+        --table-border-color: rgba(0, 0, 0, 0.2);
+        --table-bg-hover-color: rgba(159, 158, 224, 0.15);
+        --pluto-tree-color: rgb(0 0 0 / 38%);
+
+        /*pluto cell styling*/
+        --disabled-cell-bg-color: rgba(139, 139, 139, 0.25);
+        --selected-cell-bg-color: rgba(40, 78, 189, 0.24);
+        --hover-scrollbar-color-1: rgba(0, 0, 0, 0.15);
+        --hover-scrollbar-color-2: rgba(0, 0, 0, 0.05);
+        --skip-as-script-background-color: #ccc;
+        --depends-on-skip-as-script-background-color: #eee;
+
+        /* Pluto shoulders */
+        --shoulder-hover-bg-color: rgba(0, 0, 0, 0.05);
+
+        /* Logs */
+        --pluto-logs-bg-color: hsl(0deg 0% 98%);
+        --pluto-logs-key-color: rgb(0 0 0 / 51%);
+        --pluto-logs-progress-fill: #ffffff;
+        --pluto-logs-progress-bg: #e7e7e7;
+        --pluto-logs-progress-border: hsl(210deg 16% 74%);
+        --pluto-logs-info-color: white;
+        --pluto-logs-info-accent-color: inherit;
+        --pluto-logs-warn-color: rgb(236 234 213);
+        --pluto-logs-warn-accent-color: #665f26;
+        --pluto-logs-danger-color: rgb(245 218 215);
+        --pluto-logs-danger-accent-color: rgb(172 66 52);
+        --pluto-logs-debug-color: rgb(236 223 247);
+        --pluto-logs-debug-accent-color: rgb(100 50 179);
+
+        /*Top navbar styling*/
+        --nav-h1-text-color: black;
+        --nav-filepicker-color: #6f6f6f;
+        --nav-filepicker-border-color: #b2b2b2;
+        --nav-filepicker-suggest-color: rgba(129, 146, 160, 0.5);
+        --nav-process-status-bg-color: white;
+        --nav-process-status-color: var(--pluto-output-h-color);
+
+        /*header*/
+        --restart-recc-header-color: rgba(114, 192, 255, 0.56);
+        --restart-recc-accent-color: rgba(114, 192, 255);
+        --restart-req-header-color: rgba(170, 41, 32, 0.56);
+        --dead-process-header-color: rgb(230 88 46 / 38%);
+        --loading-header-color: hsla(290, 10%, 80%, 0.5);
+        --disconnected-header-color: rgba(255, 169, 114, 0.56);
+        --binder-loading-header-color: hsl(51deg 64% 90% / 50%);
+
+        /*loading bar*/
+        --loading-grad-color-1: #f1dba9;
+        --loading-grad-color-2: #d7d7d0;
+
+        /*saveall container*/
+        --overlay-button-bg: #ffffff;
+        --overlay-button-border: hsl(0 4% 91% / 1);
+        --overlay-button-border-save: #f3f2f2;
+        /* --overlay-button-color */
+
+        /*input_context_menu*/
+        --input-context-menu-border-color: rgba(0, 0, 0, 0.1);
+        --input-context-menu-bg-color: white;
+        --input-context-menu-soon-color: #55555544;
+        --input-context-menu-hover-bg-color: rgba(0, 0, 0, 0.1);
+        --input-context-menu-li-color: #1e1e1e;
+
+        /* ai features */
+        --ai-gradient-bg: linear-gradient(20deg, #f9ecff, #fff4f2);
+        --ai-prompt-bg: #fbffff;
+
+        /*Pkg status*/
+        --pkg-popup-bg: white;
+        --pkg-popup-border-color: #f0e4ee;
+        --pkg-popup-buttons-bg-color: white;
+        --pkg-version-color: #666;
+        --black: black;
+        --white: white;
+        --pkg-terminal-bg-color: #232433;
+        --pkg-terminal-border-color: #c3c3c3;
+
+        /* run area*/
+        --pluto-runarea-bg-color: hsl(0, 0, 97%);
+        --pluto-runarea-span-color: hsl(353, 5%, 64%);
+
+        /*drop ruler*/
+        --dropruler-bg-color: rgba(0, 0, 0, 0.5);
+
+        /* jlerror */
+        --jlerror-header-color: #4f1616;
+        --jlerror-mark-bg-color: rgb(243 243 243);
+        --jlerror-a-bg-color: #f5efd9;
+        --jlerror-a-border-left-color: #704141;
+        --jlerror-mark-color: black;
+
+        /* helpbox */
+        --helpbox-bg-color: white;
+        --helpbox-box-shadow-color: #00000010;
+        --helpbox-header-bg-color: hsl(0deg 0% 92%);
+        --helpbox-header-tab-bg-color: white;
+        --helpbox-header-color: hsl(230, 14%, 11%);
+        --helpbox-search-bg-color: #fbfbfb;
+        --helpbox-search-border-color: hsl(207deg 24% 87%);
+        --helpbox-notfound-search-color: rgb(139, 139, 139);
+        --helpbox-text-color: black;
+        --code-section-bg-color: whitesmoke;
+        --code-section-bg-color: #f3f3f3; /* TODO: Should this be `-border-color`? */
+        --process-item-bg: #f2f2f2;
+        --process-busy: #ffcd70;
+        --process-finished: hsl(126deg 30% 60%);
+        --process-undefined: rgb(151, 151, 151);
+        --process-failed: hsl(0deg 72.62% 64.6%);
+        --process-notify-bg: hsl(44.86deg 50% 94%);
+
+        /*footer*/
+        --footer-color: #333333;
+        --footer-bg-color: #d7dcd3;
+        --footer-atag-color: black;
+        --footer-input-border-color: #818181;
+        --footer-filepicker-button-color: white;
+        --footer-filepicker-focus-color: #896c6c;
+        --footnote-border-color: rgba(23, 115, 119, 0.15);
+        --settings-bg-color: hsl(328 100% 98% / 1);
+        --settings-p2-color: #717070;
+        --settings-header-bg-color: #f9dadf;
+
+        /* undo delete cell*/
+        --undo-delete-box-shadow-color: #0000000f;
+
+        /*codemirror hints*/
+        --cm-color-editor-tooltip-border: rgba(0, 0, 0, 0.2);
+        --cm-color-editor-li-aria-selected-bg: #16659d;
+        --cm-color-editor-li-aria-selected: white;
+        --cm-color-editor-li-notexported: rgba(0, 0, 0, 0.5);
+        --code-background: hsla(46, 90%, 98%, 1);
+        --cm-color-code-differs-gutters: rgba(214, 172, 35, 0.2);
+        --cm-color-line-numbers: #8d86875e;
+        --cm-selection-background: hsl(214deg 100% 73% / 48%);
+        --cm-selection-background-blurred: hsl(214deg 0% 73% / 48%);
+        --cm-highlighted: #cbceb668;
+
+        /* code highlighting */
+        --cm-color-editor-text: oklch(30% 0% 0deg);
+        --cm-color-comment: oklch(45% 60% 0deg);
+        --cm-color-keyword: oklch(45% 80% 30deg);
+        --cm-color-definition: oklch(28.455% 0.11677 29.223);
+        --cm-color-control-operator: oklch(56.456% 0.23502 350.694);
+        --cm-color-symbol: oklch(45% 80% 90deg);
+        --cm-color-command: oklch(35% 100% 120deg);
+        --cm-color-macro: oklch(45% 80% 150deg);
+        --cm-color-string: oklch(35% 100% 180deg);
+        --cm-color-variable: oklch(45% 40% 270deg);
+        --cm-color-typedef-shadow: oklch(0.91 0.09 72.03);
+        --cm-color-literal: oklch(45% 60% 330deg);
+        --cm-filter-type: brightness(150%) saturate(50%);
+        --cm-color-builtin: #5e7ad3;
+        --cm-color-function: #cc80ac;
+        --cm-color-link: #815ba4;
+        --cm-color-bracket: #41323f;
+        --cm-color-matchingBracket: black;
+        --cm-color-matchingBracket-bg: #1b4bbb21;
+        --cm-color-placeholder-text: rgba(0, 0, 0, 0.2);
+        --cm-color-clickable-underline: #ced2ef;
+
+        /* Mixed parsers */
+        --cm-color-html: #48b685;
+        --cm-color-html-accent: #00ab85;
+        --cm-color-css: #876800;
+        --cm-color-css-accent: #696200;
+        --cm-css-why-doesnt-codemirror-highlight-all-the-text-aaa: #3b3700;
+        --cm-color-md: #005a9b;
+        --cm-color-md-accent: #00a9d1;
+
+        /*autocomplete menu*/
+        --autocomplete-menu-bg-color: white;
+
+        /* Landing colors */
+        --index-text-color: hsl(0, 0, 60);
+        --index-light-text-color: #838383;
+        --index-clickable-text-color: black;
+        --docs-binding-bg: #8383830a;
+        --index-card-bg: white;
+        --welcome-mywork-bg: hsl(35deg 66% 93%);
+        --welcome-newnotebook-bg: whitesmoke;
+        --welcome-recentnotebook-bg: white;
+        --welcome-recentnotebook-border: #dfdfdf;
+        --welcome-open-bg: #fbfbfb;
+        --welcome-card-author-backdrop: #ffffffb0;
+
+        /* confirm-before-long-runtime dialog */
+        --confirm-runtime-bg: linear-gradient(180deg, #ffffff, #fdf8e9);
+        --confirm-runtime-bonus-bg: #ffffff;
+        --confirm-runtime-bonus-border: #dadaf1;
+        --confirm-runtime-button-bg: #f4f4f4;
+        --confirm-runtime-button-border: #c1c1c1;
+        --confirm-runtime-yes-bg: black;
+        --confirm-runtime-yes-color: #fff;
+        --confirm-runtime-yes-border: #9b9b9b;
+        --confirm-runtime-yes-progress: linear-gradient(90deg, black, #757575);
+    }
+html.pluto-dark {
+        --image-filters: invert(1) hue-rotate(180deg) contrast(0.8);
+        --out-of-focus-opacity: 0.5;
+
+        /* Color scheme */
+        --main-bg-color: hsl(0deg 0% 12%);
+        --rule-color: rgba(255, 255, 255, 0.15);
+        --kbd-border-color: #a3a1a1;
+        --header-bg-color: hsl(30deg 3% 16%);
+        --header-border-color: transparent;
+        --ui-button-color: rgb(255, 255, 255);
+        --cursor-color: white;
+
+        /* Cells */
+        --normal-cell: 100, 100, 100;
+        /* --code-differs */
+        --error-color: 255, 125, 125;
+        --normal-cell-color: rgba(var(--normal-cell), 0.2);
+        --dark-normal-cell-color: rgba(var(--normal-cell), 0.4);
+        --selected-cell-color: rgb(40 147 189 / 65%);
+        --code-differs-cell-color: #9b906c;
+        --error-cell-color: rgba(var(--error-color), 0.6);
+        --bright-error-cell-color: rgba(var(--error-color), 0.9);
+        --light-error-cell-color: rgba(var(--error-color), 0);
+
+        /*Export styling*/
+        --export-bg-color: hsl(225deg 17% 18%);
+        --export-color: rgb(255 255 255 / 84%);
+        --export-card-bg-color: rgb(73 73 73);
+        --export-card-title-color: rgba(255, 255, 255, 0.85);
+        --export-card-text-color: rgb(255 255 255 / 70%);
+        --export-card-shadow-color: #0000001c;
+
+        /*Frontmatter styling*/
+        --frontmatter-button-bg-color: #554e4e;
+        --frontmatter-outline-color: rgb(255 248 235);
+        --frontmatter-input-bg-color: #2c2c2c;
+        --frontmatter-input-border-color: #757575;
+
+        /* PlutoLand upload styling */
+        --plutoland-bg-color: var(--main-bg-color);
+        --plutoland-bigbutton-bg-color: #5b5858;
+        --plutoland-url-fg: #c0cdee;
+        --plutoland-url-bg: #02376f;
+        --plutoland-or-bg-color: #323334;
+
+        /*Pluto output styling */
+        --pluto-schema-types-color: hsl(0deg 0% 63%);
+        --pluto-schema-types-border-color: rgba(255, 255, 255, 0.2);
+        --pluto-dim-output-color: hsl(0, 0, 70%);
+        --pluto-output-color: hsl(0deg 0% 77%);
+        --pluto-output-h-color: hsl(0, 0%, 90%);
+        --pluto-output-bg-color: var(--main-bg-color);
+        --a-underline: #ffffff69;
+        --blockquote-color: inherit;
+        --blockquote-bg: #2e2e2e;
+        --admonition-title-color: black;
+        --jl-message-color: rgb(38 90 32);
+        --jl-message-accent-color: rgb(131 191 138);
+        --jl-info-color: rgb(42 73 115);
+        --jl-info-accent-color: rgb(92 140 205);
+        --jl-warn-color: rgb(96 90 34);
+        --jl-warn-accent-color: rgb(221 212 100);
+        --jl-danger-color: rgb(100 47 39);
+        --jl-danger-accent-color: rgb(255, 117, 98);
+        --jl-debug-color: hsl(288deg 33% 27%);
+        --jl-debug-accent-color: hsl(283deg 59% 69%);
+        /* --footnote-border-color */
+        --table-border-color: rgba(255, 255, 255, 0.2);
+        --table-bg-hover-color: rgba(193, 192, 235, 0.15);
+        --pluto-tree-color: rgb(209 207 207 / 61%);
+
+        /*pluto cell styling*/
+        --disabled-cell-bg-color: rgba(139, 139, 139, 0.25);
+        --selected-cell-bg-color: rgb(42 115 205 / 78%);
+        --hover-scrollbar-color-1: rgba(0, 0, 0, 0.15);
+        --hover-scrollbar-color-2: rgba(0, 0, 0, 0.05);
+        --skip-as-script-background-color: #888;
+        --depends-on-skip-as-script-background-color: #666;
+
+        /* Pluto shoulders */
+        --shoulder-hover-bg-color: rgba(255, 255, 255, 0.05);
+
+        /* Logs */
+        --pluto-logs-bg-color: hsl(0deg 0% 17%);
+        --pluto-logs-key-color: rgba(255, 255, 255, 0.6);
+        --pluto-logs-progress-fill: #5f7f5b;
+        --pluto-logs-progress-bg: #3d3d3d;
+        --pluto-logs-progress-border: hsl(210deg 35% 72%);
+        --pluto-logs-info-color: #484848;
+        --pluto-logs-info-accent-color: inherit;
+        --pluto-logs-warn-color: rgb(80 76 38);
+        --pluto-logs-warn-accent-color: rgb(239 231 135);
+        --pluto-logs-danger-color: rgb(100 47 39);
+        --pluto-logs-danger-accent-color: rgb(255 147 132);
+        --pluto-logs-debug-color: hsl(288deg 19% 25%);
+        --pluto-logs-debug-accent-color: hsl(283deg 56% 79%);
+
+        /*Top navbar styling*/
+        --nav-h1-text-color: white;
+        --nav-filepicker-color: #b6b6b6;
+        --nav-filepicker-border-color: #c7c7c7;
+        --nav-filepicker-suggest-color: rgba(107, 125, 140, 0.796);
+        --nav-process-status-bg-color: rgb(82, 82, 82);
+        --nav-process-status-color: var(--pluto-output-h-color);
+
+        /*header*/
+        --restart-recc-header-color: rgb(44 106 157 / 56%);
+        --restart-recc-accent-color: rgb(44 106 157);
+        --restart-req-header-color: rgb(145 66 60 / 56%);
+        --dead-process-header-color: rgba(250, 75, 21, 0.473);
+        --loading-header-color: hsl(0deg 0% 20% / 50%);
+        --disconnected-header-color: rgba(255, 169, 114, 0.56);
+        --binder-loading-header-color: hsl(51deg 64% 90% / 50%);
+
+        /*loading bar*/
+        --loading-grad-color-1: #a9d4f1;
+        --loading-grad-color-2: #d0d4d7;
+
+        /*saveall container*/
+        --overlay-button-bg: #2c2c2c;
+        --overlay-button-border: #9e9e9e70;
+        --overlay-button-border-save: #c7a74670;
+        --overlay-button-color: white;
+
+        /*input_context_menu*/
+        --input-context-menu-border-color: rgba(255, 255, 255, 0.1);
+        --input-context-menu-bg-color: rgb(39, 40, 47);
+        --input-context-menu-soon-color: #b1b1b144;
+        --input-context-menu-hover-bg-color: rgba(255, 255, 255, 0.1);
+        --input-context-menu-li-color: #c7c7c7;
+
+        /* ai features */
+        --ai-gradient-bg: linear-gradient(20deg, #371d43, #613c35);
+        --ai-prompt-bg: #3a3a3a;
+
+        /*Pkg status*/
+        --pkg-popup-bg: #3d2f44;
+        --pkg-popup-border-color: #574f56;
+        --pkg-popup-buttons-bg-color: var(--input-context-menu-bg-color);
+        --pkg-version-color: #bbb;
+        --black: white;
+        --white: black;
+        --pkg-terminal-bg-color: #252627;
+        --pkg-terminal-border-color: #c3c3c388;
+
+        /* run area*/
+        --pluto-runarea-bg-color: rgb(43, 43, 43);
+        --pluto-runarea-span-color: hsl(353, 5%, 64%);
+
+        /*drop ruler*/
+        --dropruler-bg-color: rgba(255, 255, 255, 0.1);
+
+        /* jlerror */
+        --jlerror-header-color: #d9baba;
+        --jlerror-mark-bg-color: rgb(0 0 0 / 18%);
+        --jlerror-a-bg-color: hsl(65.82deg 17.14% 27.45%);
+        --jlerror-a-border-left-color: hsl(66 27% 35% / 1);
+        --jlerror-mark-color: #b1a9a9;
+
+        /* helpbox */
+        --helpbox-bg-color: rgb(30 34 31);
+        --helpbox-box-shadow-color: #00000017;
+        --helpbox-header-bg-color: #2c3e36;
+        --helpbox-header-tab-bg-color: #554e4e;
+        --helpbox-header-color: rgb(255 248 235);
+        --helpbox-search-bg-color: #2c2c2c;
+        --helpbox-search-border-color: #757575;
+        --helpbox-notfound-search-color: rgb(139, 139, 139);
+        --helpbox-text-color: rgb(230, 230, 230);
+        --code-section-bg-color: rgb(44, 44, 44);
+        --code-section-border-color: #555a64;
+        --process-item-bg: #443d44;
+        --process-busy: #ffcd70;
+        --process-finished: hsl(126deg 30% 60%);
+        --process-undefined: rgb(151, 151, 151);
+        --process-failed: hsl(4, 30%, 60%);
+        --process-notify-bg: hsl(0 0% 21%);
+
+        /*footer*/
+        --footer-color: #cacaca;
+        --footer-bg-color: var(--header-bg-color);
+        --footer-atag-color: rgb(114, 161, 223);
+        --footer-input-border-color: #6c6c6c;
+        --footer-filepicker-button-color: black;
+        --footer-filepicker-focus-color: #c1c1c1;
+        --footnote-border-color: rgba(114, 225, 231, 0.15);
+        --settings-bg-color: rgb(30 34 31);
+        --settings-p2-color: #898989;
+        --settings-header-bg-color: #f9dadf;
+
+        /* undo delete cell*/
+        --undo-delete-box-shadow-color: rgb(0 0 0 / 6%);
+
+        /*codemirror hints*/
+        --cm-color-editor-tooltip-border: rgba(0, 0, 0, 0.2);
+        --cm-color-editor-li-aria-selected-bg: #3271e7;
+        --cm-color-editor-li-aria-selected: white;
+        --cm-color-editor-li-notexported: rgba(255, 255, 255, 0.5);
+        --code-background: hsl(222deg 16% 19%);
+        --cm-color-code-differs-gutters: rgb(235 213 28 / 11%);
+        --cm-color-line-numbers: #8d86875e;
+        --cm-selection-background: hsl(215deg 64% 59% / 48%);
+        --cm-selection-background-blurred: hsl(215deg 0% 59% / 48%);
+        --cm-highlighted: #cbceb629;
+
+        /* code highlighting */
+        --cm-color-editor-text: oklch(90% 3% 0deg);
+        --cm-color-comment: oklch(80% 30% 0deg);
+        --cm-color-keyword: oklch(70% 40% 30deg);
+        --cm-color-definition: oklch(72.266% 0.04982 26.319);
+        --cm-color-control-operator: oklch(0.72 0.19 353.17);
+        --cm-color-symbol: oklch(80% 30% 60deg);
+        --cm-color-macro: oklch(80% 30% 150deg);
+        --cm-color-command: oklch(80% 10% 120deg);
+        --cm-color-string: oklch(80% 10% 180deg);
+        --cm-color-variable: oklch(80% 10% 270deg);
+        --cm-color-typedef-shadow: oklch(0.44 0.11 63.6);
+        --cm-color-literal: oklch(80% 30% 330deg);
+        --cm-filter-type: brightness(80%) saturate(80%);
+        --cm-color-builtin: #5e7ad3;
+        --cm-color-function: #f99b15;
+        --cm-color-link: #815ba4;
+        --cm-color-bracket: #b8ab87;
+        --cm-color-matchingBracket: white;
+        --cm-color-matchingBracket-bg: #c58c237a;
+        --cm-color-placeholder-text: rgb(255 255 255 / 20%);
+        --cm-color-clickable-underline: #5d5f70;
+
+        /* Mixed parsers */
+        --cm-color-html: #00ab85;
+        --cm-color-html-accent: #00e7b4;
+        --cm-color-css: #ebd073;
+        --cm-color-css-accent: #fffed2;
+        --cm-css-why-doesnt-codemirror-highlight-all-the-text-aaa: #ffffea;
+        --cm-color-md: #a2c9d5;
+        --cm-color-md-accent: #00a9d1;
+
+        /*autocomplete menu*/
+        --autocomplete-menu-bg-color: var(--input-context-menu-bg-color);
+
+        /* Landing colors */
+        --index-text-color: rgb(199, 199, 199);
+        --index-light-text-color: rgb(199, 199, 199);
+        --index-clickable-text-color: rgb(235, 235, 235);
+        --docs-binding-bg: #323431;
+        --index-card-bg: #313131;
+        --welcome-mywork-bg: var(--header-bg-color);
+        --welcome-newnotebook-bg: rgb(68 72 102);
+        --welcome-recentnotebook-bg: #3b3b3b;
+        --welcome-recentnotebook-border: #6e6e6e;
+        --welcome-open-bg: hsl(233deg 20% 33%);
+        --welcome-card-author-backdrop: #0000006b;
+
+        /* confirm-before-long-runtime dialog */
+        --confirm-runtime-bg: linear-gradient(180deg, hsl(0 0% 19% / 1), hsl(243 14% 23% / 1));
+        --confirm-runtime-bonus-bg: hsl(0deg 0% 12.85%);
+        --confirm-runtime-bonus-border: #636363;
+        --confirm-runtime-button-bg: #3a3a3a;
+        --confirm-runtime-button-border: #5a5a5a;
+        --confirm-runtime-yes-bg: #ddd1d6;
+        --confirm-runtime-yes-color: #000;
+        --confirm-runtime-yes-border: #9f9f9f;
+        --confirm-runtime-yes-progress: linear-gradient(90deg, #f0f0f0, #9a9a9a);
+    }
+
+    @media (prefers-contrast: more) {
+        html.pluto-dark {
+            --cm-color-line-numbers: #b3b3b3;
+        }
+    }
+  </style>
+</head>
+<body>
+  <div class="masque-sim-chip" tabindex="0" aria-describedby="masque-sim-tip">
+  <svg class="masque-sim-chip-icon" viewBox="0 0 16 16" aria-hidden="true">
+    <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <circle cx="8" cy="5.15" r="1" fill="currentColor"/>
+    <path d="M8 7.4v4.1" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+  </svg>
+  <span class="masque-sim-chip-label">Simulating <code>@bind</code></span>
+  <span id="masque-sim-tip" class="masque-sim-tip" role="tooltip">Precomputed snapshots, not a live Julia process.</span>
+</div>
+
+  <pluto-notebook class="masque-player">
+    <pluto-cell>
+  <pluto-trafficlight></pluto-trafficlight>
+  <pluto-output class="rich_output">
+    <div id="masque-widget">
+      <bond def="sel" unique_id="pjvsdjxtnqvw"><div class="ip-host" style="position:relative; display:inline-block; width:100%; max-width:560px;">
+  <img src="shared/49b9c4b2d7049ba0a106.png" style="display:block; width:100%; height:auto;" draggable="false">
+  <script>
+{
+const currentScript = document.currentScript;
+const invalidation = new Promise(() => {});
+
+    
+    const manifest = /* See the documentation for AbstractPlutoDingetjes.Display.published_to_js */ {"background":"rgb(255,255,255)","bare":true,"fields":["legend"],"height":720,"initial":{"legend":null},"layers":[{"axis":"legend","bond":"legend","colors":{"index":[0,1,2],"palette":["rgb(224,122,61)","rgb(61,90,128)","rgb(42,157,143)"]},"events":["click","hover"],"geometry":[257,466,170,40,257,512,170,40,257,558,170,40],"id":"legend","kind":"rects","label":"Legend","links":[["scatter"],["scatter_2"],["scatter_3"]],"payloads":[{"group":null,"label":"Adelie","targets":["scatter"]},{"group":null,"label":"Chinstrap","targets":["scatter_2"]},{"group":null,"label":"Gentoo","targets":["scatter_3"]}],"style":{"width":2},"tooltip":false},{"axis":"ax1","bond":"element","colors":"rgb(42,157,143)","draw":21,"events":["hover"],"geometry":[886,458,8,939,482,8,749,493,8,952,391,8,626,413,8,607,443,8,919,406,8,710,539,8,767,530,8,767,477,8,733,478,8,828,427,8,794,394,8,703,472,8,832,415,8,708,539,8,867,507,8,713,349,8,822,500,8,805,454,8,704,430,8,850,488,8,672,477,8,748,576,8,662,474,8,846,409,8,745,480,8,610,513,8],"id":"scatter_3","kind":"circles","label":"Gentoo","payloads":[{"index":1,"x":50.187444748856755,"y":14.997701916974403},{"index":2,"x":51.47085684894347,"y":14.626943624296084},{"index":3,"x":46.88642672959021,"y":14.460033916675894},{"index":4,"x":51.7843682060626,"y":15.995163795044935},{"index":5,"x":43.92527989380657,"y":15.660941207877174},{"index":6,"x":43.46921257969989,"y":15.216310431413596},{"index":7,"x":50.991567625537954,"y":15.776213778805994},{"index":8,"x":45.94698244636752,"y":13.780594213237789},{"index":9,"x":47.331690445156475,"y":13.91283299026004},{"index":10,"x":47.31714633998609,"y":14.711266732359814},{"index":11,"x":46.51247523810093,"y":14.692538574318773},{"index":12,"x":48.80058154105263,"y":15.462752132960468},{"index":13,"x":47.9752181261372,"y":15.955764294748334},{"index":14,"x":45.773503899904085,"y":14.77711947942993},{"index":15,"x":48.88610117997384,"y":15.634362382917171},{"index":16,"x":45.91427607285249,"y":13.769888331260763},{"index":17,"x":49.72989172957427,"y":14.249121849601309},{"index":18,"x":46.02283635291143,"y":16.62442914999203},{"index":19,"x":48.65666726868856,"y":14.367770098243822},{"index":20,"x":48.23343297937228,"y":15.05440082472283},{"index":21,"x":45.81913884472115,"y":15.41362656467846},{"index":22,"x":49.33464682706662,"y":14.535970940830286},{"index":23,"x":45.03545758107798,"y":14.711617404910948},{"index":24,"x":46.87613190593788,"y":13.21907767929946},{"index":25,"x":44.80232498459001,"y":14.759391639787523},{"index":26,"x":49.22929326171897,"y":15.726174218033478},{"index":27,"x":46.79850825203311,"y":14.667609958476488},{"index":28,"x":43.54800221885781,"y":14.160838126529134}],"style":{"width":2}},{"axis":"ax1","bond":"element","colors":"rgb(61,90,128)","draw":20,"events":["hover"],"geometry":[810,206,8,861,119,8,878,337,8,633,214,8,658,315,8,778,210,8,664,204,8,1010,251,8,924,173,8,646,261,8,588,229,8,819,311,8,999,279,8,723,102,8,785,259,8,1045,329,8,955,58,8,940,200,8,842,191,8,768,207,8,972,244,8,811,165,8,804,110,8,720,239,8,967,222,8,581,191,8,726,189,8,702,339,8],"id":"scatter_2","kind":"circles","label":"Chinstrap","payloads":[{"index":1,"x":48.35446667309335,"y":18.780572837437624},{"index":2,"x":49.60423369325991,"y":20.08826294028553},{"index":3,"x":49.992115113482555,"y":16.813602643506844},{"index":4,"x":44.106971445133986,"y":18.652201125914964},{"index":5,"x":44.6981441001163,"y":17.145042492271504},{"index":6,"x":47.59843517739904,"y":18.7210584364799},{"index":7,"x":44.84821239778003,"y":18.801036542570557},{"index":8,"x":53.17866629525943,"y":18.10388587096248},{"index":9,"x":51.11040781063282,"y":19.278412014471026},{"index":10,"x":44.41414440898705,"y":17.948156249004736},{"index":11,"x":43.007217159352585,"y":18.435774641605164},{"index":12,"x":48.588723525801356,"y":17.202298476394873},{"index":13,"x":52.90982614657078,"y":17.67731631422785},{"index":14,"x":46.26585147888617,"y":20.340551370019327},{"index":15,"x":47.7560736730723,"y":17.985725790338712},{"index":16,"x":54.03638382776383,"y":16.930128019125494},{"index":17,"x":51.86786050204825,"y":21.000456997700645},{"index":18,"x":51.48906215056541,"y":18.86763342689545},{"index":19,"x":49.139754771996394,"y":19.00606045869341},{"index":20,"x":47.34439137337211,"y":18.76571688742789},{"index":21,"x":52.27592855399001,"y":18.208140366349223},{"index":22,"x":48.385745004875965,"y":19.38931727425994},{"index":23,"x":48.21440448747936,"y":20.224111337442828},{"index":24,"x":46.1908053300723,"y":18.28726773685764},{"index":25,"x":52.15164647353678,"y":18.532262673787212},{"index":26,"x":42.84815003930072,"y":18.995083640325102},{"index":27,"x":46.340768827107254,"y":19.038937969790656},{"index":28,"x":45.7690300768708,"y":16.77209405752155}],"style":{"width":2}},{"axis":"ax1","bond":"element","colors":"rgb(224,122,61)","draw":19,"events":["hover"],"geometry":[434,199,8,570,188,8,523,332,8,409,266,8,308,184,8,507,231,8,494,224,8,247,235,8,475,222,8,515,186,8,450,222,8,435,216,8,191,119,8,458,183,8,497,255,8,344,185,8,376,393,8,515,280,8,318,224,8,381,185,8,574,219,8,311,248,8,410,354,8,405,263,8,303,382,8,380,283,8,329,267,8,367,201,8],"id":"scatter","kind":"circles","label":"Adelie","payloads":[{"index":1,"x":39.293941455907635,"y":18.87557884721997},{"index":2,"x":42.57757590249874,"y":19.04475304922196},{"index":3,"x":41.43802214284903,"y":16.881249851984567},{"index":4,"x":38.700541406018516,"y":17.87817357693499},{"index":5,"x":36.26552886863024,"y":19.108295187742048},{"index":6,"x":41.04784091695672,"y":18.397452828161672},{"index":7,"x":40.752254419016495,"y":18.500285478574373},{"index":8,"x":34.79947324719667,"y":18.34097590652541},{"index":9,"x":40.29583035222523,"y":18.53397377062393},{"index":10,"x":41.25611869810339,"y":19.072223496288967},{"index":11,"x":39.67271364532305,"y":18.536853429336578},{"index":12,"x":39.328676353977414,"y":18.627923749351893},{"index":13,"x":33.43160497565328,"y":20.084254755604917},{"index":14,"x":39.88147941723987,"y":19.12341040422875},{"index":15,"x":40.80696493439594,"y":18.040059879146582},{"index":16,"x":37.121767816016764,"y":19.09534884981702},{"index":17,"x":37.90881053913129,"y":15.961714234798732},{"index":18,"x":41.24483230437881,"y":17.671737688869488},{"index":19,"x":36.49349707463404,"y":18.508618128016103},{"index":20,"x":38.00850466258168,"y":19.086088780444744},{"index":21,"x":42.67126098235087,"y":18.5748457679585},{"index":22,"x":36.338937348149614,"y":18.13908004180155},{"index":23,"x":38.73052385345229,"y":16.55759182622144},{"index":24,"x":38.594287193578815,"y":17.92623291902943},{"index":25,"x":36.13354381586287,"y":16.126870471293095},{"index":26,"x":37.9839826072811,"y":17.623715944099956},{"index":27,"x":36.764749450407194,"y":17.85890113780579},{"index":28,"x":37.69127696238104,"y":18.853377965064343}],"style":{"width":2}}],"occluders":[[159.0,433.0,196.0,158.0]],"scaling":2.0,"transforms":{"ax1":{"is3d":false,"ispolar":false,"polar":null,"valueaxis":null,"viewport":[148.0,32.0,940.0,570.0],"xcats":null,"xlims":[32.40136601769599,55.06662278572111],"xreversed":false,"xscale":"identity","ycats":null,"ylims":[12.830008707581822,21.389525969418283],"yreversed":false,"yscale":"identity"},"legend":{"is3d":false,"ispolar":false,"polar":null,"valueaxis":null,"viewport":[148.0,422.0,217.81201171875,180.0],"xcats":null,"xlims":[0.0,1.0],"xreversed":false,"xscale":"identity","ycats":null,"ylims":[0.0,1.0],"yreversed":false,"yscale":"identity"}},"width":1120,"snapshots":{"controls":[],"initial":{"legend":null},"keyed":["legend"],"keys":{"legend:0":1,"legend:1":2,"legend:2":3,"null":0},"snaps":["shared/1ea159dca7c8fcf06684.json","shared/d2871257dcbadaf74f27.json","shared/370296e2ef3c89a4d4f0.json","shared/f88307d67b6dfbbb4b5e.json"]}};
+    const requestFrame = null;
+    window.Masque.mount(currentScript, manifest, invalidation, requestFrame);
+  
+if (typeof manifest !== "undefined" && currentScript && currentScript.parentElement) {
+  currentScript.parentElement.masqueManifest = manifest;
+}
+}
+</script>
+</div>
+</bond>
+    </div>
+  </pluto-output>
+</pluto-cell>
+<pluto-cell>
+  <pluto-trafficlight></pluto-trafficlight>
+  <pluto-output>
+    <assignee>sel</assignee>
+    <div id="masque-out" data-masque-bind>
+      <div class="markdown"><p><em>Click a species in the legend.</em></p>
+</div>
+    </div>
+  </pluto-output>
+</pluto-cell>
+
+
+  </pluto-notebook>
+  <script>
+{
+  function layerIndexKey(layer, index) {
+  return String(layer) + ":" + String(Number(index));
+}
+function pickKey(v) {
+  const k = layerIndexKey(v.layer, v.index);
+  return v.sample == null ? k : k + "@" + String(Number(v.sample));
+}
+function itemKey(it) {
+  const k = pickKey(it);
+  const p = it.payload;
+  if (!p || p.i0 == null) return k;
+  return k + "@" + p.i0 + "-" + p.i1 + "/" + p.j0 + "-" + p.j1;
+}
+function envKey(v) {
+  if (v == null) return "null";
+  if (Array.isArray(v.items)) return "items:" + v.items.map(itemKey).join(",");
+  if (v.layer != null && v.index != null && v.index !== "") {
+    return pickKey(v);
+  }
+  return JSON.stringify(v);
+}
+function stable(x) {
+  if (x === undefined) x = null;
+  if (x === null || typeof x !== "object") return JSON.stringify(x);
+  if (Array.isArray(x)) return "[" + x.map(stable).join(",") + "]";
+  return "{" + Object.keys(x).sort().map(function (k) { return JSON.stringify(k) + ":" + stable(x[k]); }).join(",") + "}";
+}
+// A field keys the same as its starting value when it shows the same thing: a box released
+// where it started keeps its cells though its edges differ in the last float digit.
+function changed(table, v) {
+  const out = [];
+  const init = table.initial || {};
+  (table.keyed || []).forEach(function (f) {
+    const cur = v[f] === undefined ? null : v[f];
+    const start = init[f] === undefined ? null : init[f];
+    if (stable(cur) !== stable(start) && fieldKey(table, f, cur) !== fieldKey(table, f, start)) out.push([f, cur]);
+  });
+  return out;
+}
+function fieldKey(table, f, cur) {
+  if (cur == null) return "null@" + f;
+  if ((table.controls || []).indexOf(f) !== -1) return f + "=" + JSON.stringify(cur.payload);
+  return envKey(cur);
+}
+function keyOf(table, v) {
+  if (v == null) return "null";
+  const d = changed(table, v);
+  if (!d.length) return "null";
+  return d.map(function (p) { return fieldKey(table, p[0], p[1]); }).join("+");
+}
+function keysFor(table, v) {
+  const keys = [keyOf(table, v)];
+  const d = v == null ? [] : changed(table, v);
+  const one = d.length === 1 ? d[0][1] : null;
+  if (one && one.layer != null && one.index != null && one.index !== "") {
+    keys.push(String(one.layer) + ":" + String(one.index));
+    keys.push(String(one.layer) + ":" + String(one.index | 0));
+  }
+  return keys;
+}
+function find(table, keys) {
+  for (let i = 0; i < keys.length; i++) {
+    if (Object.prototype.hasOwnProperty.call(table.keys, keys[i])) {
+      return table.snaps[table.keys[keys[i]]];
+    }
+  }
+  return null;
+}
+// Fetches each state file once and keeps it; a failed fetch is tried again next time.
+function jsonFiles() {
+  const loaded = new Map();
+  return function (file) {
+    if (!loaded.has(file)) {
+      loaded.set(file, fetch(file).then(function (r) {
+        if (!r.ok) throw new Error(file + ": " + r.status);
+        return r.json();
+      }).catch(function (e) {
+        loaded.delete(file);
+        throw e;
+      }));
+    }
+    return loaded.get(file);
+  };
+}
+// Shows each value's cells once its file loads, unless the reader reached a newer value first,
+// a miss included: a slow file never lands over a newer value's cells or its note.
+function latestOnly(load, apply, miss) {
+  let latest = 0;
+  return function (file) {
+    const n = ++latest;
+    miss(!file);
+    if (!file) return;
+    load(file).then(function (snap) {
+      if (n === latest) apply(snap);
+    }, function (e) {
+      console.warn("masque player: snapshot", e);
+      if (n === latest) miss(true);
+    });
+  };
+}
+// A reader who clicks one plot and then another changes two fields, a value the harvest never
+// recorded. Show the latest change on its own: the field that differs from the last value.
+function lookup(table, v) {
+  const prev = table.last_;
+  table.last_ = v;
+  let hit = find(table, keysFor(table, v));
+  // A moved control changes what every other field's snapshot would show, so a value the
+  // harvest skipped stays a miss rather than showing a snapshot taken at other settings.
+  const controlMoved = v != null && changed(table, v).some(function (p) { return (table.controls || []).indexOf(p[0]) !== -1; });
+  if (!hit && v != null && prev != null && !controlMoved) {
+    const moved = (table.keyed || []).filter(function (f) { return stable(v[f]) !== stable(prev[f]); });
+    if (moved.length === 0) return table.shown_ || null;
+    if (moved.length === 1) {
+      const alone = Object.assign({}, table.initial || {});
+      alone[moved[0]] = v[moved[0]];
+      hit = find(table, keysFor(table, alone));
+    }
+  }
+  if (hit) table.shown_ = hit;
+  return hit;
+}
+
+  function sizeFrame() {
+    if (!window.frameElement) return;
+    window.frameElement.style.overflow = "hidden";
+    window.frameElement.setAttribute("scrolling", "no");
+    const nb = document.querySelector("pluto-notebook");
+    const padBottom = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+    const bottom = (nb ? nb.getBoundingClientRect().bottom : document.documentElement.scrollHeight) + padBottom;
+    window.frameElement.style.height = Math.max(1, Math.ceil(bottom)) + "px";
+  }
+  const host = document.querySelector(".ip-host");
+  const idlePng = (host && host.querySelector("img") && host.querySelector("img").getAttribute("src")) || "";
+  // innerHTML does not run scripts. A swapped cell can be another widget, so
+  // rebuild each inline script or the selected highlight never mounts.
+  function setCellHtml(el, html) {
+    el.innerHTML = html;
+    el.querySelectorAll("script").forEach(function (old) {
+      if (old.src) return;
+      const s = document.createElement("script");
+      for (let i = 0; i < old.attributes.length; i++) {
+        s.setAttribute(old.attributes[i].name, old.attributes[i].value);
+      }
+      s.text = old.textContent;
+      old.replaceWith(s);
+    });
+  }
+  function apply(snap) {
+    const img = host.querySelector("img");
+    if (img) {
+      const next = snap.png || idlePng;
+      if (next && img.getAttribute("src") !== next) img.src = next;
+    }
+    const out = document.getElementById("masque-out");
+    if (out && Array.isArray(snap.cells)) setCellHtml(out, snap.cells.join("\n"));
+    if (snap.cells && !Array.isArray(snap.cells)) {
+      Object.keys(snap.cells).forEach(function (id) {
+        const el = document.querySelector('[data-masque-cell="' + id + '"]');
+        if (el) setCellHtml(el, snap.cells[id]);
+      });
+    }
+    sizeFrame();
+  }
+  // Each state's cells (and a remounted picture) are a file fetched when the reader gets there.
+  const show = latestOnly(jsonFiles(), apply, function () {});
+  function applyFromHost(host) {
+    const man = host && host.masqueManifest;
+    const snaps = man && man.snapshots;
+    if (!snaps) return false;
+    const file = lookup(snaps, host.value);
+    if (!file && host.value != null) console.warn("masque player: no snapshot for", keyOf(snaps, host.value));
+    show(file);
+    return !!file;
+  }
+  if (host) {
+    let cur = host.value;
+    Object.defineProperty(host, "value", {
+      configurable: true,
+      enumerable: true,
+      get: function () { return cur; },
+      set: function (v) {
+        cur = v;
+        applyFromHost(host);
+        sizeFrame();
+      },
+    });
+    const dispatch = host.dispatchEvent.bind(host);
+    host.dispatchEvent = function (ev) {
+      const ok = dispatch(ev);
+      if (ev && ev.type === "input") {
+        applyFromHost(host);
+        sizeFrame();
+      }
+      return ok;
+    };
+    host.addEventListener("input", function () {
+      applyFromHost(host);
+      sizeFrame();
+    });
+    applyFromHost(host);
+  }
+  sizeFrame();
+  window.addEventListener("load", sizeFrame);
+}
+  </script>
+</body>
+</html>

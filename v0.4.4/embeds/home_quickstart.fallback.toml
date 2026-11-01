@@ -1,0 +1,4 @@
+image = "home_quickstart.png"
+
+[outputs]
+b0e1e001-0001-4000-8000-000000000004 = "click a point"
