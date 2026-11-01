@@ -33,6 +33,7 @@
     end
     @test sess_seen === true
     @test length(fig.scene.current_screens) == n0
+    @test isempty(ax.scene.current_screens)   # child scenes too (#508)
 
     # _serialize_scene(scene) directly (not just via scene_payload's _plain wrapper).
     raw = _WGLExt._headless_screen(fig.scene) do screen

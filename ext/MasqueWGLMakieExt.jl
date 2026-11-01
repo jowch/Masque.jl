@@ -98,6 +98,8 @@ function _headless_screen(f, scene)
     end
 end
 
+# `push_screen!` adds the screen to every child scene, but `delete_screen!` removes it from the
+# scene it is given only, so walk the children (#508).
 function _detach_screen!(scene, screen)
     screen in scene.current_screens && Makie.delete_screen!(scene, screen)
     foreach(c -> _detach_screen!(c, screen), scene.children)
