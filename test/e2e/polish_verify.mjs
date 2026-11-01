@@ -909,6 +909,7 @@ try {
   // circle, not the sphere's behind it.
   for (const [key, layerId, sel, hov] of [
     ["scatter3d", "scatter", 1, 0],
+    ["scatter3d_data", "scatter", 1, 0],
     ["meshscatter3d", "meshscatter", 1, 0],
     ["wireframe3d", "wireframe", 0, 3],
     ["overlap3d", "scatter", null, 0],
@@ -968,7 +969,7 @@ try {
         if (circles) {
           const [cx, cy, r] = [g[3 * i], g[3 * i + 1], g[3 * i + 2]];
           probes.push({ x: cx, y: cy, want: key === "overlap3d" ? "dark" : "mark", what: `${i}/centre` });
-          if (key === "meshscatter3d") {
+          if (key === "meshscatter3d" || key === "scatter3d_data") {
             const reach = [];
             for (let a = 0; a < 16; a++) {
               const [dx, dy] = [Math.cos((a * Math.PI) / 8), Math.sin((a * Math.PI) / 8)];
