@@ -56,6 +56,16 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == string(id))
         scatter!(ax4, ["a", "b", "c", "d"], 1.0:4.0)
         ev4 = Masque.initial_bond(masque(fig4, (v = ThresholdInteractable(ax4; orientation = :vertical),); auto = false)).v
         @test ev4.value == 2.0 && ev4.category == "b"
+        # Zoomed to categories 6–9 of 10, it starts on one in view, not on the 5th.
+        figz = Figure(size = (600, 400))
+        axz = Axis(figz[1, 1]; dim1_conversion = Makie.CategoricalConversion())
+        scatter!(axz, string.('a':'j'), 1.0:10.0)
+        xlims!(axz, "f", "i")
+        evz = Masque.initial_bond(masque(figz, (v = ThresholdInteractable(axz; orientation = :vertical),); auto = false)).v
+        @test evz.value == 7.0 && evz.category == "g"
+        @test Masque._middle_category((5.5, 9.5), 10) == 7
+        @test Masque._middle_category((9.5, 5.5), 10) == 7     # a reversed axis
+        @test Masque._middle_category((2.6, 2.9), 10) == 3     # no category in view
     end
 
     @testset "a box starts as the middle half of the limits" begin

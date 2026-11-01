@@ -719,8 +719,9 @@ The `@bind` value is a `NamedTuple` with one field per layer a reader can set, n
 id, in the order the layers are listed. A plot that takes clicks holds its pick: `nothing`
 until a click, then one [`InteractionEvent`](@ref), and `nothing` again when the same mark is
 clicked twice. A [`ThresholdInteractable`](@ref) holds a [`ThresholdEvent`](@ref), starting
-at its `value`, and an [`ROIInteractable`](@ref) a [`BoundsEvent`](@ref), starting at its
-`bounds`. A box with `selects` also fills its target's field with what it contains: a
+at its `value` (or the middle of the axis without one), and an [`ROIInteractable`](@ref) a
+[`BoundsEvent`](@ref), starting at its `bounds` (or the middle half of the axis without
+them). A box with `selects` also fills its target's field with what it contains: a
 `Vector{ElementEvent}` over points (an empty box is `ElementEvent[]`), one
 [`GridWindowEvent`](@ref) over a grid, starting at what its `bounds` contain. That target
 takes no clicks. A line (`lines!`, `stairs!`, `series!`, the line of a `scatterlines!`) only

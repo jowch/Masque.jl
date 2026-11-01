@@ -2095,7 +2095,7 @@ position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up.
 - `value` — the line's initial data-space position (a y-value for `:horizontal`, x-value for
   `:vertical`). Default: the middle of the axis's limits along the dragged dimension, as they
   are when `masque` runs. On a `log10` or `log` scale that is the middle on screen (the
-  geometric mean of the limits); on a categorical axis, the middle category.
+  geometric mean of the limits); on a categorical axis, the middle category in view.
 - `id` — the layer id; becomes `InteractionEvent.layer` on commit. Default `:threshold`.
 - `update_while_dragging` — with `onchange` on [`masque`](@ref), redraw the figure while the
   line moves, not only when it is let go. Default `true`, like Makie's `Slider`. The `@bind`
@@ -2285,10 +2285,19 @@ function _pin_start(i::ThresholdInteractable, ctx)
     t === nothing && return i
     h = i.orientation === :horizontal
     cats = h ? t.ycats : t.xcats
-    # A release on a categorical axis snaps to a category, so the start sits on one too.
-    v = cats === nothing || isempty(cats) ? _along(h ? t.ylims : t.xlims, h ? t.yscale : t.xscale, 0.5) :
-        Float64(cld(length(cats), 2))
+    lims = h ? t.ylims : t.xlims
+    v = cats === nothing || isempty(cats) ? _along(lims, h ? t.yscale : t.xscale, 0.5) :
+        Float64(_middle_category(lims, length(cats)))
     return ThresholdInteractable(i.ax, i.orientation, v, i.id, i.update_while_dragging)
+end
+# A release on a categorical axis snaps to a category, so the start sits on one too: the
+# middle of the categories in view (the lower one of two), which is all of them unless the
+# axis is zoomed. With none in view, the one nearest the middle.
+function _middle_category(lims, n)
+    lo, hi = minmax(lims...)
+    a, b = max(1, ceil(Int, lo)), min(n, floor(Int, hi))
+    a <= b && return (a + b) ÷ 2
+    return clamp(round(Int, (lo + hi) / 2), 1, n)
 end
 function _pin_start(i::ROIInteractable, ctx)
     i.bounds === nothing || return i
