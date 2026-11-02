@@ -1112,9 +1112,12 @@ try {
   // on a PolarAxis, full circle and sector.
   // The sector's data runs past its limits: points `hidden` lie where the axis masks the
   // surface (θ = 5π/6, and r = 0.5 inside the inner radius), so hovering there shows nothing.
-  for (const [key, hov, sel, hovIJ, hidden] of [
-    ["surface3d", 12, 13, [3, 3], []], ["surface_polar", 11, 22, [3, 2], []],
-    ["surface_sector", 22, 30, [2, 4], [26, 1]],
+  // On a PolarAxis the tooltip reads θ and r in the axis's tick format (#510), so the hovered
+  // point's row is named by `coords`.
+  for (const [key, hov, sel, hovIJ, hidden, coords] of [
+    ["surface3d", 12, 13, [3, 3], [], []],
+    ["surface_polar", 11, 22, [3, 2], [], [/θ ?90°/, /\br ?1\b/]],
+    ["surface_sector", 22, 30, [2, 4], [26, 1], [/θ ?30°/, /\br ?2\b/]],
   ]) {
     const m = await inspect(key);
     pin(m, key);
@@ -1144,6 +1147,11 @@ try {
     if (!new RegExp(`i\\s*${hovIJ[0]}\\s*j\\s*${hovIJ[1]}\\b`).test(t.text.replace(/\s+/g, " "))) {
       throw new Error(`${key}: tooltip ${JSON.stringify(t.text)} is not point (${hovIJ})`);
     }
+    const flat = t.text.replace(/\s+/g, " ");
+    for (const re of coords) {
+      if (!re.test(flat)) throw new Error(`${key}: tooltip ${JSON.stringify(t.text)} does not match ${re}`);
+    }
+    if (coords.length) passed.push(`${key}/theta-r-format`);
     passed.push(`${key}/highlight`);
     for (const k of hidden) {
       // Off the figure first, and let the last tooltip and ring finish leaving.
