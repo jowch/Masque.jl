@@ -1187,6 +1187,91 @@ try {
       continue;
     }
 
+    // Nested views (#559): an inset axis with its own view inside its parent's. Over the inset,
+    // Ctrl+wheel and a drag move the inset's view; outside it, the parent's. Which one moved is
+    // read off the corner readout: the inset spans 0–1 and the parent 0–10.
+    if (spec.mode === "nested") {
+      const gOut = layers.find((l) => l.id === "view")?.geometry;
+      const gIn = layers.find((l) => l.id === "inset")?.geometry;
+      if (!gOut || !gIn) throw new Error(`${key}: expected views "view" and "inset", got ${layers.map((l) => l.id)}`);
+      if (!(gIn.x > gOut.x && gIn.x + gIn.w < gOut.x + gOut.w && gIn.y > gOut.y && gIn.y + gIn.h < gOut.y + gOut.h)) {
+        throw new Error(`${key}: the inset view ${JSON.stringify(gIn)} is not inside the parent's ${JSON.stringify(gOut)}`);
+      }
+      // Client px of an image px, with the plot on screen.
+      const clientAt = (ix, iy) => page.evaluate(([kk, x, y]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        return { x: b.left + x * s, y: b.top + y * s };
+      }, [key, ix, iy]);
+      const readout = () => page.evaluate((kk) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const ro = sr.querySelector(".masque-readout");
+        return { photo: host.dataset.masquePhoto || "", text: ro.classList.contains("show") ? ro.textContent : "" };
+      }, key);
+      // The x range the readout shows, polled for up to 3 s.
+      const xRange = async (what) => {
+        for (let i = 0; i < 30; i++) {
+          const r = await readout();
+          const m = /x:\[\s*(-?[\d.e+-]+)\s*[,–]\s*(-?[\d.e+-]+)/.exec(r.text.replace(/\u2212/g, "-"));
+          if (m) return Number(m[2]) - Number(m[1]);
+          await new Promise((res) => setTimeout(res, 100));
+        }
+        throw new Error(`${key}: no limits readout after ${what}`);
+      };
+      const settled = async () => {
+        for (let i = 0; ; i++) {
+          const r = await readout();
+          if (!r.photo && !r.text) return;
+          if (i > 100) throw new Error(`${key}: the view never settled: ${JSON.stringify(r)}`);
+          await new Promise((res) => setTimeout(res, 200));
+        }
+      };
+      const ctrlWheel = (c) => page.evaluate(([kk, x, y]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: x, clientY: y, deltaY: -120, ctrlKey: true });
+        sr.querySelector(".surface").dispatchEvent(ev);
+        return ev.defaultPrevented;
+      }, [key, c.x, c.y]);
+      const inner = await clientAt(gIn.x + gIn.w / 2, gIn.y + gIn.h / 2);
+      // Left of the inset, inside the parent.
+      const outer = await clientAt(gOut.x + (gIn.x - gOut.x) / 2, gIn.y + gIn.h / 2);
+      const isInset = (w) => w > 0 && w < 1.5, isParent = (w) => w > 2 && w < 12;
+
+      if (!(await ctrlWheel(inner))) throw new Error(`${key}: Ctrl+wheel over the inset was not taken`);
+      let w = await xRange("Ctrl+wheel over the inset");
+      if (!isInset(w)) throw new Error(`${key}: Ctrl+wheel over the inset zoomed a view spanning ${w} in x, not the inset's (0–1)`);
+      passed.push(`${key}/wheel-over-inset-zooms-inset`);
+      await settled();
+
+      if (!(await ctrlWheel(outer))) throw new Error(`${key}: Ctrl+wheel over the parent was not taken`);
+      w = await xRange("Ctrl+wheel over the parent");
+      if (!isParent(w)) throw new Error(`${key}: Ctrl+wheel beside the inset zoomed a view spanning ${w} in x, not the parent's (0–10)`);
+      passed.push(`${key}/wheel-beside-inset-zooms-parent`);
+      await settled();
+
+      for (const [c, want, name] of [[inner, isInset, "inset"], [outer, isParent, "parent"]]) {
+        await page.mouse.move(c.x, c.y);
+        await page.mouse.down();
+        await page.mouse.move(c.x + 15, c.y + 8, { steps: 4 });
+        w = await xRange(`a drag over the ${name}`);
+        await page.mouse.up();
+        if (!want(w)) throw new Error(`${key}: a drag over the ${name} moved a view spanning ${w} in x`);
+        passed.push(`${key}/drag-over-${name}-pans-${name}`);
+        await settled();
+      }
+      await page.mouse.move(1, 1);
+      console.error(`OK  ${key} — the wheel and a drag over the inset moved the inset's view; beside it, the parent's`);
+      continue;
+    }
+
     // Several fields at once (#335): a click on a point sets `scatter`, a drag of the threshold
     // sets its own field, both print in the `@bind` value, and a default line beside them shows
     // its tooltip but has no field and takes no click.

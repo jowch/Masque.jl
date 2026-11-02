@@ -3,7 +3,7 @@ import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, surfa
 import { emptyMask, maskHit } from "./gridmask"
 import { applyMove, onLeave, hideTip, hideViewReadout, showViewReadout, syncFocusTip, replaceTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
-import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onDoubleClick, onPointerMove } from "./bond"
+import { isApplePlatform, photoHeldByOther, onDown, onUp, onCancel, onLostCapture, onClick, onDoubleClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import { buildDragStops } from "./dragkeys"
 import { fieldSelection, recordPicks } from "./history"
@@ -23,8 +23,8 @@ import { isLightBackground } from "./color"
 import { createFade } from "./fade"
 import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, oneHome, MOTION_MS, NOTE_MS } from "./state"
 import type { HiGroups, HiSet, OverlayCtx } from "./state"
-import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
-import { axisFrame, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
+import type { Hit, HitLayer, Limits3, Manifest, ViewGeometry } from "./types"
+import { axisFrame, innermostView, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
 import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_HINT_MS, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
 
@@ -1317,26 +1317,33 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // The axis viewport is in layout pixels. The zoom anchor is the content pixel
         // under the cursor, or a second notch walks off it.
         const layout = layoutImagePx(ctx.base_, ctx.manifest_, clientX, clientY)
-        for (const layer of ctx.manifest_.layers) {
-            if (layer.kind !== "view" || !layer.events.includes("drag")) continue
-            const g = layer.geometry as ViewGeometry
-            if (layout.x < g.x || layout.x > g.x + g.w || layout.y < g.y || layout.y > g.y + g.h) continue
-            const wheel: NonNullable<ViewGeometry["wheel"]> = g.wheel ?? "modifier"
-            if (g.mode === "orbit") {
-                if (!g.limits) continue
-                // An Axis3 view's limits, on screen now.
-                return { id: layer.id, axis: "", limits3: g.limits as Limits3, wheel, layout }
-            }
-            if (!ctx.manifest_.transforms[layer.axis]) continue
-            return { id: layer.id, axis: layer.axis, limits3: null as Limits3 | null, wheel, layout }
+        // A new gesture zooms the innermost view under the pointer: an inset's own, not its
+        // parent's (#559). Later notches keep that view, as a drag does, so a zoom that drifts
+        // across the inset's edge doesn't hand the parent's photograph to the inset.
+        // `zoomable` lets the wheel over an inset that can't zoom fall through to its parent.
+        // A drag there still goes to the inset (yieldsToInnerView has no such filter); every
+        // view Julia ships today has its transform or limits, so the two never differ.
+        const zoomable = (l: HitLayer) => {
+            const g = l.geometry as ViewGeometry
+            return g.mode === "orbit" ? !!g.limits : !!ctx.manifest_.transforms[l.axis]
         }
-        return null
+        const live = state.wheelTimer_ !== null && state.wheelViewId_ !== null
+            ? ctx.manifest_.layers.find((l) => l.id === state.wheelViewId_ && l.kind === "view" && zoomable(l))
+            : undefined
+        const layer = live ?? innermostView(ctx.manifest_, layout.x, layout.y, "drag", zoomable)
+        if (!layer) return null
+        const g = layer.geometry as ViewGeometry
+        const wheel: NonNullable<ViewGeometry["wheel"]> = g.wheel ?? "modifier"
+        // An Axis3 view's limits, on screen now.
+        if (g.mode === "orbit") return { id: layer.id, axis: "", limits3: (g.limits ?? null) as Limits3 | null, wheel, layout }
+        return { id: layer.id, axis: layer.axis, limits3: null as Limits3 | null, wheel, layout }
     }
 
     // Zoom a view by `k` (above 1 zooms in) about the point `viewAt` found, through the
     // photograph and the idle settle a wheel notch uses. A Safari pinch comes here too (#541).
     const zoomView = (hit: NonNullable<ReturnType<typeof viewAt>>, k: number) => {
         const { id, axis, limits3, layout } = hit
+        if (!limits3 && photoHeldByOther(state, id)) return
         if (limits3) {
             const shown = limits3
             // Axis3 (#321): no photograph to scale. Each notch asks for limits scaled about
@@ -1346,6 +1353,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             showViewReadout(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
             if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
             const wheelId = id
+            state.wheelViewId_ = id
             state.wheelTimer_ = setTimeout(() => {
                 state.wheelTimer_ = null
                 hideViewReadout(ctx)
@@ -1365,6 +1373,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
         const wheelId = id
+        state.wheelViewId_ = id
         const wheelAxis = axis
         state.wheelTimer_ = setTimeout(() => {
             state.wheelTimer_ = null
