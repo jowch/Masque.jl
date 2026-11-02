@@ -155,7 +155,7 @@ one element), or keep `mode = :polyline`. `lines!`, `stairs!`, and
 **Cause:** `bounds` is not a 4-tuple, or the min/max order is backwards.
 
 **Fix:** pass `bounds = (xmin, xmax, ymin, ymax)` with `xmin < xmax`
-and `ymin < ymax`.
+and `ymin < ymax`, or leave `bounds` out to start the box in the middle of the axis.
 
 ### An unknown Region kind, or `selected=` on the base Region id
 

@@ -477,6 +477,10 @@ function build_manifest(
         overlay_style = nothing, owners_out = nothing, suspend_surfaces = false, with_initial = true,
     )
     plan = interactables
+    # A threshold or box with no start takes it from the limits. `masque` sets it once at mount;
+    # a direct call (tests, a backend) sets it here. Before `validate`, which reads the value; an
+    # axis `validate` refuses keeps an unset start (`_start_transform`).
+    interactables = _pin_starts(interactables, ctx)
     pairs = Tuple{Any, HitLayer}[]
     for i in interactables
         msg = validate(i, ctx)
@@ -719,8 +723,9 @@ The `@bind` value is a `NamedTuple` with one field per layer a reader can set, n
 id, in the order the layers are listed. A plot that takes clicks holds its pick: `nothing`
 until a click, then one [`InteractionEvent`](@ref), and `nothing` again when the same mark is
 clicked twice. A [`ThresholdInteractable`](@ref) holds a [`ThresholdEvent`](@ref), starting
-at its `value`, and an [`ROIInteractable`](@ref) a [`BoundsEvent`](@ref), starting at its
-`bounds`. A box with `selects` also fills its target's field with what it contains: a
+at its `value` (or the middle of the axis without one), and an [`ROIInteractable`](@ref) a
+[`BoundsEvent`](@ref), starting at its `bounds` (or the middle half of the axis without
+them). A box with `selects` also fills its target's field with what it contains: a
 `Vector{ElementEvent}` over points (an empty box is `ElementEvent[]`), one
 [`GridWindowEvent`](@ref) over a grid, starting at what its `bounds` contain. That target
 takes no clicks. A line (`lines!`, `stairs!`, `series!`, the line of a `scatterlines!`) only
@@ -857,6 +862,8 @@ function _masque(
             ArgumentError("masque: `px_per_unit = $ppu` makes the picture less than 1 pixel wide"),
         )
         ctx = context(backend, fig, ppu, max_width)
+        # A threshold or box with no start takes it from the limits now, and keeps it.
+        interactables = _pin_starts(interactables, ctx)
         owners_out = Ref(Dict{String, LayerOwner}())
         build() = build_manifest(
             interactables, ctx; selected, tip_style, tip_digits,

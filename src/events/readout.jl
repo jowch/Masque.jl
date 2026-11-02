@@ -95,6 +95,7 @@ function _threshold_event(id::Symbol, js_payload)
 end
 
 _threshold_value(x::Real) = Float64(x)
+_threshold_value(::Nothing) = nothing   # set from the axis limits when `masque` runs (#513)
 _threshold_value(x::ThresholdEvent) = getfield(x, :value)
 function _threshold_value(x)
     throw(ArgumentError("ThresholdInteractable: value must be a number or a ThresholdEvent, got $(typeof(x))"))

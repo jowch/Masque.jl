@@ -93,7 +93,8 @@ for the heatmap.
 
 A [`ThresholdInteractable`](@ref) draws a line across the axis for you
 to drag. Use it for a cutoff you would otherwise set with a slider, so
-that you set it against the data itself. The line starts at `value`.
+that you set it against the data itself. The line starts at `value`,
+or halfway along the axis if you leave `value` out.
 With `orientation = :horizontal` it sits at constant `y` and you drag
 it up and down, and with `:vertical` it sits at constant `x`:
 
@@ -229,7 +230,8 @@ end
 
 The line runs across the bar, so leave `orientation` out: it is
 horizontal on a vertical colorbar and vertical on a horizontal one.
-`value` must lie inside the colorbar's limits. Hovering the bar away
+`value` must lie inside the colorbar's limits; leave it out, and the
+line starts in the middle of the scale. Hovering the bar away
 from the line still shows the value under the pointer. With `onchange`
 (see [Update the figure](@ref)), a redraw that moves the colorbar's
 limits past the line leaves the line at the end of the bar until you
