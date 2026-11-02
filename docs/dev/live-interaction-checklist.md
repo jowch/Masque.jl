@@ -84,7 +84,7 @@ overlaystyle `color` when one is set, else the mark's colour moved 45% toward bl
 plot area or white on a dark one, else (no `colors`) the chrome grey. Other plots in the axis,
 grid lines and text keep their look, except where a faded mark's cover lies over them; a legend's
 pick fades every series that legend names, lines included, and the picked line keeps its own
-colour (no wash). A whole line picked with no other line in scope to fade (a lone line on an
+colour (no wash). A whole line picked with no other line in scope to fade (a lone `stairs!` on an
 Axis3) keeps a pick halo along it instead. The picks are punched out in drawing order (each
 layer's `draw`, its plot's place in the backend's order), and a faded line drawn after a kept
 mark it meets (or any faded mark drawn after a kept line) has its cover put back over it, so a
@@ -120,6 +120,18 @@ figure's edge extends onto the page (Jonathan 2026-10-29). Without the Popover A
 to the figure's edge. A
 resolvable per-element `colors` (today `scatter!`'s `color=`) adds a 3px tooltip accent border
 in that colour (`--masque-mark-border`); the text stays neutral.
+
+View chrome (#526): a moving view's live readout (`x:[…] y:[…]`, `z:[…]` too on an `Axis3`
+zoom or pan, `az=… el=…` while an `Axis3` turns) sits in `.masque-readout` at the figure's
+bottom-left corner, for every input (mouse
+drag, wheel, the view keys), instead of following the pointer, so it is never under a finger.
+It is the tooltip's box and theme, shown and hidden at once, and a mark's tooltip hides while
+the view moves. A plain wheel over a `wheel = :modifier` view shows "Ctrl + scroll to zoom"
+("Cmd" on Apple platforms) in `.masque-note`, the tooltip-themed note in the same corner that
+also carries an `onchange` error, for 1.5 s after the last plain wheel; it never covers an
+error the note is showing (#537's touch hint is the same kind of note). The two stack in a
+column, the note above, so a readout that wraps never sits under it. The bottom-left corner
+belongs to the note and the readout: the view buttons (#525) never use it.
 
 ROI chrome: 4 corner handles (7 CSS px, white fill, 1px chrome stroke, ~1.5 CSS px corner
 radius); a corner resizes two axes. The sides have no grip, but the manifest `handle` on each
@@ -212,7 +224,7 @@ bake it; hover/click or drag only.
 | Scatter (dark figure) | `:circles` | fade toward the dark background | tip, click `@bind`, persist, flat `#c8c8c8` edge stroke + dodge fill brightens the marker's interior (screenshot) on the dark figure too, still readable |
 | Arrows3D | `:segments` | ring | tip, click `@bind`, persist |
 | Axis3 scatter / meshscatter | `:circles` | fade, `r` from the projected mark | tip, click `@bind`, persist, hover highlight on the projected mark |
-| Axis3 lines | `:lines` | none (one element) | tip, readout `x`/`y`/`z` (#502), click `@bind` (whole line) |
+| Axis3 lines | `:lines` | point ring (`selected = [1]`) | tip, readout `x`/`y`/`z` (#502), click `@bind` picks the point, with `z` (#518) |
 | Axis3 wireframe | `:segments` (one per edge) | ring | tip, click `@bind`, persist, ring on the edge |
 | Axis3 overlapping pair | `:circles` over `:circles` | none | the plot drawn last answers where both claim the pixel (its layer sorts first), highlight takes its circle |
 | Text | `:rects` | fade | tip, click `@bind`, persist |

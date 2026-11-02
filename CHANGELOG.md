@@ -6,16 +6,63 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Breaking
+- Scrolling over a plot with a `ViewInteractable` scrolls the page, as it does everywhere else
+  on the page. To zoom, hold Ctrl (Cmd on a Mac) while scrolling; in Chrome and Firefox a
+  trackpad pinch zooms too. A plain scroll over the plot shows a short hint in its corner
+  saying so. Before, any scroll over the plot zoomed it and the page stopped scrolling.
+  `ViewInteractable(ax; wheel = :always)` brings back the old behavior, and `wheel = :none`
+  turns wheel zoom off. An axis whose scroll zoom is turned off in Makie, with
+  `deregister_interaction!(ax, :scrollzoom)`, `deactivate_interaction!(ax, :scrollzoom)` or
+  both `xzoomlock` and `yzoomlock`, gets `wheel = :none` unless the call says otherwise;
+  Masque 0.4 ignored those settings. See
+  [Upgrading](https://jowch.github.io/Masque.jl/stable/upgrading/) (#526).
+
 ### Added
-- `ThresholdInteractable` takes a `Colorbar`: drag a line across the bar to set a cutoff on the
-  colorbar's scale, `identity`, `log10` or `log`. The line follows the bar, horizontal on a
-  vertical colorbar and vertical on a horizontal one, and hovering or clicking the rest of the
-  bar still reads its value (#499).
+- A `surface!` on a `PolarAxis`, which is how Makie draws a polar heatmap, responds to hover
+  and click like a surface on an `Axis3`: the tooltip shows the point nearest the pointer, and
+  a click gives a `GridCellEvent` with its `(i, j)`. Before, `masque` skipped it with a
+  warning (#514).
+- A moved view can go back to where it started: double-click an empty part of the plot, or
+  press `0` while the view has keyboard focus. Limits come back as written, so automatic
+  limits are automatic again, and an `Axis3` gets its azimuth and elevation back. Linked axes
+  and panels go back together. Re-running only the `masque` cell keeps the starting view (#524).
 - `SpanInteractable` drags a band, a `(lo, hi)` range, on an `Axis` or a `Colorbar`. Drag an
   edge to move that end, or inside the band to move both. The plot outside the band is faded
   and each edge has a grip. Its field is a `SpanEvent` with `lo` and `hi`. Points, lines, bars
   and shapes inside the band still answer hover and click; a heatmap or image inside it
   answers hover, and a press on it moves the band (#500).
+
+### Changed
+- Default tooltips and readouts show a coordinate the way its axis labels it. On a
+  `PolarAxis` a point reads `θ 90°` and `r 2` instead of `x 1.571` and `y 2`. An axis with
+  `ytickformat = "{:.1f} mV"` shows `3.5 mV`, and `MultiplesTicks(4, π, "π")` shows `1.5π`.
+  This reaches the `AxisInteractable`, `ColorbarInteractable`, threshold, ROI, view and
+  slice readouts and the keyboard announcement too, and to the `x` and `y` Masque adds beside
+  your own `payloads` fields. Templates and the fields you set yourself are unchanged, and so
+  is the `@bind` value. A set `tooltip_sigdigits` wins over the
+  format's precision. See "Axis units" on the Tooltips page (#510).
+- **Breaking:** a click on a bound line on an `Axis3` picks the point you plotted nearest
+  the click, as on a 2D `Axis`, where it used to pick the whole line. `pick.index` is now
+  that point's position in your data, `pick.line` says which line it is on, and `pick.x`,
+  `pick.y` and `pick.z` hold it. `selected=` indices on such a line name points too. To
+  upgrade, code that read `pick.index` as the line now reads `pick.line` (#518).
+- While you pan, zoom or turn a view, its readout (the axis limits, or an `Axis3`'s angles
+  while it turns) shows in the bottom-left corner of the figure instead of beside the pointer,
+  and a point's tooltip doesn't show over it (#526).
+
+## [0.4.5] - 2026-11-02
+
+### Added
+- `ThresholdInteractable(ax)` and `ROIInteractable(ax)` work without a `value` or `bounds`.
+  The line starts halfway along the axis, and the box over the middle half of it, as the
+  axis is when `masque` runs: the middle on screen for a log scale, and the middle category
+  in view on a categorical axis. On a `Colorbar`, the line starts mid-scale. A `value` or
+  `bounds` given still sets the start (#513).
+- `ThresholdInteractable` takes a `Colorbar`: drag a line across the bar to set a cutoff on the
+  colorbar's scale, `identity`, `log10` or `log`. The line follows the bar, horizontal on a
+  vertical colorbar and vertical on a horizontal one, and hovering or clicking the rest of the
+  bar still reads its value (#499).
 - Hovering a line on an `Axis3` shows `x`, `y` and `z` of the point you plotted nearest the
   pointer, as a line on a 2D `Axis` does, and a tooltip template can name `z`. This covers
   `lines!`, `scatterlines!`'s line, `contour3d!` and a 3D `streamplot!`. A click still picks
@@ -776,7 +823,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/jowch/Masque.jl/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/jowch/Masque.jl/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/jowch/Masque.jl/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/jowch/Masque.jl/compare/v0.4.1...v0.4.2

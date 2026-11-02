@@ -1159,9 +1159,17 @@ try {
   // A surface point (#259) is highlighted as its dual cell: a closed polygon through the midpoints
   // of its grid edges and the centres of its quads, so the polygon surrounds the point. The hover
   // and the selection use the closed-mark recipe; the tooltip sits over the point. On Cairo the
-  // point itself must be on the drawn surface.
-  {
-    const key = "surface3d";
+  // point itself must be on the drawn surface. The polar cases (#514) are the same layer kind
+  // on a PolarAxis, full circle and sector.
+  // The sector's data runs past its limits: points `hidden` lie where the axis masks the
+  // surface (θ = 5π/6, and r = 0.5 inside the inner radius), so hovering there shows nothing.
+  // On a PolarAxis the tooltip reads θ and r in the axis's tick format (#510), so the hovered
+  // point's row is named by `coords`.
+  for (const [key, hov, sel, hovIJ, hidden, coords] of [
+    ["surface3d", 12, 13, [3, 3], [], []],
+    ["surface_polar", 11, 22, [3, 2], [], [/θ ?90°/, /\br ?1\b/]],
+    ["surface_sector", 22, 30, [2, 4], [26, 1], [/θ ?30°/, /\br ?2\b/]],
+  ]) {
     const m = await inspect(key);
     pin(m, key);
     const layer = (await layersOf(key)).find((l) => l.id === "surface");
@@ -1174,7 +1182,6 @@ try {
       const xs = v.filter((_, i) => i % 2 === 0), ys = v.filter((_, i) => i % 2 === 1);
       return Math.min(...xs) < x && x < Math.max(...xs) && Math.min(...ys) < y && y < Math.max(...ys);
     };
-    const hov = 12, sel = 13;
     let t = null;
     for (let a = 0; a < 8; a++) {
       t = await hoverAt(key, ...pt(hov));
@@ -1188,8 +1195,23 @@ try {
         throw new Error(`${key}: hover ${shape.layer} is not a cell around the point ${pt(hov)}: ${shape.tag} ${shape.points}`);
       }
     }
-    if (!/i\s*3\s*j\s*3/.test(t.text.replace(/\s+/g, " "))) throw new Error(`${key}: tooltip ${JSON.stringify(t.text)} is not point (3, 3)`);
+    if (!new RegExp(`i\\s*${hovIJ[0]}\\s*j\\s*${hovIJ[1]}\\b`).test(t.text.replace(/\s+/g, " "))) {
+      throw new Error(`${key}: tooltip ${JSON.stringify(t.text)} is not point (${hovIJ})`);
+    }
+    const flat = t.text.replace(/\s+/g, " ");
+    for (const re of coords) {
+      if (!re.test(flat)) throw new Error(`${key}: tooltip ${JSON.stringify(t.text)} does not match ${re}`);
+    }
+    if (coords.length) passed.push(`${key}/theta-r-format`);
     passed.push(`${key}/highlight`);
+    for (const k of hidden) {
+      // Off the figure first, and let the last tooltip and ring finish leaving.
+      await hoverAt(key, 2, 2); await page.waitForTimeout(600);
+      const h = await hoverAt(key, ...pt(k));
+      const ring = [h.hi.fill, h.hi.edge, h.hi.plain].some((c) => c && !/masque-leave/.test(c.className ?? ""));
+      if (h.show || ring) throw new Error(`${key}: masked point ${k} answers hover: ${JSON.stringify(h.text)}`);
+    }
+    if (hidden.length) passed.push(`${key}/masked-silent`);
 
     // Select point `sel` (kind_sweep may already have), check the wash, and leave it as found.
     const clickAt = (x, y) => page.evaluate(([k, ix, iy]) => {
@@ -1255,13 +1277,19 @@ try {
       const b = host.querySelector("img, canvas").getBoundingClientRect();
       const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
       sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", {
-        bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: dy,
+        bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: dy, ctrlKey: true,
       }));
       // Read in the same turn as the wheel: the readout hides 150 ms after the last notch, and
       // on a loaded software-GL page two animation frames can take longer than that.
-      const t = sr.querySelector(".masque-tip");
+      // The readout sits in the figure's bottom-left corner (#526), and no mark tooltip shows.
+      const t = sr.querySelector(".masque-readout");
       const cs = getComputedStyle(t);
-      const during = { show: t.classList.contains("show"), text: t.innerText, bg: cs.backgroundColor, color: cs.color };
+      const tb = t.getBoundingClientRect(), hb = sr.host.getBoundingClientRect();
+      const during = {
+        show: t.classList.contains("show"), text: t.innerText, bg: cs.backgroundColor, color: cs.color,
+        left: tb.left - hb.left, bottom: hb.bottom - tb.bottom,
+        tip: sr.querySelector(".masque-tip").classList.contains("show"),
+      };
       await new Promise((res) => setTimeout(res, 600));   // past the wheel's idle settle
       return { during, after: t.classList.contains("show") };
     }, ["view3d", view3.x + view3.w / 2, view3.y + view3.h / 2, deltaY]);
@@ -1271,6 +1299,10 @@ try {
     if (r.during.bg !== lightTip.bg || r.during.color !== lightTip.color) {
       throw new Error(`view3d/zoom-readout: readout theme ${r.during.bg}/${r.during.color} differs from the hover tooltip's ${lightTip.bg}/${lightTip.color}`);
     }
+    if (!(Math.abs(r.during.left - 8) <= 2 && Math.abs(r.during.bottom - 8) <= 2)) {
+      throw new Error(`view3d/zoom-readout: the readout is not in the figure's bottom-left corner: ${JSON.stringify(r.during)}`);
+    }
+    if (r.during.tip) throw new Error("view3d/zoom-readout: a mark tooltip shows while the view zooms");
     if (r.after) throw new Error("view3d/zoom-readout: the readout is still showing after the zoom settled");
     await wheel3(300);
     passed.push("view3d/zoom-readout");

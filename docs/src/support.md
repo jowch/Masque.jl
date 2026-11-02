@@ -17,14 +17,14 @@ radius under the pointer.
 | Interaction | `Axis` | `Axis3` | `PolarAxis` |
 |---|---|---|---|
 | Hover and click marks | every recipe | some recipes | some recipes |
-| Select several marks (`select = :many`, see [Select several marks](@ref)) | yes | yes ⁴ | yes |
+| Select several marks (`select = :many`, see [Select several marks](@ref)) | yes | yes ⁴ | yes ⁴ |
 | Drag a box to select marks (with `select = :many`) | yes ⁵ | yes ⁵ | yes |
 | Link selections across plots ([`linked`](@ref)) | yes | yes | yes |
-| Hover a line to read the nearest point you plotted | yes | yes ⁷ | yes |
-| Hover a surface to read its height | no ⁶ | yes | no |
+| Hover a line to read the nearest point you plotted | yes | yes | yes |
+| Hover a surface to read its values | no ⁶ | yes | yes |
 | Read `(x, y)` ([`AxisInteractable`](@ref)) | yes ¹ | no | yes ³ |
 | Drag a threshold ([`ThresholdInteractable`](@ref)) | yes ¹ | no | no |
-| Drag a band ([`SpanInteractable`](@ref)) | yes ⁸ | no | no |
+| Drag a band ([`SpanInteractable`](@ref)) | yes ⁷ | no | no |
 | Draw a box you can move and resize ([`ROIInteractable`](@ref)) | yes ² | no | no |
 | Slice across series ([`SliceInteractable`](@ref)) | yes ² | no | no |
 | Pan or orbit ([`ViewInteractable`](@ref)) | pan ² | orbit | no |
@@ -47,15 +47,12 @@ turns the view, so hold Alt (Option on a Mac) to draw the box.
 
 ⁶ Draw the matrix with `heatmap!` to read its values on a 2D `Axis`.
 
-⁷ The tooltip shows `x`, `y` and `z`, but a click picks the whole
-line, not the point.
-
-⁸ The scale the band moves along must be `identity`, `log10`, or
+⁷ The scale the band moves along must be `identity`, `log10`, or
 `log`, and that axis must be numeric.
 
 A "no" in the last six rows, a scale outside that list (such as
 `Makie.pseudolog10` or `Makie.Symlog10`), or a categorical axis where ²
-or ⁸ requires a numeric one raises an `ArgumentError` when `masque` runs,
+or ⁷ requires a numeric one raises an `ArgumentError` when `masque` runs,
 instead of giving a wrong coordinate. The other "no" cells don't raise:
 a `surface!` is skipped with a warning. Orbiting an `Axis3` has no
 scale requirement.
@@ -94,7 +91,7 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | `arrows3d!` (`Arrows3D`) | `:arrows3d` | `:segments` | yes | — |
 | `arrows2d!` (`Arrows2D`) | `:arrows2d` | `:segments` | — | — |
 | `heatmap!` / `image!` | `:cells` | `:grid` | — | — |
-| `surface!` | `:surface` | `:surface` | only | — |
+| `surface!` | `:surface` | `:surface` | yes | yes |
 | `barplot!` | `:bars` | `:rects` | — | — |
 | `poly!` | `:poly` | `:polygons` | — | — |
 | `stairs!` | `:stairs` | `:lines` | — | — |
@@ -122,11 +119,11 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | `Legend` (block) | `:legend` | `:rects` | yes | yes |
 
 Each `lines!` and `stairs!` plot is one element for its whole line, and
-`series!` has one element per series. On a 2D `Axis` or a
-`PolarAxis`, hovering a line shows the point you plotted nearest the
-pointer, and a click on a line named in `bind` picks that point. Only
-the body of a `boxplot!` responds, not its whiskers or outliers, and an
-`annotation!` responds on its text. In a `contourf!` plot, hovering inside a hole of a filled
+`series!` has one element per series. Hovering a line shows the point
+you plotted nearest the pointer, and a click on a line named in `bind`
+picks that point. A `stairs!` on an `Axis3` responds as one whole line.
+Only the body of a `boxplot!` responds, not its whiskers or outliers,
+and an `annotation!` responds on its text. In a `contourf!` plot, hovering inside a hole of a filled
 level reaches nothing unless another level is drawn there. A `scatter!`
 sized in data units (`markerspace = :data`) responds over each marker's
 drawn shape: a square over its square, a circle over its circle. To
@@ -143,10 +140,13 @@ gives `:violin`, `:scatter`, and `:boxplot`, and `tricontourf!` gives
 shows how many points fell in it. A plot whose `space` is not
 `:data`, such as a `bracket!` label or a `scatter!` placed with
 `space = :relative`, is skipped with a warning that names its `space`.
-A `surface!` responds on an `Axis3` only: hovering it shows the
-data point under the pointer on the side you can see, and a
-`wireframe!` drawn over the same grid is left as decoration so the
-surface answers. A `surface!` on a 2D `Axis` is skipped with a
+A `surface!` responds on an `Axis3` and a `PolarAxis`: hovering it
+shows the data point nearest the pointer, on the side you can see, and
+a `wireframe!` drawn over the same grid on an `Axis3` is left as
+decoration so the surface answers. On a `PolarAxis`, a `surface!` is
+how Makie draws a polar heatmap, and the tooltip shows the point's
+angle and radius the way the axis's other tooltips do. A `surface!` on
+a 2D `Axis` is skipped with a
 warning; to inspect a grid there, draw it with `heatmap!`. Where marks
 of one plot overlap, the one drawn on top answers. On a 2D `Axis` that
 is the one listed last. On an `Axis3`, the `meshscatter!` sphere

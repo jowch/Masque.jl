@@ -178,10 +178,14 @@ export interface OverlayCtx {
     // Significant figures for a tooltip number with no format spec. Read once from the mount
     // manifest: a pan frame's manifest (mount.ts's revealFrame) does not carry it.
     tipDigits_: number
+    tipExplicit_: boolean // the user set tooltip_sigdigits: it outranks an axis format's precision (#510)
     host_: HTMLElement
     base_: HTMLElement
     surface_: HTMLElement
     tip_: HTMLElement
+    // The live limits readout of a moving view (pan, zoom, orbit, any input), at the figure's
+    // bottom-left corner instead of following the pointer, so it is never under a finger.
+    readout_: HTMLElement
     hiGroup_: HiSet
     selGroup_: HiSet
     // Legend, colorbar, and axis rings. Siblings of the photograph clip, so a live matrix
@@ -293,6 +297,13 @@ export interface OverlayState {
     // The view id that made the latest Axis3 zoom or pan request. Another id's remembered
     // limits are stale once `linkcameras!(...; limits = true)` lets this one move them (#362).
     view3Last_: string | null
+    // Views away from where they started (#524). A frame's `moved` adds a view; a request
+    // that moves one adds it at once; a settle frame at home or a reset takes it out. A reset is
+    // sent only for a view in here.
+    viewMoved_: Set<string>
+    // Plain clicks since the last one that ended a drag. A double-click resets a view only when
+    // both its clicks were plain: two quick pan strokes are not a reset.
+    plainClicks_: number
     // Undo and redo for picks (history.ts): each step is the pick fields one commit changed,
     // as they were before it. Newest last.
     undo_: Record<string, unknown>[]
@@ -337,6 +348,8 @@ export function createOverlayState(): OverlayState {
         keyView_: false,
         view3_: new Map(),
         view3Last_: null,
+        viewMoved_: new Set(),
+        plainClicks_: 0,
         undo_: [],
         redo_: [],
     }

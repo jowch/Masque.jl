@@ -7,11 +7,11 @@ function _css_color(c)
 end
 
 # Only set kwargs are emitted; unset ones fall through to the overlay's built-in defaults.
-# Significant figures for a tooltip number with no format spec (the frontend's DEFAULT_SIGDIGITS).
-# Past 17 a Float64 has no more digits to show.
-const _DEFAULT_SIGDIGITS = 4
+# `tooltip_sigdigits`: `nothing` (unset) leaves the frontend's DEFAULT_SIGDIGITS of 4, below an
+# axis format string's own precision. Past 17 a Float64 has no more digits to show.
 
 function _check_sigdigits(n)
+    n === nothing && return nothing
     n isa Integer && !(n isa Bool) && 1 <= n <= 17 && return Int(n)
     throw(ArgumentError("tooltip_sigdigits must be an integer from 1 to 17, got $(repr(n))"))
 end
@@ -182,6 +182,10 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         "events" => [string(e) for e in L.events],
         "style" => style,
     )
+    # The coordinate fields Masque filled in (`_merge_payloads`): the default tooltip prints
+    # them in the axis's format (#510).
+    ck = _coord_keys(L.payloads)
+    isempty(ck) || (d["coords"] = String[string(k) for k in ck])
     if L.kind in (:segments, :polyline, :lines, :rects, :polygons)
         t = hit_tol(i)
         t === nothing || (d["tol"] = round(Int, t * ctx.scaling))
@@ -448,6 +452,7 @@ _transform_dict(t::AxisTransform) = Dict{String, Any}(
     "is3d" => t.is3d,
     "ispolar" => t.ispolar,
     "polar" => _polar_dict(t.polar),
+    (k => f for (k, f) in ("xfmt" => t.xfmt, "yfmt" => t.yfmt, "zfmt" => t.zfmt) if f !== nothing)...,
 )
 
 _polar_dict(::Nothing) = nothing
@@ -473,10 +478,14 @@ the published manifest.
 """
 function build_manifest(
         interactables, ctx::InteractionContext;
-        selected = nothing, tip_style = nothing, tip_digits = _DEFAULT_SIGDIGITS, background = nothing,
+        selected = nothing, tip_style = nothing, tip_digits = nothing, background = nothing,
         overlay_style = nothing, owners_out = nothing, suspend_surfaces = false, with_initial = true,
     )
     plan = interactables
+    # A threshold or box with no start takes it from the limits. `masque` sets it once at mount;
+    # a direct call (tests, a backend) sets it here. Before `validate`, which reads the value; an
+    # axis `validate` refuses keeps an unset start (`_start_transform`).
+    interactables = _pin_starts(interactables, ctx)
     pairs = Tuple{Any, HitLayer}[]
     for i in interactables
         msg = validate(i, ctx)
@@ -582,7 +591,9 @@ function build_manifest(
     initial === nothing || (m["initial"] = initial)
     (tip_style === nothing || isempty(tip_style)) || (m["tipStyle"] = tip_style)
     (overlay_style === nothing || isempty(overlay_style)) || (m["overlayStyle"] = overlay_style)
-    tip_digits == _DEFAULT_SIGDIGITS || (m["tipDigits"] = tip_digits)
+    # Sent only when the user set it: a set `tooltip_sigdigits` outranks a Makie format string's
+    # precision, and Masque's default does not (#510).
+    tip_digits === nothing || (m["tipDigits"] = tip_digits)
     background === nothing || (m["background"] = _css_color(background))
     # An axis whose empty plot area is not the figure's colour ships that colour as `fill`: the
     # selected look fades unpicked marks toward it (#394).
@@ -719,8 +730,10 @@ The `@bind` value is a `NamedTuple` with one field per layer a reader can set, n
 id, in the order the layers are listed. A plot that takes clicks holds its pick: `nothing`
 until a click, then one [`InteractionEvent`](@ref), and `nothing` again when the same mark is
 clicked twice. A [`ThresholdInteractable`](@ref) holds a [`ThresholdEvent`](@ref), starting
-at its `value`, a [`SpanInteractable`](@ref) a [`SpanEvent`](@ref), starting at its `span`,
-and an [`ROIInteractable`](@ref) a [`BoundsEvent`](@ref), starting at its `bounds`. A box with `selects` also fills its target's field with what it contains: a
+at its `value` (or the middle of the axis without one), a [`SpanInteractable`](@ref) a
+[`SpanEvent`](@ref), starting at its `span`, and an [`ROIInteractable`](@ref) a
+[`BoundsEvent`](@ref), starting at its `bounds` (or the middle half of the axis without
+them). A box with `selects` also fills its target's field with what it contains: a
 `Vector{ElementEvent}` over points (an empty box is `ElementEvent[]`), one
 [`GridWindowEvent`](@ref) over a grid, starting at what its `bounds` contain. That target
 takes no clicks. A line (`lines!`, `stairs!`, `series!`, the line of a `scatterlines!`) only
@@ -778,11 +791,12 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   shows at; on `:webgl`, `2`. A larger number gives a sharper, heavier picture. Neither this
   nor `max_width` follows `CairoMakie.activate!` or `WGLMakie.activate!`.
 - `tooltip_sigdigits` — significant figures for a tooltip number that has no format spec.
-  Default `4`, so `0.30000000000000004` shows as `0.3` and `2.71828` as `2.718`; integers,
-  and the whole-number part of a value at or above `10^tooltip_sigdigits`, show in full.
-  Readouts and drag labels keep their trailing zeros (`2.500`), so they don't change width as
-  the pointer moves. A template field with a spec, such as `\$(x:.2f)`, ignores it, and the
-  `@bind` value is never rounded.
+  Unset, it is 4, so `0.30000000000000004` shows as `0.3` and `2.71828` as `2.718`;
+  integers, and the whole-number part of a value at or above `10^tooltip_sigdigits`, show in
+  full. Readouts and drag labels keep their trailing zeros (`2.500`), so they don't change
+  width as the pointer moves. A coordinate on an axis with a format string, such as
+  `ytickformat = "{:.1f} mV"`, shows that format's precision unless you set this. A template
+  field with a spec, such as `\$(x:.2f)`, ignores it, and the `@bind` value is never rounded.
 - `tooltipstyle` — the look of the tooltip card, as a `NamedTuple`:
   `tooltipstyle = (; bg = :black, color = :white, radius = 6)`. Keys: `bg`, `color`, `accent`,
   `font`, `font_size`, `radius`, `caret`. Each key you leave out keeps the built-in look. See
@@ -839,7 +853,7 @@ _check_onchange(f) = f === nothing || f isa Function || throw(
 function _masque(
         fig, interactables::AbstractVector; backend::Union{Nothing, Symbol, AbstractBackend} = nothing,
         max_width = nothing, px_per_unit = nothing, selected = nothing, onchange = nothing,
-        tooltipstyle = nothing, tooltip_sigdigits = _DEFAULT_SIGDIGITS, overlaystyle = nothing,
+        tooltipstyle = nothing, tooltip_sigdigits = nothing, overlaystyle = nothing,
     )
     tip_digits = _check_sigdigits(tooltip_sigdigits)
     _check_onchange(onchange)
@@ -850,6 +864,8 @@ function _masque(
     bg0 = fig.scene.backgroundcolor[]
     try
         fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
+        # Before anything draws: a view's home is the limits the author wrote (#524).
+        _record_view_homes!(interactables)
         _finalize!(fig)        # finalize once; render + context share it
         _pin_pan_ticklabelspace!(fig, interactables)
         ppu = something(px_per_unit, _ppu(backend, fig, max_width))
@@ -857,6 +873,8 @@ function _masque(
             ArgumentError("masque: `px_per_unit = $ppu` makes the picture less than 1 pixel wide"),
         )
         ctx = context(backend, fig, ppu, max_width)
+        # A threshold or box with no start takes it from the limits now, and keeps it.
+        interactables = _pin_starts(interactables, ctx)
         owners_out = Ref(Dict{String, LayerOwner}())
         build() = build_manifest(
             interactables, ctx; selected, tip_style, tip_digits,
@@ -1278,7 +1296,9 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
     ax === nothing && throw(
         ArgumentError("Masque gesture channel: no ViewInteractable with id :$(id) on this widget"),
     )
-    if haskey(input, "azimuth") || haskey(input, "limits")
+    if get(input, "reset", false) === true
+        _reset_view!(ax)
+    elseif haskey(input, "azimuth") || haskey(input, "limits")
         if haskey(input, "azimuth")
             ax.azimuth[] = Float64(input["azimuth"])
             ax.elevation[] = Float64(input["elevation"])
@@ -1295,6 +1315,7 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
         ax.limits[] = (xlims..., ylims...)
         _pan_linked_axes!(ax, xlims, ylims)
     end
+    _note_view_left!(view_axes)
     live === nothing && return _render_gesture_frame(input, backend, fig, interactables, ppu, max_width)
     owners_out = Ref(Dict{String, LayerOwner}())
     frame = _render_gesture_frame(input, backend, fig, live.plan, ppu, max_width; owners_out)
@@ -1372,7 +1393,12 @@ _suspended_surface(i::SurfaceInteractable, ctx) =
 # one farther pose cover the compile a coalesced first drag otherwise still pays. `stop`
 # bails between frames when the cell is replaced; the camera is put back either way.
 function _warm_view_render_frame!(frame, view_axes; stop = () -> false, extra = ())
-    _warm_view_poses!(frame, view_axes, stop)
+    left = _view_left_snapshot(view_axes)
+    try
+        _warm_view_poses!(frame, view_axes, stop)
+    finally
+        _restore_view_left!(left)
+    end
     for input in extra
         stop() && break
         frame(input)

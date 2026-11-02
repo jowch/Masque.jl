@@ -1,8 +1,8 @@
 import { invertAxis, matrixLimits, panLimits3, projectAxis } from "./geometry"
-import { hideTip, placeTip, setMarkAccent, setTipText, setTipVisible } from "./hover"
+import { hideTip, hideViewReadout, showViewReadout, placeTip, setMarkAccent, setTipText, setTipVisible } from "./hover"
 import { scheduleAnnounce } from "./keyboard"
-import { settleCurrentPan } from "./bond"
-import { fmt } from "./state"
+import { resetView, settleCurrentPan } from "./bond"
+import { fmtCoord } from "./template"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
@@ -22,7 +22,7 @@ const PAGE_CSS = 10
 const VIEW_STEP = 0.1 // fraction of the axis viewport per arrow press, pan and orbit alike
 const ZOOM_NOTCH = 100 // one wheel notch, in wheelScale's pixel units
 
-const NUDGE_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", "+", "=", "-", "_"])
+const NUDGE_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", "+", "=", "-", "_", "0"])
 
 export interface DragStops {
     // Re-place each stop over its line, box, or viewport. Cheap: a handful of style writes.
@@ -39,8 +39,8 @@ const HINTS = {
         "Alt with an arrow moves that edge out; Alt and Shift with an arrow moves it in.",
     roi: "Use arrow keys to move the box, Page Up or Page Down for a larger step. " +
         "Alt with an arrow grows that side; Alt and Shift with an arrow shrinks it.",
-    pan: "Use arrow keys to pan, plus or minus to zoom.",
-    orbit: "Use arrow keys to rotate the view, Shift with an arrow to pan, plus or minus to zoom.",
+    pan: "Use arrow keys to pan, plus or minus to zoom, 0 to reset.",
+    orbit: "Use arrow keys to rotate the view, Shift with an arrow to pan, plus or minus to zoom, 0 to reset.",
 }
 
 function layerById(ctx: OverlayCtx, id: string): HitLayer | undefined {
@@ -60,7 +60,7 @@ function thresholdValue(layer: HitLayer, ctx: OverlayCtx): string {
     const [lo, hi] = tg.span
     const mid = (lo + hi) / 2
     const v = tg.orientation === "h" ? invertAxis(t, mid, tg.pos).y : invertAxis(t, tg.pos, mid).x
-    return fmt(v, ctx.tipDigits_)
+    return fmtCoord(v, tg.orientation === "h" ? t.yfmt : t.xfmt, ctx.tipDigits_, ctx.tipExplicit_, true)
 }
 
 export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: ShadowRoot): DragStops {
@@ -133,6 +133,12 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             scheduleAnnounce(ctx, state, text)
         }
 
+        // A view's readout sits in the figure's corner (#526), as for the mouse and the wheel.
+        const viewReadout = (text: string) => {
+            showViewReadout(ctx, state, text)
+            scheduleAnnounce(ctx, state, text)
+        }
+
         const nudgeThreshold = (l: HitLayer, e: KeyboardEvent): boolean => {
             const tg = l.geometry as ThresholdGeometry
             const t = ctx.manifest_.transforms[l.axis]
@@ -168,7 +174,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             const d = thresholdDrag.begin(id, line, tg, t, -1) as Extract<Drag, { kind: "threshold" }>
             const mid = (tg.span[0] + tg.span[1]) / 2
             const p = h ? { x: mid, y: pos } : { x: pos, y: mid }
-            const text = thresholdDrag.move(d, p, ctx.tipDigits_)
+            const text = thresholdDrag.move(d, p, ctx.tipDigits_, ctx.tipExplicit_)
             el.setAttribute("aria-valuetext", text)
             place()
             showReadout(text)
@@ -304,7 +310,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                     const input = { id, limits: lim, settle: false }
                     state.keyView_ = true
                     ctx.gesture_.request(input)
-                    showReadout(viewDrag.limits3Tip(lim, ctx.tipDigits_))
+                    viewReadout(viewDrag.limits3Tip(lim, ctx.tipDigits_, t, ctx.tipExplicit_))
                     pending = () => { state.keyView_ = false; ctx.gesture_.settle({ ...input, settle: true }) }
                     return true
                 }
@@ -316,7 +322,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                 orbitCam = { azimuth: input.azimuth as number, elevation: input.elevation as number }
                 state.keyView_ = true
                 ctx.gesture_.request(input)
-                showReadout(viewDrag.tip(o, p, ctx.tipDigits_))
+                viewReadout(viewDrag.tip(o, p, ctx.tipDigits_, ctx.tipExplicit_))
                 pending = () => { state.keyView_ = false; ctx.gesture_.settle({ ...input, settle: true }) }
                 return true
             }
@@ -336,7 +342,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             ctx.photoPaint_(next)
             state.keyView_ = true
             ctx.gesture_.request({ id, ...lim, settle: false, s: next.s, tx: next.tx, ty: next.ty })
-            showReadout(viewDrag.limitsTip(lim, ctx.tipDigits_))
+            viewReadout(viewDrag.limitsTip(lim, ctx.tipDigits_, t, ctx.tipExplicit_))
             pending = () => { state.keyView_ = false; settleCurrentPan(ctx, state, d) }
             return true
         }
@@ -392,6 +398,18 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             const l = layerById(ctx, id)
             // A pointer drag owns the geometry until it is released.
             if (!l || state.drag_) return
+            // `0` puts a view back where it started (#524). A held key's settle would move it
+            // again, so it goes; the next key starts from the reset camera.
+            if (e.key === "0") {
+                if (l.kind !== "view") return
+                pending = null
+                held.clear()
+                state.keyView_ = false
+                orbitCam = null
+                resetView(ctx, state, id)
+                e.preventDefault(); e.stopPropagation()
+                return
+            }
             const before = pending
             const handled = l.kind === "threshold" ? nudgeThreshold(l, e)
                 : l.kind === "span" ? nudgeSpan(l, e)
@@ -409,6 +427,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             flush()
             orbitCam = null
             hideTip(ctx, state)
+            hideViewReadout(ctx)
         }
         el.addEventListener("keydown", onKeydown)
         el.addEventListener("keyup", onKeyup)

@@ -602,6 +602,8 @@ try {
         lineY: line ? Number(line.getAttribute("y1")) : null,
         rect: rect ? ["x", "y", "width", "height"].map((a) => Number(rect.getAttribute(a))) : null,
         tip: sr.querySelector(".masque-tip")?.classList.contains("show") ? sr.querySelector(".masque-tip").textContent : null,
+        // A view's live readout sits in the figure's corner (#526).
+        readout: sr.querySelector(".masque-readout")?.classList.contains("show") ? sr.querySelector(".masque-readout").textContent : null,
         liveText: live?.textContent ?? "",
         inputs: window.__masqueKbdInputs[k],
         frame: host.dataset.masqueGestureFrame ? JSON.parse(host.dataset.masqueGestureFrame) : null,
@@ -772,7 +774,7 @@ try {
       }, `${key} preview frame`);
       await page.waitForTimeout(200);
       const held = await dragState(key, id);
-      if (!held.tip || !/x:\[/.test(held.tip)) throw new Error(`${key}: a preview frame hid the readout ${JSON.stringify({ tip: held.tip, frame: preview.d.frame })}`);
+      if (!held.readout || !/x:\[/.test(held.readout)) throw new Error(`${key}: a preview frame hid the readout ${JSON.stringify({ readout: held.readout, frame: preview.d.frame })}`);
       await page.keyboard.up("ArrowRight");
       const first = await settleAfter(s.frame?.n ?? 0, `${key} settle frame`);
       await page.keyboard.press("ArrowRight");
@@ -788,12 +790,25 @@ try {
       s = await dragState(key, id);
       if (s.inputs !== n0) throw new Error(`${key}: a view nudge wrote the bond`);
       if ((await textOf(`#out_${key}`)) !== before) throw new Error(`${key}: a view nudge changed #out_${key}`);
-      // Put the camera back for the drivers that run after this one.
-      await page.keyboard.press("-");
-      await page.keyboard.press("ArrowLeft");
-      await page.keyboard.press("ArrowLeft");
-      await page.waitForTimeout(1500);
       passed.push(`${key}/arrow-pan+zoom+settle-no-bind`);
+      // #524: `0` puts the view back at the limits the page mounted with, which also leaves
+      // the camera where the drivers that run after this one expect it.
+      await page.keyboard.press("0");
+      const reset = await waitFor(async () => {
+        const d = await dragState(key, id);
+        return { ok: d.frame && d.frame.n > zoomed.f.n && d.frame.reset === true && d.frame.settle, f: d.frame };
+      }, `${key} reset frame`);
+      const home = await page.evaluate((k) => {
+        const layers = JSON.parse(document.querySelector(`#coords_${k}`).textContent);
+        const t = JSON.parse(document.querySelector(`#axes_${k}`).textContent)[layers.find((l) => l.kind === "view").axis];
+        return [...t.xlims, ...t.ylims];
+      }, key);
+      const got = [reset.f.xmin, reset.f.xmax, reset.f.ymin, reset.f.ymax];
+      if (!got.every((v, i) => Math.abs(v - home[i]) <= 1e-6 * Math.max(1, Math.abs(home[i]), Math.abs(home[1] - home[0]), Math.abs(home[3] - home[2])))) {
+        throw new Error(`${key}: 0 reset to ${JSON.stringify(reset.f)}, not the mount limits ${JSON.stringify(home)}`);
+      }
+      if ((await dragState(key, id)).inputs !== n0) throw new Error(`${key}: the reset wrote the bond`);
+      passed.push(`${key}/zero-resets`);
       await page.keyboard.press("Escape");
     }
 
@@ -827,10 +842,21 @@ try {
       s = await dragState(key, id);
       if (s.inputs !== n0) throw new Error(`${key}: a view nudge wrote the bond`);
       if ((await textOf(`#out_${key}`)) !== before) throw new Error(`${key}: a view nudge changed #out_${key}`);
-      // Put the camera back for the drivers that run after this one.
-      for (const k of ["ArrowLeft", "Shift+ArrowLeft", "-", "-"]) await page.keyboard.press(k);
-      await page.waitForTimeout(1500);
       passed.push(`${key}/zoom+shift-pan+orbit-no-bind`);
+      // #524: `0` turns and zooms the view back to the camera the page mounted with.
+      await page.keyboard.press("0");
+      const reset = await waitFor(async () => {
+        const d = await dragState(key, id);
+        return { ok: d.frame && d.frame.n > orbit.f.n && d.frame.reset === true && d.frame.settle, f: d.frame };
+      }, `${key} reset frame`);
+      const g = await page.evaluate((k) => JSON.parse(document.querySelector(`#coords_${k}`).textContent).find((l) => l.kind === "view").geometry, key);
+      const near = (a, b, tol) => Math.abs(a - b) <= tol;
+      if (!near(reset.f.azimuth, g.azimuth, 1e-9) || !near(reset.f.elevation, g.elevation, 1e-9) ||
+        !reset.f.limits.every((v, i) => near(v, g.limits[i], 1e-6 * Math.max(1, w(g.limits, Math.floor(i / 2)))))) {
+        throw new Error(`${key}: 0 reset to ${JSON.stringify(reset.f)}, not the mount camera ${JSON.stringify({ azimuth: g.azimuth, elevation: g.elevation, limits: g.limits })}`);
+      }
+      if ((await dragState(key, id)).inputs !== n0) throw new Error(`${key}: the reset wrote the bond`);
+      passed.push(`${key}/zero-resets`);
       await page.keyboard.press("Escape");
     }
   }

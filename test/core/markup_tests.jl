@@ -162,7 +162,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test masque(tfig; tooltip_sigdigits = 7).manifest["tipDigits"] == 7     # zero-config path too
         tstyle = masque(tfig; tooltipstyle = (; bg = :red, caret = false)).manifest["tipStyle"]
         @test tstyle == Dict("--masque-tip-bg" => "rgb(255,0,0)", "--masque-tip-caret" => "none")
-        for bad in (0, 18, 2.5, "3", nothing, true)
+        for bad in (0, 18, 2.5, "3", true)
             @test_throws ArgumentError masque(
                 tfig, PointInteractable(tax, pts2); tooltip_sigdigits = bad, auto = false
             )

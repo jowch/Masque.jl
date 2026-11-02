@@ -21,8 +21,9 @@ image, so a click on its own cannot hide a series, recolor a mark, or
 zoom in. Do those in Julia from the `@bind` value. For example,
 [Legend](@ref) fades the other series when you click a legend entry.
 
-A pan or orbit stays where you left it until the figure is created
-again. Double-clicking does not reset it. See [Pan, zoom and orbit](@ref).
+A pan or orbit stays where you left it until you double-click an empty
+part of the plot, which puts it back, or the figure is created again.
+See [Pan, zoom and orbit](@ref).
 
 Each widget knows only its own figure. To have a click in one plot
 highlight the same observation in another, connect the two in Pluto
@@ -83,7 +84,8 @@ mark can be blocked by a farther one created after it.
 - The keyboard does not reach heatmap or image cells. See
   [Keyboard and screen readers](@ref accessibility-limitations).
 - Some plot types are skipped on `Axis3` and `PolarAxis`, a `surface!`
-  does not respond to the pointer, and `LScene` is not supported.
+  on a 2D `Axis` does not respond to the pointer, and `LScene` is not
+  supported.
   [Supported plots and axes](@ref) has the full list.
 
 If something behaves differently from what this page describes, see
