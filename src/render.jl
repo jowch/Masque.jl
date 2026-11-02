@@ -1324,7 +1324,8 @@ function _render_gesture_frame(input, backend, fig, interactables, ppu, max_widt
     # mount ppu's coordinate space below, so image-px geometry (viewBox, hit regions) never
     # moves out from under the overlay; only the PNG's own pixel density changes (the <img>
     # is width:100% CSS-scaled — see frontend-delivery.md — so that's decoupled from its
-    # intrinsic size).
+    # intrinsic size). A figure `resize!`d after display changes the manifest's width and
+    # height, at the same scale, and the frontend resizes the overlay to match (#546).
     render_ppu = get(input, "settle", false) === true ? ppu : 1.0
     bg0 = fig.scene.backgroundcolor[]
     try
@@ -1340,6 +1341,8 @@ function _render_gesture_frame(input, backend, fig, interactables, ppu, max_widt
         result = _with_blocks_hidden(() -> render(backend, fig, render_ppu), interactables)
         frame = _gesture_frame(result)
         frame["manifest"] = manifest
+        # The figure can be resized after display (#546); the widget follows it, as at mount.
+        frame["displayWidth"] = round(Int, min(size(fig.scene)[1], max_width))
         return frame
     finally
         fig.scene.backgroundcolor[] = bg0

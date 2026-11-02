@@ -7,6 +7,7 @@ export interface FrameResponse {
     width?: number
     height?: number
     pxPerUnit?: number
+    displayWidth?: number // CSS px the widget may grow to: the figure's width, capped at max_width
     manifest?: unknown // Manifest, kept loose here to avoid a cycle with mount.ts's own import of this file
     error?: string     // `onchange` threw: no picture, a note instead
     clear?: string[]   // fields whose plot changed its number of marks; their picks go
