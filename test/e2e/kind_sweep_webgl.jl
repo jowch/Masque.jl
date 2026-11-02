@@ -737,7 +737,7 @@ HTML(
         "<span id=\"axes_onchange\" style=\"display:none\">$(JSON3.write(sweep.onchange.manifest["transforms"]))</span>",
 )
 
-# ╔═╡ d1000000-0000-0000-0000-000000000186
+# ╔═╡ d1000000-0000-0000-0000-000000000535
 # How many times the cell reading the controls' bond has run: a control commit must run it
 # once (#458). It has no inputs, so Pluto never runs it again. The count shows in a span named
 # `count_controls`: Pluto already gives the page an element with the variable's own name.
@@ -1030,7 +1030,7 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000128
 # ╠═d1000000-0000-0000-0000-000000000160
 # ╠═d1000000-0000-0000-0000-000000000161
-# ╠═d1000000-0000-0000-0000-000000000186
+# ╠═d1000000-0000-0000-0000-000000000535
 # ╠═d1000000-0000-0000-0000-000000000170
 # ╠═d1000000-0000-0000-0000-000000000171
 # ╠═d1000000-0000-0000-0000-000000000129
