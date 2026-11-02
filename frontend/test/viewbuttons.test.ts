@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
-import { placeButtons, viewsWithButtons, boxLength, CORNERS } from "../src/viewbuttons"
+import { placeButtons, viewsWithButtons, boxLength, boxBreadth, CORNERS } from "../src/viewbuttons"
 import type { AxisTransform, HitLayer, Manifest } from "../src/types"
 import { withFields } from "./fields"
 
@@ -101,15 +101,16 @@ describe("where the buttons go", () => {
 })
 
 // The live widget, as reset.test.ts drives it.
-const manifestOf = (opts: { moved?: boolean; controls?: string; mode?: "pan" | "orbit"; picks?: boolean } = {}): Manifest => {
+const manifestOf = (opts: { moved?: boolean; controls?: string; mode?: "pan" | "orbit"; picks?: boolean; rect?: [number, number, number, number]; occluders?: Array<[number, number, number, number]> } = {}): Manifest => {
     const mode = opts.mode ?? "pan"
+    const [x, y, w, h] = opts.rect ?? [0, 0, 1200, 800]
     const geometry: Record<string, unknown> = mode === "pan"
-        ? { x: 0, y: 0, w: 1200, h: 800, mode }
-        : { x: 0, y: 0, w: 1200, h: 800, mode, azimuth: 0, elevation: 0, limits: [0, 1, 0, 1, 0, 1], panx: [0.001, 0, 0], pany: [0, 0, -0.001] }
+        ? { x, y, w, h, mode }
+        : { x, y, w, h, mode, azimuth: 0, elevation: 0, limits: [0, 1, 0, 1, 0, 1], panx: [0.001, 0, 0], pany: [0, 0, -0.001] }
     if (opts.moved) geometry.moved = true
     if (opts.controls) geometry.controls = opts.controls
     return {
-        width: 1200, height: 800, scaling: 2, transforms: { ax1: tf([0, 0, 1200, 800]) },
+        width: 1200, height: 800, scaling: 2, transforms: { ax1: tf([x, y, w, h]) }, occluders: opts.occluders,
         layers: [
             { id: "pts", kind: "circles", geometry: [100, 100, 10], payloads: [{ v: 1 }], axis: "ax1", events: ["click", "hover"] },
             { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [], geometry: geometry as never },
@@ -215,19 +216,90 @@ describe("the corner buttons on a live widget", () => {
     })
 
     it("a press is not a click on the plot: no pick cleared, nothing hit-tested", async () => {
-        const { surface, box, inputs } = setup(manifestOf())
+        const { host, surface, box, inputs } = setup(manifestOf())
         // Pick the mark at CSS (50, 50).
         surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true, cancelable: true }))
         expect(inputs).toHaveLength(1)
+        // Past the shadow root: the page (Pluto, a drag in progress on window) never sees the press.
         const seen: string[] = []
-        for (const t of ["pointerdown", "mousedown", "click", "dblclick"]) surface.addEventListener(t, () => seen.push(t))
+        for (const t of ["pointerdown", "pointerup", "mousedown", "click", "dblclick"]) host.addEventListener(t, () => seen.push(t))
         const b = btn(box!, "in")
         b.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, composed: true }))
+        b.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, composed: true }))
+        b.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, composed: true }))
         b.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, composed: true }))
         b.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true, composed: true }))
         await tick()
         expect(seen).toEqual([])
         expect(inputs).toHaveLength(1)
+    })
+
+    it("+ and - stay put when reset joins: the box is placed by where all three start", () => {
+        // A 1200x800 picture at 600x400 CSS px. Stack in `tr`; row in `tr` (a short axis);
+        // stack in `br` (both top corners covered).
+        const L = boxLength(24), B = boxBreadth(24)
+        const cases: Array<[string, Manifest, string, string]> = [
+            ["tr stack", manifestOf(), `calc(100% - ${8 + B}px)`, "calc(0% + 8px)"],
+            ["tr row", manifestOf({ rect: [0, 0, 1200, 200] }), `calc(100% - ${8 + L}px)`, "calc(0% + 8px)"],
+            ["br stack", manifestOf({ occluders: [[1000, 0, 200, 200], [0, 0, 200, 200]] }), `calc(100% - ${8 + B}px)`, `calc(100% - ${8 + L}px)`],
+        ]
+        for (const [name, m, left, top] of cases) {
+            const { box } = setup(m)
+            const at = () => [box!.style.left, box!.style.top, box!.style.right, box!.style.bottom]
+            expect(at(), name).toEqual([left, top, "", ""])
+            btn(box!, "in").click()
+            expect(box!.classList.contains("moved"), name).toBe(true)
+            expect(at(), name).toEqual([left, top, "", ""])
+            // Reset is the last button: it joins at the far end, after + and -.
+            expect([...box!.querySelectorAll("button")].map((b) => b.className), name).toEqual(["masque-vb-in", "masque-vb-out", "masque-vb-reset"])
+        }
+    })
+
+    it("a wheel over the box is the plot's: Ctrl+wheel zooms, a plain wheel scrolls the page", async () => {
+        // happy-dom drops ctrlKey and clientX/Y from a WheelEvent init (#526); the box rebuilds
+        // the event for the surface, so give it a WheelEvent that keeps them.
+        const Base = WheelEvent
+        class Kept extends Base {
+            constructor(type: string, init: WheelEventInit = {}) {
+                super(type, init)
+                for (const k of ["ctrlKey", "metaKey", "clientX", "clientY"] as const) Object.defineProperty(this, k, { value: init[k] ?? (k.endsWith("Key") ? false : 0) })
+            }
+        }
+        vi.stubGlobal("WheelEvent", Kept)
+        const { box, requestFrame } = setup(manifestOf())
+        const plain = new WheelEvent("wheel", { deltaY: -100, clientX: 590, clientY: 10, bubbles: true, cancelable: true, composed: true })
+        box!.dispatchEvent(plain)
+        expect(plain.defaultPrevented).toBe(false)
+        await tick(50)
+        expect(requestFrame).not.toHaveBeenCalled()
+        const ctrl = new WheelEvent("wheel", { deltaY: -100, clientX: 590, clientY: 10, ctrlKey: true, bubbles: true, cancelable: true, composed: true })
+        box!.dispatchEvent(ctrl)
+        expect(ctrl.defaultPrevented).toBe(true)
+        await tick(50)
+        expect(requestFrame).toHaveBeenCalled()
+        vi.unstubAllGlobals()
+    })
+
+    it("focus on a twin's keyboard stop shows the shared stack", () => {
+        const m = manifestOf()
+        m.transforms.ax2 = tf([0, 0, 1200, 800])
+        m.layers.push({ ...m.layers[1], id: "view_2", axis: "ax2" })
+        const { shadow, box } = setup(m)
+        expect(shadow.querySelectorAll(".masque-vb")).toHaveLength(1)
+        const stop2 = shadow.querySelector(`.drag-stop[data-layer="view_2"]`) as HTMLElement
+        stop2.dispatchEvent(new FocusEvent("focusin", { bubbles: true, composed: true }))
+        expect(box!.classList.contains("show")).toBe(true)
+        stop2.dispatchEvent(new FocusEvent("focusout", { bubbles: true, composed: true }))
+        expect(box!.classList.contains("show")).toBe(false)
+    })
+
+    it("a touch outside the widget puts a touch-shown box away", () => {
+        const { surface, box } = setup(manifestOf())
+        pointer(surface, "pointerdown", 300, 200, "touch")
+        pointer(surface, "pointerup", 300, 200, "touch")
+        expect(box!.classList.contains("show")).toBe(true)
+        pointer(document.body, "pointerdown", 900, 900, "touch")
+        expect(box!.classList.contains("show")).toBe(false)
     })
 
     it("controls = :always shows them without hover; :none leaves them out", () => {

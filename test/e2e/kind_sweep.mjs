@@ -515,8 +515,12 @@ try {
     if (p.box.show) throw new Error(`${key}-buttons: the box shows before any hover`);
     const vp = { x: p.base.x + g.x * p.base.s, y: p.base.y + g.y * p.base.s, w: g.w * p.base.s, h: g.h * p.base.s };
     await page.mouse.move(vp.x + vp.w / 2, vp.y + vp.h / 2);
-    await new Promise((r) => setTimeout(r, 250));
-    p = await probe();
+    // Read once the fade in has ended (a busy WebGL page can start it late), for up to 3 s.
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      p = await probe();
+      if (p.box.show && p.box.opacity >= 0.99) break;
+    }
     if (!p.box.show || p.box.opacity < 0.99) throw new Error(`${key}-buttons: hover did not show the box (${JSON.stringify(p.box)})`);
     if (p.box.corner !== corner) throw new Error(`${key}-buttons: box in corner ${p.box.corner}, expected ${corner}`);
     const r = p.box.r, near = (a, b) => Math.abs(a - b) <= 1.5;
@@ -538,13 +542,16 @@ try {
     await page.mouse.click(p.box.in.x + p.box.in.w / 2, p.box.in.y + p.box.in.h / 2);
     const z = await waitStamp(n0, (o) => o.settle === true && o.reset !== true);
     const width = (o) => (Array.isArray(o.limits) ? o.limits[1] - o.limits[0] : o.xmax - o.xmin);
-    const home = g.mode === "orbit" ? g.limits[1] - g.limits[0] : null;
-    if (home !== null ? !(width(z) < 0.99 * home) : !(width(z) > 0)) throw new Error(`${key}-buttons: zoom in did not narrow the limits (${JSON.stringify(z)})`);
+    const inAt = p.box.in;
     p = await probe();
     if (!p.box.reset) throw new Error(`${key}-buttons: reset did not join after zoom in`);
+    // Reset joining moves no button already there: a second click on + is still +.
+    if (Math.abs(p.box.in.x - inAt.x) > 0.5 || Math.abs(p.box.in.y - inAt.y) > 0.5) throw new Error(`${key}-buttons: zoom in moved from ${JSON.stringify(inAt)} to ${JSON.stringify(p.box.in)} when reset joined`);
     if (!p.box.show) throw new Error(`${key}-buttons: the box hid while the pointer was on it`);
     await page.mouse.click(p.box.reset.x + p.box.reset.w / 2, p.box.reset.y + p.box.reset.h / 2);
-    await waitStamp(z.n, (o) => o.reset === true && o.settle === true);
+    const home = await waitStamp(z.n, (o) => o.reset === true && o.settle === true);
+    // Against the home limits the reset lands at (orbit frames carry `limits`, pans x/y spans).
+    if (!(width(z) < 0.99 * width(home))) throw new Error(`${key}-buttons: zoom in did not narrow the limits (${JSON.stringify(z)}, home ${JSON.stringify(home)})`);
     p = await probe();
     if (p.box.reset) throw new Error(`${key}-buttons: reset still shows after the view went home`);
     const after = await textOf(`#out_${key}`);

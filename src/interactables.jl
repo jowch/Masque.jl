@@ -2114,19 +2114,19 @@ struct ViewInteractable <: AbstractInteractable
 end
 const _WHEEL_MODES = (:modifier, :always, :none)
 const _VIEW_CONTROLS = (:hover, :always, :none)
-function ViewInteractable(ax; id = :view, wheel = nothing, controls::Symbol = :hover)
+function ViewInteractable(ax; id = :view, wheel = nothing, controls = :hover)
     wheel === nothing || wheel in _WHEEL_MODES ||
         throw(ArgumentError("ViewInteractable: wheel = $(repr(wheel)) is not one of :modifier, :always or :none."))
-    controls in _VIEW_CONTROLS || throw(
+    controls isa Symbol && controls in _VIEW_CONTROLS || throw(
         ArgumentError(
-            "ViewInteractable: controls = :$(controls) is not one of :hover, :always or :none."
+            "ViewInteractable: controls = $(repr(controls)) is not one of :hover, :always or :none."
         )
     )
     return ViewInteractable(ax, id, wheel, controls)
 end
-# The positional forms from before `controls`.
-ViewInteractable(ax, id::Symbol) = ViewInteractable(ax, id, nothing, :hover)
-ViewInteractable(ax, id::Symbol, wheel::Union{Symbol, Nothing}) = ViewInteractable(ax, id, wheel, :hover)
+# The positional forms from before `controls`, checked as the keyword form is.
+ViewInteractable(ax, id::Symbol) = ViewInteractable(ax; id)
+ViewInteractable(ax, id::Symbol, wheel) = ViewInteractable(ax; id, wheel)
 # The wheel policy a view ships. An explicit `wheel` wins. Without one, an axis whose scroll
 # zoom the author turned off in Makie, with `deregister_interaction!(ax, :scrollzoom)`,
 # `deactivate_interaction!(ax, :scrollzoom)` or (2D) both `xzoomlock` and `yzoomlock`, doesn't zoom on the wheel either; any other axis takes the

@@ -26,19 +26,22 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 
     @testset "an unknown setting is an error that names the choices" begin
         fig, ax = fig_ax()
-        err = try
-            ViewInteractable(ax; controls = :corner)
-            nothing
-        catch e
-            e
+        for bad in (:corner, "always")
+            err = try
+                ViewInteractable(ax; controls = bad)
+                nothing
+            catch e
+                e
+            end
+            @test err isa ArgumentError
+            @test occursin(":hover, :always or :none", err.msg)
         end
-        @test err isa ArgumentError
-        @test occursin(":hover, :always or :none", err.msg)
     end
 
     @testset "the two-field form still builds, and a renumbered id keeps controls" begin
         fig, ax = fig_ax()
         @test ViewInteractable(ax, :pan).controls === :hover
+        @test_throws ArgumentError ViewInteractable(ax, :pan, :bogus)
         fig = Figure(size = (700, 350))
         a1 = Axis(fig[1, 1]); a2 = Axis(fig[1, 2])
         scatter!(a1, 0:3, 0:3); scatter!(a2, 0:3, 0:3)

@@ -178,6 +178,7 @@ export const VIEW_BUTTONS_STYLE = `
        border: 1px solid var(--masque-tip-border-resolved); border-radius: var(--masque-tip-radius, 4px);
        box-shadow: var(--masque-tip-shadow, 0 2px 4px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08));
        transition: opacity ${MOTION_MS}ms ease-out; }
+.masque-vb { touch-action: manipulation; }
 .masque-vb.row { flex-direction: row; }
 .masque-vb[hidden] { display: none; }
 .masque-vb.show { opacity: 1; pointer-events: auto; }
@@ -265,7 +266,19 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
         el.addEventListener("pointerup", own)
         el.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation() })
         el.addEventListener("dblclick", (e) => { e.preventDefault(); e.stopPropagation() })
-        el.addEventListener("wheel", own)
+        // A wheel over the box is the plot's: the surface's handler decides (Ctrl/Cmd+wheel zooms,
+        // a plain wheel scrolls the page), so the box leaves no dead spot in the plot.
+        el.addEventListener("wheel", (e) => {
+            e.stopPropagation()
+            const f = new WheelEvent("wheel", {
+                deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ, deltaMode: e.deltaMode,
+                clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY,
+                ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey, altKey: e.altKey,
+                bubbles: true, cancelable: true,
+            })
+            ctx.surface_.dispatchEvent(f)
+            if (f.defaultPrevented) e.preventDefault()
+        }, { passive: false })
         el.addEventListener("pointerleave", (e) => {
             if (e.pointerType !== "touch" && hovered === l.id && !(e.relatedTarget === ctx.surface_)) { hovered = null; paint() }
         })
@@ -301,13 +314,20 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
             b.el.style.setProperty("--masque-vb-size", `${p.size}px`)
             b.el.style.setProperty("--masque-vb-icon", `${p.size === COARSE ? 24 : 14}px`)
             // Percentages of the figure, so the box follows the widget's width without a re-place;
-            // the inset is CSS px.
+            // the inset is CSS px. Always placed by its top-left corner, where the box of all three
+            // buttons starts: reset joins or leaves at the far end, and + and - never move under the
+            // pointer. So a two-button row in `tr`/`br`, or a two-button `br` stack, sits one button
+            // further in from the corner until reset joins.
             const W = m.width, H = m.height
             const [x, y, w, h] = vp
-            b.el.style.left = p.corner === "tl" ? `calc(${(x / W) * 100}% + ${INSET}px)` : ""
-            b.el.style.right = p.corner === "tl" ? "" : `calc(${((W - x - w) / W) * 100}% + ${INSET}px)`
-            b.el.style.top = p.corner === "br" ? "" : `calc(${(y / H) * 100}% + ${INSET}px)`
-            b.el.style.bottom = p.corner === "br" ? `calc(${((H - y - h) / H) * 100}% + ${INSET}px)` : ""
+            const across = p.row ? boxLength(p.size) : boxBreadth(p.size)
+            const down = p.row ? boxBreadth(p.size) : boxLength(p.size)
+            b.el.style.left = p.corner === "tl"
+                ? `calc(${(x / W) * 100}% + ${INSET}px)`
+                : `calc(${((x + w) / W) * 100}% - ${INSET + across}px)`
+            b.el.style.top = p.corner === "br"
+                ? `calc(${((y + h) / H) * 100}% - ${INSET + down}px)`
+                : `calc(${(y / H) * 100}% + ${INSET}px)`
         }
         paint()
     }
@@ -320,16 +340,42 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
         return null
     }
 
+    // The box a view shows: its own, or for a twin (same viewport) the first view's.
+    const owner = (id: string): string | null => {
+        if (boxes.has(id)) return id
+        const m = ctx.manifest_
+        const l = m.layers.find((x) => x.id === id && x.kind === "view")
+        if (!l) return null
+        const g = l.geometry as ViewGeometry
+        for (const b of boxes.values()) {
+            const o = m.layers.find((x) => x.id === b.id && x.kind === "view")
+            const og = o?.geometry as ViewGeometry | undefined
+            if (og && sameRect([g.x, g.y, g.w, g.h], [og.x, og.y, og.w, og.h])) return b.id
+        }
+        return null
+    }
+
+    // A touch outside the widget puts a touch-shown box away (one on the plot re-aims it).
+    const onDocDown = (e: PointerEvent) => {
+        if (e.pointerType !== "touch" || touched === null) return
+        const path = typeof e.composedPath === "function" ? e.composedPath() : []
+        if (path.includes(shadow.host) || path.includes(shadow as unknown as EventTarget)) return
+        touched = null
+        paint()
+    }
+    document.addEventListener("pointerdown", onDocDown, true)
+
     // The view's keyboard stop (dragkeys.ts): focus there shows its box.
     const onFocusIn = (e: Event) => {
         const t = e.target as HTMLElement | null
         const id = t?.classList?.contains("drag-stop") ? t.dataset.layer ?? null : null
-        focused = id && boxes.has(id) ? id : null
+        focused = id ? owner(id) : null
         paint()
     }
     const onFocusOut = (e: FocusEvent) => {
         const t = e.target as HTMLElement | null
-        if (t?.dataset?.layer === focused) { focused = null; paint() }
+        const id = t?.dataset?.layer
+        if (id && owner(id) === focused) { focused = null; paint() }
     }
     shadow.addEventListener("focusin", onFocusIn)
     shadow.addEventListener("focusout", onFocusOut as EventListener)
@@ -352,6 +398,7 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
             shadow.removeEventListener("focusin", onFocusIn)
             shadow.removeEventListener("focusout", onFocusOut as EventListener)
             coarseQuery?.removeEventListener?.("change", onCoarse)
+            document.removeEventListener("pointerdown", onDocDown, true)
             for (const b of boxes.values()) b.el.remove()
             boxes.clear()
         },
