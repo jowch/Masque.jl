@@ -886,7 +886,6 @@ Nearly all of each "before" figure is compile (96–100%).
 | first `masque` (a pick) | 15.5–24.0 | 0.4–0.7 | 16.4–27.1 | 0.4–0.8 |
 | first `show` | 0.5–1.2 | 0.01 | 1.0–2.5 | 0.02–0.05 |
 | first bond value (a pick) | 0.9–1.5 | 0.1–0.4 | 0.8–1.3 | 0.1 |
-| first value shown (a pick) | 0.2 | 0.05–0.06 | 0.19–0.21 | 0.06 |
 | view warmup, pan + orbit | 5.6–8.5 | 0.3–0.5 | 4.8–8.8 | 0.2–0.4 |
 | first `onchange` frame | 0.9 | 0.5 | 0.4 | 0.3–0.4 |
 | any step, second figure | ≤ 0.24 | ≤ 0.24 | ≤ 0.22 | ≤ 0.22 |
@@ -904,13 +903,21 @@ parallel), its pkgimage grows from 0.06–0.2 MB to 47–50 MB (about the size o
 38 MB, and WGLMakie's, 60 MB), and loading is 0–1 s slower. The `precompile_workload` preference
 on Masque turns the workload off.
 
-The "first value shown" row is how long a cell takes to print the first pick's value: the value
-and each of its fields as `text/plain`, the way Pluto shows a `@bind` value. It was measured
-later, on 2026-11-02 with the same bench, on base `a6c2567` ("before") and with the show step
-#567 adds to the workload ("after"), two runs each. The first bond value on that base is
-0.07–0.2 s on both backends, before and after. About 0.05 s stays compile: the value is a
-`NamedTuple` named by the notebook's own ids, which no workload can name in advance. Pluto's
-own first round trip after a session opens, 0.3–1.8 s in CI, is separate and still open (#567).
+Showing the first value was measured later, on 2026-11-02 with the same bench, on base
+`a6c2567` ("before") and with the show step #567 adds to the workload ("after"). It is how long
+a cell takes to print the first pick's value: the value and each of its fields as `text/plain`,
+the way Pluto shows a `@bind` value. Seconds, as the range of four runs from two sessions:
+
+| step | cairo before | cairo after | webgl before | webgl after |
+|---|---:|---:|---:|---:|
+| first value shown (a pick) | 0.2–0.39 | 0.05–0.08 | 0.19–0.22 | 0.06–0.11 |
+
+The first bond value itself, 0.07–0.28 s before and 0.07–0.2 s after on both backends, doesn't
+change; its spread is noise. Showing a value from a widget whose ids the workload doesn't use (a
+point pick and a segment pick) goes from 0.26–0.27 s to 0.10–0.11 s too. About 0.05 s stays
+compile: the value is a `NamedTuple` named by the notebook's own ids, which no workload can name
+in advance. Pluto's own first round trip after a session opens, 0.3–1.8 s in CI, is separate and
+still open (#567).
 
 ## Axis3 projection hinge (2026-07-01, 2026-07-02)
 
