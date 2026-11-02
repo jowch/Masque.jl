@@ -2390,6 +2390,76 @@ try {
       continue;
     }
 
+    if (spec.resizeAfterDisplay) {
+      // #546: a later cell `resize!`d the figure after it was shown. The pan's frame draws it
+      // at the new size, so the overlay must take that size too: its svgs' viewBox matches the
+      // picture, the host may grow to the new width, and a hover on each of the lower axis's
+      // points, where the resized figure draws them (`#resized_<key>`, image px), rings it.
+      const p = hitPoint(layer, 0);
+      const probe = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center", inline: "nearest" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const base = host.querySelector("img, canvas");
+        return {
+          stamp: host.dataset.masqueGestureFrame ?? null,
+          viewBoxes: [...sr.querySelectorAll("svg.masque-fill, svg.masque-edge, svg.masque-plain")].map((v) => v.getAttribute("viewBox")),
+          picture: base.tagName === "IMG" ? [base.naturalWidth, base.naturalHeight] : [base.width, base.height],
+          maxWidth: host.style.maxWidth,
+        };
+      }, key);
+      const before = await probe();
+      await drag(key, p.x, p.y, p.x + 40, p.y, true);
+      const tries = backend === "webgl" ? 50 : 25;
+      const delayMs = backend === "webgl" ? 300 : 200;
+      let after = before;
+      for (let i = 0; i < tries; i++) {
+        await new Promise((r) => setTimeout(r, delayMs));
+        after = await probe();
+        const st = after.stamp ? JSON.parse(after.stamp) : null;
+        if (st && st.settle === true && after.stamp !== before.stamp) break;
+      }
+      const st = after.stamp ? JSON.parse(after.stamp) : null;
+      if (!st || st.settle !== true || after.stamp === before.stamp) {
+        throw new Error(`${key}: no settle frame after the pan (stamp ${JSON.stringify(after.stamp)})`);
+      }
+      const [pw, ph] = after.picture;
+      const sized = after.viewBoxes.every((vb) => {
+        const [, , w, h] = vb.split(" ").map(Number);
+        return Math.abs(w - pw) <= 1 && Math.abs(h - ph) <= 1;
+      });
+      if (!sized || after.viewBoxes[0] === before.viewBoxes[0]) {
+        throw new Error(`${key}: overlay kept its size after the resized frame: viewBox ${JSON.stringify(after.viewBoxes)} (was ${before.viewBoxes[0]}), picture ${pw}×${ph}`);
+      }
+      passed.push(`${key}/resized-viewbox`);
+      const marks = await page.evaluate((k) => JSON.parse(document.querySelector(`#resized_${k}`).textContent), key);
+      const rings = await page.evaluate(([k, marks]) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const surface = sr.querySelector(".surface");
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        return marks.map(([x, y]) => {
+          const cx = b.left + x * s, cy = b.top + y * s;
+          surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: false }));
+          surface.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, clientX: cx, clientY: cy }));
+          const ring = sr.querySelector(`svg g.masque-clip g.hi > *`);
+          const r = ring?.getBoundingClientRect();
+          return { at: [Math.round(cx), Math.round(cy)], off: r ? Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy) : null };
+        });
+      }, [key, marks]);
+      if (rings.length !== 3 || rings.some((r) => r.off === null || r.off > 3)) {
+        throw new Error(`${key}: a hover ring is off its mark after the resized frame: ${JSON.stringify(rings)}`);
+      }
+      passed.push(`${key}/resized-ring`);
+      console.error(`OK  ${key}/resized — viewBox ${after.viewBoxes[0]} on a ${pw}×${ph} picture, max-width ${after.maxWidth}, rings ${JSON.stringify(rings.map((r) => +r.off.toFixed(2)))} px off`);
+      continue;
+    }
+
     if (spec.mode === "drag" && spec.layerKind === "view") {
       // #102/§12.3: a view gesture commits nothing anymore — the OLD assertion here waited for
       // #out_view's bond text to change and would now fail for the right reason (nothing ever

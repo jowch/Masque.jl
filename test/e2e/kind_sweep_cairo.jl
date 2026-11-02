@@ -760,6 +760,25 @@ HTML(
         "<span id=\"coords_view_wheel\" style=\"display:none\">$(JSON3.write(sweep.view_wheel.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000546
+@bind ev_view_resized sweep.view_resized
+
+# ╔═╡ c1000000-0000-0000-0000-000000000547
+HTML(
+    "<span id=\"out_view_resized\">VIEW_RESIZED=$(sweep_field("view_resized", ev_view_resized))</span>" *
+        "<span id=\"bond_view_resized\" style=\"display:none\">$(repr(ev_view_resized))</span>" *
+        "<span id=\"coords_view_resized\" style=\"display:none\">$(JSON3.write(sweep.view_resized.manifest["layers"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000548
+# After the widget is shown (#546): the next pan draws the figure at its new size.
+let
+    ev_view_resized
+    sleep(1)
+    marks = resize_view_resized!(sweep.view_resized.manifest["scaling"])
+    HTML("<span id=\"resized_view_resized\" style=\"display:none\">$(JSON3.write(marks))</span>")
+end
+
 # ╔═╡ c1000000-0000-0000-0000-000000000038
 @bind ev_legend sweep.legend
 
@@ -1127,6 +1146,9 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000153
 # ╠═c1000000-0000-0000-0000-000000000202
 # ╠═c1000000-0000-0000-0000-000000000203
+# ╠═c1000000-0000-0000-0000-000000000546
+# ╠═c1000000-0000-0000-0000-000000000547
+# ╠═c1000000-0000-0000-0000-000000000548
 # ╠═c1000000-0000-0000-0000-000000000038
 # ╠═c1000000-0000-0000-0000-000000000039
 # ╠═c1000000-0000-0000-0000-000000000047
