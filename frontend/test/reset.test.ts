@@ -135,6 +135,30 @@ describe("reset a moved view (#524)", () => {
         expect(resets(requestFrame)).toHaveLength(1)
     })
 
+    it("an axis readout on the same axis, or a hover-only mark, does not stop the reset; a mark still does", async () => {
+        const m = manifestOf({ moved: true })
+        // The readout covers the whole viewport for click and hover, after the marks.
+        m.layers.splice(1, 0,
+            { id: "tip", kind: "circles", geometry: [400, 400, 10], payloads: [{ v: 2 }], axis: "ax1", events: ["hover"] },
+            { id: "readout", kind: "axis", axis: "ax1", events: ["click", "hover"], payloads: [], geometry: null as never })
+        const { surface, requestFrame } = setup(m)
+        doubleClick(surface, 50, 50) // the clickable mark
+        await tick()
+        expect(resets(requestFrame)).toHaveLength(0)
+        doubleClick(surface, 200, 200) // the hover-only mark
+        await tick()
+        expect(resets(requestFrame)).toHaveLength(1)
+    })
+
+    it("an axis readout's empty space resets", async () => {
+        const m = manifestOf({ moved: true })
+        m.layers.splice(1, 0, { id: "readout", kind: "axis", axis: "ax1", events: ["click", "hover"], payloads: [], geometry: null as never })
+        const { surface, requestFrame } = setup(m)
+        doubleClick(surface, 300, 300)
+        await tick()
+        expect(resets(requestFrame)).toHaveLength(1)
+    })
+
     it("a Cmd/Ctrl double-click does not reset", async () => {
         const { surface, requestFrame } = setup(manifestOf({ moved: true }))
         const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? { metaKey: true } : { ctrlKey: true }

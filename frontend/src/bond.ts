@@ -779,18 +779,20 @@ export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): vo
     commitClick(ctx, state, hit, sample.x, sample.y, isToggleClick(e))
 }
 
-// A double-click on an empty part of a view's plot puts the view back where it started (#524).
-// On a mark the two clicks are already two picks, and on a line, a box or a legend they are
-// that control's. The first click has already cleared a one-pick field there, as any click on
-// empty space does (#384): waiting to see whether a second click comes would slow every pick.
+// A double-click on a view's plot, away from anything a click picks, puts the view back where
+// it started (#524). On a mark the two clicks are already two picks, and on a line, a box or a
+// legend they are that control's. An axis or colorbar readout and a mark that only shows a
+// tooltip pick nothing a reset would undo, so they don't stand in its way. The first click has
+// already cleared a one-pick field there, as any click on empty space does (#384): waiting to
+// see whether a second click comes would slow every pick.
 export function onDoubleClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {
     if (state.drag_ || state.plainClicks_ < 2 || isToggleClick(e)) return
     const m = ctx.manifest_
     const p = layoutImagePx(ctx.base_, m, e.clientX, e.clientY)
     const under = hitTestAt(m, p.x, p.y, state.photo_, "drag", state.photoViewId_)
     if (under?.layer.kind !== "view") return
-    if (hitTestAt(m, p.x, p.y, state.photo_, "click", state.photoViewId_)) return
-    if (hitTestAt(m, p.x, p.y, state.photo_, "hover", state.photoViewId_)) return
+    const picked = hitTestAt(m, p.x, p.y, state.photo_, "click", state.photoViewId_)
+    if (picked && picked.layer.kind !== "axis") return
     if (m.occluders?.some(([bx, by, bw, bh]) => p.x >= bx && p.x <= bx + bw && p.y >= by && p.y <= by + bh)) return
     if (resetView(ctx, state, under.layer.id)) { e.preventDefault(); e.stopPropagation() }
 }
