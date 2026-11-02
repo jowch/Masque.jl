@@ -130,7 +130,8 @@ repo's own docs build) one widget already warns and two fail.
   cut a line also ships `drawn`, one small integer per drawn vertex.
 - **Not display width.** `px_per_unit` scales the PNG roughly with the square of the width but
   leaves the manifest alone: scatter-1000's PNG is 90 KB at 300 px and 188 KB at 700 px, its
-  manifest 38 KB at both.
+  manifest 38 KB at both. The design width it ships for hit slack (`cssWidth`, #527) is one
+  integer per manifest.
 
 ### Per-kind manifest costs
 

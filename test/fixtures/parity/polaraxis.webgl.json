@@ -216,6 +216,7 @@
         "lines": null,
         "scatter": null
     },
+    "cssWidth": 600,
     "transforms": {
         "ax1": {
             "xscale": "identity",

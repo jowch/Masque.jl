@@ -323,11 +323,12 @@ end
     @test Masque._resolve_backend(nothing) isa _WGLExt.WebGLBackend   # the one loaded
     w = masque(fig)
     @test w isa _WGLExt.WebGLWidget && w.px_per_unit == 2.0 && w.display_css == 600
-    @test w.manifest["scaling"] == 2.0
+    @test w.manifest["scaling"] == 2.0 && w.manifest["cssWidth"] == 600
     err = (@test_throws ArgumentError masque(fig; backend = :cairo)).value
     @test occursin("using CairoMakie", err.msg)
     w = masque(fig; backend = :webgl, max_width = 300)
     @test w.display_css == 300 && w.px_per_unit == 2.0    # WebGL's density ignores max_width
+    @test w.manifest["cssWidth"] == 300                   # hit slack's design width (#527)
     w = masque(fig; px_per_unit = 3)
     @test w.px_per_unit == 3.0 && w.manifest["scaling"] == 3.0 && w.manifest["width"] == 1800
 
