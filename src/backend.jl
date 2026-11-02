@@ -51,9 +51,16 @@ struct AxisTransform
     is3d::Bool                              # pixel→data inversion is undefined on a 3D axis; lims are degenerate
     ispolar::Bool                           # lims are the Cartesian window of the viewport; `polar` maps it to (θ, r)
     polar::Union{Nothing, PolarFrame}       # PolarAxis only: the resolved `Makie.Polar` fields JS needs to invert
+    # How a tooltip prints a coordinate on each dimension, read from the axis's tick settings
+    # (`_coord_format`); `nothing` prints the plain number.
+    xfmt::Union{Nothing, Dict{String, Any}}
+    yfmt::Union{Nothing, Dict{String, Any}}
+    zfmt::Union{Nothing, Dict{String, Any}}
 end
 AxisTransform(id, xlims, ylims, xscale, yscale, viewport, xreversed, yreversed, xcats, ycats, valueaxis, is3d, ispolar) =
     AxisTransform(id, xlims, ylims, xscale, yscale, viewport, xreversed, yreversed, xcats, ycats, valueaxis, is3d, ispolar, nothing)
+AxisTransform(id, xlims, ylims, xscale, yscale, viewport, xreversed, yreversed, xcats, ycats, valueaxis, is3d, ispolar, polar) =
+    AxisTransform(id, xlims, ylims, xscale, yscale, viewport, xreversed, yreversed, xcats, ycats, valueaxis, is3d, ispolar, polar, nothing, nothing, nothing)
 
 """
     InteractionContext
@@ -239,6 +246,89 @@ function _cats(conv)
     return String[string(c) for (_, c) in sort(conv.int_to_category; by = first)]
 end
 
+# How a tooltip prints a coordinate on one axis dimension (#510): the axis's tick settings read
+# once, as the wire's `CoordFormat` (`frontend/src/types.ts`), or `nothing` for the plain number.
+# Display only: the `@bind` value keeps the raw number. A format string gives its affixes and,
+# when it states one, its precision as a d3 spec; `AngularTicks` and `MultiplesTicks` give a
+# scale and a suffix. A function format, hand-placed `(values, labels)` ticks, a log scale and a
+# converted dimension (categories, dates, units) give nothing. `label` renames the table key
+# (`θ`, `r` on a PolarAxis) and is sent even when the number is plain.
+function _coord_format(ticks, format; scale = identity, conv = nothing, label = nothing)
+    f = (scale === identity && conv === nothing) ? _tick_format(ticks, format) : nothing
+    label === nothing && return f
+    f = something(f, Dict{String, Any}())
+    f["label"] = label
+    return f
+end
+
+function _tick_format(ticks, format)
+    ticks isa Tuple && return nothing           # hand-placed `(values, labels)`: no rule between them
+    format isa AbstractString && return _format_string(format)
+    format isa Makie.Automatic || return nothing
+    ticks isa Makie.AngularTicks && return _scaled_format(ticks.label_factor, ticks.suffix)
+    ticks isa Makie.MultiplesTicks && return _scaled_format(1 / ticks.multiple, ticks.suffix)
+    return nothing
+end
+
+function _scaled_format(scale, suffix)
+    f = Dict{String, Any}()
+    isfinite(scale) && scale != 1 && (f["scale"] = Float64(scale))
+    isempty(suffix) || (f["suffix"] = String(suffix))
+    return isempty(f) ? nothing : f
+end
+
+# A Format.jl format string, the one Makie calls `Format.format(str, v)` with: the text around
+# its one `{…}` becomes the prefix and suffix, and the spec inside the subset d3-format shares
+# with it (`,`, `.p`, and the types f, e, g, %, d) becomes `spec`. Width, fill, alignment and sign
+# pad for tick layout, which a tooltip has no column for, so they are dropped. `%` is a scale of
+# 100 and a `%` suffix, so `tooltip_sigdigits` can still round the scaled value. A spec outside
+# the subset keeps the affixes only. No placeholder, or more than one: nothing.
+const _PY_SPEC = r"^(?:.?[<>=^])?[-+ ]?#?0?(\d+)?([,_])?(?:\.(\d+))?([A-Za-z%])?$"
+
+function _format_string(str::AbstractString)
+    parts = String[]; specs = String[]
+    buf = IOBuffer(); i = firstindex(str)
+    while i <= lastindex(str)
+        c = str[i]; n = nextind(str, i)
+        if (c == '{' || c == '}') && n <= lastindex(str) && str[n] == c
+            print(buf, c); i = nextind(str, n)       # `{{` and `}}` are literal braces
+        elseif c == '{'
+            close = findnext('}', str, n)
+            close === nothing && return nothing
+            push!(parts, String(take!(buf))); push!(specs, str[n:prevind(str, close)])
+            i = nextind(str, close)
+        else
+            print(buf, c); i = n
+        end
+    end
+    push!(parts, String(take!(buf)))
+    length(specs) == 1 || return nothing
+    f = Dict{String, Any}()
+    prefix, suffix = parts
+    field = specs[1]
+    colon = findfirst(':', field)
+    arg = colon === nothing ? field : field[1:prevind(field, colon)]
+    spec = colon === nothing ? "" : field[nextind(field, colon):end]
+    m = (isempty(arg) || arg == "1") ? match(_PY_SPEC, spec) : nothing
+    if m !== nothing
+        _, sep, prec, type = m.captures
+        type = type === nothing ? nothing : lowercase(type)
+        if type == "%"
+            f["scale"] = 100.0
+            suffix = "%" * suffix
+            type = "f"
+        end
+        sep == "," && (f["group"] = true)
+        type == "e" && (f["exp"] = true)
+        if (prec !== nothing || type !== nothing) && (type === nothing || type in ("f", "e", "g", "d")) && sep != "_"
+            f["spec"] = (sep == "," ? "," : "") * (prec === nothing ? "" : ".$prec") * something(type, "")
+        end
+    end
+    isempty(prefix) || (f["prefix"] = prefix)
+    isempty(suffix) || (f["suffix"] = suffix)
+    return isempty(f) ? nothing : f
+end
+
 function _axis_transform(id, ax, scaling, out_h)
     vp = _scene_viewport(ax); o = vp.origin; wv = vp.widths
     vpx = (o[1] * scaling, out_h - (o[2] + wv[2]) * scaling, wv[1] * scaling, wv[2] * scaling)
@@ -248,7 +338,10 @@ function _axis_transform(id, ax, scaling, out_h)
         (fo[1], fo[1] + fw[1]), (fo[2], fo[2] + fw[2]),
         _scalesym(ax.xscale[]), _scalesym(ax.yscale[]),
         vpx, ax.xreversed[], ax.yreversed[],
-        _cats(ax.dim1_conversion[]), _cats(ax.dim2_conversion[]), nothing, false, false
+        _cats(ax.dim1_conversion[]), _cats(ax.dim2_conversion[]), nothing, false, false, nothing,
+        _coord_format(ax.xticks[], ax.xtickformat[]; scale = ax.xscale[], conv = ax.dim1_conversion[]),
+        _coord_format(ax.yticks[], ax.ytickformat[]; scale = ax.yscale[], conv = ax.dim2_conversion[]),
+        nothing,
     )
 end
 
@@ -260,7 +353,10 @@ function _axis3_transform(id, ax, scaling, out_h)
     vpx = (o[1] * scaling, out_h - (o[2] + wv[2]) * scaling, wv[1] * scaling, wv[2] * scaling)
     return AxisTransform(
         id, (0.0, 1.0), (0.0, 1.0), :identity, :identity,
-        vpx, false, false, nothing, nothing, nothing, true, false
+        vpx, false, false, nothing, nothing, nothing, true, false, nothing,
+        _coord_format(ax.xticks[], ax.xtickformat[], conv = ax.dim1_conversion[]),
+        _coord_format(ax.yticks[], ax.ytickformat[], conv = ax.dim2_conversion[]),
+        _coord_format(ax.zticks[], ax.ztickformat[], conv = ax.dim3_conversion[]),
     )
 end
 
@@ -273,9 +369,15 @@ function _polar_transform(id, ax, scaling, out_h)
     vpx = (o[1] * scaling, out_h - (o[2] + wv[2]) * scaling, wv[1] * scaling, wv[2] * scaling)
     lo = Makie.to_world(ax.scene, Makie.Point2d(0, 0))
     hi = Makie.to_world(ax.scene, Makie.Point2d(wv[1], wv[2]))
+    frame = _polar_frame(ax)
+    # θ reads in the axis's own angle unit (`AngularTicks(180/π, "°")` by default) and r in its
+    # `rtickformat`. Which of the plot's x and y is θ follows `theta_as_x`.
+    ft = _coord_format(ax.thetaticks[], ax.thetatickformat[]; label = "θ")
+    fr = _coord_format(ax.rticks[], ax.rtickformat[]; label = "r")
+    fx, fy = frame.theta_as_x ? (ft, fr) : (fr, ft)
     return AxisTransform(
         id, (Float64(lo[1]), Float64(hi[1])), (Float64(lo[2]), Float64(hi[2])), :identity, :identity,
-        vpx, false, false, nothing, nothing, nothing, false, true, _polar_frame(ax)
+        vpx, false, false, nothing, nothing, nothing, false, true, frame, fx, fy, nothing
     )
 end
 
@@ -298,11 +400,12 @@ function _colorbar_transform(id, cb, scaling, out_h)
     isnothing(lims) && error("Colorbar introspection: nothing limits (Makie internals changed?)")
     lo, hi = Float64(lims[1]), Float64(lims[2])
     sc = _scalesym(cb.scale[])
+    f = _coord_format(cb.ticks[], cb.tickformat[]; scale = cb.scale[])
     vertical = cb.vertical[]
     if vertical
-        return AxisTransform(id, (0.0, 1.0), (lo, hi), :identity, sc, vpx, false, false, nothing, nothing, :y, false, false)
+        return AxisTransform(id, (0.0, 1.0), (lo, hi), :identity, sc, vpx, false, false, nothing, nothing, :y, false, false, nothing, nothing, f, nothing)
     else
-        return AxisTransform(id, (lo, hi), (0.0, 1.0), sc, :identity, vpx, false, false, nothing, nothing, :x, false, false)
+        return AxisTransform(id, (lo, hi), (0.0, 1.0), sc, :identity, vpx, false, false, nothing, nothing, :x, false, false, nothing, f, nothing, nothing)
     end
 end
 

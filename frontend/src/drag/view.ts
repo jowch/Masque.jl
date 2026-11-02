@@ -1,5 +1,6 @@
 import { panLimits, orbitAngles, panLimits3, zoomLimits3 } from "../geometry"
 import { fmt, VIEW_MIN_PX } from "../state"
+import { fmtCoord } from "../template"
 import type { Drag, OverlayState } from "../state"
 import type { AxisTransform, Limits3, ViewGeometry } from "../types"
 
@@ -12,21 +13,24 @@ export function begin(id: string, g: ViewGeometry, t: AxisTransform, x0: number,
     return d
 }
 
-export function tip(d: Extract<Drag, { kind: "view" }>, p: { x: number; y: number }, digits: number): string {
-    if (d.slide_ && d.base_) return limits3Tip(panLimits3(d.g_, d.base_, p.x - d.x0_, p.y - d.y0_), digits)
+export function tip(d: Extract<Drag, { kind: "view" }>, p: { x: number; y: number }, digits: number, explicit = false): string {
+    if (d.slide_ && d.base_) return limits3Tip(panLimits3(d.g_, d.base_, p.x - d.x0_, p.y - d.y0_), digits, d.t_, explicit)
     if (d.g_.mode === "orbit") {
         const o = orbitAngles(d.g_, d.x0_, d.y0_, p.x, p.y)
         return `az=${fmt(o.azimuth, digits)} el=${fmt(o.elevation, digits)}`
     }
-    return limitsTip(panLimits(d.t_, d.x0_, d.y0_, p.x, p.y), digits)
+    return limitsTip(panLimits(d.t_, d.x0_, d.y0_, p.x, p.y), digits, d.t_, explicit)
 }
 
-export function limitsTip(lim: { xmin: number; xmax: number; ymin: number; ymax: number }, digits: number): string {
-    return `x:[${fmt(lim.xmin, digits)}, ${fmt(lim.xmax, digits)}] y:[${fmt(lim.ymin, digits)}, ${fmt(lim.ymax, digits)}]`
+// A view's limits, each axis in its own format (`t`'s `xfmt` …; none prints plain numbers).
+export function limitsTip(lim: { xmin: number; xmax: number; ymin: number; ymax: number }, digits: number, t?: AxisTransform, explicit = false): string {
+    const x = (v: number) => fmtCoord(v, t?.xfmt, digits, explicit, true), y = (v: number) => fmtCoord(v, t?.yfmt, digits, explicit, true)
+    return `x:[${x(lim.xmin)}, ${x(lim.xmax)}] y:[${y(lim.ymin)}, ${y(lim.ymax)}]`
 }
 
-export function limits3Tip(l: Limits3, digits: number): string {
-    return `x:[${fmt(l[0], digits)}, ${fmt(l[1], digits)}] y:[${fmt(l[2], digits)}, ${fmt(l[3], digits)}] z:[${fmt(l[4], digits)}, ${fmt(l[5], digits)}]`
+export function limits3Tip(l: Limits3, digits: number, t?: AxisTransform, explicit = false): string {
+    const c = (v: number, f: AxisTransform["xfmt"]) => fmtCoord(v, f, digits, explicit, true)
+    return `x:[${c(l[0], t?.xfmt)}, ${c(l[1], t?.xfmt)}] y:[${c(l[2], t?.yfmt)}, ${c(l[3], t?.yfmt)}] z:[${c(l[4], t?.zfmt)}, ${c(l[5], t?.zfmt)}]`
 }
 
 // The Axis3 limits the next zoom or pan starts from: the last ones this view asked for, else

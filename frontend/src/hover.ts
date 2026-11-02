@@ -1,6 +1,6 @@
 import { anchorFor, axisPoint, computeAnchoredPlacement, hitTestAt, layerPoint, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layerFrame } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
-import { renderTemplate, renderAutoTable, esc, fmtNum, withReadout } from "./template"
+import { renderTemplate, renderAutoTable, esc, fmtNum, fmtCoord, coordFields, readoutKeys, withReadout } from "./template"
 import { drawHover, clearHover, drawLegendLink, drawPartners, clearLegendLink, markColorFor } from "./highlight"
 import { groupOf, partnerHits } from "./linked"
 import { hideCross, syncCross } from "./cross"
@@ -8,9 +8,9 @@ import { linkedHits } from "./selection"
 import { surfaceFields } from "./surface"
 import { cancel as cancelMarquee } from "./drag/marquee"
 import { hasRegions, regionOf } from "./regions"
-import { fmt, cssAnchor, layoutImagePx, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
+import { cssAnchor, layoutImagePx, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { OverlayCtx, OverlayState } from "./state"
-import type { Hit, HitLayer, Manifest, SliceGeometry, ThresholdGeometry } from "./types"
+import type { AxisTransform, Hit, HitLayer, Manifest, SliceGeometry, ThresholdGeometry } from "./types"
 
 const TIP_GAP = 8
 const TIP_OFFSET = 10
@@ -240,8 +240,11 @@ export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): 
     if (layer.tooltip === false) return null
     if (layer.kind === "surface") {
         // The point's own fields, then its payload's, which win a name clash (#308).
-        const fields = { ...surfaceFields(layer, hit.index), ...cellObject(hit) }
-        return layer.template ? renderTemplate(layer.template, fields, ctx.tipDigits_) : renderAutoTable(fields, ctx.tipDigits_)
+        const own = cellObject(hit)
+        const fields = { ...surfaceFields(layer, hit.index), ...own }
+        if (layer.template) return renderTemplate(layer.template, fields, ctx.tipDigits_)
+        const t = ctx.manifest_.transforms[layer.axis]
+        return renderAutoTable(fields, ctx.tipDigits_, coordFields(t, layer, own, ["x", "y", "z"]), ctx.tipExplicit_)
     }
     if (layer.template) {
         const payload = resolvePayload(hit, ctx.manifest_, x, y)
@@ -273,10 +276,15 @@ export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): 
         return hit.grid_[2] === undefined ? `(${i},${j})` : `(${i},${j}) = ${esc(fmtNum(hit.grid_[2], ctx.tipDigits_))}`
     } else if (hit.axis_) {
         const v = resolvePayload(hit, ctx.manifest_, x, y) as { x?: unknown; y?: unknown; value?: unknown }
-        const d = ctx.tipDigits_
-        return "value" in v ? esc(fmt(v.value, d)) : `x=${esc(fmt(v.x, d))}, y=${esc(fmt(v.y, d))}`
+        const d = ctx.tipDigits_, ex = ctx.tipExplicit_
+        const t = ctx.manifest_.transforms[layer.axis]
+        if ("value" in v) return esc(fmtCoord(v.value, t?.valueaxis === "x" ? t.xfmt : t?.yfmt, d, ex, true))
+        const kx = t?.xfmt?.label ?? "x", ky = t?.yfmt?.label ?? "y"
+        return `${esc(kx)}=${esc(fmtCoord(v.x, t?.xfmt, d, ex, true))}, ${esc(ky)}=${esc(fmtCoord(v.y, t?.yfmt, d, ex, true))}`
     }
-    return renderAutoTable(withReadout(hit.layer.payloads[hit.index], hit, ctx.manifest_.transforms[layer.axis], false), ctx.tipDigits_)
+    const t = ctx.manifest_.transforms[layer.axis]
+    const payload = hit.layer.payloads[hit.index]
+    return renderAutoTable(withReadout(payload, hit, t, false), ctx.tipDigits_, coordFields(t, layer, payload, readoutKeys(hit)), ctx.tipExplicit_)
 }
 
 export function applyTipHtml(ctx: OverlayCtx, state: OverlayState, html: string, hit: Hit | null): void {
@@ -393,11 +401,17 @@ function hitIsColorbar(hit: Hit): boolean {
     return hit.layer.kind === "axis" && Array.isArray(g) && g.length === 4
 }
 
-function sliceTipHtml(layer: HitLayer, payload: Record<string, number>, digits: number): string | null {
+// `probe` is the slice coordinate's key (`x` on a vertical slice); every other field is a
+// series' value on the other axis. Each prints in its axis's format.
+function sliceTipHtml(layer: HitLayer, payload: Record<string, number>, probe: "x" | "y", t: AxisTransform | undefined, digits: number, explicit: boolean): string | null {
     if (layer.tooltip === false) return null
     if (layer.template) return renderTemplate(layer.template, payload, digits)
+    const pf = probe === "x" ? t?.xfmt : t?.yfmt, vf = probe === "x" ? t?.yfmt : t?.xfmt
     const shown: Record<string, string> = {}
-    for (const [k, v] of Object.entries(payload)) shown[k] = fmt(v, digits)
+    for (const [k, v] of Object.entries(payload)) {
+        if (k === probe) shown[pf?.label ?? k] = fmtCoord(v, pf, digits, explicit, true)
+        else shown[k] = fmtCoord(v, vf, digits, explicit, true)
+    }
     return renderAutoTable(shown)
 }
 
@@ -472,9 +486,10 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
         clearLegendLink(ctx, state, true)
         const geom = sliceLayer.geometry as SliceGeometry
         const payload: Record<string, number> = {}
-        payload[geom.orientation === "v" ? "x" : "y"] = sampled.probe
+        const probe = geom.orientation === "v" ? "x" : "y"
+        payload[probe] = sampled.probe
         for (const s of sampled.samples) payload[s.id] = s.value
-        const html = sliceTipHtml(sliceLayer, payload, ctx.tipDigits_)
+        const html = sliceTipHtml(sliceLayer, payload, probe, ctx.manifest_.transforms[sliceLayer.axis], ctx.tipDigits_, ctx.tipExplicit_)
         if (html === null) hideTip(ctx, state)
         else {
             applyTipHtml(ctx, state, html, null)
