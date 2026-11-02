@@ -1,6 +1,7 @@
 import { invertAxis, projectAxis } from "../geometry"
 import { SVG_NS, DEFAULT_STYLE } from "../highlight"
-import { clampX, clampY, fmt } from "../state"
+import { clampX, clampY } from "../state"
+import { fmtCoord } from "../template"
 import type { Drag } from "../state"
 import type { AxisTransform, Manifest, ThresholdGeometry } from "../types"
 
@@ -48,10 +49,10 @@ function place(d: Extract<Drag, { kind: "threshold" }>, pos: number): void {
     setLine(d.line_, d.tg_, pos)
 }
 
-export function move(d: Extract<Drag, { kind: "threshold" }>, p: { x: number; y: number }, digits: number): string {
+export function move(d: Extract<Drag, { kind: "threshold" }>, p: { x: number; y: number }, digits: number, explicit = false): string {
     place(d, d.tg_.orientation === "h" ? clampY(d.t_, p.y) : clampX(d.t_, p.x))
     const v = invertAxis(d.t_, clampX(d.t_, p.x), clampY(d.t_, p.y))
-    return fmt(d.tg_.orientation === "h" ? v.y : v.x, digits)
+    return d.tg_.orientation === "h" ? fmtCoord(v.y, d.t_.yfmt, digits, explicit, true) : fmtCoord(v.x, d.t_.xfmt, digits, explicit, true)
 }
 
 // The field a release here would set, without moving the line: what an in-drag `onchange`

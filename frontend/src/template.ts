@@ -1,19 +1,22 @@
 // Template literal markup is author-trusted; every interpolated data value is HTML-escaped.
 import { format } from "d3-format"
-import type { AxisTransform, Hit, TemplateSegment } from "./types"
+import type { AxisTransform, CoordFormat, Hit, HitLayer, TemplateSegment } from "./types"
 
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }
 export const esc = (v: unknown): string => String(v).replace(/[&<>"']/g, (c) => ESC[c])
 
 const fmtCache = new Map<string, (n: number) => string>()
-function applySpec(spec: string, v: unknown): string {
-    if (typeof v !== "number" || !Number.isFinite(v)) return esc(v)
+function specFn(spec: string): (n: number) => string {
     let f = fmtCache.get(spec)
     if (!f) {
         try { f = format(spec) } catch { f = String as unknown as (n: number) => string }
         fmtCache.set(spec, f)
     }
-    try { return esc(f(v)) } catch { return esc(v) }
+    return f
+}
+function applySpec(spec: string, v: unknown): string {
+    if (typeof v !== "number" || !Number.isFinite(v)) return esc(v)
+    try { return esc(specFn(spec)(v)) } catch { return esc(v) }
 }
 
 // A number with no format spec: at most `digits` significant figures, trailing zeros dropped,
@@ -25,6 +28,49 @@ export function fmtNum(v: unknown, digits: number = DEFAULT_SIGDIGITS): string {
     if (typeof v !== "number" || !Number.isFinite(v) || Number.isInteger(v)) return String(v)
     if (Math.abs(v) >= 10 ** digits) return String(Math.round(v))
     return String(Number(v.toPrecision(digits)))
+}
+
+// A coordinate as the axis around it reads (#510): scaled, with the axis's prefix and suffix.
+// Precision, highest first: `tooltip_sigdigits` when the user set it (`explicit`), the precision
+// a Makie format string states (`spec`), then `digits` significant figures. `live` is for a value
+// that changes as the pointer moves, which keeps its trailing zeros so the label holds its width
+// (state.ts's `fmt`). With no format this is today's plain number. Not HTML-escaped.
+export function fmtCoord(v: unknown, f: CoordFormat | undefined, digits: number, explicit: boolean, live = false): string {
+    if (typeof v !== "number" || !Number.isFinite(v)) return String(v)
+    if (!f) return live ? v.toPrecision(digits) : fmtNum(v, digits)
+    const x = v * (f.scale ?? 1)
+    let body: string
+    if (f.spec && !explicit) {
+        const fn = specFn(f.spec) // String when the spec doesn't parse: then significant figures
+        body = fn === (String as unknown) ? fmtNum(x, digits) : fn(x)
+    } else if (f.exp) {
+        body = specFn(`.${digits - 1}${live ? "" : "~"}e`)(x)
+    } else {
+        body = live ? x.toPrecision(digits) : fmtNum(x, digits)
+        if (f.group && !body.includes("e")) body = body.replace(/^(-?)(\d+)/, (_, s: string, d: string) => s + d.replace(/\B(?=(\d{3})+(?!\d))/g, ","))
+    }
+    return (f.prefix ?? "") + body + (f.suffix ?? "")
+}
+
+// Which of a hit's fields are coordinates, each with its axis's format: the payload fields
+// Masque filled in (`layer.coords`, even beside a user's own fields); a line's readout, `x` and
+// `y` unless the payload has its own; a surface point, the `x`, `y` and `z` its payload doesn't
+// override. A field the user set stays a plain number. Only fields whose axis has a format are
+// listed.
+export type CoordFields = Record<string, CoordFormat>
+// The coordinates a line hover's readout fills in: `x`, `y`, and `z` on an Axis3 line.
+export function readoutKeys(hit: Hit): readonly string[] {
+    return !hit.pt_ ? [] : hit.pt_.length > 3 ? ["x", "y", "z"] : ["x", "y"]
+}
+export function coordFields(t: AxisTransform | undefined, layer: HitLayer, payload: unknown, computed: readonly string[]): CoordFields | undefined {
+    if (!t || !(t.xfmt || t.yfmt || t.zfmt)) return undefined
+    const own = payload != null && typeof payload === "object" ? payload as Record<string, unknown> : {}
+    const out: CoordFields = {}
+    for (const k of ["x", "y", "z"] as const) {
+        const f = t[`${k}fmt`]
+        if (f && (layer.coords?.includes(k) || (computed.includes(k) && !(k in own)))) out[k] = f
+    }
+    return out
 }
 
 // A line hover's readout merged into its payload: `x` and `y` of the nearest sample (and `z` on
@@ -62,11 +108,16 @@ export function renderTemplate(segments: TemplateSegment[], payload: unknown, di
 }
 
 // Auto name/value table from a payload object (the zero-config default). All values escaped.
-export function renderAutoTable(payload: unknown, digits: number = DEFAULT_SIGDIGITS): string {
+// `coords` prints the listed coordinate fields in their axis's format, under its key label.
+export function renderAutoTable(payload: unknown, digits: number = DEFAULT_SIGDIGITS, coords?: CoordFields, explicit = false): string {
     if (payload == null) return ""
     if (typeof payload !== "object") return esc(fmtNum(payload, digits))
     return Object.entries(payload as Record<string, unknown>)
-        .map(([k, v]) => `<div class="masque-tip-row"><span class="masque-tip-key">${esc(k)}</span><span class="masque-tip-val">${esc(fmtNum(v, digits))}</span></div>`)
+        .map(([k, v]) => {
+            const f = coords?.[k]
+            const val = f ? fmtCoord(v, f, digits, explicit) : fmtNum(v, digits)
+            return `<div class="masque-tip-row"><span class="masque-tip-key">${esc(f?.label ?? k)}</span><span class="masque-tip-val">${esc(val)}</span></div>`
+        })
         .join("")
 }
 
@@ -74,11 +125,14 @@ export function renderAutoTable(payload: unknown, digits: number = DEFAULT_SIGDI
 // The live region takes plain text, not markup — a tag-stripped renderAutoTable output would
 // read "index0x1y4" (its markup is all in the tags); this builds the same key/value pairs
 // without HTML. Values are NOT run through esc() (no HTML context to escape for).
-export function renderAutoTablePlain(payload: unknown, digits: number = DEFAULT_SIGDIGITS): string {
+export function renderAutoTablePlain(payload: unknown, digits: number = DEFAULT_SIGDIGITS, coords?: CoordFields, explicit = false): string {
     if (payload == null) return ""
     if (typeof payload !== "object") return fmtNum(payload, digits)
     return Object.entries(payload as Record<string, unknown>)
-        .map(([k, v]) => `${k} ${fmtNum(v, digits)}`)
+        .map(([k, v]) => {
+            const f = coords?.[k]
+            return f ? `${f.label ?? k} ${fmtCoord(v, f, digits, explicit)}` : `${k} ${fmtNum(v, digits)}`
+        })
         .join(", ")
 }
 
@@ -101,7 +155,7 @@ export function stripToPlain(html: string): string {
 // Plain-text tooltip content for one hit — the announcement body in keyboard.ts's live region.
 // `:axis`/`:grid` hits never reach here (keyboard.ts's focus list excludes those kinds), so
 // unlike hover.ts's tipHtmlForHit this needs no manifest/px/py for continuous-axis inversion.
-export function plainTextForHit(hit: Hit, digits: number = DEFAULT_SIGDIGITS, t?: AxisTransform): string {
+export function plainTextForHit(hit: Hit, digits: number = DEFAULT_SIGDIGITS, t?: AxisTransform, explicit = false): string {
     const layer = hit.layer
     if (layer.tooltip === false) {
         // A legend entry has no visual card by default — the label is already in the row —
@@ -118,5 +172,5 @@ export function plainTextForHit(hit: Hit, digits: number = DEFAULT_SIGDIGITS, t?
     }
     const payload = layer.payloads[hit.index]
     if (layer.template) return stripToPlain(renderTemplate(layer.template, withReadout(payload, hit, t, true), digits))
-    return renderAutoTablePlain(withReadout(payload, hit, t, false), digits)
+    return renderAutoTablePlain(withReadout(payload, hit, t, false), digits, coordFields(t, layer, payload, readoutKeys(hit)), explicit)
 }

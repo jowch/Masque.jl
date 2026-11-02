@@ -106,6 +106,31 @@ _state_input(state; settle = true) = Dict{String, Any}("onchange" => true, "stat
         @test level[] == 2.5
     end
 
+    @testset "a colorbar threshold redraws past the end of the bar (#499)" begin
+        z = reshape(collect(1.0:12.0), 4, 3)
+        fig = Figure(size = (500, 300)); ax = Axis(fig[1, 1])
+        data = Observable(copy(z)); hm = heatmap!(ax, data); cb = Colorbar(fig[1, 2], hm)
+        cap = Ref(Inf)
+        w = masque(fig, (cut = ThresholdInteractable(cb; value = 6.0),); onchange = st -> (data[] = min.(z, cap[])))
+        Masque._sync_view_warmup!(w.render_frame)
+        frame(v) = w.render_frame(_state_input(Dict("cut" => Dict("layer" => "cut", "index" => 0, "payload" => v))))
+        geom(r) = only(l for l in r["manifest"]["layers"] if l["id"] == "cut")["geometry"]
+        t = w.manifest["transforms"][only(l for l in w.manifest["layers"] if l["id"] == "cut")["axis"]]
+        top = t["viewport"][2]
+        # A drag to the end of the bar can send a value a rounding error past its limit.
+        r = frame(nextfloat(12.0))
+        @test haskey(r, "png") && geom(r)["pos"] ≈ top
+        # An onchange that narrows the colorbar's range leaves the line at the end of the bar.
+        cap[] = 8.0
+        r = frame(10.0)
+        @test haskey(r, "png") && cb.limits[][2] == 8.0
+        @test geom(r)["pos"] ≈ top
+        # An onchange that already narrows the range at mount leaves the line at the end too.
+        cap[] = Inf; data[] = copy(z)
+        w2 = masque(fig, (cut = ThresholdInteractable(cb; value = 9.0),); onchange = st -> (data[] = min.(z, st.cut.value - 1)))
+        @test only(l for l in w2.manifest["layers"] if l["id"] == "cut")["geometry"]["pos"] ≈ top
+    end
+
     @testset "an error in a frame keeps the picture and names it" begin
         (; fig, fit, thr) = _onchange_fixture()
         w = masque(fig, (cutoff = thr,); onchange = st -> st.cutoff.value > 4 ? error("too high: $(st.cutoff.value)") : nothing)

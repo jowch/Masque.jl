@@ -30,6 +30,7 @@ be a player, so their page shows a clip of the live notebook instead:
 | `docs/src/assets/view-orbit.mp4` | Pan, zoom and orbit › Orbit an `Axis3` | `view_orbit_notebook.jl` | `test/e2e/docs_clip.mjs view-orbit` |
 | `docs/src/assets/readout-colorbar.mp4` | Read coordinates › Read a colorbar value | `colorbar_notebook.jl` | `test/e2e/docs_clip.mjs colorbar` |
 | `docs/src/assets/readout-threshold.mp4` | Read coordinates › Drag a threshold | `readout_threshold_notebook.jl` | `test/e2e/docs_clip.mjs readout-threshold` |
+| `docs/src/assets/readout-colorbar-threshold.mp4` | Read coordinates › Drag a cutoff on a colorbar | `readout_colorbar_threshold_notebook.jl` | `test/e2e/docs_clip.mjs readout-colorbar-threshold` |
 | `docs/src/assets/readout-band.mp4` | Read coordinates › Set a range with two thresholds | `band_notebook.jl` | `test/e2e/docs_clip.mjs band` |
 
 The Home page's four loops have their own recorders: see `docs/dev/home-gifs/README.md`. The

@@ -368,6 +368,21 @@ const CLIPS = {
       }
     },
   },
+  // Read coordinates: drag a cutoff on a colorbar down, then up (#499).
+  "readout-colorbar-threshold": {
+    notebook: "readout_colorbar_threshold_notebook.jl", nn: 20,
+    async run(c) {
+      let from = 0.5;
+      for (const [to, ms] of [[-0.2, 1500], [0.8, 2200]]) {
+        await c.glide(c.data("cut", 0.5, from), 800);
+        await c.page.mouse.down();
+        await c.glide(c.data("cut", 0.5, to), ms, 45);
+        await c.page.mouse.up();
+        await c.settle(1300);
+        from = to;
+      }
+    },
+  },
   // Read coordinates: narrow a band from both sides.
   "band": {
     notebook: "band_notebook.jl", nn: 18,
