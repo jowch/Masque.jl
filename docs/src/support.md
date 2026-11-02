@@ -144,7 +144,8 @@ shows the data point nearest the pointer, on the side you can see, and
 a `wireframe!` drawn over the same grid on an `Axis3` is left as
 decoration so the surface answers. On a `PolarAxis`, a `surface!` is
 how Makie draws a polar heatmap, and the tooltip shows the point's
-angle (`x`, in radians) and radius (`y`). A `surface!` on a 2D `Axis` is skipped with a
+angle and radius the way the axis's other tooltips do. A `surface!` on
+a 2D `Axis` is skipped with a
 warning; to inspect a grid there, draw it with `heatmap!`. Where marks
 of one plot overlap, the one drawn on top answers. On a 2D `Axis` that
 is the one listed last. On an `Axis3`, the `meshscatter!` sphere

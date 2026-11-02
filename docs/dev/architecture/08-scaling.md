@@ -64,7 +64,7 @@ it does not make the sample finer. *Implemented:* `src/interactables.jl` (`_grid
 **A dense surface is thinned to a fixed stride (#259).** A `:surface` layer ships projected
 points, so a fine grid outgrows the
 envelope, and its cells are smaller than a pixel anyway. Along each grid direction the layer
-ships at most `N = floor(L / SURFACE_MIN_SCREEN_PX)` points, with `L` the `Axis3` viewport's
+ships at most `N = floor(L / SURFACE_MIN_SCREEN_PX)` points, with `L` the axis viewport's
 longer side in screen pixels and `SURFACE_MIN_SCREEN_PX = 4`: every `ceil(n / N)`-th row and
 column, plus the last. One cap from the longer side, not one per direction, because rows and
 columns stop mapping to screen x and y once the box turns. The stride ignores the camera, so the
