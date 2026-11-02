@@ -45,9 +45,9 @@ the circles, rectangles, and polygons of a
 [`RegionInteractable`](@ref). For what it does not reach, see
 [Limitations](@ref accessibility-limitations).
 
-## Threshold lines, ROI boxes, and panning
+## Threshold lines, bands, ROI boxes, and panning
 
-Each threshold line, ROI box, and pan or orbit view is its own Tab stop
+Each threshold line, band, ROI box, and pan or orbit view is its own Tab stop
 after the plot, so the arrow keys on the plot keep moving between marks.
 Press Tab from the plot to reach the first one. The value shows as you
 press a key, and the `@bind` value changes once, when you let go, so
@@ -58,6 +58,11 @@ cells that use it update when you release the key, not at every step.
 | Threshold line | ↑ / ↓, or ← / → on a vertical line | Move the line by one screen pixel |
 | | Page Up / Page Down | Move it by ten |
 | | Home / End | Move it to the lowest / highest value |
+| Band | ← / →, or ↑ / ↓ on a horizontal band | Move the band by one screen pixel |
+| | Page Up / Page Down | Move it by ten |
+| | Home / End | Move it to the lowest / highest value |
+| | Alt + arrow key | Move that side's edge out |
+| | Alt + Shift + arrow key | Move that side's edge in |
 | ROI box | Arrow keys | Move the box by one screen pixel |
 | | Page Up / Page Down | Move it up or down by ten |
 | | Alt + arrow key | Grow the box on that side |

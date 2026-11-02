@@ -31,6 +31,11 @@ All notable changes to this project are documented here. The format is based on
   pointer is over it, so a reader can see it moves. Figures that already use
   `ViewInteractable` gain them; `ViewInteractable(ax; controls = :none)` leaves them out and
   `controls = :always` keeps them shown (#525).
+- `SpanInteractable` drags a band, a `(lo, hi)` range, on an `Axis` or a `Colorbar`. Drag an
+  edge to move that end, or inside the band to move both. The plot outside the band is faded
+  and each edge has a grip. Its field is a `SpanEvent` with `lo` and `hi`. Points, lines, bars
+  and shapes inside the band still answer hover and click; a heatmap or image inside it
+  answers hover, and a press on it moves the band (#500).
 
 ### Changed
 - Default tooltips and readouts show a coordinate the way its axis labels it. On a
