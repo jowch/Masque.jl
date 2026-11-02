@@ -4700,6 +4700,31 @@ try {
       passed.push(`${p.key}/touch-nearest`);
       console.error(`OK  ${p.key} — touch ${p.at.dCss.toFixed(1)} CSS px off the mark picks it; a mouse there misses`);
     }
+    // An axis readout that answers anywhere (`AxisInteractable` with no bbox, listed last) is a
+    // miss's fallback: a tap near a mark still picks the mark, where a mouse gets the readout.
+    {
+      const pts = (await layersOf("axis")).find((l) => l.id === "pts" && l.kind === "circles");
+      if (!pts) throw new Error("touch/axis: no pts layer");
+      const sc = await cssScale("axis");
+      const before = await fieldValue("axis", "pts");
+      const idx = [0, 1, 2].find((k) => before?.index !== k);
+      const at = tapPoint(pts, idx, hitPoint(pts, idx), sc);
+      if (!at) throw new Error(`touch/axis: no spot 8–14 CSS px off element ${idx} with it clearly nearest`);
+      const x = sc.left + at.x * sc.s, y = sc.top + at.y * sc.s;
+      await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+      await page.mouse.click(x, y);
+      await settle();
+      const mouse = await fieldValue("axis", "pts");
+      if (mouse?.index === idx) throw new Error(`touch/axis: a mouse click ${at.dCss.toFixed(1)} CSS px off element ${idx} picked it; want the axis readout`);
+      await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await settle();
+      const v = await fieldValue("axis", "pts");
+      if (v?.index !== idx) throw new Error(`touch/axis: a tap ${at.dCss.toFixed(1)} CSS px off element ${idx} picked ${JSON.stringify(v)}; want the mark over the axis readout`);
+      passed.push("axis/touch-nearest-over-readout");
+      console.error(`OK  axis — a tap ${at.dCss.toFixed(1)} CSS px off a mark picks it over the axis readout`);
+    }
     // A bar takes a tap inside it only.
     {
       const spec = meta.find((m) => m.key === "barplot");

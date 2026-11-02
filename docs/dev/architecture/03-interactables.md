@@ -107,7 +107,10 @@ finger's reach wins, not the first layer whose slack covers the point, so a far 
 top can't take a tap from a nearer one; equally near elements fall back to the top-drawn rule.
 Every other kind is hit inside its shape only (a `:rects` or `:polygons` layer's `tol` is the
 mouse's), and the first such hit ends the walk: an exact hit beats a near one, so a point or
-line drawn over it (earlier in the manifest) takes the tap only when the finger is on it. The reach is CSS px on screen: per layer `"touch"` (from
+line drawn over it (earlier in the manifest) takes the tap only when the finger is on it. A
+readout that answers anywhere in its axis (an `:axis` layer with no bbox, a threshold, a span,
+an ROI, a view) is a miss's fallback instead: a point or line within reach takes the tap first.
+Strokes the finger is on all count 0; the nearest centreline breaks that tie, as for a mouse. The reach is CSS px on screen: per layer `"touch"` (from
 `touch_radius`, CSS px, not scaled like `tol`), else the manifest's `"touch": {radius}` (from
 `masque(...; touch)`), else 16. The overlay converts it with the live image-px-per-CSS-px ratio
 and the live zoom. `"touch": false` gives a finger the mouse's rule. Both fields are sent only

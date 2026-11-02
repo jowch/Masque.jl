@@ -39,20 +39,21 @@ export const imgPx = (base: HTMLElement, manifest: Manifest, e: MouseEvent): { x
     return { x: (e.clientX - r.left) * s, y: (e.clientY - r.top) * s }
 }
 
+// A finger's hit test for an event from a touch (`pointerType`), with the image px per CSS px
+// of the base's layout box (the width layoutImagePx measures in); null for a mouse or a pen,
+// which keep the tight rule (geometry.ts's hitTestAt).
+export function touchReach(base: HTMLElement, manifest: Manifest, pointerType: string | undefined): TouchReach | null {
+    if (pointerType !== "touch") return null
+    const w = base.offsetWidth > 0 ? base.offsetWidth : base.getBoundingClientRect().width
+    return { pxPerCss_: w > 0 ? manifest.width / w : manifest.scaling }
+}
+
 // Image pixel under the cursor in the base's border box. `offsetWidth` cancels, so a
 // photographic CSS transform on that element would make this the content pixel. The base
 // stays untransformed — the matrix is on the data copy — so this is the layout point a
 // pan wants as `cur`. Wheel zoom and the grabbed pan anchor want the content pixel,
 // `unmapPoint(photo, layoutImagePx(...))`. A zero `offsetWidth` (happy-dom, or not laid
 // out yet) falls back to the border box.
-// A finger's hit test for an event from a touch (`pointerType`), with the live image px per CSS
-// px; null for a mouse or a pen, which keep the tight rule (geometry.ts's hitTestAt).
-export function touchReach(base: HTMLElement, manifest: Manifest, pointerType: string | undefined): TouchReach | null {
-    if (pointerType !== "touch") return null
-    const w = base.getBoundingClientRect().width
-    return { pxPerCss_: w > 0 ? manifest.width / w : manifest.scaling }
-}
-
 export function layoutImagePx(base: HTMLElement, manifest: Manifest, clientX: number, clientY: number): { x: number; y: number } {
     const r = base.getBoundingClientRect()
     const boxW = base.offsetWidth > 0 ? base.offsetWidth : r.width

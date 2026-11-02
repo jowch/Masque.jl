@@ -90,6 +90,46 @@ describe("touch hit test", () => {
         expect(hitTestAt(under, 300, 280, ID, "click", null, 1, FINGER)?.layer.id).toBe("bars")
     })
 
+    it("takes a tap inside a shape with no outline reach, and none near it", () => {
+        const polys: HitLayer = {
+            id: "polys", kind: "polygons", axis: "ax", events: ["click"], payloads: [{}],
+            geometry: [[0, 0, 20, 0, 20, 20, 0, 20]],
+        }
+        const m = manifest([polys])
+        expect(hitTestAt(m, 10, 10, ID, "click", null, 1, FINGER)?.layer.id).toBe("polys")
+        expect(hitTestAt(m, 25, 10, ID, "click", null, 1, FINGER)).toBeNull()
+        // Only points and lines have a nearest element.
+        expect(nearestInLayer(polys, 25, 10, 32)).toBeNull()
+    })
+
+    it("lets a near mark beat an axis readout that answers anywhere", () => {
+        const axis = { id: "ax", kind: "axis", axis: "ax", events: ["click", "hover"], payloads: [] } as unknown as HitLayer
+        const m = manifest([circles("pts", [100, 100, 5]), axis])
+        // 2 and 15 px off the marker's edge: the marker, as a mouse gets it inside its slack.
+        expect(hitTestAt(m, 107, 100, ID, "click")?.layer.id).toBe("pts")
+        expect(hitTestAt(m, 107, 100, ID, "click", null, 1, FINGER)?.layer.id).toBe("pts")
+        expect(hitTestAt(m, 120, 100, ID, "click", null, 1, FINGER)?.layer.id).toBe("pts")
+        // Out of reach, the readout takes it.
+        expect(hitTestAt(m, 200, 100, ID, "click", null, 1, FINGER)?.layer.id).toBe("ax")
+        // A bounded axis (a colorbar) is an exact hit inside its box.
+        const bar = { ...axis, id: "cb", geometry: [110, 80, 20, 40] } as HitLayer
+        const c = manifest([circles("pts", [100, 100, 5]), bar])
+        expect(hitTestAt(c, 115, 100, ID, "click", null, 1, FINGER)?.layer.id).toBe("cb")
+    })
+
+    it("breaks a tie between strokes a finger is on by the nearest centreline", () => {
+        // Two 10 px thick lines 4 px apart: at y = 103 the finger is on both strokes.
+        const lines: HitLayer = {
+            id: "ln", kind: "lines", axis: "ax", events: ["click"], payloads: [{}, {}],
+            geometry: [[0, 100, 200, 100], [0, 104, 200, 104]], linewidth: 10,
+        }
+        const m = manifest([lines])
+        expect(hitTestAt(m, 100, 103, ID, "click", null, 1, FINGER)?.index).toBe(1)
+        expect(hitTestAt(m, 100, 101, ID, "click", null, 1, FINGER)?.index).toBe(0)
+        const segs: HitLayer = { ...lines, id: "sg", kind: "segments", geometry: [0, 100, 200, 100, 0, 104, 200, 104] }
+        expect(hitTestAt(manifest([segs]), 100, 103, ID, "click", null, 1, FINGER)?.index).toBe(1)
+    })
+
     it("takes the radius from the widget, then the layer", () => {
         const m = manifest([circles("pts", [100, 100, 5])], { touch: { radius: 4 } })
         expect(hitTestAt(m, 112, 100, ID, "click", null, 1, FINGER)?.index).toBe(0)
