@@ -1448,18 +1448,18 @@ function _skip_for_axis(ax, p)
         return true
     end
     if ax isa Makie.Axis && p isa Makie.Surface
-        _skip_note("surface on a 2D Axis — surfaces get hover and click targets on Axis3 only")
+        _skip_note("surface on a 2D Axis — surfaces get hover and click targets on Axis3 and PolarAxis only")
         return true
     end
     if ax isa Makie.PolarAxis && !(
             p isa Union{
                 Makie.Scatter, Makie.Lines, Makie.LineSegments,
-                Makie.ScatterLines, Makie.Series,
+                Makie.ScatterLines, Makie.Series, Makie.Surface,
             }
         )
         _skip_note(
             "$(Makie.plotkey(p)) on PolarAxis — only Scatter/Lines/LineSegments/ScatterLines/" *
-                "Series have polar-valid extraction today. " * _SUPPORT_PAGE
+                "Series/Surface have polar-valid extraction today. " * _SUPPORT_PAGE
         )
         return true
     end

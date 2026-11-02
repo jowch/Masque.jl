@@ -52,7 +52,6 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 
 ### Interaction and selection
 - *idea* — a legend click toggles series visibility (a bond round trip and re-render).
-- *idea* — double-click resets the view to the figure's limits or camera.
 - *idea* — Escape aborts a drag and restores its start.
 - *idea* — links across layers and across figures; across widgets this needs a registry.
 - #499 — drag a threshold on a `Colorbar`.
@@ -61,7 +60,6 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 - *idea* — more controls: a line profile (two ends, an ImageJ-style profile), a point handle
   (one `(x, y)` that always has a value), a persistent polygon, a circle, an angle, and a
   multi-level threshold.
-- *idea* — default a threshold's `value` and an ROI's `bounds` from the axis limits.
 - *idea* — nearest-mark snapping within a radius.
 - *idea* — a 2D profile probe on a heatmap cell; a delta readout between two parked probes.
 

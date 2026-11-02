@@ -155,7 +155,7 @@ one element), or keep `mode = :polyline`. `lines!`, `stairs!`, and
 **Cause:** `bounds` is not a 4-tuple, or the min/max order is backwards.
 
 **Fix:** pass `bounds = (xmin, xmax, ymin, ymax)` with `xmin < xmax`
-and `ymin < ymax`.
+and `ymin < ymax`, or leave `bounds` out to start the box in the middle of the axis.
 
 ### An unknown Region kind, or `selected=` on the base Region id
 
@@ -223,8 +223,9 @@ plot. A rectangle interactable you pass yourself, such as
 wrong place.
 
 **Fix:** on a `PolarAxis`, only scatter, line, segment,
-`scatterlines!`, and `series!` plots work. Use a Cartesian `Axis` for
-the rest. See [Supported plots and axes](@ref).
+`scatterlines!`, `series!`, and `surface!` plots work. For a polar
+heatmap, draw the matrix with `surface!(ax, θ, r, values; shading =
+NoShading)`. Use a Cartesian `Axis` for the rest. See [Supported plots and axes](@ref).
 
 ### A box, slice, or pan on a categorical axis
 

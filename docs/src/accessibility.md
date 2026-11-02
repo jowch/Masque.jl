@@ -64,9 +64,11 @@ cells that use it update when you release the key, not at every step.
 | | Alt + Shift + arrow key | Shrink the box on that side |
 | Pan view | Arrow keys | Pan by a tenth of the axis |
 | | + / − | Zoom in / out around the middle of the axis |
+| | 0 | Go back to the starting view |
 | Orbit view | Arrow keys | Rotate the camera |
 | | Shift + arrow key | Pan by a tenth of the axis |
 | | + / − | Zoom in / out around the middle of the axis |
+| | 0 | Go back to the starting view |
 | Any | Escape | Leave the stop |
 
 On a categorical axis, a threshold line moves one category at a time.

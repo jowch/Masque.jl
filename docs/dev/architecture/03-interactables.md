@@ -80,7 +80,7 @@ Geometry layout by `kind` (all coords image-px, top-left origin):
 | `:segments` | `Float32[x0,y0,x1,y1, …]` | nearest of disjoint pairs | pair index |
 | `:rects` | `Float32[cx,cy,w,h, …]` | point-in-rect, top element first, else the nearest rect within `tol` of its edge | quad index |
 | `:grid` | `(xedges, yedges, ncols, nrows)` plus `values[]` **or** `sample` (screen pixels; [§8](08-scaling.md)) | source bin, or the screen pixel then the cell at its center | `j*ncols+i` |
-| `:surface` | a projected vertex grid: `ni`, `nj`, source `i`/`j` per shipped row/column, `xy` (image px, row-major, NaN = not drawn), `order` (quads front to back), data `x`/`y`/`z`[/`value`] arrays | quads in `order`, point-in-quad as two triangles; the first hit answers with its corner nearest the pointer | `b*ni+a`, the shipped point |
+| `:surface` | a projected vertex grid: `ni`, `nj`, source `i`/`j` per shipped row/column, `xy` (image px, row-major, NaN = not drawn), `order` (quads front to back), data `x`/`y`/`z`[/`value`] arrays; on a `PolarAxis` that masks past its limits, `clip` (the shown annulus `[cx,cy,rin,rout]` in image px, plus `[phi0,span]` on a sector) | quads in `order`, point-in-quad as two triangles; the first hit answers with its corner nearest the pointer that `clip` shows; a pointer outside `clip` misses | `b*ni+a`, the shipped point |
 | `:polygons` | one flat ring per element, or a list of rings when that element has holes (exterior, then each hole) | even-odd across that element's rings, last element first, else the nearest element within `tol` of a ring | element index |
 | `:axis` | `nothing` (unbounded, `AxisInteractable`) or `Real[x,y,w,h]` bbox (bounded, `ColorbarInteractable`) | absent geometry = always-hit; bbox present = point-in-bbox; invert pixel via `AxisTransform` | `-1` (continuous); `valueaxis ≠ nothing` → 1-D `(; value)` |
 
@@ -99,13 +99,21 @@ A point inside an element still wins over another element's outline. `:circles` 
 centers the outline on the marker's edge, and all of it on WebGL, which paints it outside).
 `:circles` and the other kinds' manifests are untouched by this field.
 
-`points` (optional, `:lines` on a 2D axis only) is one flat `[x1, y1, x2, y2, …]` per element:
+`points` (optional, `:lines`) is one flat `[x1, y1, x2, y2, …]` per element:
 the line's own data samples, which the hover readout snaps to ([§10](10-tooltips.md)). The
 geometry is rounded to image pixels and a stairs path adds corners between samples, so the
 samples cannot be recovered from it. Numbers ship as Float32. On a date or categorical axis a
 coordinate ships as the text a scatter's default payload holds. `step` (`"pre"`, `"post"` or
 `"center"`, from a `stairs` plot) says which sample each drawn corner belongs to. Placement
 (`translate!`, …) moves the path but not the samples.
+
+On an `Axis3` a pixel is a ray, so the readout cannot invert the cursor: a `:lines` layer there
+also ships `zpoints`, one flat `[z1, z2, …]` per element (#502). Drawn vertex `k` is sample `k`,
+as on 2D, until a zoom's limits cut the path ([§12](12-gesture-channel.md)): the cut adds
+vertices where the path leaves the box. Then `drawn` (one entry per element, `null` for a
+path drawn whole) says what each drawn vertex is: `2k` for sample `k`, `2k + 1` for a cut on
+the edge from sample `k`, `-1` for a gap. A line with a `step`, or whose samples aren't its
+path's vertices, ships no samples on an `Axis3`.
 
 Where elements of one `:circles`, `:rects` or `:polygons` layer overlap, the one drawn on top
 answers (#331, #340). With no `order`, that is the last one listed, since both backends paint a
@@ -155,7 +163,7 @@ this table is `docs/src/support.md`.
 | `SegmentInteractable` | `:polyline` \| `:lines` \| `:segments` | Lines, Stairs, Series, ScatterLines·line (`:lines`, one element per path); an explicit `mode=:polyline` vertex list stays `:polyline` (per edge); LineSegments, Errorbars, Rangebars, HLines, VLines, Stem·stems, Wireframe, Arrows3D, Arrows2D (`:pairs` → `:segments`) | `:lines` `(; index)` (a series adds `label` when Makie set one); `:polyline` / `:segments` `(; segment_index)`; Arrows3D `(; index, x, y, z, u, v, w)`; Arrows2D `(; index, x, y, u, v)` |
 | `RectInteractable` | `:rects` | BarPlot, Hist, Waterfall, CrossBar, HSpan, VSpan, Spy, BoxPlot (un-notched) | BarPlot/Waterfall `(; low, high, value)`; Hist `(; value, low, high)`; CrossBar `(; midpoint, low, high)`; HSpan/VSpan `(; low, high)`; BoxPlot `(; q1, median, q3)`; Spy `(; index)` |
 | `GridInteractable` | `:grid` | Heatmap, Image | optional, one per cell, row-major like `values[]` (#290); the client resolves `(; i, j, value)`, and a click commits a `GridCellEvent` carrying that cell's payload |
-| `SurfaceInteractable` | `:surface` | Surface on `Axis3` (a `Wireframe` of the same grid is decoration, [§7](07-scope.md)) | no per-point payload objects: the client builds `(; i, j, x, y, z[, value])` from the geometry's arrays, merges optional per-point `payloads` on top (payload wins), and a click commits a `GridCellEvent` with `value = z[i, j]` (#259) |
+| `SurfaceInteractable` | `:surface` | Surface on `Axis3` (a `Wireframe` of the same grid is decoration, [§7](07-scope.md)) or on `PolarAxis` (a polar heatmap, #514) | no per-point payload objects: the client builds `(; i, j, x, y, z[, value])` from the geometry's arrays, merges optional per-point `payloads` on top (payload wins), and a click commits a `GridCellEvent` with `value = z[i, j]` (#259) |
 | `PolygonInteractable` | `:polygons` | Poly, Band, Density, Contourf, Violin, Voronoiplot, BoxPlot (notched) | Band/Density/Voronoiplot `(; index)`; Contourf `(; low, high)`; Violin `(; x)` |
 | `AxisInteractable` | `:axis` (unbounded) | the Axis area itself (linear + log) — declared | `(; x, y)` inverted client-side |
 | `ColorbarInteractable` | `:axis` (bounded bbox) | Colorbar — auto-extracted from `fig.content` | `(; value)` inverted client-side via `AxisTransform.valueaxis` |

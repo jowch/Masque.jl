@@ -115,8 +115,8 @@ export function surfaceSelection(layer: HitLayer, index: number): Hit | null {
 }
 
 // A line takes picks as its data points: the pick is the sample nearest the click, as hover
-// reads it out, not the whole line. A line without `points` (one on an Axis3) has no samples to
-// pick, so its pick stays the whole line.
+// reads it out, not the whole line, on an Axis3 too (#518). A line without `points` has no
+// samples to pick, so its pick stays the whole line.
 export const picksPoints = (layer: HitLayer): boolean => layer.kind === "lines" && Array.isArray(layer.points)
 
 // Picked sample `s` of line `index`, drawn as a ring around the point, its radius the line's

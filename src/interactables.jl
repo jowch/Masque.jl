@@ -28,7 +28,9 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
     `"i"`/`"j"` (0-based source index of each shipped row/column), `"xy"` (image px,
     interleaved, row-major over `(ni, nj)`; `NaN` is a point not drawn), `"order"` (0-based quad
     indices, front to back; quad `a + b·(ni-1)` has corners `(a, b)` to `(a+1, b+1)`), the data
-    `"x"`/`"y"` (length `ni`/`nj`, or one per point), `"z"`, and optionally `"value"`.
+    `"x"`/`"y"` (length `ni`/`nj`, or one per point), `"z"`, and optionally `"value"`. On a
+    `PolarAxis` that masks what lies outside its limits, `"clip"` is the shown region in image
+    px: `[cx, cy, rin, rout]` around the polar origin, plus `[phi0, span]` on a sector.
     Payloads, when present, are one per shipped point, row-major like `xy`
   - `:axis` — `nothing` (whole-axis readout, `AxisInteractable`) or flat `Real[x, y, w, h]`
     (the colorbar's pixel bbox, `ColorbarInteractable`); not element-indexed
@@ -85,8 +87,8 @@ struct HitLayer
     label::Union{Nothing, String}
     colors::Any
     links::Union{Nothing, Vector{Vector{Symbol}}}
-    # :lines on a 2D axis: per element, the data samples `[x1, y1, x2, y2, …]` a hover readout
-    # snaps to, and the staircase `step` mode when the drawn path adds corners between them.
+    # :lines: per element, the data samples `[x1, y1, x2, y2, …]` a hover readout snaps to,
+    # and the staircase `step` mode when the drawn path adds corners between them.
     points::Union{Nothing, Vector}
     step::Union{Nothing, Symbol}
     # :circles/:rects: 0-based element indices, top first, that the overlay hit-tests in; an
@@ -94,7 +96,16 @@ struct HitLayer
     order::Union{Nothing, Vector{Int}}
     # :circles: per element, the drawn outline as an ellipse, `(sxx, sxy, syy)` (image px²).
     ellipses::Union{Nothing, Vector}
+    # :lines on an Axis3: per element, the `z` of each sample in `points`.
+    zpoints::Union{Nothing, Vector}
+    # :lines on a zoomed Axis3, whose limits cut the drawn path: per element, what each vertex
+    # of the drawn geometry is, `2k` for sample `k` (0-based), `2k + 1` for a point where the
+    # edge from sample `k` is cut, `-1` for a gap. `nothing` for a path drawn whole, whose
+    # vertex `k` is sample `k`.
+    drawn::Union{Nothing, Vector}
 end
+HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses) =
+    HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses, nothing, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order) =
     HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step) =
@@ -315,7 +326,12 @@ end
 function expand_payloads(payloads, n, who)
     npl = length(payloads)
     npl == n || throw(ArgumentError("$who: payloads has $npl entries, expected $n"))
-    return collect(Any, payloads)
+    out = collect(Any, payloads)
+    # A copy of payloads Masque merged (an arrow's, passed on to SegmentInteractable) keeps the
+    # record of which coordinates Masque filled in.
+    ks = _coord_keys(payloads)
+    isempty(ks) || _note_coord_keys!(out, ks)
+    return out
 end
 _check_payloads(payloads, n, what) = expand_payloads(payloads, n, what)
 
@@ -323,10 +339,62 @@ _check_payloads(payloads, n, what) = expand_payloads(payloads, n, what)
 # scatter point gives `(; name, x, y)`, and the user's fields win a clash. `index` (and a
 # segment's `segment_index`) is left out, since the event carries it as `ev.index`. A payload
 # that isn't key-value (a bare string) replaces the default, as there is nothing to merge.
+#
+# The `x`, `y` and `z` Masque fills in are the mark's coordinates, so its default tooltip prints
+# them in the axis's format (#510). `_merge_payloads` records which of them it filled in for
+# every element, keyed by the returned vector, and `_coord_keys` reads that back when the
+# manifest is built. A field the user's own payload sets, and every field of a payload that
+# isn't key-value, stays theirs: a plain number.
 function _merge_payloads(defaults, payloads, who)
-    payloads === nothing && return defaults
+    defaults = convert(Vector{Any}, defaults)
+    if payloads === nothing
+        _note_coord_keys!(defaults, _default_coord_keys(defaults))
+        return defaults
+    end
     pl = expand_payloads(payloads, length(defaults), who)
-    return Any[_merge_payload(d, p) for (d, p) in zip(defaults, pl)]
+    out = Any[_merge_payload(d, p) for (d, p) in zip(defaults, pl)]
+    ks = _default_coord_keys(defaults)
+    for p in pl
+        isempty(ks) && break
+        if p isa NamedTuple
+            ks = filter(k -> !haskey(p, k), ks)
+        elseif p isa AbstractDict && keytype(p) in (Symbol, String)
+            ks = filter(k -> !haskey(p, keytype(p) === Symbol ? k : string(k)), ks)
+        else
+            ks = Symbol[]
+        end
+    end
+    _note_coord_keys!(out, ks)
+    return out
+end
+
+# The coordinate fields every default payload has.
+function _default_coord_keys(defaults)
+    isempty(defaults) && return Symbol[]
+    return Symbol[k for k in (:x, :y, :z) if all(d -> d isa NamedTuple && haskey(d, k), defaults)]
+end
+
+# A weak identity table: payload vector => the coordinate fields Masque filled in. Keyed by
+# `objectid` and checked with `===` through a `WeakRef`, so it neither keeps a vector alive nor
+# answers for a different vector that reuses the id. Dead entries are dropped as new ones come.
+const _COORD_KEYS = Dict{UInt, Tuple{WeakRef, Vector{Symbol}}}()
+const _COORD_KEYS_LOCK = ReentrantLock()
+function _note_coord_keys!(v::Vector{Any}, ks::Vector{Symbol})
+    return lock(_COORD_KEYS_LOCK) do
+        length(_COORD_KEYS) > 64 && filter!(kv -> kv[2][1].value !== nothing, _COORD_KEYS)
+        if isempty(ks)
+            delete!(_COORD_KEYS, objectid(v))
+        else
+            _COORD_KEYS[objectid(v)] = (WeakRef(v), ks)
+        end
+        nothing
+    end
+end
+function _coord_keys(v)
+    return lock(_COORD_KEYS_LOCK) do
+        e = get(_COORD_KEYS, objectid(v), nothing)
+        (e === nothing || e[1].value !== v) ? Symbol[] : e[2]
+    end
 end
 _default_fields(d::NamedTuple) = Base.structdiff(d, NamedTuple{(:index, :segment_index)})
 _merge_payload(d, p) = p
@@ -795,8 +863,10 @@ function _edge_px(ctx, ax, box, a, b)
     return t, at(t[1]), at(t[2])
 end
 _push_px!(g, q) = append!(g, (_q(q[1]), _q(q[2])))
-# One connected path (`:lines`): runs of visible edges, NaN-separated.
-function _clipped_path_px(ctx, ax, vs, box)
+# One connected path (`:lines`): runs of visible edges, NaN-separated. With `codes`, also
+# records what each vertex pushed is (see `HitLayer.drawn`): `2(k - 1)` for vertex `k` itself,
+# `2(k - 1) + 1` for a cut on the edge from vertex `k`, `-1` for a gap.
+function _clipped_path_px(ctx, ax, vs, box, codes = nothing)
     _needs_clip(box, vs) || return _flat_px(ctx, ax, vs, box)
     g = Real[]
     open = false   # g ends on the previous edge's far end, so the next edge continues from it
@@ -808,10 +878,15 @@ function _clipped_path_px(ctx, ax, vs, box)
         end
         (t0, t1), a, b = e
         if !(open && t0 == 0)
-            isempty(g) || isnan(g[end]) || append!(g, (NaN32, NaN32))
+            if !(isempty(g) || isnan(g[end]))
+                append!(g, (NaN32, NaN32))
+                codes === nothing || push!(codes, -1)
+            end
             _push_px!(g, a)
+            codes === nothing || push!(codes, t0 == 0 ? 2(k - 1) : 2(k - 1) + 1)
         end
         _push_px!(g, b)
+        codes === nothing || push!(codes, t1 == 1 ? 2k : 2(k - 1) + 1)
         open = t1 == 1
     end
     return g
@@ -843,6 +918,9 @@ function _flat_data(ax, vs, ::Type{T} = Float32) where {T}
     u = _unconvert_payloads(ax, Any[(; x = v[1], y = v[2]) for v in vs])
     return Any[c for pl in u for c in (pl.x, pl.y)]
 end
+# One line's sample `z`s, the third coordinate on an Axis3. Makie draws no category or date
+# axis on an Axis3, so they stay numbers.
+_flat_z(ax, vs, ::Type{T} = Float32) where {T} = T[v[3] for v in vs]
 _converts_dim(ax) = any((:dim1_conversion, :dim2_conversion)) do d
     hasproperty(ax, d) || return false
     c = getproperty(ax, d)[]
@@ -857,15 +935,11 @@ function hitlayers(i::SegmentInteractable, ctx)
             [vs]
         end
         box = _clipbox(i.ax)
-        geom = [_clipped_path_px(ctx, i.ax, path, box) for path in raw]
         aid = axis_id(ctx, i.ax)
-        # The readout's samples. Axis3 has no 2D sample to show the cursor's position on a path.
-        points, step = if ctx.transforms[aid].is3d
-            nothing, nothing
-        else
-            [_flat_data(i.ax, path) for path in _sample_paths(i, raw)], _step(i)
-        end
-        return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, step)]
+        ctx.transforms[aid].is3d && return _lines3d_layers(i, ctx, raw, box, aid)
+        geom = [_clipped_path_px(ctx, i.ax, path, box) for path in raw]
+        points = [_flat_data(i.ax, path) for path in _sample_paths(i, raw)]
+        return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, _step(i))]
     end
     vs = i.resolve === nothing ? i.vertices : [_pt3(v) for v in i.resolve(i.ax)]
     box = _clipbox(i.ax)
@@ -878,6 +952,33 @@ function hitlayers(i::SegmentInteractable, ctx)
     return [HitLayer(i.id, :segments, _clipped_pairs_px(ctx, i.ax, pairs, box), i.payloads, aid, events(i), i.label)]
 end
 
+# Lines on an Axis3. A pixel there is a ray, so the readout can't invert the cursor: each
+# sample's `x`, `y` and `z` ship, and the readout is the drawn vertex nearest the cursor along
+# the path, as on a 2D axis. Where the axis limits cut a path, `drawn` says which sample each
+# drawn vertex is. A staircase, or samples that aren't the path's vertices, ship no samples, so
+# the line reads out as a whole.
+function _lines3d_layers(i::SegmentInteractable, ctx, raw, box, aid)
+    samples = _sample_paths(i, raw)
+    ok = _step(i) === nothing && length(samples) == length(raw) && all(length.(samples) .== length.(raw))
+    drawn = Any[]
+    geom = map(raw) do path
+        ok && _needs_clip(box, path) || (push!(drawn, nothing); return _clipped_path_px(ctx, i.ax, path, box))
+        codes = Int[]
+        g = _clipped_path_px(ctx, i.ax, path, box, codes)
+        push!(drawn, codes)
+        return g
+    end
+    ok || return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label)]
+    points = [_flat_data(i.ax, path) for path in samples]
+    zpoints = [_flat_z(i.ax, path) for path in samples]
+    return [
+        HitLayer(
+            i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, nothing, nothing, nothing,
+            zpoints, all(isnothing, drawn) ? nothing : drawn,
+        ),
+    ]
+end
+
 # Each line's data samples, as plotted. A line built without samples reads them off its path.
 _sample_paths(i::SegmentInteractable, raw = nothing) = i.samples !== nothing ? i.samples[2] :
     raw !== nothing ? raw : i.paths !== nothing ? i.paths :
@@ -887,6 +988,9 @@ _step(i::SegmentInteractable) = i.samples === nothing ? nothing : i.samples[1]
 # owner isn't a line of data points.
 _line_data(i::SegmentInteractable, k) = i.unit === :line ? _flat_data(i.ax, _sample_paths(i)[k], Float64) : nothing
 _line_data(i, k) = nothing
+# Line `k`'s sample `z`s at full precision, on an Axis3; `nothing` elsewhere.
+_line_zdata(i::SegmentInteractable, k) = i.unit === :line && i.ax isa Makie.Axis3 ? _flat_z(i.ax, _sample_paths(i)[k], Float64) : nothing
+_line_zdata(i, k) = nothing
 
 # ============================ RectInteractable =============================
 """
@@ -1195,10 +1299,12 @@ end
     SurfaceInteractable(ax, x, y, z; id=:surface, value=nothing, payloads=nothing, tooltip=nothing, label=nothing)
     SurfaceInteractable(ax, p::Makie.Surface; id=:surface, payloads=nothing, tooltip=nothing, label=<p's label>)
 
-A 3D surface on an `Axis3`. Produces one `:surface` [`HitLayer`](@ref). The pointer lands in one
-of the surface's drawn quads and answers with the data point at the quad's corner nearest the
-pointer, on the side of the surface you can see. A click commits a [`GridCellEvent`](@ref) with
-the point's `(i, j)` and `value = z[i, j]`, so `z[pick]` (or any matrix of `z`'s shape) reads it.
+A 3D surface on an `Axis3`, or a polar heatmap drawn with `surface!` on a `PolarAxis`. Produces
+one `:surface` [`HitLayer`](@ref). The pointer lands in one of the surface's drawn quads and
+answers with the data point at the quad's corner nearest the pointer, on the side of the surface
+you can see. A click commits a [`GridCellEvent`](@ref) with the point's `(i, j)` and
+`value = z[i, j]`, so `z[pick]` (or any matrix of `z`'s shape) reads it. On a `PolarAxis`, `x`
+and `y` are the angle (in radians) and the radius, in the order `surface!` took them.
 
 # Arguments
 - `x`, `y` — the grid, as in `surface!`: vectors of length `size(z, 1)` and `size(z, 2)`, or
@@ -1223,7 +1329,8 @@ pixels of the axis's longer side, with the last row and column always kept.
 A point that is not shipped cannot be hovered; at that density it is smaller than a pixel. The
 stride depends on the axis size only, so it stays the same as the view turns.
 
-Quads with a corner outside the axis limits are not hit, as CairoMakie does not draw them.
+Quads with a corner outside the axis limits are not hit, as CairoMakie does not draw them. On a
+`PolarAxis`, the part of the surface outside the axis's limits is hidden and is not hit either.
 Between this layer and another plot on the same axis, the plot drawn last still wins.
 
 # Examples
@@ -1296,9 +1403,11 @@ function SurfaceInteractable(
     return SurfaceInteractable(ax, pos, xs, ys, zs, vs, id, pl, tooltip, label === nothing ? nothing : String(label))
 end
 tooltip_spec(i::SurfaceInteractable) = i.tooltip
-validate(i::SurfaceInteractable, ctx::InteractionContext) =
-    ctx.transforms[axis_id(ctx, i.ax)].is3d ? nothing :
-    "SurfaceInteractable :$(i.id): a surface is hit-tested on an `Axis3` only (a 2D `Axis` is roadmap scope)"
+function validate(i::SurfaceInteractable, ctx::InteractionContext)
+    t = ctx.transforms[axis_id(ctx, i.ax)]
+    return t.is3d || t.ispolar ? nothing :
+        "SurfaceInteractable :$(i.id): a surface is hit-tested on an `Axis3` or a `PolarAxis` only (a 2D `Axis` is roadmap scope)"
+end
 
 # Shipped source indices along one grid direction of `n` points, at most about `cap` of them:
 # every `s`-th, and always the last, so the surface's edge answers. The stride is a whole
@@ -1336,9 +1445,32 @@ function hitlayers(i::SurfaceInteractable, ctx)
         "z" => Float32[i.z[a, b] for b in J for a in I],
     )
     i.value === nothing || (geom["value"] = Float32[i.value[a, b] for b in J for a in I])
+    clip = _polar_clip(ctx, i.ax)
+    clip === nothing || (geom["clip"] = clip)
     pl = i.payloads === nothing ? Any[] :
         i.payloads isa Function ? Any[i.payloads(a, b) for b in J for a in I] : Any[i.payloads[a, b] for b in J for a in I]
     return [HitLayer(i.id, :surface, geom, pl, axis_id(ctx, i.ax), events(i), i.label)]
+end
+
+# The part of a `PolarAxis` that shows its plots, in image px: `[cx, cy, rin, rout]` for the
+# annulus around the polar origin `(cx, cy)`, plus `[phi0, span]` on a sector, the image-space
+# angle (counterclockwise, as on screen) of the sector's first edge and its signed width.
+# `PolarAxis` masks everything outside it (`clip = true`), so a surface drawn past the limits is
+# hidden there, while its quads still cover that area. `nothing` when nothing is masked.
+function _polar_clip(ctx, ax)
+    ax isa Makie.PolarAxis && ax.clip[] === true || return nothing
+    tf = _transform_func(ax.scene)
+    pt(θ, r) = ax.theta_as_x[] ? (θ, r) : (r, θ)
+    rmin, rmax = Float64.(ax.target_rlims[])
+    t1, t2 = Float64.(ax.target_thetalims[])
+    c = data_to_image_px(ctx, ax, pt(t1, Float64(tf.r0)))
+    radius(r) = (q = data_to_image_px(ctx, ax, pt(t1, r)); hypot(q[1] - c[1], q[2] - c[2]))
+    out = Float64[c[1], c[2], radius(rmin), radius(rmax)]
+    if abs(t2 - t1) < 2π - 1.0e-6
+        q = data_to_image_px(ctx, ax, pt(t1, rmax))
+        push!(out, atan(c[2] - q[2], q[1] - c[1]), tf.direction * (t2 - t1))
+    end
+    return out
 end
 
 """
@@ -1948,6 +2080,12 @@ resolution. Because nothing commits, `ax`'s camera stays wherever the gesture le
 cell re-runs (a fresh `Figure`/`Axis` resets it); to persist a view across re-renders, bind it
 explicitly with the `Ref` + `@bind` pattern (§12.8).
 
+**Reset.** A double-click on an empty part of the plot, or `0` while the view has keyboard
+focus, puts the view back where it started: the limits as the author wrote them (automatic
+limits come back automatic) and, on an `Axis3`, the azimuth and elevation. Axes tied to `ax`
+by `linkaxes!`, `linkxaxes!` or `linkyaxes!` go back with it. Re-running only the `masque`
+cell keeps that starting point, even though the axis still shows the moved view.
+
 `masque` raises `ArgumentError` at build time if `ax` is a `PolarAxis` (a polar pan or zoom
 moves r and θ limits, not Cartesian ones), a `Colorbar`'s value axis (no pan/orbit view applies), a categorical
 2D axis (pan needs numeric limits to shift), or (2D only) either scale isn't client-invertible
@@ -2074,6 +2212,8 @@ function hitlayers(i::ViewInteractable, ctx)
         "mode" => t.is3d ? "orbit" : "pan",
         "wheel" => String(_view_wheel(i)),
     )
+    # Away from where it started (#524): a reset has somewhere to go. Left out at home.
+    _view_moved(i.ax) && (geom["moved"] = true)
     if !t.is3d && i.ax isa Makie.Axis
         geom["clip"], geom["fill"] = _pan_window(ctx, i.ax)
         links = _pan_links(ctx, i.ax)
@@ -2128,19 +2268,23 @@ end
 
 # ============================ ThresholdInteractable ========================
 """
-    ThresholdInteractable(ax; orientation=:horizontal, value, id=:threshold, update_while_dragging=true)
+    ThresholdInteractable(ax; orientation, value=nothing, id=:threshold, update_while_dragging=true)
 
 A draggable horizontal or vertical line: drag for a live client-side readout, and the pixel
 position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up. Produces one
 `:threshold` [`HitLayer`](@ref).
 
 # Arguments
-- `ax` — a `Makie.Axis`.
+- `ax` — a `Makie.Axis`, or a `Makie.Colorbar` to drag a cutoff along its color scale.
 - `orientation` — `:horizontal` (constant-y line, dragged vertically) or `:vertical`
   (constant-x line, dragged horizontally). Any other value raises `ArgumentError`. Default
-  `:horizontal`.
+  `:horizontal` on an `Axis`. On a `Colorbar` the line runs across the bar, so it follows the
+  colorbar: `:horizontal` on a vertical colorbar, `:vertical` on a horizontal one; leave it out.
 - `value` — the line's initial data-space position (a y-value for `:horizontal`, x-value for
-  `:vertical`). Required, no default.
+  `:vertical`; on a `Colorbar`, a value on its scale, inside its limits). Default: the middle
+  of the axis's limits along the dragged dimension, as they are when `masque` runs. On a
+  `log10` or `log` scale that is the middle on screen (the geometric mean of the limits); on a
+  categorical axis, the middle category in view; on a `Colorbar`, the middle of its scale.
 - `id` — the layer id; becomes `InteractionEvent.layer` on commit. Default `:threshold`.
 - `update_while_dragging` — with `onchange` on [`masque`](@ref), redraw the figure while the
   line moves, not only when it is let go. Default `true`, like Makie's `Slider`. The `@bind`
@@ -2149,38 +2293,66 @@ position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up.
 Payload on commit (client-side): the scalar data coordinate.
 
 Its field in the `@bind` value starts as a [`ThresholdEvent`](@ref) at `value` (with its
-`category` on a categorical axis, when `value` is a category's position).
+`category` on a categorical axis, when `value` is a category's position). On a `Colorbar` the
+value is in the colorbar's units, the same ones a [`ColorbarInteractable`](@ref) click reads.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
 a data value — inversion is undefined), a `PolarAxis` (a straight line is neither a constant r nor
-a constant θ), a `Colorbar` (use [`ColorbarInteractable`](@ref) to read a value off it, or put
-the threshold on an `Axis`, such as a histogram of the same values), or
-the dragged axis's scale isn't client-invertible (`:horizontal` needs the y-scale, `:vertical`
-the x-scale; supported: `identity`, `log10`, `log`).
+a constant θ), or a `Legend`; if the dragged scale isn't client-invertible (`:horizontal` needs
+the y-scale, `:vertical` the x-scale, a `Colorbar` its own scale; supported: `identity`,
+`log10`, `log`); or, on a `Colorbar`, if `orientation` runs along the bar instead of across it.
+On a `Colorbar`, a `value` outside the colorbar's limits raises `ArgumentError` here. If an
+`onchange` later moves the limits past the line, the line waits at the end of the bar.
 
 # Examples
 ```julia
 ThresholdInteractable(ax; orientation = :horizontal, value = 5.0)
+
+# starts halfway up the axis
+ThresholdInteractable(ax)
+
+# a cutoff on the colorbar of a heatmap `hm`
+cb = Colorbar(fig[1, 2], hm)
+ThresholdInteractable(cb; value = 0.5)
 ```
 """
 struct ThresholdInteractable <: AbstractInteractable
-    ax; orientation::Symbol; value::Float64; id::Symbol
+    # value: `nothing` until `masque` sets it from the axis limits (`_pin_start`).
+    ax; orientation::Symbol; value::Union{Nothing, Float64}; id::Symbol
     update_while_dragging::Bool
 end
 # The 0.3.0 positional form, before `update_while_dragging`.
 ThresholdInteractable(ax, orientation::Symbol, value::Real, id::Symbol) = ThresholdInteractable(ax, orientation, value, id, true)
-function ThresholdInteractable(ax; orientation = :horizontal, value, id = :threshold, update_while_dragging::Bool = true)
+function ThresholdInteractable(ax; orientation = _threshold_orientation(ax), value = nothing, id = :threshold, update_while_dragging::Bool = true)
     orientation in (:horizontal, :vertical) ||
         throw(ArgumentError("ThresholdInteractable: orientation must be :horizontal or :vertical, got $(orientation)"))
-    return ThresholdInteractable(ax, orientation, _threshold_value(value), id, update_while_dragging)
+    v = _threshold_value(value)
+    ax isa Makie.Colorbar && v !== nothing && _check_on_bar(ax, v)
+    return ThresholdInteractable(ax, orientation, v, id, update_while_dragging)
 end
+# Only the value the author writes is held to the colorbar's limits, as they are when it is
+# written. A value the browser sends back can sit a rounding error past the end of the bar, and
+# an `onchange` can move the limits under the line; a redraw then draws the line at the end of
+# the bar instead (`_colorbar_pos`).
+function _check_on_bar(cb, v)
+    lims = cb.limits[]
+    lims === nothing && return nothing
+    lo, hi = minmax(Float64(lims[1]), Float64(lims[2]))
+    lo <= v <= hi || throw(
+        ArgumentError(
+            "ThresholdInteractable: value = $(v) is outside the colorbar's limits ($(lo), $(hi)), " *
+                "so the line would sit off the bar. Pick a value inside them."
+        )
+    )
+    return nothing
+end
+# Across the bar on a colorbar; a horizontal line everywhere else.
+_threshold_orientation(ax) = ax isa Makie.Colorbar && !ax.vertical[] ? :vertical : :horizontal
 events(::ThresholdInteractable) = (:drag,)
 function validate(i::ThresholdInteractable, ctx::InteractionContext)
     i.ax isa Makie.Legend && return "ThresholdInteractable: ax is a Legend, not an Axis — a legend has no data-space scalar to drag."
-    i.ax isa Makie.Colorbar && return "ThresholdInteractable: ax is a Colorbar, not an Axis — a threshold " *
-        "can't be dragged on a colorbar yet. To read a value off the colorbar, use " *
-        "ColorbarInteractable(cb); to drag a cutoff, put the threshold on an Axis, such as a histogram of the same values."
     t = ctx.transforms[axis_id(ctx, i.ax)]
+    i.ax isa Makie.Colorbar && return _validate_colorbar_threshold(i, t)
     t.is3d && return "ThresholdInteractable: drag inverts a pixel to a data scalar via the axis " *
         "transform, which is undefined on an Axis3 (a screen pixel is a ray, not a data value)."
     t.ispolar && return "ThresholdInteractable: a threshold is not supported on PolarAxis (it drags a " *
@@ -2190,10 +2362,35 @@ function validate(i::ThresholdInteractable, ctx::InteractionContext)
         "invertible $(i.orientation === :horizontal ? "y" : "x")-scale ($(sc) is not; supported: identity/log10/log)."
     return nothing
 end
+function _validate_colorbar_threshold(i, t)
+    vertical = t.valueaxis === :y
+    across = vertical ? :horizontal : :vertical
+    i.orientation === across || return "ThresholdInteractable: a $(vertical ? "vertical" : "horizontal") " *
+        "colorbar takes a $(across) line, across the bar; got orientation = :$(i.orientation). " *
+        "Leave orientation out on a Colorbar and it follows the bar."
+    sc = vertical ? t.yscale : t.xscale
+    sc in _JS_INVERTIBLE || return "ThresholdInteractable: the colorbar's scale $(sc) is not " *
+        "invertible client-side; supported: identity/log10/log."
+    return nothing
+end
+# The pixel along a colorbar's value axis where `v` sits, the way geometry.ts `projectAxis` puts
+# it, held to the bar.
+function _colorbar_pos(t, v)
+    vx, vy, vw, vh = t.viewport
+    vertical = t.valueaxis === :y
+    lims = vertical ? t.ylims : t.xlims
+    f = (vertical ? t.yscale : t.xscale) === :identity ? identity : log10
+    frac = clamp((f(v) - f(lims[1])) / (f(lims[2]) - f(lims[1])), 0.0, 1.0)
+    return vertical ? vy + (1 - frac) * vh : vx + frac * vw
+end
 function hitlayers(i::ThresholdInteractable, ctx)
     t = ctx.transforms[axis_id(ctx, i.ax)]
     vx, vy, vw, vh = t.viewport
-    if i.orientation === :horizontal
+    if i.ax isa Makie.Colorbar
+        pos = _colorbar_pos(t, i.value)
+        span = i.orientation === :horizontal ? Float32[vx, vx + vw] : Float32[vy, vy + vh]
+        orient = i.orientation === :horizontal ? "h" : "v"
+    elseif i.orientation === :horizontal
         pos = _proj(ctx, i.ax, (t.xlims[1], i.value))[2]   # constant data-y → its pixel-y
         span = Float32[vx, vx + vw]; orient = "h"
     else
@@ -2207,7 +2404,7 @@ end
 
 # ============================ ROIInteractable ==============================
 """
-    ROIInteractable(ax; bounds, id=:roi, selects=nothing, update_while_dragging=true)
+    ROIInteractable(ax; bounds=nothing, id=:roi, selects=nothing, update_while_dragging=true)
 
 A draggable and resizable rectangle: drag the interior to move it, a corner to resize both
 edges, or the middle of a side (no drawn grip there) to resize just that one edge; on mouse-up
@@ -2220,6 +2417,8 @@ compatible layer, reporting the contained elements. Produces one `:roi` [`HitLay
 - `ax` — a `Makie.Axis`.
 - `bounds` — initial `(xmin, xmax, ymin, ymax)` in data space. Requires `xmin < xmax` and
   `ymin < ymax` (`ArgumentError` otherwise); length must be 4 (`ArgumentError` otherwise).
+  Default: a box half the size of the axis's limits, centred in them, as they are when
+  `masque` runs. On a `log10` or `log` scale it is centred and sized on screen.
 - `id` — the layer id; becomes `InteractionEvent.layer` on commit. Default `:roi`.
 - `selects` — the layer to brush: a `:circles` or `:grid` layer's `id`, or the plot itself
   (`selects = sc`), whatever id that plot's layer ends up with. On mouse-up, elements whose
@@ -2248,6 +2447,9 @@ need numeric limits), or either scale isn't client-invertible (supported: `ident
 ```julia
 ROIInteractable(ax; bounds = (0.0, 1.0, 0.0, 1.0))
 
+# starts as a box over the middle of the axis
+ROIInteractable(ax)
+
 # brush the points of a scatter plot `sc`
 ROIInteractable(ax; bounds = (0.0, 1.0, 0.0, 1.0), selects = sc)
 
@@ -2258,11 +2460,13 @@ ROIInteractable(ax; bounds = (0.0, 1.0, 0.0, 1.0), selects = :scatter)
 struct ROIInteractable <: AbstractSelector
     # bounds: (xmin,xmax,ymin,ymax) data space. A plot `selects` becomes a `_PlotTarget` in
     # `_assemble`, then the one compatible layer id in `build_manifest`.
-    ax; bounds::NTuple{4, Float64}; id::Symbol; selects::Union{Nothing, Symbol, Makie.AbstractPlot, _PlotTarget}
+    # bounds: `nothing` until `masque` sets them from the axis limits (`_pin_start`).
+    ax; bounds::Union{Nothing, NTuple{4, Float64}}; id::Symbol; selects::Union{Nothing, Symbol, Makie.AbstractPlot, _PlotTarget}
     update_while_dragging::Bool
 end
 ROIInteractable(ax, bounds::NTuple{4, Real}, id::Symbol, selects) = ROIInteractable(ax, bounds, id, selects, true)
-function ROIInteractable(ax; bounds, id = :roi, selects = nothing, update_while_dragging::Bool = true)
+function ROIInteractable(ax; bounds = nothing, id = :roi, selects = nothing, update_while_dragging::Bool = true)
+    bounds === nothing && return ROIInteractable(ax, nothing, id, selects, update_while_dragging)
     xmin, xmax, ymin, ymax = _roi_bounds(bounds)
     (xmin < xmax && ymin < ymax) ||
         throw(ArgumentError("ROIInteractable: need xmin < xmax and ymin < ymax, got $(bounds)"))
@@ -2299,6 +2503,81 @@ function hitlayers(i::ROIInteractable, ctx)
     i.update_while_dragging || (geom["settleOnly"] = true)
     return [HitLayer(i.id, :roi, geom, Any[], axis_id(ctx, i.ax), events(i))]
 end
+
+# ============================ starts from the axis limits ==================
+# A threshold or box made without a `value` or `bounds` starts in the middle of its axis as
+# `masque` finds it (#513). `masque` sets the start once, at mount, so a pan or an `onchange`
+# frame that moves the limits leaves the line where it was, as it does a line given a `value`.
+
+# The point a fraction `f` of the way along `lims` on screen: on a log scale, in log space.
+function _along(lims, scale::Symbol, f)
+    a, b = lims
+    scale in (:log10, :log) && return exp10(log10(a) + f * (log10(b) - log10(a)))
+    return a + f * (b - a)
+end
+
+_pin_start(i, ctx) = i
+function _pin_start(i::ThresholdInteractable, ctx)
+    i.value === nothing || return i
+    t = _start_transform(i, ctx)
+    t === nothing && return i
+    h = i.orientation === :horizontal
+    cats = h ? t.ycats : t.xcats
+    lims = h ? t.ylims : t.xlims
+    v = cats === nothing || isempty(cats) ? _along(lims, h ? t.yscale : t.xscale, 0.5) :
+        Float64(_middle_category(lims, length(cats)))
+    return ThresholdInteractable(i.ax, i.orientation, v, i.id, i.update_while_dragging)
+end
+# A release on a categorical axis snaps to a category, so the start sits on one too: the
+# middle of the categories in view (the lower one of two), which is all of them unless the
+# axis is zoomed. With none in view, the one nearest the middle.
+function _middle_category(lims, n)
+    lo, hi = minmax(lims...)
+    a, b = max(1, ceil(Int, lo)), min(n, floor(Int, hi))
+    a <= b && return (a + b) ÷ 2
+    return clamp(round(Int, (lo + hi) / 2), 1, n)
+end
+function _pin_start(i::ROIInteractable, ctx)
+    i.bounds === nothing || return i
+    t = _start_transform(i, ctx)
+    t === nothing && return i
+    b = (
+        _along(t.xlims, t.xscale, 0.25), _along(t.xlims, t.xscale, 0.75),
+        _along(t.ylims, t.yscale, 0.25), _along(t.ylims, t.yscale, 0.75),
+    )
+    return ROIInteractable(i.ax, b, i.id, i.selects, i.update_while_dragging)
+end
+# The axis transform a start is read from, or `nothing` where `validate` refuses the axis.
+function _start_transform(i, ctx)
+    id = get(ctx.ids, i.ax, nothing)
+    id === nothing && return nothing
+    t = get(ctx.transforms, id, nothing)
+    (t === nothing || t.is3d || t.ispolar) && return nothing
+    return t
+end
+
+# The plan with every unset start set from `ctx`; a new plan, so the caller's vector stays as
+# it was.
+function _pin_starts(p, ctx)
+    any(_unpinned, p) || return p
+    ints = AbstractInteractable[_pin_start(i, ctx) for i in p]
+    p isa _Plan || return ints
+    return _Plan(ints, p.binding, p.onchange, p.rebuild, p.mount, p.hidden, p.draw)
+end
+_unpinned(i::ThresholdInteractable) = i.value === nothing
+_unpinned(i::ROIInteractable) = i.bounds === nothing
+_unpinned(_) = false
+
+# A rebuilt plan's unset starts, set to where `old`, the plan it replaces, had them.
+function _carry_starts(ints, old)
+    any(_unpinned, ints) || return ints
+    was = Dict{Symbol, Any}(i.id => i for i in old if i isa Union{ThresholdInteractable, ROIInteractable} && !_unpinned(i))
+    return AbstractInteractable[
+        _unpinned(i) && get(was, i.id, nothing) isa typeof(i) ? _with_start(i, was[i.id]) : i for i in ints
+    ]
+end
+_with_start(i::ThresholdInteractable, w) = ThresholdInteractable(i.ax, i.orientation, w.value, i.id, i.update_while_dragging)
+_with_start(i::ROIInteractable, w) = ROIInteractable(i.ax, w.bounds, i.id, i.selects, i.update_while_dragging)
 
 # ============================ custom: RegionInteractable (Tier A) =========
 """

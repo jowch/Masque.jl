@@ -114,12 +114,16 @@ repo's own docs build) one widget already warns and two fail.
   1.8 KB of `xy` in a 2.2 KB manifest, 1 000 vertices 17.6 KB in 18.0 KB (~18 B/vertex). The
   raster stays the empty-axis floor (9.8 KB). A view gesture rebuilds the manifest every frame,
   so a slice on a panned axis pays this again per camera move.
-- **Line samples** for the hover readout (`points`, section I, 2026-10-03, #262): a 2D line also
-  carries each sample as two Float32s (~10 B/sample), beside its integer-pixel geometry
-  (~6 B/vertex). That makes a line layer about 2.7× its geometry alone: 100 samples is 1.0 KB of
-  `points` in a 2.0 KB manifest, 1 000 is 9.8 KB in 15.8 KB, 10 000 is 98 KB in 156 KB. That stays
-  under a 10 000-point scatter's 379 KB. Date and category axes carry text instead, which is larger
-  per sample. Axis3 lines carry none.
+- **Line samples** for the hover readout (`points`, section I, 2026-10-03, #262; re-run
+  2026-11-01 on `b930607` plus #502): a 2D line also carries each sample as two Float32s
+  (~10 B/sample), beside its integer-pixel geometry (~6 B/vertex). That makes a line layer about
+  2.7× its geometry alone: 100 samples is 1.0 KB of `points` in a 2.0 KB manifest, 1 000 is
+  9.8 KB in 16.0 KB, 10 000 is 98 KB in 156 KB. That stays under a 10 000-point scatter's
+  379 KB. Date and category axes carry text instead, which is larger per sample. A line on an
+  Axis3 adds each sample's `z` (`zpoints`, ~15 B/sample in all), about 3.5× its geometry: 100
+  samples is 1.5 KB in 2.5 KB, 1 000 is 14.7 KB in 21.0 KB, 10 000 is 147 KB in 206 KB. No
+  cap, as on 2D: at 10 000 samples it is still under the scatter. A zoomed Axis3 whose limits
+  cut a line also ships `drawn`, one small integer per drawn vertex.
 - **Not display width.** `px_per_unit` scales the PNG roughly with the square of the width but
   leaves the manifest alone: scatter-1000's PNG is 90 KB at 300 px and 188 KB at 700 px, its
   manifest 38 KB at both.
@@ -202,6 +206,7 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `colors`, colormapped | same | a fixed 32-stop palette + ~1–2 B/element for the index |
 | `links` | each `LegendInteractable` layer | ~9–11 B/entry (a 3-entry legend layer is 341 B, 32 B of it `links`) |
 | `clip` + `fill` | each 2-D pan view layer | under 50 B |
+| `clip` (in `geometry`) | each `:surface` layer on a `PolarAxis` (#514) | 42 B for the annulus (4 floats), 60 B on a sector (6), measured at `0c23602` on a 50×50 polar surface; the rest of the layer is the Section J surface |
 | `wheel` | each view layer (#526) | 19 B (`"wheel":"modifier",`), counted, not benched |
 | `is3d`, `valueaxis` | each axis transform | 6 B and 11 B |
 | `selects` | each selector ROI layer | one short string |
@@ -211,7 +216,15 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `many` | each `select = :many` layer (#335) | 13 B (`payload_envelope.jl` §K) |
 | `draw` | each layer whose plot `masque` knows (#462) | 6–8 B (key 5 B + a small integer); `payload_envelope.jl` at `d31f6e1` moved only the 1 000-point scatter manifest, by 6 B, and the two `:many` scatters by 0.1 KB |
 | `groups`, `group` | once per `linked(...)` group, and a tag on each member layer (#346) | under 0.1 KB by position; with `key`, `rows` adds one small integer per mark (`payload_envelope.jl` §M) |
+| `xfmt`, `yfmt`, `zfmt` | each axis transform whose ticks have a format string, `AngularTicks` or `MultiplesTicks`, and both dimensions of a `PolarAxis` (#510) | ~15–60 B per formatted dimension; absent on an axis with automatic ticks |
+| `coords` | each layer whose payloads include coordinates Masque filled in (points, text, arrows) (#510) | 19 B for `["x","y"]` |
 | `regions` | each grid layer given `regions = R` (#359) | `[id, n, …]` runs over the row-major cells, one pair per region edge crossed along a row (`payload_envelope.jl` §L) |
+
+Re-running `payload_envelope.jl` and `stress.jl` for the tick-format tooltips (#510, 2026-11-02)
+moved only the 1 000-point scatter manifest, by 19 B (its `coords` list), and the Axis3
+meshscatter by under 0.1 KB. No fixture sets a tick format, so no `xfmt` is sent. Every stress
+manifest and PNG size is unchanged at the precision above. Which fields Masque filled in is
+recorded when the payloads are merged, so finding `coords` costs a lookup, not a pass over them.
 
 Re-running `payload_envelope.jl` for the composite bind value (#335, 2026-10-10) moved no
 manifest in the tables above by more than 0.1 KB; `fields` and `initial` replace the old

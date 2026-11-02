@@ -197,6 +197,99 @@ bump(n; lo = -3, hi = 3) = (xs = range(lo, hi; length = n); (xs, xs, [exp(-(a^2 
         @test count(i -> i isa SegmentInteractable, ints4) == 0
     end
 
+    @testset "PolarAxis: a polar heatmap lands on its drawn cells (#514)" begin
+        th = range(0, 2π; length = 13); rs = range(0.5, 2; length = 5)
+        zs = [cos(2t) * r for t in th, r in rs]
+        for axkw in (
+                (;),
+                (; thetalimits = (0, π / 2), direction = -1, theta_0 = π / 4, rlimits = (0.5, 2)),
+                (; theta_as_x = false),
+            )
+            fig = Figure(; size = (500, 450))
+            ax = PolarAxis(fig[1, 1]; axkw...)
+            sth = get(axkw, :thetalimits, nothing) === nothing ? th : range(0, π / 2; length = 7)
+            args = get(axkw, :theta_as_x, true) ? (sth, rs) : (rs, sth)
+            z = get(axkw, :theta_as_x, true) ? zs[1:length(sth), :] : permutedims(zs[1:length(sth), :])
+            p = surface!(ax, args..., z; shading = NoShading, colormap = [:red, :red])
+            ints = @test_logs interactables(fig)
+            si = only(ints)
+            @test si isa SurfaceInteractable
+            _, ppu, ctx = ctx_for(fig)
+            @test validate(si, ctx) === nothing
+            L = only(hitlayers(si, ctx))
+            g = L.geometry
+            n = g["ni"] * g["nj"]
+            @test size(z) == (g["ni"], g["nj"]) && length(g["order"]) == (g["ni"] - 1) * (g["nj"] - 1)
+            # Each shipped point is the closure's projection of (θ, r), on the drawn surface.
+            for (k, (a, b)) in enumerate((a, b) for b in 1:g["nj"] for a in 1:g["ni"])
+                q = Masque.data_to_image_px(ctx, ax, (args[1][a], args[2][b], z[a, b]))
+                @test abs(g["xy"][2k - 1] - q[1]) <= 0.5 && abs(g["xy"][2k] - q[2]) <= 0.5
+            end
+            img = Makie.colorbuffer(fig; px_per_unit = ppu)
+            @test all(drawn_near(img, g["xy"][2k - 1], g["xy"][2k]; tol = 2) for k in 1:n)
+            # The pixel at a quad's centre answers one of that quad's corners.
+            for q in g["order"][1:7:end]
+                ks = quad_corners(g, q)
+                cx = sum(g["xy"][2k - 1] for k in ks) / 4; cy = sum(g["xy"][2k] for k in ks) / 4
+                hit = surface_hit(g, cx, cy)
+                @test hit !== nothing && first(hit) in ks
+            end
+            # The polar centre, inside the inner radius, is not on the surface.
+            if get(axkw, :thetalimits, nothing) === nothing
+                c = Masque.data_to_image_px(ctx, ax, (0.0, 0.0))
+                @test surface_hit(g, c[1], c[2]) === nothing
+            end
+        end
+
+        # Data past the axis limits is masked, so the shipped `clip` region must cover exactly
+        # the points inside them, to the 1 px slack of `shown` in frontend/src/surface.ts (the
+        # shipped pixels are rounded).
+        function shown(c, px, py; tol = 1)
+            dx, dy = px - c[1], c[2] - py
+            d = hypot(dx, dy)
+            c[3] - tol <= d <= c[4] + tol || return false
+            length(c) < 6 && return true
+            turn = c[6] >= 0 ? atan(dy, dx) - c[5] : c[5] - atan(dy, dx)
+            rel = mod(turn, 2π)
+            return rel <= abs(c[6]) + tol / d || rel >= 2π - tol / d
+        end
+        for (axkw, inside) in (
+                ((; rlimits = (0.0, 1.2)), (t, r) -> r <= 1.2),
+                (
+                    (; thetalimits = (0, π / 2), direction = -1, theta_0 = π / 4, rlimits = (0.8, 1.6)),
+                    (t, r) -> 0.8 <= r <= 1.6 && mod(t, 2π) <= π / 2,   # θ = 2π is the θ = 0 ray
+                ),
+                ((; thetalimits = (π / 4, π), theta_as_x = false), (t, r) -> π / 4 <= t <= π),
+            )
+            fig = Figure(; size = (500, 450))
+            ax = PolarAxis(fig[1, 1]; axkw...)
+            tx = get(axkw, :theta_as_x, true)
+            p = tx ? surface!(ax, th, rs, zs) : surface!(ax, rs, th, permutedims(zs))
+            g = only(hitlayers(SurfaceInteractable(ax, p), ctx_for(fig)[3])).geometry
+            c = g["clip"]
+            @test length(c) == (haskey(axkw, :thetalimits) ? 6 : 4)
+            for (k, (a, b)) in enumerate((a, b) for b in 1:g["nj"] for a in 1:g["ni"])
+                t, r = tx ? (th[a], rs[b]) : (th[b], rs[a])
+                @test shown(c, g["xy"][2k - 1], g["xy"][2k]) == inside(t, r)
+            end
+        end
+        fig = Figure(); ax = PolarAxis(fig[1, 1]; clip = false)
+        p = surface!(ax, th, rs, zs)
+        @test !haskey(only(hitlayers(SurfaceInteractable(ax, p), ctx_for(fig)[3])).geometry, "clip")
+
+        # Through `masque`: one surface layer bound as a grid cell; `select = :many` is refused
+        # the way it is on Axis3.
+        fig = Figure(); ax = PolarAxis(fig[1, 1])
+        p = surface!(ax, th, rs, zs; shading = NoShading)
+        w = masque(fig; bind = p)
+        surf = only(l for l in w.manifest["layers"] if l["kind"] == "surface")
+        @test surf["bond"] == "gridcell"
+        @test w.manifest["transforms"][surf["axis"]]["ispolar"] === true
+        ev = Masque.transform_bond(SurfaceInteractable(ax, p), only(hitlayers(SurfaceInteractable(ax, p), ctx_for(fig)[3])), nothing, Dict("i" => 2, "j" => 1, "value" => zs[3, 2]))
+        @test ev isa GridCellEvent && (ev.i, ev.j) == (3, 2) && zs[ev] == zs[3, 2]
+        @test_throws "surface cells don't take several picks yet" interactables(ax, p; select = :many)
+    end
+
     @testset "payload function runs at shipped points only" begin
         n = 1000
         xs = range(0, 1; length = n)

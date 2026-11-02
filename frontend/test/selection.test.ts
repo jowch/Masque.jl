@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { cellRange, computeSelection, layerNElements, selectionFor, linkedHits, selectionForValue, sameValue, indicesInBox, linkedIndices } from "../src/selection"
+import { cellRange, computeSelection, layerNElements, selectionFor, linkedHits, selectionForValue, sameValue, indicesInBox, linkedIndices, picksPoints, elementPicks } from "../src/selection"
 import type { Hit, HitLayer, Manifest } from "../src/types"
 
 // layerNElements' other kind branches (circles/rects/polygons/segments/polyline) are exercised
@@ -241,5 +241,18 @@ describe("indicesInBox and linkedIndices (#335)", () => {
         const m = { width: 100, height: 100, scaling: 1, transforms: {}, layers: [pts, leg] } as Manifest
         expect([...linkedIndices(m, leg, 0)].map(([l, ks]) => [l.id, ks])).toEqual([["pts", [0, 1]]])
         expect([...linkedIndices(m, leg, 1)].map(([l, ks]) => [l.id, ks])).toEqual([["pts", [1]]])
+    })
+})
+
+// #518: a line on an Axis3 picks its points, as a 2D line does.
+describe("picksPoints", () => {
+    const line = { id: "l", kind: "lines", geometry: [[0, 0, 10, 0]], payloads: [{ index: 1 }], axis: "ax1", events: ["click"], points: [[0, 0, 1, 0]] } as HitLayer
+    it("a line picks its points, on an Axis3 too; one without points is picked whole", () => {
+        expect(picksPoints(line)).toBe(true)
+        expect(picksPoints({ ...line, zpoints: [[0, 1]] })).toBe(true)
+        // A legend entry or a marquee over an Axis3 line holds each of its points.
+        const m = { width: 100, height: 100, scaling: 1, transforms: {}, layers: [] } as unknown as Manifest
+        expect(elementPicks(m, { ...line, zpoints: [[0, 1]] }, [0])).toEqual([{ layer: "l", index: 0, sample: 0 }, { layer: "l", index: 0, sample: 1 }])
+        expect(picksPoints({ ...line, points: undefined })).toBe(false)
     })
 })

@@ -175,11 +175,12 @@ end
             wt = masque(f, SegmentInteractable(a, pl; id = :tl, tooltip = masque"$(i): $(x), $(y)"))
             @test haskey(only(filter(d -> d["id"] == "tl", wt.manifest["layers"])), "template")
             @test_throws ArgumentError masque(f, SegmentInteractable(a, pl; id = :tl, tooltip = masque"$(z)"))
-            # Axis3 has no 2D readout, so it ships no samples.
+            # On an Axis3 the samples ship with their z (#502).
             f3 = Figure(size = (400, 300)); a3 = Axis3(f3[1, 1])
-            p3 = lines!(a3, [0.0, 1.0], [0.0, 1.0], [0.0, 1.0])
+            p3 = lines!(a3, [0.0, 1.0], [0.0, 1.0], [0.0, 2.0])
             _, _, c3 = ctx_for(f3)
-            @test only(hitlayers(SegmentInteractable(a3, p3), c3)).points === nothing
+            L3 = only(hitlayers(SegmentInteractable(a3, p3), c3))
+            @test L3.points == [Float32[0, 0, 1, 1]] && L3.zpoints == [Float32[0, 2]]
         end
 
         @testset "heatmap/image -> GridInteractable, incl. EndPoints expansion" begin

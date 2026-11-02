@@ -251,6 +251,20 @@ let
             "lines, $n pts", kb(mp(w.manifest)), kb(g_b), kb(p_b), (g_b + p_b) / g_b,
         )
     end
+    # On an Axis3 (#502) each sample also ships its `z` (`zpoints`), one more Float32. Its own
+    # RNG, so the sections after this one draw the same numbers as before it was added.
+    rng = Random.Xoshiro(502)
+    for n in (100, 1_000, 10_000)
+        f = Figure(size = (600, 450)); ax = Axis3(f[1, 1])
+        lines!(ax, range(0, 10; length = n), cumsum(randn(rng, n)), cumsum(randn(rng, n)))
+        w = masque(f)
+        layer = only(filter(l -> l["kind"] == "lines", w.manifest["layers"]))
+        g_b, p_b = mp(layer["geometry"]), mp(layer["points"]) + mp(layer["zpoints"])
+        @printf(
+            "  %-40s  manifest=%7s KB   geometry=%7s KB   points=%7s KB  (×%.1f)\n",
+            "lines on Axis3, $n pts", kb(mp(w.manifest)), kb(g_b), kb(p_b), (g_b + p_b) / g_b,
+        )
+    end
 end
 println("\n=== J. surface on Axis3 — projected vertex grid, depth order, thinned to a fixed stride ===")
 # A `:surface` layer (#259) ships each shipped point's integer-px `xy`, its Float32 `z` (and

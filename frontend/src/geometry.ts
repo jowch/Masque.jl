@@ -2,7 +2,7 @@
 import { isIdentity, type PhotoMatrix } from "./photo"
 import { hitSurface, surfaceVertex } from "./surface"
 import { withRegion } from "./regions"
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry, Limits3 } from "./types"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry, Limits3, Readout } from "./types"
 
 const HIT_TOL = 4 // px slack for circles/rects
 export const SEG_TOL = 8 // px slack for segments/polylines
@@ -88,27 +88,51 @@ export function closestPointOnPath(px: number, py: number, verts: number[], cut 
 // Following the path, not the x axis, keeps a curve that doubles back on the branch under the
 // cursor. A staircase's corners are not samples: Makie draws sample k at vertex 2k, and a
 // corner belongs to the step it sits on (the next sample for `pre`, its own for `post` and
-// `center`). Returns [0-based sample, x, y] in data space, or null without `points`.
-// With the axis transform `t`, only a sample Makie draws inside the plot area is read: the
-// path runs on past the axis limits, unseen, so where an edge leaves the plot its far end is
-// not a choice. An edge with neither end inside reads nothing.
-export function lineReadout(layer: HitLayer, index: number, px: number, py: number, t?: AxisTransform): [number, number | string, number | string] | null {
+// `center`). On a path an Axis3's limits cut (`drawn`), the edge is the one its drawn piece
+// lies on. Returns [0-based sample, x, y] (and z on an Axis3) in data space, or null without
+// `points`. With the axis transform `t`, only a sample Makie draws inside the plot area is
+// read: the path runs on past the axis limits, unseen, so where an edge leaves the plot its far
+// end is not a choice. An edge with neither end inside reads nothing.
+export function lineReadout(layer: HitLayer, index: number, px: number, py: number, t?: AxisTransform): Readout | null {
     const pts = layer.points?.[index]
     const verts = (layer.geometry as number[][] | null)?.[index]
     if (!pts || !verts) return null
     const on = closestPointOnPath(px, py, verts)
     if (!on) return null
-    const a = on.edge, b = a + 1
-    const da = Math.hypot(verts[2 * a] - on.x, verts[2 * a + 1] - on.y)
-    const db = Math.hypot(verts[2 * b] - on.x, verts[2 * b + 1] - on.y)
-    const shown = (v: number | string | undefined) => typeof v === "string" || Number.isFinite(v)
-    for (const k of db < da ? [b, a] : [a, b]) { // a tie keeps the earlier vertex
-        const s = layer.step === undefined ? k : layer.step === "pre" ? Math.ceil(k / 2) : Math.floor(k / 2)
-        if (t && !samplePoint(layer, index, s, t, true)) continue
-        const x = pts[2 * s], y = pts[2 * s + 1]
-        return x !== undefined && y !== undefined && shown(x) && shown(y) ? [s, x, y] : null
+    const codes = layer.drawn?.[index]
+    let near: number[]
+    if (codes) {
+        // A cut path's vertices aren't its samples: read the two samples of the edge it is on.
+        const e = codes[on.edge] >> 1
+        const far = (s: number) => {
+            const p = samplePoint(layer, index, s)
+            return p ? Math.hypot(p.x - on.x, p.y - on.y) : Infinity
+        }
+        near = far(e + 1) < far(e) ? [e + 1, e] : [e, e + 1]
+    } else {
+        const a = on.edge, b = a + 1
+        const da = Math.hypot(verts[2 * a] - on.x, verts[2 * a + 1] - on.y)
+        const db = Math.hypot(verts[2 * b] - on.x, verts[2 * b + 1] - on.y)
+        near = (db < da ? [b, a] : [a, b]).map((k) => (layer.step === undefined ? k : layer.step === "pre" ? Math.ceil(k / 2) : Math.floor(k / 2)))
+    }
+    for (const s of near) { // a tie keeps the earlier vertex
+        if ((t || codes) && !samplePoint(layer, index, s, t, true)) continue
+        return readoutAt(layer, index, s)
     }
     return null
+}
+
+// Sample `s` of line `index` as a readout, or null when a coordinate is missing or not finite.
+export function readoutAt(layer: HitLayer, index: number, s: number): Readout | null {
+    const pts = layer.points?.[index]
+    if (!pts) return null
+    const shown = (v: number | string | undefined): v is number | string => typeof v === "string" || Number.isFinite(v)
+    const x = pts[2 * s], y = pts[2 * s + 1]
+    if (!shown(x) || !shown(y)) return null
+    const zs = layer.zpoints?.[index]
+    if (!zs) return [s, x, y]
+    const z = zs[s]
+    return shown(z) ? [s, x, y, z] : null
 }
 
 // Whether image px (x, y) is inside axis `t`'s plot area, give or take half a pixel of rounding.
@@ -122,6 +146,19 @@ function inPlot(t: AxisTransform, x: number, y: number): boolean {
 // vertex 2s to 2s + 1, at its own x when the axis can place it, else the tread's middle.
 // null when the sample is not on screen (a NaN gap, or out of range), and with `visible`, when
 // it lies outside the plot area, past the axis limits.
+// Each drawn sample's vertex on a cut path, built once per `drawn` entry: the keyboard walks
+// every sample of a line, and a search per sample would be quadratic on a long one.
+const drawnVertices = new WeakMap<number[], Map<number, number>>()
+function drawnVertexOf(codes: number[]): Map<number, number> {
+    let m = drawnVertices.get(codes)
+    if (!m) {
+        m = new Map()
+        codes.forEach((c, k) => { if (c >= 0 && c % 2 === 0) m!.set(c / 2, k) })
+        drawnVertices.set(codes, m)
+    }
+    return m
+}
+
 export function samplePoint(layer: HitLayer, index: number, s: number, t?: AxisTransform, visible = false): { x: number; y: number } | null {
     const p = samplePosition(layer, index, s, t)
     return p && visible && t && !inPlot(t, p.x, p.y) ? null : p
@@ -131,6 +168,11 @@ function samplePosition(layer: HitLayer, index: number, s: number, t?: AxisTrans
     const n = (layer.points?.[index]?.length ?? 0) / 2
     if (!verts || !Number.isInteger(s) || s < 0 || s >= n) return null
     const at = (k: number) => (finitePair(verts[2 * k], verts[2 * k + 1]) ? { x: verts[2 * k], y: verts[2 * k + 1] } : null)
+    const codes = layer.drawn?.[index]
+    if (codes) { // a path cut by an Axis3's limits: the vertex that is sample s, if it is drawn
+        const k = drawnVertexOf(codes).get(s)
+        return k === undefined ? null : at(k)
+    }
     if (layer.step === undefined) return at(s)
     if (layer.step !== "center") return at(2 * s)
     if (s === 0) return at(0)
