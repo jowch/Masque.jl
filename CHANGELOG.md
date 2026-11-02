@@ -51,6 +51,11 @@ All notable changes to this project are documented here. The format is based on
   while it turns) shows in the bottom-left corner of the figure instead of beside the pointer,
   and a point's tooltip doesn't show over it (#526).
 
+### Fixed
+- A figure you `resize!` after it is shown keeps its highlights on the marks. The next pan,
+  zoom or `onchange` redraw shows the new size, and the hover ring and selection now follow
+  it, where they used to land up to a few hundred pixels below the mark (#546).
+
 ## [0.4.5] - 2026-11-02
 
 ### Added
