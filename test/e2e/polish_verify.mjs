@@ -612,6 +612,8 @@ try {
     await page.mouse.down();
     for (let i = 1; i <= 6; i++) await page.mouse.move(cx + 5 * i, cy + 2 * i);
     await page.mouse.up();
+    // Off the figure, so the corner view buttons (#525) hide before the screenshots.
+    await page.mouse.move(2, 2);
     let st = null;
     for (let i = 0; i < (backend === "webgl" ? 50 : 25); i++) {
       await new Promise((r) => setTimeout(r, backend === "webgl" ? 300 : 200));
@@ -1355,11 +1357,17 @@ try {
     if (st.btn[0] !== 24 || st.btn[1] !== 24 || st.icon !== 14 || st.stroke !== "1.75") fail("button, icon or stroke size is off");
     if (!/opacity 0\.1s/.test(st.transition)) fail("the box does not fade over the tooltip's 100 ms");
     if (st.reset !== "none") fail("reset shows before the view has moved");
-    const lum = (c) => { const v = c.match(/[\d.]+/g).map(Number); return (0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]) / 255; };
+    // 0..1 lightness: the L of an lch() colour, else the luminance of an rgb() one.
+    const lum = (c) => { const v = c.match(/[\d.]+/g).map(Number); return c.startsWith("lch") ? v[0] / 100 : (0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]) / 255; };
     if (dark ? !(lum(st.bg) < 0.3) : !(lum(st.bg) > 0.8)) fail(`a ${dark ? "dark" : "light"} figure's box is not ${dark ? "dark" : "light"}`);
     // On screen: a spot inside the box, between the icon and the edge, reads the box's colour.
     const png = PNG.sync.read(await page.screenshot({ clip: { x: st.rect.x + 3, y: st.rect.y + 3, width: 2, height: 2 } }));
-    const want = st.bg.match(/[\d.]+/g).map(Number);
+    // The browser resolves the box's colour (lch or rgb) to sRGB through a canvas.
+    const want = await page.evaluate((css) => {
+      const c = document.createElement("canvas").getContext("2d");
+      c.fillStyle = css; c.fillRect(0, 0, 1, 1);
+      return [...c.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+    }, st.bg);
     if (![0, 1, 2].every((c) => Math.abs(png.data[c] - want[c]) <= 12)) fail(`screen reads ${[...png.data.slice(0, 3)]} inside the box, not ${want}`);
     await page.mouse.move(1, 1);
     passed.push(`${key}/view-buttons-look`);
