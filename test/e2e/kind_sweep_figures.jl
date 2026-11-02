@@ -585,6 +585,15 @@ kind_sweep_meta() = [
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "wheel",
     ),
     Dict(
+        # The figure is `resize!`d in a later cell, after it is shown (#546). The pan's frame
+        # draws it at the new size, and the overlay must follow: the driver hovers the lower
+        # axis's points where the resized figure draws them and finds each ring on its mark.
+        "key" => "view_resized", "layerId" => "view", "layerKind" => "view",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+        "resizeAfterDisplay" => true,
+    ),
+    Dict(
         "key" => "legend", "layerId" => "legend", "layerKind" => "rects",
         "selected" => nothing, "halo" => false, "selectedIndex" => 2, "clickIndex" => 2,
         "tip" => "pts", "mode" => "element",
@@ -1674,6 +1683,16 @@ function build_kind_sweep()
         )
     end
 
+    view_resized = let
+        fig = Figure(size = (480, 300))
+        ax = Axis(fig[1, 1]; title = "view, resized after display")
+        scatter!(ax, 11:13, [1, 2.46, 4.17]; color = :gray, markersize = 14)
+        ax2 = Axis(fig[2, 1])
+        lower = scatter!(ax2, 21:23, [1, 2.46, 4.17]; color = :gray, markersize = 14)
+        VIEW_RESIZED[] = (fig, ax2)
+        masque(fig, ViewInteractable(ax), interactables(lower; id = :lower); auto = false)
+    end
+
     legend = let
         xs = collect(0.0:0.5:3.0)
         fig = Figure(size = (480, 320))
@@ -1965,9 +1984,28 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, legend, series_legend,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_resized, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
+end
+
+# `view_resized`'s figure and lower axis, for the cell that resizes it after display (#546).
+const VIEW_RESIZED = Ref{Any}(nothing)
+
+# Resize `view_resized`'s figure, wider and taller, after it is shown. Gives the image px where
+# the resized figure draws the lower axis's points, at the widget's scale `k` (top-left origin,
+# y down), and the new width.
+function resize_view_resized!(k; to = (640, 420))
+    fig, ax2 = VIEW_RESIZED[]
+    resize!(fig, to...)
+    Masque._finalize!(fig)   # lay the figure out at its new size, as a frame will
+    H = to[2]
+    o = ax2.scene.viewport[].origin
+    marks = map(zip(21:23, [1, 2.46, 4.17])) do (x, y)
+        p = Makie.project(ax2.scene, Makie.Point2f(x, y)) .+ o
+        (k * p[1], k * (H - p[2]))
+    end
+    return (; marks, width = to[1])   # the CSS width the widget may grow to (under max_width)
 end
 
 # The text a notebook prints for one sweep widget's `@bind` value `ev`: the field the case is
