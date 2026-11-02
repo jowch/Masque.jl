@@ -223,8 +223,9 @@ plot. A rectangle interactable you pass yourself, such as
 wrong place.
 
 **Fix:** on a `PolarAxis`, only scatter, line, segment,
-`scatterlines!`, and `series!` plots work. Use a Cartesian `Axis` for
-the rest. See [Supported plots and axes](@ref).
+`scatterlines!`, `series!`, and `surface!` plots work. For a polar
+heatmap, draw the matrix with `surface!(ax, θ, r, values; shading =
+NoShading)`. Use a Cartesian `Axis` for the rest. See [Supported plots and axes](@ref).
 
 ### A box, slice, or pan on a categorical axis
 

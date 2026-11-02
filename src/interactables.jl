@@ -28,7 +28,9 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
     `"i"`/`"j"` (0-based source index of each shipped row/column), `"xy"` (image px,
     interleaved, row-major over `(ni, nj)`; `NaN` is a point not drawn), `"order"` (0-based quad
     indices, front to back; quad `a + b·(ni-1)` has corners `(a, b)` to `(a+1, b+1)`), the data
-    `"x"`/`"y"` (length `ni`/`nj`, or one per point), `"z"`, and optionally `"value"`.
+    `"x"`/`"y"` (length `ni`/`nj`, or one per point), `"z"`, and optionally `"value"`. On a
+    `PolarAxis` that masks what lies outside its limits, `"clip"` is the shown region in image
+    px: `[cx, cy, rin, rout]` around the polar origin, plus `[phi0, span]` on a sector.
     Payloads, when present, are one per shipped point, row-major like `xy`
   - `:axis` — `nothing` (whole-axis readout, `AxisInteractable`) or flat `Real[x, y, w, h]`
     (the colorbar's pixel bbox, `ColorbarInteractable`); not element-indexed
@@ -1195,10 +1197,12 @@ end
     SurfaceInteractable(ax, x, y, z; id=:surface, value=nothing, payloads=nothing, tooltip=nothing, label=nothing)
     SurfaceInteractable(ax, p::Makie.Surface; id=:surface, payloads=nothing, tooltip=nothing, label=<p's label>)
 
-A 3D surface on an `Axis3`. Produces one `:surface` [`HitLayer`](@ref). The pointer lands in one
-of the surface's drawn quads and answers with the data point at the quad's corner nearest the
-pointer, on the side of the surface you can see. A click commits a [`GridCellEvent`](@ref) with
-the point's `(i, j)` and `value = z[i, j]`, so `z[pick]` (or any matrix of `z`'s shape) reads it.
+A 3D surface on an `Axis3`, or a polar heatmap drawn with `surface!` on a `PolarAxis`. Produces
+one `:surface` [`HitLayer`](@ref). The pointer lands in one of the surface's drawn quads and
+answers with the data point at the quad's corner nearest the pointer, on the side of the surface
+you can see. A click commits a [`GridCellEvent`](@ref) with the point's `(i, j)` and
+`value = z[i, j]`, so `z[pick]` (or any matrix of `z`'s shape) reads it. On a `PolarAxis`, `x`
+and `y` are the angle (in radians) and the radius, in the order `surface!` took them.
 
 # Arguments
 - `x`, `y` — the grid, as in `surface!`: vectors of length `size(z, 1)` and `size(z, 2)`, or
@@ -1223,7 +1227,8 @@ pixels of the axis's longer side, with the last row and column always kept.
 A point that is not shipped cannot be hovered; at that density it is smaller than a pixel. The
 stride depends on the axis size only, so it stays the same as the view turns.
 
-Quads with a corner outside the axis limits are not hit, as CairoMakie does not draw them.
+Quads with a corner outside the axis limits are not hit, as CairoMakie does not draw them. On a
+`PolarAxis`, the part of the surface outside the axis's limits is hidden and is not hit either.
 Between this layer and another plot on the same axis, the plot drawn last still wins.
 
 # Examples
@@ -1296,9 +1301,11 @@ function SurfaceInteractable(
     return SurfaceInteractable(ax, pos, xs, ys, zs, vs, id, pl, tooltip, label === nothing ? nothing : String(label))
 end
 tooltip_spec(i::SurfaceInteractable) = i.tooltip
-validate(i::SurfaceInteractable, ctx::InteractionContext) =
-    ctx.transforms[axis_id(ctx, i.ax)].is3d ? nothing :
-    "SurfaceInteractable :$(i.id): a surface is hit-tested on an `Axis3` only (a 2D `Axis` is roadmap scope)"
+function validate(i::SurfaceInteractable, ctx::InteractionContext)
+    t = ctx.transforms[axis_id(ctx, i.ax)]
+    return t.is3d || t.ispolar ? nothing :
+        "SurfaceInteractable :$(i.id): a surface is hit-tested on an `Axis3` or a `PolarAxis` only (a 2D `Axis` is roadmap scope)"
+end
 
 # Shipped source indices along one grid direction of `n` points, at most about `cap` of them:
 # every `s`-th, and always the last, so the surface's edge answers. The stride is a whole
@@ -1336,9 +1343,32 @@ function hitlayers(i::SurfaceInteractable, ctx)
         "z" => Float32[i.z[a, b] for b in J for a in I],
     )
     i.value === nothing || (geom["value"] = Float32[i.value[a, b] for b in J for a in I])
+    clip = _polar_clip(ctx, i.ax)
+    clip === nothing || (geom["clip"] = clip)
     pl = i.payloads === nothing ? Any[] :
         i.payloads isa Function ? Any[i.payloads(a, b) for b in J for a in I] : Any[i.payloads[a, b] for b in J for a in I]
     return [HitLayer(i.id, :surface, geom, pl, axis_id(ctx, i.ax), events(i), i.label)]
+end
+
+# The part of a `PolarAxis` that shows its plots, in image px: `[cx, cy, rin, rout]` for the
+# annulus around the polar origin `(cx, cy)`, plus `[phi0, span]` on a sector, the image-space
+# angle (counterclockwise, as on screen) of the sector's first edge and its signed width.
+# `PolarAxis` masks everything outside it (`clip = true`), so a surface drawn past the limits is
+# hidden there, while its quads still cover that area. `nothing` when nothing is masked.
+function _polar_clip(ctx, ax)
+    ax isa Makie.PolarAxis && ax.clip[] === true || return nothing
+    tf = _transform_func(ax.scene)
+    pt(θ, r) = ax.theta_as_x[] ? (θ, r) : (r, θ)
+    rmin, rmax = Float64.(ax.target_rlims[])
+    t1, t2 = Float64.(ax.target_thetalims[])
+    c = data_to_image_px(ctx, ax, pt(t1, Float64(tf.r0)))
+    radius(r) = (q = data_to_image_px(ctx, ax, pt(t1, r)); hypot(q[1] - c[1], q[2] - c[2]))
+    out = Float64[c[1], c[2], radius(rmin), radius(rmax)]
+    if abs(t2 - t1) < 2π - 1.0e-6
+        q = data_to_image_px(ctx, ax, pt(t1, rmax))
+        push!(out, atan(c[2] - q[2], q[1] - c[1]), tf.direction * (t2 - t1))
+    end
+    return out
 end
 
 """

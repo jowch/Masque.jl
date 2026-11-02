@@ -153,3 +153,42 @@ describe(":surface tooltip and restored selection", () => {
         expect(selectionForValue(m, { layer: "surface", index: 4 })).toBeNull()
     })
 })
+
+describe(":surface on a PolarAxis (clip)", () => {
+    // The flat 3×3 grid with the polar origin at (0, 20), the grid's bottom-left corner on
+    // screen (image y grows down). Shown region: radius 5 to 18, so points (0, 2) at d = 0,
+    // (2, 0) at d ≈ 28 and (2, 1) at d ≈ 22 are hidden; (1, 1) at d ≈ 14 is shown.
+    const annulus = (): SurfaceGeometry => flat(undefined, { clip: [0, 20, 5, 18] })
+
+    it("misses where the axis masks the surface", () => {
+        const L = layer(annulus())
+        expect(hitLayer(L, 1, 19)).toBeNull() // inside the inner radius
+        expect(hitLayer(L, 19, 1)).toBeNull() // past the outer radius
+        expect(hitLayer(L, 8, 9)?.index).toBe(4) // shown: point (1, 1)
+    })
+
+    it("answers the nearest corner the axis shows, not a hidden one", () => {
+        // (12, 8) is in quad 1, nearest corner (1, 0) at d ≈ 22 is hidden; (1, 1) is next.
+        const L = layer(annulus())
+        expect(hitLayer(layer(flat()), 12, 8)?.index).toBe(4)
+        expect(hitLayer(L, 12, 8)?.index).toBe(4)
+        expect(hitLayer(L, 11, 11)?.index).toBe(4)
+    })
+
+    it("highlights a shown point's whole cell, and never a hidden point", () => {
+        const g = annulus()
+        expect(dualCell(g, 4)).toEqual(dualCell(flat(), 4))
+        expect(dualCell(g, 2)).toEqual([])
+    })
+
+    it("keeps a sector's angular limits, either direction", () => {
+        // Sector from screen angle 0 (east) turning 90° counterclockwise: the upper-right quarter.
+        const ccw = layer(flat(undefined, { clip: [10, 10, 0, 20, 0, Math.PI / 2] }))
+        expect(hitLayer(ccw, 14, 6)).not.toBeNull()
+        expect(hitLayer(ccw, 6, 14)).toBeNull()
+        // The same quarter given from its north edge, turning clockwise.
+        const cw = layer(flat(undefined, { clip: [10, 10, 0, 20, Math.PI / 2, -Math.PI / 2] }))
+        expect(hitLayer(cw, 14, 6)).not.toBeNull()
+        expect(hitLayer(cw, 6, 6)).toBeNull()
+    })
+})

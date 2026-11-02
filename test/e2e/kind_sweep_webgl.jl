@@ -363,6 +363,26 @@ HTML(
         "<span id=\"coords_surface3d\" style=\"display:none\">$(JSON3.write(sweep.surface3d.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000186
+@bind ev_surface_polar sweep.surface_polar
+
+# ╔═╡ d1000000-0000-0000-0000-000000000187
+HTML(
+    "<span id=\"out_surface_polar\">SURFACE_POLAR=$(sweep_field("surface_polar", ev_surface_polar))</span>" *
+        "<span id=\"bond_surface_polar\" style=\"display:none\">$(repr(ev_surface_polar))</span>" *
+        "<span id=\"coords_surface_polar\" style=\"display:none\">$(JSON3.write(sweep.surface_polar.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000188
+@bind ev_surface_sector sweep.surface_sector
+
+# ╔═╡ d1000000-0000-0000-0000-000000000189
+HTML(
+    "<span id=\"out_surface_sector\">SURFACE_SECTOR=$(sweep_field("surface_sector", ev_surface_sector))</span>" *
+        "<span id=\"bond_surface_sector\" style=\"display:none\">$(repr(ev_surface_sector))</span>" *
+        "<span id=\"coords_surface_sector\" style=\"display:none\">$(JSON3.write(sweep.surface_sector.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000125
 @bind ev_text3d sweep.text3d
 
@@ -949,6 +969,10 @@ HTML(
 # ╠═d1000000-0000-0000-0000-00000000010a
 # ╠═d1000000-0000-0000-0000-000000000123
 # ╠═d1000000-0000-0000-0000-000000000124
+# ╠═d1000000-0000-0000-0000-000000000186
+# ╠═d1000000-0000-0000-0000-000000000187
+# ╠═d1000000-0000-0000-0000-000000000188
+# ╠═d1000000-0000-0000-0000-000000000189
 # ╠═d1000000-0000-0000-0000-000000000125
 # ╠═d1000000-0000-0000-0000-000000000126
 # ╠═d1000000-0000-0000-0000-00000000010b

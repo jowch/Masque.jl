@@ -17,11 +17,11 @@ radius under the pointer.
 | Interaction | `Axis` | `Axis3` | `PolarAxis` |
 |---|---|---|---|
 | Hover and click marks | every recipe | some recipes | some recipes |
-| Select several marks (`select = :many`, see [Select several marks](@ref)) | yes | yes ⁴ | yes |
+| Select several marks (`select = :many`, see [Select several marks](@ref)) | yes | yes ⁴ | yes ⁴ |
 | Drag a box to select marks (with `select = :many`) | yes ⁵ | yes ⁵ | yes |
 | Link selections across plots ([`linked`](@ref)) | yes | yes | yes |
 | Hover a line to read the nearest point you plotted | yes | no | yes |
-| Hover a surface to read its height | no ⁶ | yes | no |
+| Hover a surface to read its values | no ⁶ | yes | yes |
 | Read `(x, y)` ([`AxisInteractable`](@ref)) | yes ¹ | no | yes ³ |
 | Drag a threshold ([`ThresholdInteractable`](@ref)) | yes ¹ | no | no |
 | Draw a box you can move and resize ([`ROIInteractable`](@ref)) | yes ² | no | no |
@@ -86,7 +86,7 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | `arrows3d!` (`Arrows3D`) | `:arrows3d` | `:segments` | yes | — |
 | `arrows2d!` (`Arrows2D`) | `:arrows2d` | `:segments` | — | — |
 | `heatmap!` / `image!` | `:cells` | `:grid` | — | — |
-| `surface!` | `:surface` | `:surface` | only | — |
+| `surface!` | `:surface` | `:surface` | yes | yes |
 | `barplot!` | `:bars` | `:rects` | — | — |
 | `poly!` | `:poly` | `:polygons` | — | — |
 | `stairs!` | `:stairs` | `:lines` | — | — |
@@ -135,10 +135,12 @@ gives `:violin`, `:scatter`, and `:boxplot`, and `tricontourf!` gives
 shows how many points fell in it. A plot whose `space` is not
 `:data`, such as a `bracket!` label or a `scatter!` placed with
 `space = :relative`, is skipped with a warning that names its `space`.
-A `surface!` responds on an `Axis3` only: hovering it shows the
-data point under the pointer on the side you can see, and a
-`wireframe!` drawn over the same grid is left as decoration so the
-surface answers. A `surface!` on a 2D `Axis` is skipped with a
+A `surface!` responds on an `Axis3` and a `PolarAxis`: hovering it
+shows the data point nearest the pointer, on the side you can see, and
+a `wireframe!` drawn over the same grid on an `Axis3` is left as
+decoration so the surface answers. On a `PolarAxis`, a `surface!` is
+how Makie draws a polar heatmap, and the tooltip shows the point's
+angle (`x`, in radians) and radius (`y`). A `surface!` on a 2D `Axis` is skipped with a
 warning; to inspect a grid there, draw it with `heatmap!`. Where marks
 of one plot overlap, the one drawn on top answers. On a 2D `Axis` that
 is the one listed last. On an `Axis3`, the `meshscatter!` sphere

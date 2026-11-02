@@ -1108,9 +1108,11 @@ try {
   // A surface point (#259) is highlighted as its dual cell: a closed polygon through the midpoints
   // of its grid edges and the centres of its quads, so the polygon surrounds the point. The hover
   // and the selection use the closed-mark recipe; the tooltip sits over the point. On Cairo the
-  // point itself must be on the drawn surface.
-  {
-    const key = "surface3d";
+  // point itself must be on the drawn surface. The polar cases (#514) are the same layer kind
+  // on a PolarAxis, full circle and sector.
+  for (const [key, hov, sel, hovIJ] of [
+    ["surface3d", 12, 13, [3, 3]], ["surface_polar", 11, 22, [3, 2]], ["surface_sector", 9, 14, [2, 3]],
+  ]) {
     const m = await inspect(key);
     pin(m, key);
     const layer = (await layersOf(key)).find((l) => l.id === "surface");
@@ -1123,7 +1125,6 @@ try {
       const xs = v.filter((_, i) => i % 2 === 0), ys = v.filter((_, i) => i % 2 === 1);
       return Math.min(...xs) < x && x < Math.max(...xs) && Math.min(...ys) < y && y < Math.max(...ys);
     };
-    const hov = 12, sel = 13;
     let t = null;
     for (let a = 0; a < 8; a++) {
       t = await hoverAt(key, ...pt(hov));
@@ -1137,7 +1138,9 @@ try {
         throw new Error(`${key}: hover ${shape.layer} is not a cell around the point ${pt(hov)}: ${shape.tag} ${shape.points}`);
       }
     }
-    if (!/i\s*3\s*j\s*3/.test(t.text.replace(/\s+/g, " "))) throw new Error(`${key}: tooltip ${JSON.stringify(t.text)} is not point (3, 3)`);
+    if (!new RegExp(`i\\s*${hovIJ[0]}\\s*j\\s*${hovIJ[1]}\\b`).test(t.text.replace(/\s+/g, " "))) {
+      throw new Error(`${key}: tooltip ${JSON.stringify(t.text)} is not point (${hovIJ})`);
+    }
     passed.push(`${key}/highlight`);
 
     // Select point `sel` (kind_sweep may already have), check the wash, and leave it as found.
