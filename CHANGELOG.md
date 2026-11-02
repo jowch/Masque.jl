@@ -55,6 +55,8 @@ All notable changes to this project are documented here. The format is based on
 - While you pan, zoom or turn a view, its readout (the axis limits, or an `Axis3`'s angles
   while it turns) shows in the bottom-left corner of the figure instead of beside the pointer,
   and a point's tooltip doesn't show over it (#526).
+- The first click after Julia starts shows its value sooner. A cell that shows the `@bind`
+  value took about 0.2 s to print the first one, and now takes under 0.1 s (part of #567).
 
 ### Fixed
 - An inset axis with its own `ViewInteractable`, inside an axis that has one too, now pans
