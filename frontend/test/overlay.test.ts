@@ -7839,6 +7839,7 @@ describe("nested views", () => {
         for (let i = 0; i < 20; i++) await Promise.resolve()
         expect(a.host.dataset.masquePhoto).not.toBe("")
         drag(a.surface, 300, 200) // the inset, still under the parent's photograph
+        wheel(a.surface, 300, 200) // nor does a zoom start there
         for (let i = 0; i < 20; i++) await Promise.resolve()
         expect(new Set(a.ids())).toEqual(new Set(["vout"]))
         // Once the parent's picture is in, the inset pans from its own place.
