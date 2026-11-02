@@ -683,6 +683,23 @@ try {
   };
 
   const expectBase = backend === "webgl" ? "canvas" : "img";
+  // An off-screen WebGL plot hands its GPU context back and shows a snapshot img (the context
+  // pool in wgl-shim.ts), so whether a plot holds a canvas depends on where the last step
+  // scrolled. Each case brings its plot on screen and waits for its context, as a reader
+  // scrolling to it would, before the canvas check below.
+  const bringLive = async (key) => {
+    const live = await page.evaluate(async (k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center", inline: "nearest" });
+      for (let i = 0; i < 75; i++) {
+        if (host.querySelector("img, canvas")?.tagName === "CANVAS") return true;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      return false;
+    }, key);
+    if (!live) console.error(`${key}: no WebGL context 15 s after scrolling the plot on screen`);
+  };
 
   // Set below when the loop reaches "scatter" — the hover-on-selected-noop check after the loop
   // needs the INDEX actually clicked (not just spec.clickIndex), since the collision-avoidance
@@ -694,6 +711,7 @@ try {
     const wantDark = key === "scatter_dark"; // the only dark-figure case in kind_sweep_figures.jl
     const sh = await shadowOf(key);
     if (!sh?.ok) throw new Error(`${key}: overlay surface missing`);
+    if (backend === "webgl") await bringLive(key);
     // #99: installed once per widget, before anything below can draw a hover — the no-pulse
     // window (below) opens at the tooltip-establishing hover, not here, but the recorder has to
     // already be watching by then to catch that add.
