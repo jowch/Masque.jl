@@ -216,7 +216,7 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `draw` | each layer whose plot `masque` knows (#462) | 6–8 B (key 5 B + a small integer); `payload_envelope.jl` at `d31f6e1` moved only the 1 000-point scatter manifest, by 6 B, and the two `:many` scatters by 0.1 KB |
 | `groups`, `group` | once per `linked(...)` group, and a tag on each member layer (#346) | under 0.1 KB by position; with `key`, `rows` adds one small integer per mark (`payload_envelope.jl` §M) |
 | `xfmt`, `yfmt`, `zfmt` | each axis transform whose ticks have a format string, `AngularTicks` or `MultiplesTicks`, and both dimensions of a `PolarAxis` (#510) | ~15–60 B per formatted dimension; absent on an axis with automatic ticks |
-| `coords` | each layer whose payloads include coordinates Masque filled in (points, text, arrows) (#510) | 19 B for `["x","y"]` |
+| `coords` | each layer whose payloads include fields Masque filled in that are measured along an axis: points, text, arrows (#510), and a bar's, hist's, waterfall's, box's, crossbar's or span's values (#543) | a field → axis map: 27 B for `{"x":"x","y":"y"}`, ~45 B for a bar's `low`/`high`/`value` |
 | `regions` | each grid layer given `regions = R` (#359) | `[id, n, …]` runs over the row-major cells, one pair per region edge crossed along a row (`payload_envelope.jl` §L) |
 
 Re-running `payload_envelope.jl` and `stress.jl` for the tick-format tooltips (#510, 2026-11-02)
@@ -224,6 +224,10 @@ moved only the 1 000-point scatter manifest, by 19 B (its `coords` list), and th
 meshscatter by under 0.1 KB. No fixture sets a tick format, so no `xfmt` is sent. Every stress
 manifest and PNG size is unchanged at the precision above. Which fields Masque filled in is
 recorded when the payloads are merged, so finding `coords` costs a lookup, not a pass over them.
+
+Re-running `payload_envelope.jl` when `coords` became a field → axis map (#543, 2026-11-02, on
+`b85691f`) moved the 100-point scatter manifest from 4.0 to 4.1 KB and the violin by 1 B per
+element. It is per layer, not per element, so no other table row moved at the precision above.
 
 Re-running `payload_envelope.jl` for the composite bind value (#335, 2026-10-10) moved no
 manifest in the tables above by more than 0.1 KB; `fields` and `initial` replace the old

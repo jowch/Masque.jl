@@ -144,7 +144,6 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         # Colour values are read off a colorbar, not an axis: plain.
         @test coords(PolygonInteractable(ax, contourf!(ax, rand(5, 5)))) == Dict{String, String}()
     end
-    end
 
     @testset "tooltip_sigdigits is sent only when set" begin
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, [1.0], [1.0])
