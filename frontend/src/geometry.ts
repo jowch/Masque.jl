@@ -859,10 +859,12 @@ function yieldsToOtherAxis(manifest: Manifest, layer: HitLayer, x: number, y: nu
 }
 
 // Nested views (#559): an inset axis with its own view sits inside its parent's, so the
-// pointer over the inset is inside both. The smallest view rectangle that holds the point is
-// the one on top, and it takes the drag, the wheel and the corner buttons. Two the same size
-// (twin axes sharing a viewport) go to the first listed, as before. `ok` narrows which views
-// count, so a view that can't take the gesture leaves it to the next one out.
+// pointer over the inset is inside both. The smallest view rectangle that holds the point
+// takes the drag, the wheel and the corner buttons. The rule assumes nesting, where the
+// smaller view is the one drawn on top; of two views that only partly overlap, the smaller
+// wins whichever Makie drew last. Two the same size (twin axes sharing a viewport) go to the
+// first listed, as before. `ok` narrows which views count, so a view that can't take the
+// gesture leaves it to the next one out.
 export function innermostView(
     manifest: Manifest, x: number, y: number, event = "drag", ok: (l: HitLayer) => boolean = () => true,
 ): HitLayer | null {

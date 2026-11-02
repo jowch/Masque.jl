@@ -23,7 +23,7 @@ import { isLightBackground } from "./color"
 import { createFade } from "./fade"
 import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, oneHome, MOTION_MS, NOTE_MS } from "./state"
 import type { HiGroups, HiSet, OverlayCtx } from "./state"
-import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
+import type { Hit, HitLayer, Limits3, Manifest, ViewGeometry } from "./types"
 import { axisFrame, innermostView, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
 import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_HINT_MS, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
@@ -1313,11 +1313,20 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         let axis = ""
         let limits3: Limits3 | null = null // an Axis3 view's limits, on screen now
         let wheel: ViewGeometry["wheel"] = "modifier"
-        // The innermost view under the pointer zooms: an inset's own, not its parent's (#559).
-        const layer = innermostView(ctx.manifest_, layout.x, layout.y, "drag", (l) => {
+        // A new gesture zooms the innermost view under the pointer: an inset's own, not its
+        // parent's (#559). Later notches keep that view, as a drag does, so a zoom that drifts
+        // across the inset's edge doesn't hand the parent's photograph to the inset.
+        // `zoomable` lets the wheel over an inset that can't zoom fall through to its parent.
+        // A drag there still goes to the inset (yieldsToInnerView has no such filter); every
+        // view Julia ships today has its transform or limits, so the two never differ.
+        const zoomable = (l: HitLayer) => {
             const g = l.geometry as ViewGeometry
             return g.mode === "orbit" ? !!g.limits : !!ctx.manifest_.transforms[l.axis]
-        })
+        }
+        const live = state.wheelTimer_ !== null && state.wheelViewId_ !== null
+            ? ctx.manifest_.layers.find((l) => l.id === state.wheelViewId_ && l.kind === "view" && zoomable(l))
+            : undefined
+        const layer = live ?? innermostView(ctx.manifest_, layout.x, layout.y, "drag", zoomable)
         if (layer) {
             const g = layer.geometry as ViewGeometry
             id = layer.id
@@ -1343,6 +1352,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             showViewReadout(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
             if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
             const wheelId = id
+            state.wheelViewId_ = id
             state.wheelTimer_ = setTimeout(() => {
                 state.wheelTimer_ = null
                 hideViewReadout(ctx)
@@ -1362,6 +1372,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
         const wheelId = id
+        state.wheelViewId_ = id
         const wheelAxis = axis
         state.wheelTimer_ = setTimeout(() => {
             state.wheelTimer_ = null

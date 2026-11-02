@@ -7788,8 +7788,9 @@ describe("nested views", () => {
         img.getBoundingClientRect = () =>
             ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
-        const ids = () => requestFrame.mock.calls.map((c) => ((c as unknown[])[0] as { id: string }).id)
-        return { surface, ids }
+        const calls = () => requestFrame.mock.calls.map((c) => (c as unknown[])[0] as { id: string; settle?: boolean })
+        const ids = () => calls().map((c) => c.id)
+        return { surface, ids, calls }
     }
 
     it("a wheel over the inset zooms the inset, and outside it the parent", async () => {
@@ -7801,6 +7802,27 @@ describe("nested views", () => {
         wheel(b.surface, 100, 100)
         await Promise.resolve()
         expect(b.ids()[0]).toBe("vout")
+    })
+
+    it("a wheel gesture that drifts onto the inset keeps zooming the parent", async () => {
+        vi.useFakeTimers()
+        try {
+            const a = mounted()
+            wheel(a.surface, 100, 100)
+            wheel(a.surface, 100, 100)
+            wheel(a.surface, 300, 200) // over the inset, inside the idle window
+            await vi.advanceTimersByTimeAsync(2000)
+            expect(a.ids().length).toBeGreaterThan(0)
+            expect(new Set(a.ids())).toEqual(new Set(["vout"]))
+            const settles = a.calls().filter((i) => i.settle === true)
+            expect(settles).toHaveLength(1)
+            // Once that gesture has settled, a new one over the inset is the inset's.
+            wheel(a.surface, 300, 200)
+            await vi.advanceTimersByTimeAsync(2000)
+            expect(a.ids()[a.ids().length - 1]).toBe("vin")
+        } finally {
+            vi.useRealTimers()
+        }
     })
 
     it("a drag over the inset pans the inset, and outside it the parent", async () => {
