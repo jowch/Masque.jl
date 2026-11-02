@@ -977,8 +977,45 @@ try {
         await new Promise((r) => setTimeout(r, 200));
       }
 
+      // #541: a Safari trackpad pinch (gesturestart / gesturechange / gestureend with a
+      // cumulative `scale`). Chromium never fires these, so they are dispatched here; each step
+      // goes through the real frame round trip and the idle settle.
+      const pinch = (kk, x, y) => page.evaluate(([k2, px, py]) => {
+        const span = document.querySelector(`#coords_${k2}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const surface = sr.querySelector(".surface");
+        const prevented = [];
+        for (const [type, scale] of [["gesturestart", 1], ["gesturechange", 1.3], ["gesturechange", 1.6], ["gestureend", 1.6]]) {
+          const ev = new Event(type, { bubbles: true, cancelable: true });
+          Object.defineProperty(ev, "scale", { value: scale });
+          Object.defineProperty(ev, "clientX", { value: px });
+          Object.defineProperty(ev, "clientY", { value: py });
+          surface.dispatchEvent(ev);
+          prevented.push(ev.defaultPrevented);
+        }
+        const ro = sr.querySelector(".masque-readout");
+        return { prevented, photo: host.dataset.masquePhoto || "", readout: ro.classList.contains("show") ? ro.textContent : "" };
+      }, [kk, x, y]);
+      c = await centerOf(gAlways);
+      const pz = await pinch(key, c.x, c.y);
+      if (!pz.prevented.every(Boolean)) throw new Error(`${key}: a Safari pinch over a zooming view was left to the page: ${JSON.stringify(pz)}`);
+      const scaleOf = (ph) => Number(ph.split(",")[0]);
+      if (!(Math.abs(scaleOf(pz.photo) - 1.6) < 1e-6)) throw new Error(`${key}: a Safari pinch to 1.6 did not scale the view by 1.6: ${JSON.stringify(pz)}`);
+      if (!/x:\[/.test(pz.readout)) throw new Error(`${key}: no corner readout while a Safari pinch zoomed: ${JSON.stringify(pz)}`);
+      for (let i = 0; ; i++) {
+        const st = await state(key);
+        if (!st.photo && !st.readout) break;
+        if (i > 100) throw new Error(`${key}: the Safari pinch zoom never settled: ${JSON.stringify(st)}`);
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      passed.push(`${key}/safari-pinch-zooms`);
+
       // :none — Ctrl+wheel is not taken, and a real plain wheel scrolls the page with no hint.
       c = await centerOf(gNone);
+      const pn = await pinch(key, c.x, c.y);
+      if (pn.prevented.some(Boolean) || pn.photo) throw new Error(`${key}: a Safari pinch was taken by a wheel = :none view: ${JSON.stringify(pn)}`);
+      passed.push(`${key}/none-safari-pinch-left-to-page`);
       const ctrl = await page.evaluate(([kk, x, y]) => {
         const span = document.querySelector(`#coords_${kk}`);
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);

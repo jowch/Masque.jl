@@ -1388,6 +1388,15 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // cumulative `scale`, not as Ctrl+wheel. Over a view that takes the wheel (`:modifier` or
     // `:always`) each change zooms by the ratio to the last one, about the gesture's point,
     // and Safari does not zoom the page. `wheel = :none` leaves the pinch to Safari.
+    //
+    // iOS and iPadOS Safari fire the same events for a two-finger touch pinch. That one is a
+    // touch gesture, and #537 owns touch, so a gesture that starts with fingers on the plot is
+    // left alone. Touch events count the fingers: unlike pointers, the browser doesn't cancel
+    // them when it takes the gesture over.
+    let touchesDown = 0
+    const countTouches = (e: TouchEvent) => {
+        touchesDown = e.touches.length
+    }
     const pinchView = (e: Event) => {
         const g = e as SafariGestureEvent
         if (state.drag_) return null
@@ -1395,7 +1404,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         return hit && hit.wheel !== "none" ? hit : null
     }
     const onGestureStart = (e: Event) => {
-        if (!pinchView(e)) return
+        // A gesturestart always ends whatever pinch came before, even one whose gestureend
+        // never arrived.
+        pinchScale = null
+        if (touchesDown > 0 || !pinchView(e)) return
         e.preventDefault()
         pinchScale = 1
     }
@@ -1414,12 +1426,20 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         e.preventDefault()
         pinchScale = null // the wheel's idle timer settles the last change
     }
+    // A pinch whose gestureend was lost (the window lost focus mid-pinch) must not leave every
+    // later Ctrl+wheel swallowed.
+    const endPinch = () => {
+        pinchScale = null
+    }
 
     surface.addEventListener("pointerdown", down)
     surface.addEventListener("wheel", onWheel, { passive: false })
     surface.addEventListener("gesturestart", onGestureStart)
     surface.addEventListener("gesturechange", onGestureChange)
     surface.addEventListener("gestureend", onGestureEnd)
+    surface.addEventListener("pointerdown", endPinch)
+    window.addEventListener("blur", endPinch)
+    for (const t of ["touchstart", "touchend", "touchcancel"] as const) surface.addEventListener(t, countTouches, { passive: true })
     surface.addEventListener("pointermove", move)
     surface.addEventListener("pointerup", up)
     surface.addEventListener("pointercancel", cancel)
@@ -1449,6 +1469,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         surface.removeEventListener("gesturestart", onGestureStart)
         surface.removeEventListener("gesturechange", onGestureChange)
         surface.removeEventListener("gestureend", onGestureEnd)
+        surface.removeEventListener("pointerdown", endPinch)
+        window.removeEventListener("blur", endPinch)
+        for (const t of ["touchstart", "touchend", "touchcancel"] as const) surface.removeEventListener(t, countTouches)
         surface.removeEventListener("pointermove", move)
         surface.removeEventListener("pointerup", up)
         surface.removeEventListener("pointercancel", cancel)

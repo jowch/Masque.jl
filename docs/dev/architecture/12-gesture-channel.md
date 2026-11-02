@@ -187,12 +187,15 @@ the sent frame is actually visible — the image `load` on `:cairo`, the scene s
 leaving only the residual if the pointer has moved on. It is not a client camera, and it is not a
 substitute for the frame itself. A wheel has no pointer release, so the terminal request is one
 settle 150ms (`WHEEL_IDLE_MS`, `frontend/src/photo.ts`) after the last notch. A new notch resets
-that wait. Which wheels a view takes is its layer's `wheel` (#526): `modifier` (the default) takes only
-Ctrl/Cmd+wheel, which is also how Chrome and Firefox send a trackpad pinch (Safari sends
-`gesturestart`/`gesturechange`/`gestureend`, which zoom by the change in `scale` through the same
-path and idle settle, #541), and leaves a plain wheel to the page with a hint in the corner note; `always` takes every wheel; `none` takes none.
-A wheel the view doesn't take is never `preventDefault`ed. An orbit with no limits ignores the wheel. A request's matrix is relative to the frame on screen when it
-was built, and one round trip at a time means a request can land after an earlier frame has
+that wait. Which wheels a view takes is its layer's `wheel` (#526): `modifier` (the default) takes
+only Ctrl/Cmd+wheel, which is also how Chrome and Firefox send a trackpad pinch, and leaves a plain
+wheel to the page with a hint in the corner note; `always` takes every wheel; `none` takes none. A
+wheel the view doesn't take is never `preventDefault`ed. An orbit with no limits ignores the wheel.
+Safari sends a trackpad pinch as `gesturestart`/`gesturechange`/`gestureend` (#541); a view whose
+`wheel` isn't `none` zooms by each change in `scale` through the same path and idle settle. iOS
+Safari fires the same events for a two-finger touch pinch, so a gesture that starts with fingers on
+the plot is left to the touch handling (#537). A request's matrix is relative to the frame on screen
+when it was built, and one round trip at a time means a request can land after an earlier frame has
 already replaced that base (a wheel settle behind its own preview, a pan released mid-flight). The
 overlay re-expresses such a request through each frame that landed since it was built before
 taking the residual (#165). Only data pixels slide. The view layer's `clip` rect is the

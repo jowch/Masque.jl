@@ -5072,6 +5072,66 @@ describe("photographic pan / wheel zoom", () => {
         gesture(surface, "gestureend", 2)
     })
 
+    // iOS / iPadOS Safari fire gesture events for a two-finger touch pinch too. That is #537's.
+    const touches = (surface: HTMLElement, type: string, n: number) => {
+        const ev = new Event(type, { bubbles: true, cancelable: true })
+        Object.defineProperty(ev, "touches", { value: { length: n } })
+        surface.dispatchEvent(ev)
+    }
+    it("pan: a gesture that starts with fingers on the plot (an iOS touch pinch) is left alone", () => {
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+        mount(script, withWheel("pan", "modifier"), undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        touches(surface, "touchstart", 1)
+        touches(surface, "touchstart", 2)
+        for (const [type, scale] of [["gesturestart", 1], ["gesturechange", 1.5], ["gestureend", 1.5]] as const) {
+            expect(gesture(surface, type, scale).defaultPrevented).toBe(false)
+        }
+        expect(host.dataset.masquePhoto ?? "").toBe("")
+        expect(requestFrame).not.toHaveBeenCalled()
+        // Once the fingers lift, a trackpad pinch zooms again.
+        touches(surface, "touchend", 1)
+        touches(surface, "touchend", 0)
+        expect(gesture(surface, "gesturestart", 1).defaultPrevented).toBe(true)
+        gesture(surface, "gesturechange", 1.5)
+        expect(photoOf(host).s).toBeCloseTo(1.5)
+        gesture(surface, "gestureend", 1.5)
+    })
+
+    it("pan: a pinch off every view is left to Safari's page zoom", () => {
+        const { host, script } = setup()
+        const m = withWheel("pan", "modifier")
+        Object.assign(m.layers[0].geometry as unknown as Record<string, unknown>, { x: 0, y: 0, w: 600, h: 400 })
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        // Client (500, 300) is layout pixel (1000, 600), outside the view's top-left quarter.
+        for (const [type, scale] of [["gesturestart", 1], ["gesturechange", 1.5], ["gestureend", 1.5]] as const) {
+            expect(gesture(surface, type, scale, 500, 300).defaultPrevented).toBe(false)
+        }
+        expect(host.dataset.masquePhoto ?? "").toBe("")
+        expect(requestFrame).not.toHaveBeenCalled()
+    })
+
+    it("pan: a pinch whose gestureend never comes does not keep swallowing Ctrl+wheel", () => {
+        for (const end of ["blur", "pointerdown", "gesturestart"] as const) {
+            const { host, script } = setup()
+            mount(script, withWheel("pan", "modifier"), undefined, vi.fn(async () => ({ png: new Uint8Array([1]) })))
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            gesture(surface, "gesturestart", 1)
+            gesture(surface, "gesturechange", 0.5)
+            if (end === "blur") window.dispatchEvent(new Event("blur"))
+            // A pointerdown off every view, so it starts no pan.
+            else if (end === "pointerdown") surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 5000, clientY: 5000, bubbles: true }))
+            // A new pinch that starts off the view: not taken, but it ends the stale one.
+            else gesture(surface, "gesturestart", 1, 5000, 5000)
+            const before = photoOf(host).s
+            plainWheel(surface, { ctrlKey: true })
+            expect(photoOf(host).s).toBeGreaterThan(before)
+        }
+    })
+
     for (const mode of ["pan", "orbit"] as const) {
         it(`${mode}: with wheel = none a Safari pinch is left to the page`, async () => {
             const { host, script } = setup()
