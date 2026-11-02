@@ -1924,18 +1924,20 @@ end
 # `view_resized`'s figure and lower axis, for the cell that resizes it after display (#546).
 const VIEW_RESIZED = Ref{Any}(nothing)
 
-# Resize `view_resized`'s figure, after it is shown, and give the image px where the resized
-# figure draws the lower axis's points, at the widget's scale `k` (top-left origin, y down).
-function resize_view_resized!(k; to = (480, 420))
+# Resize `view_resized`'s figure, wider and taller, after it is shown. Gives the image px where
+# the resized figure draws the lower axis's points, at the widget's scale `k` (top-left origin,
+# y down), and the new width.
+function resize_view_resized!(k; to = (640, 420))
     fig, ax2 = VIEW_RESIZED[]
     resize!(fig, to...)
     Masque._finalize!(fig)   # lay the figure out at its new size, as a frame will
     H = to[2]
     o = ax2.scene.viewport[].origin
-    return map(zip(21:23, [1, 2.46, 4.17])) do (x, y)
+    marks = map(zip(21:23, [1, 2.46, 4.17])) do (x, y)
         p = Makie.project(ax2.scene, Makie.Point2f(x, y)) .+ o
         (k * p[1], k * (H - p[2]))
     end
+    return (; marks, width = to[1])   # the CSS width the widget may grow to (under max_width)
 end
 
 # The text a notebook prints for one sweep widget's `@bind` value `ev`: the field the case is

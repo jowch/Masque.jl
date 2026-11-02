@@ -776,8 +776,8 @@ HTML(
 let
     ev_view_resized
     sleep(1)
-    marks = resize_view_resized!(sweep.view_resized.manifest["scaling"])
-    HTML("<span id=\"resized_view_resized\" style=\"display:none\">$(JSON3.write(marks))</span>")
+    resized = resize_view_resized!(sweep.view_resized.manifest["scaling"])
+    HTML("<span id=\"resized_view_resized\" style=\"display:none\">$(JSON3.write(resized))</span>")
 end
 
 # ╔═╡ d1000000-0000-0000-0000-000000000038

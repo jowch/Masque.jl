@@ -2393,8 +2393,8 @@ try {
     if (spec.resizeAfterDisplay) {
       // #546: a later cell `resize!`d the figure after it was shown. The pan's frame draws it
       // at the new size, so the overlay must take that size too: its svgs' viewBox matches the
-      // picture, the host may grow to the new width, and a hover on each of the lower axis's
-      // points, where the resized figure draws them (`#resized_<key>`, image px), rings it.
+      // picture, the host may grow to the new width (`#resized_<key>`'s `width`), and a hover on each of the lower axis's
+      // points, where the resized figure draws them (its `marks`, image px), rings it.
       const p = hitPoint(layer, 0);
       const probe = () => page.evaluate((k) => {
         const span = document.querySelector(`#coords_${k}`);
@@ -2434,7 +2434,11 @@ try {
         throw new Error(`${key}: overlay kept its size after the resized frame: viewBox ${JSON.stringify(after.viewBoxes)} (was ${before.viewBoxes[0]}), picture ${pw}×${ph}`);
       }
       passed.push(`${key}/resized-viewbox`);
-      const marks = await page.evaluate((k) => JSON.parse(document.querySelector(`#resized_${k}`).textContent), key);
+      const { marks, width } = await page.evaluate((k) => JSON.parse(document.querySelector(`#resized_${k}`).textContent), key);
+      if (after.maxWidth !== `${width}px`) {
+        throw new Error(`${key}: the host's max-width is ${after.maxWidth} after the resized frame, want ${width}px`);
+      }
+      passed.push(`${key}/resized-max-width`);
       const rings = await page.evaluate(([k, marks]) => {
         const span = document.querySelector(`#coords_${k}`);
         const hosts = [...document.querySelectorAll(".ip-host")];
