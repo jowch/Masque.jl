@@ -243,6 +243,26 @@ HTML(
         "<span id=\"occluders_legend_hidden\" style=\"display:none\">$(JSON3.write(get(sweep.legend_hidden.manifest, "occluders", [])))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-00000000019a
+@bind ev_box_hidden sweep.box_hidden
+
+# ╔═╡ c1000000-0000-0000-0000-00000000019b
+HTML(
+    "<span id=\"out_box_hidden\">BOX_HIDDEN=$(sweep_field("box_hidden", ev_box_hidden))</span>" *
+        "<span id=\"coords_box_hidden\" style=\"display:none\">$(JSON3.write(sweep.box_hidden.manifest["layers"]))</span>" *
+        "<span id=\"occluders_box_hidden\" style=\"display:none\">$(JSON3.write(get(sweep.box_hidden.manifest, "occluders", [])))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-00000000019c
+@bind ev_box_axes sweep.box_axes
+
+# ╔═╡ c1000000-0000-0000-0000-00000000019d
+HTML(
+    "<span id=\"out_box_axes\">BOX_AXES=$(sweep_field("box_axes", ev_box_axes))</span>" *
+        "<span id=\"coords_box_axes\" style=\"display:none\">$(JSON3.write(sweep.box_axes.manifest["layers"]))</span>" *
+        "<span id=\"occluders_box_axes\" style=\"display:none\">$(JSON3.write(get(sweep.box_axes.manifest, "occluders", [])))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-0000000000e9
 @bind ev_hidden_plot sweep.hidden_plot
 
@@ -1089,6 +1109,10 @@ HTML(
 # ╟─c1000000-0000-0000-0000-0000000000e6
 # ╠═c1000000-0000-0000-0000-0000000000e7
 # ╟─c1000000-0000-0000-0000-0000000000e8
+# ╠═c1000000-0000-0000-0000-00000000019a
+# ╟─c1000000-0000-0000-0000-00000000019b
+# ╠═c1000000-0000-0000-0000-00000000019c
+# ╟─c1000000-0000-0000-0000-00000000019d
 # ╠═c1000000-0000-0000-0000-0000000000e9
 # ╟─c1000000-0000-0000-0000-0000000000ea
 # ╠═c1000000-0000-0000-0000-000000000182
