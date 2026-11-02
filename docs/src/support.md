@@ -117,9 +117,8 @@ Each `lines!` and `stairs!` plot is one element for its whole line, and
 `series!` has one element per series. Hovering a line shows the point
 you plotted nearest the pointer, and a click on a line named in `bind`
 picks that point. A `stairs!` on an `Axis3` responds as one whole line.
-Only
-the body of a `boxplot!` responds, not its whiskers or outliers, and an
-`annotation!` responds on its text. In a `contourf!` plot, hovering inside a hole of a filled
+Only the body of a `boxplot!` responds, not its whiskers or outliers,
+and an `annotation!` responds on its text. In a `contourf!` plot, hovering inside a hole of a filled
 level reaches nothing unless another level is drawn there. A `scatter!`
 sized in data units (`markerspace = :data`) responds over each marker's
 drawn shape: a square over its square, a circle over its circle. To

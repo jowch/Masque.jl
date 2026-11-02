@@ -198,7 +198,7 @@ kind_sweep_meta() = [
         # first point, and the click lands on the third.
         "key" => "lines3d", "layerId" => "lines", "layerKind" => "lines",
         "selected" => "point", "circle" => false, "selectedIndex" => 0, "selectedSample" => 0,
-        "clickIndex" => 0, "clickSample" => 2,
+        "clickIndex" => 0, "clickSample" => 2, "clickZ" => "3.0",
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
         "readout" => Dict("vertex" => 2, "text" => ["x2", "y4", "z3"]),
     ),

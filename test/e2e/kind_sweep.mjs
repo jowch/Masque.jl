@@ -3659,6 +3659,10 @@ try {
       if (clickSample !== null && !new RegExp(`\\bline = ${clickIdx + 1}\\b`).test(after)) {
         throw new Error(`${key}-click: expected the point on line ${clickIdx + 1}: ${after.slice(0, 220)}`);
       }
+      // An Axis3 line's point carries its z (#518).
+      if (spec.clickZ != null && !new RegExp(`\\bz = ${spec.clickZ}\\b`).test(after)) {
+        throw new Error(`${key}-click: expected z = ${spec.clickZ} in the bond: ${after.slice(0, 220)}`);
+      }
     }
     if (spec.layerId === "legend" && !/LegendEvent\(/.test(after)) {
       throw new Error(`${key}-click: expected LegendEvent: ${after.slice(0, 220)}`);
