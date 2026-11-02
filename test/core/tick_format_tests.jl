@@ -93,21 +93,29 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test !any(haskey(d0, k) for k in ("xfmt", "yfmt", "zfmt"))
     end
 
-    @testset "layers of Masque's own payloads are flagged" begin
+    @testset "the coordinate fields Masque fills in are listed" begin
         fig = Figure(); ax = Axis(fig[1, 1]; ytickformat = "{:.1f} mV")
         sc = scatter!(ax, [1.0, 2.0], [3.47, 4.1])
         tx = text!(ax, [1.0], [2.0]; text = ["a"])
         ar = arrows2d!(ax, [1.0], [1.0], [0.5], [0.5])
         _, _, ctx = ctx_for(fig)
-        flag(i) = get(build_manifest([i], ctx)["layers"][1], "coords", false)
-        @test flag(PointInteractable(ax, sc))
-        @test flag(TextInteractable(ax, tx))
-        @test flag(SegmentInteractable(ax, ar))
-        # A user's own payloads stay plain numbers, merged or not.
-        @test !flag(PointInteractable(ax, sc; payloads = [(; name = "a"), (; name = "b")]))
-        @test !flag(PointInteractable(ax, sc; payloads = [(; x = "left"), (; x = "right")]))
-        @test !flag(RectInteractable(ax, [(0.0, 0.0, 1.0, 1.0)]))           # (; index) only
-        @test !flag(SegmentInteractable(ax, lines!(ax, [1, 2], [1, 2])))  # its readout is browser-side
+        coords(i) = get(build_manifest([i], ctx)["layers"][1], "coords", String[])
+        @test coords(PointInteractable(ax, sc)) == ["x", "y"]
+        @test coords(TextInteractable(ax, tx)) == ["x", "y"]
+        @test coords(SegmentInteractable(ax, ar)) == ["x", "y"]       # u/v are offsets: plain
+        # Beside a user's own fields, the x/y Masque merged in still follow the axis.
+        @test coords(PointInteractable(ax, sc; payloads = [(; name = "a"), (; name = "b")])) == ["x", "y"]
+        @test coords(PointInteractable(ax, sc; payloads = [Dict("name" => "a"), Dict("name" => "b")])) == ["x", "y"]
+        # A field the user sets is theirs, in any element.
+        @test coords(PointInteractable(ax, sc; payloads = [(; x = "left"), (; name = "b")])) == ["y"]
+        @test coords(PointInteractable(ax, sc; payloads = [(; x = 1, y = 2), (; x = 3, y = 4)])) == String[]
+        @test coords(PointInteractable(ax, sc; payloads = ["a", "b"])) == String[]  # not key-value
+        @test coords(RectInteractable(ax, [(0.0, 0.0, 1.0, 1.0)])) == String[]        # (; index) only
+        @test coords(SegmentInteractable(ax, lines!(ax, [1, 2], [1, 2]))) == String[]  # its readout is browser-side
+        # The record is per vector: a copy of Masque's payloads is the user's own.
+        p = PointInteractable(ax, sc)
+        @test IP._coord_keys(p.payloads) == [:x, :y]
+        @test IP._coord_keys(copy(p.payloads)) == Symbol[]
     end
 
     @testset "tooltip_sigdigits is sent only when set" begin

@@ -10,7 +10,10 @@
             "events": [
                 "hover"
             ],
-            "coords": true,
+            "coords": [
+                "x",
+                "y"
+            ],
             "kind": "circles",
             "id": "pts",
             "geometry": [

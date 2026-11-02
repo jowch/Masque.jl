@@ -15,7 +15,11 @@
                 "click",
                 "hover"
             ],
-            "coords": true,
+            "coords": [
+                "x",
+                "y",
+                "z"
+            ],
             "kind": "circles",
             "id": "scatter",
             "geometry": [

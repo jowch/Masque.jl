@@ -283,7 +283,7 @@ export interface HitLayer {
     linewidth?: number // :segments/:polyline/:lines: the drawn line width, image px (absent → Makie's default, 1.5 logical px); fade.ts covers a line with it
     template?: TemplateSegment[] // masque"..." parsed once per layer; $() fields fill from payloads[]
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table
-    coords?: true                // payloads are Masque's defaults: x/y/z print in the axis's CoordFormat
+    coords?: string[]            // the payload fields Masque filled in ("x", "y", "z"): they print in the axis's CoordFormat
     brush?: "elements" | "grid" // a `selects` box's target: its field holds what the box holds
     many?: true // a `select = :many` field: it holds { items: [...] }, and a click toggles one in or out
     group?: string // the `linked(...)` group this layer is a member of: its clicks edit the group's field

@@ -61,7 +61,7 @@ const layerOf = (payloads: unknown[], extra: Partial<HitLayer> = {}) =>
 
 describe("coordinate fields in the default table", () => {
     it("formats Masque's default x/y and renames them θ/r on a PolarAxis", () => {
-        const L = layerOf([{ index: 1, x: Math.PI / 2, y: 2 }], { coords: true })
+        const L = layerOf([{ index: 1, x: Math.PI / 2, y: 2 }], { coords: ["x", "y"] })
         const c = coordFields(POLAR, L, L.payloads[0], [])
         const html = renderAutoTable(L.payloads[0], 4, c)
         expect(html).toContain(">θ<")
@@ -76,17 +76,21 @@ describe("coordinate fields in the default table", () => {
         expect(html).toContain(">x<")
         expect(html).toContain(">1.571<")
     })
+    it("formats the x/y Masque merged in beside a user's own fields", () => {
+        const L = layerOf([{ name: "a", x: Math.PI / 2, y: 2 }], { coords: ["x", "y"] })
+        expect(renderAutoTablePlain(L.payloads[0], 4, coordFields(POLAR, L, L.payloads[0], []))).toBe("name a, θ 90°, r 2")
+    })
     it("formats a line readout's x/y but not a payload field that shadows one", () => {
         const L = layerOf([{ index: 1, y: 9 }])
         const c = coordFields({ xfmt: MV, yfmt: MV } as unknown as AxisTransform, L, L.payloads[0], ["x", "y"])
         expect(Object.keys(c!)).toEqual(["x"])
     })
     it("gives nothing for an axis with no formats", () => {
-        expect(coordFields({} as AxisTransform, layerOf([{}], { coords: true }), {}, ["x"])).toBeUndefined()
-        expect(coordFields(undefined, layerOf([{}], { coords: true }), {}, ["x"])).toBeUndefined()
+        expect(coordFields({} as AxisTransform, layerOf([{}], { coords: ["x", "y"] }), {}, ["x"])).toBeUndefined()
+        expect(coordFields(undefined, layerOf([{}], { coords: ["x", "y"] }), {}, ["x"])).toBeUndefined()
     })
     it("reaches the hover tooltip and the keyboard announcement", () => {
-        const L = layerOf([{ index: 1, x: 0.5, y: 3.4721 }], { coords: true })
+        const L = layerOf([{ index: 1, x: 0.5, y: 3.4721 }], { coords: ["x", "y"] })
         const t = { xfmt: PCT, yfmt: MV } as unknown as AxisTransform
         const hit = { layer: L, index: 0 } as Hit
         const ctx = { manifest_: { layers: [L], transforms: { ax1: t } }, tipDigits_: 4, tipExplicit_: false } as unknown as OverlayCtx
@@ -97,7 +101,7 @@ describe("coordinate fields in the default table", () => {
         expect(plainTextForHit(hit, 6, t, true)).toBe("index 1, x 50%, y 3.4721 mV")
     })
     it("leaves a template's fields raw", () => {
-        const L = layerOf([{ index: 1, x: Math.PI / 2, y: 2 }], { coords: true, template: ["x=", { f: "x" }] } as Partial<HitLayer>)
+        const L = layerOf([{ index: 1, x: Math.PI / 2, y: 2 }], { coords: ["x", "y"], template: ["x=", { f: "x" }] } as Partial<HitLayer>)
         expect(plainTextForHit({ layer: L, index: 0 } as Hit, 4, POLAR)).toBe("x=1.571")
     })
 })

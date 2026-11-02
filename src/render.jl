@@ -172,16 +172,6 @@ function _payload_keys(payloads)
     return ks
 end
 
-# The field sets of Masque's own default payloads that carry a mark's coordinates: points,
-# text and arrows. A layer whose every payload has one of these sets is flagged `coords`, and its
-# default tooltip prints `x`, `y` and `z` in the axis's format (#510). A user's own `payloads =`
-# change the set (theirs merge in first), so their fields print as plain numbers, as they did.
-const _COORD_PAYLOAD_KEYS = (
-    (:index, :x, :y), (:index, :x, :y, :z), (:text, :index, :x, :y), (:text, :index, :x, :y, :z),
-    (:index, :x, :y, :u, :v), (:index, :x, :y, :z, :u, :v, :w),
-)
-_coord_payloads(pls) = !isempty(pls) && all(pl -> pl isa NamedTuple && keys(pl) in _COORD_PAYLOAD_KEYS, pls)
-
 function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     hs = hoverstyle(i)
     style = Dict{String, Any}("width" => hs.width)
@@ -192,7 +182,10 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         "events" => [string(e) for e in L.events],
         "style" => style,
     )
-    _coord_payloads(L.payloads) && (d["coords"] = true)
+    # The coordinate fields Masque filled in (`_merge_payloads`): the default tooltip prints
+    # them in the axis's format (#510).
+    ck = _coord_keys(L.payloads)
+    isempty(ck) || (d["coords"] = String[string(k) for k in ck])
     if L.kind in (:segments, :polyline, :lines, :rects, :polygons)
         t = hit_tol(i)
         t === nothing || (d["tol"] = round(Int, t * ctx.scaling))

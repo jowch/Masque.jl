@@ -85,11 +85,12 @@ with `ytickformat = "{:.1f} mV"`, `y` shows `3.5 mV`, rounded as the
 format says. The same goes for `MultiplesTicks(4, π, "π")`, which shows
 `1.5π`, and for the readouts of an [`AxisInteractable`](@ref), a
 [`ColorbarInteractable`](@ref), a dragged threshold, an ROI box and a
-view's limits. This covers the `x`, `y` and `z` Masque fills in itself:
-a point's, a text label's and an arrow's position, a line's nearest
-sample, and a surface point. Fields of your own `payloads` and `$(x)` in
-a template stay plain numbers. To print one in the axis's unit, give it
-a spec in a template, such as `$(y:.1f) mV`.
+view's limits. This covers the `x`, `y` and `z` Masque fills in itself,
+next to your own `payloads` fields too: a point's, a text label's and an
+arrow's position, a line's nearest sample, and a surface point. A field
+you set yourself, even one named `x`, and `$(x)` in a template stay plain
+numbers. To print one in the axis's unit, give it a spec in a template,
+such as `$(y:.1f) mV`.
 
 Set `tooltip_sigdigits` and it wins over the format's own precision:
 with `tooltip_sigdigits = 6`, the `"{:.1f} mV"` axis shows `3.4721 mV`.

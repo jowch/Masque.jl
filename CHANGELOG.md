@@ -11,8 +11,9 @@ All notable changes to this project are documented here. The format is based on
   `PolarAxis` a point reads `θ 90°` and `r 2` instead of `x 1.571` and `y 2`. An axis with
   `ytickformat = "{:.1f} mV"` shows `3.5 mV`, and `MultiplesTicks(4, π, "π")` shows `1.5π`.
   This reaches the `AxisInteractable`, `ColorbarInteractable`, threshold, ROI, view and
-  slice readouts and the keyboard announcement too. Templates and your own `payloads` fields
-  are unchanged, and so is the `@bind` value. A set `tooltip_sigdigits` wins over the
+  slice readouts and the keyboard announcement too, and to the `x` and `y` Masque adds beside
+  your own `payloads` fields. Templates and the fields you set yourself are unchanged, and so
+  is the `@bind` value. A set `tooltip_sigdigits` wins over the
   format's precision. See "Axis units" on the Tooltips page (#510).
 
 ## [0.4.4] - 2026-11-01

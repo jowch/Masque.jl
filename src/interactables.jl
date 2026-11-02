@@ -315,7 +315,12 @@ end
 function expand_payloads(payloads, n, who)
     npl = length(payloads)
     npl == n || throw(ArgumentError("$who: payloads has $npl entries, expected $n"))
-    return collect(Any, payloads)
+    out = collect(Any, payloads)
+    # A copy of payloads Masque merged (an arrow's, passed on to SegmentInteractable) keeps the
+    # record of which coordinates Masque filled in.
+    ks = _coord_keys(payloads)
+    isempty(ks) || _note_coord_keys!(out, ks)
+    return out
 end
 _check_payloads(payloads, n, what) = expand_payloads(payloads, n, what)
 
@@ -323,10 +328,62 @@ _check_payloads(payloads, n, what) = expand_payloads(payloads, n, what)
 # scatter point gives `(; name, x, y)`, and the user's fields win a clash. `index` (and a
 # segment's `segment_index`) is left out, since the event carries it as `ev.index`. A payload
 # that isn't key-value (a bare string) replaces the default, as there is nothing to merge.
+#
+# The `x`, `y` and `z` Masque fills in are the mark's coordinates, so its default tooltip prints
+# them in the axis's format (#510). `_merge_payloads` records which of them it filled in for
+# every element, keyed by the returned vector, and `_coord_keys` reads that back when the
+# manifest is built. A field the user's own payload sets, and every field of a payload that
+# isn't key-value, stays theirs: a plain number.
 function _merge_payloads(defaults, payloads, who)
-    payloads === nothing && return defaults
+    defaults = convert(Vector{Any}, defaults)
+    if payloads === nothing
+        _note_coord_keys!(defaults, _default_coord_keys(defaults))
+        return defaults
+    end
     pl = expand_payloads(payloads, length(defaults), who)
-    return Any[_merge_payload(d, p) for (d, p) in zip(defaults, pl)]
+    out = Any[_merge_payload(d, p) for (d, p) in zip(defaults, pl)]
+    ks = _default_coord_keys(defaults)
+    for p in pl
+        isempty(ks) && break
+        if p isa NamedTuple
+            ks = filter(k -> !haskey(p, k), ks)
+        elseif p isa AbstractDict && keytype(p) in (Symbol, String)
+            ks = filter(k -> !haskey(p, keytype(p) === Symbol ? k : string(k)), ks)
+        else
+            ks = Symbol[]
+        end
+    end
+    _note_coord_keys!(out, ks)
+    return out
+end
+
+# The coordinate fields every default payload has.
+function _default_coord_keys(defaults)
+    isempty(defaults) && return Symbol[]
+    return Symbol[k for k in (:x, :y, :z) if all(d -> d isa NamedTuple && haskey(d, k), defaults)]
+end
+
+# A weak identity table: payload vector => the coordinate fields Masque filled in. Keyed by
+# `objectid` and checked with `===` through a `WeakRef`, so it neither keeps a vector alive nor
+# answers for a different vector that reuses the id. Dead entries are dropped as new ones come.
+const _COORD_KEYS = Dict{UInt, Tuple{WeakRef, Vector{Symbol}}}()
+const _COORD_KEYS_LOCK = ReentrantLock()
+function _note_coord_keys!(v::Vector{Any}, ks::Vector{Symbol})
+    return lock(_COORD_KEYS_LOCK) do
+        length(_COORD_KEYS) > 64 && filter!(kv -> kv[2][1].value !== nothing, _COORD_KEYS)
+        if isempty(ks)
+            delete!(_COORD_KEYS, objectid(v))
+        else
+            _COORD_KEYS[objectid(v)] = (WeakRef(v), ks)
+        end
+        nothing
+    end
+end
+function _coord_keys(v)
+    return lock(_COORD_KEYS_LOCK) do
+        e = get(_COORD_KEYS, objectid(v), nothing)
+        (e === nothing || e[1].value !== v) ? Symbol[] : e[2]
+    end
 end
 _default_fields(d::NamedTuple) = Base.structdiff(d, NamedTuple{(:index, :segment_index)})
 _merge_payload(d, p) = p

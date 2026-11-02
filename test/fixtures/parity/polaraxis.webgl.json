@@ -2,7 +2,10 @@
     "height": 900,
     "layers": [
         {
-            "coords": true,
+            "coords": [
+                "x",
+                "y"
+            ],
             "kind": "circles",
             "id": "scatter",
             "geometry": [

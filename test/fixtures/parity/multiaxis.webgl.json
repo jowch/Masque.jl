@@ -2,7 +2,10 @@
     "height": 800,
     "layers": [
         {
-            "coords": true,
+            "coords": [
+                "x",
+                "y"
+            ],
             "kind": "circles",
             "id": "left",
             "geometry": [
@@ -36,7 +39,10 @@
             ]
         },
         {
-            "coords": true,
+            "coords": [
+                "x",
+                "y"
+            ],
             "kind": "circles",
             "id": "right",
             "geometry": [

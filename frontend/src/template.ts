@@ -52,10 +52,11 @@ export function fmtCoord(v: unknown, f: CoordFormat | undefined, digits: number,
     return (f.prefix ?? "") + body + (f.suffix ?? "")
 }
 
-// Which of a hit's fields are coordinates, each with its axis's format. Masque's own default
-// payloads (`layer.coords`) give `x`, `y` and `z`; a line's readout, `x` and `y` unless the
-// payload has its own; a surface point, the `x`, `y` and `z` its payload doesn't override. A
-// user's own payload fields stay plain numbers. Only fields whose axis has a format are listed.
+// Which of a hit's fields are coordinates, each with its axis's format: the payload fields
+// Masque filled in (`layer.coords`, even beside a user's own fields); a line's readout, `x` and
+// `y` unless the payload has its own; a surface point, the `x`, `y` and `z` its payload doesn't
+// override. A field the user set stays a plain number. Only fields whose axis has a format are
+// listed.
 export type CoordFields = Record<string, CoordFormat>
 export function coordFields(t: AxisTransform | undefined, layer: HitLayer, payload: unknown, computed: readonly string[]): CoordFields | undefined {
     if (!t || !(t.xfmt || t.yfmt || t.zfmt)) return undefined
@@ -63,7 +64,7 @@ export function coordFields(t: AxisTransform | undefined, layer: HitLayer, paylo
     const out: CoordFields = {}
     for (const k of ["x", "y", "z"] as const) {
         const f = t[`${k}fmt`]
-        if (f && (layer.coords || (computed.includes(k) && !(k in own)))) out[k] = f
+        if (f && (layer.coords?.includes(k) || (computed.includes(k) && !(k in own)))) out[k] = f
     }
     return out
 }
