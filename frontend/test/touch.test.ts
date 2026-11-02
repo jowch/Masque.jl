@@ -132,6 +132,48 @@ describe("touch hold", () => {
         expect(touchmove(surface)).toBe(false)
     })
 
+    it("a move that left the slop before the hold, delivered late, is still a scroll", () => {
+        // A busy page can run the hold timer before it delivers a move the finger made earlier.
+        vi.useFakeTimers()
+        const { surface } = setup()
+        const down = ev("pointerdown", 300, 200, "touch")
+        Object.defineProperty(down, "timeStamp", { value: 1000 })
+        surface.dispatchEvent(down)
+        vi.advanceTimersByTime(HOLD_MS)
+        const move = ev("pointermove", 300, 240, "touch")
+        Object.defineProperty(move, "timeStamp", { value: 1100 })
+        surface.dispatchEvent(move)
+        expect(touchmove(surface)).toBe(false)
+    })
+
+    it("a late touchmove that left the slop early is not cancelled either", () => {
+        vi.useFakeTimers()
+        const { surface } = setup()
+        const down = ev("pointerdown", 300, 200, "touch")
+        Object.defineProperty(down, "timeStamp", { value: 1000 })
+        surface.dispatchEvent(down)
+        vi.advanceTimersByTime(HOLD_MS)
+        const e = new Event("touchmove", { bubbles: true, cancelable: true })
+        Object.defineProperty(e, "timeStamp", { value: 1100 })
+        Object.defineProperty(e, "changedTouches", { value: [{ clientX: 300, clientY: 240 }] })
+        surface.dispatchEvent(e)
+        expect(e.defaultPrevented).toBe(false)
+    })
+
+    it("a move after a real hold scrubs even when the hold timer is overdue", () => {
+        // A busy page runs queued input before an overdue timer.
+        vi.useFakeTimers()
+        const { surface, tip } = setup()
+        const down = ev("pointerdown", 300, 200, "touch")
+        Object.defineProperty(down, "timeStamp", { value: 1000 })
+        surface.dispatchEvent(down)
+        const move = ev("pointermove", 305, 200, "touch")
+        Object.defineProperty(move, "timeStamp", { value: 1000 + HOLD_MS + 150 })
+        surface.dispatchEvent(move)
+        expect(tip.classList.contains("show")).toBe(true)
+        expect(touchmove(surface)).toBe(true)
+    })
+
     it("the long-press menu is ours during a hold", () => {
         vi.useFakeTimers()
         const { surface } = setup()

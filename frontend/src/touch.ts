@@ -13,6 +13,36 @@ const HOLD_SLOP_PX = 10
 
 const isTouch = (e: PointerEvent) => e.pointerType === "touch"
 
+// A move that left the slop before HOLD_MS had passed, by the input's own timestamps, is a
+// scroll even when a busy page ran the hold timer before it could deliver that move.
+function movedEarly(t: TouchState, x: number, y: number, ts: number): boolean {
+    const s = t.start_
+    return !!s && ts - s.t < HOLD_MS && Math.hypot(x - s.x, y - s.y) > HOLD_SLOP_PX
+}
+
+// The hold, now: the finger stayed inside the slop for HOLD_MS.
+function startScrub(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): void {
+    const t = state.touch_
+    cancelHold(t)
+    if (state.drag_) return
+    t.scrub_ = true
+    applyMove(ctx, state, e)
+}
+
+// A busy page runs input before an overdue timer, so the first move after a real hold can
+// arrive while the hold is still pending. The move's own samples say which came first: one
+// that left the slop before HOLD_MS is a scroll, one at HOLD_MS or later means the hold was due.
+function holdDue(t: TouchState, e: PointerEvent): boolean {
+    const s = t.start_
+    if (!t.hold_ || !s) return false
+    const samples = e.getCoalescedEvents?.() ?? []
+    for (const p of samples.length ? samples : [e]) {
+        if (p.timeStamp - s.t >= HOLD_MS) return true
+        if (Math.hypot(p.clientX - s.x, p.clientY - s.y) > HOLD_SLOP_PX) return false
+    }
+    return false
+}
+
 function cancelHold(t: TouchState): void {
     if (t.hold_) clearTimeout(t.hold_.timer)
     t.hold_ = null
@@ -26,26 +56,24 @@ export function touchDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent)
     t.pin_ = null
     t.scrub_ = false
     t.last_ = e
+    t.start_ = { x: e.clientX, y: e.clientY, t: e.timeStamp }
     cancelHold(t)
     // A drag layer (threshold, ROI, view) took the press: it already owns the finger.
     if (state.drag_) return
     const id = e.pointerId
     t.hold_ = {
         id, x: e.clientX, y: e.clientY,
-        timer: setTimeout(() => {
-            t.hold_ = null
-            if (state.drag_) return
-            t.scrub_ = true
-            applyMove(ctx, state, t.last_ ?? e)
-        }, HOLD_MS),
+        timer: setTimeout(() => startScrub(ctx, state, t.last_ ?? e), HOLD_MS),
     }
 }
 
-export function touchMove(state: OverlayState, e: PointerEvent): void {
+export function touchMove(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): void {
     const t = state.touch_
     // A mouse or pen moving over the plot owns hover again.
     if (!isTouch(e)) { t.pin_ = null; return }
     t.last_ = e
+    if (holdDue(t, e)) { startScrub(ctx, state, e); return }
+    if (t.scrub_ && movedEarly(t, e.clientX, e.clientY, e.timeStamp)) t.scrub_ = false
     const h = t.hold_
     if (h && h.id === e.pointerId && Math.hypot(e.clientX - h.x, e.clientY - h.y) > HOLD_SLOP_PX) cancelHold(t)
 }
@@ -90,7 +118,11 @@ export function unpinOnScroll(ctx: OverlayCtx, state: OverlayState): boolean {
 // Non-passive touchmove on the surface: once the hold has fired, the finger scrubs and the
 // page stays put for the rest of that touch.
 export function onTouchMove(state: OverlayState, e: TouchEvent): void {
-    if (state.touch_.scrub_ && e.cancelable) e.preventDefault()
+    const t = state.touch_
+    if (!t.scrub_) return
+    const p = e.changedTouches?.[0] ?? e.touches?.[0]
+    if (p && movedEarly(t, p.clientX, p.clientY, e.timeStamp)) { t.scrub_ = false; return }
+    if (e.cancelable) e.preventDefault()
 }
 
 // A held finger opens the long-press menu on Android; the hold is ours.

@@ -1253,7 +1253,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(overlayTick)
 
     const down = (e: PointerEvent) => { onDown(ctx, state, e); touchDown(ctx, state, e) }
-    const move = (e: PointerEvent) => { lastMove = e; touchMove(state, e); onPointerMove(ctx, state, e) }
+    const move = (e: PointerEvent) => { lastMove = e; touchMove(ctx, state, e); onPointerMove(ctx, state, e) }
     const releaseChrome = (kind: string | undefined) => {
         if ((kind === "roi" || kind === "threshold" || kind === "span") && !state.drag_) flushPendingChrome()
     }

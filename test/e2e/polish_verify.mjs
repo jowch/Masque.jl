@@ -1366,7 +1366,10 @@ try {
   {
     const cdp = await context.newCDPSession(page);
     await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
-    const touch = (type, pts) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts.map(([x, y]) => ({ x, y, id: 1 })) });
+    // `at` (ms since epoch) stamps the event with the time the finger did it. Without it CDP
+    // stamps dispatch time, and the overlay's non-passive touchmove listener makes each dispatch
+    // wait on the page: on a busy WebGL page a quick swipe then reads as a finger held still.
+    const touch = (type, pts, at) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts.map(([x, y]) => ({ x, y, id: 1 })), ...(at ? { timestamp: at / 1000 } : {}) });
     const tapAt = async (x, y) => { await touch("touchStart", [[x, y]]); await touch("touchEnd", []); await new Promise((r) => setTimeout(r, 250)); };
     // Client px of image px (ix, iy), or of a fraction of the figure when frac is set.
     const clientOf = (key, ix, iy, frac = false) => page.evaluate(([k, ix, iy, frac]) => {
@@ -1389,6 +1392,9 @@ try {
       const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
       host.scrollIntoView({ block: "center", behavior: "instant" });
     }, key);
+    // A busy WebGL page can take several frames to apply a scroll or run its scroll event,
+    // so poll rather than read once.
+    const until = async (f, ms = 3000) => { const end = Date.now() + ms; let v; while (!(v = await f()) && Date.now() < end) await new Promise((r) => setTimeout(r, 100)); return v; };
     await page.mouse.move(1, 1);
     await center("scatter");
     await new Promise((r) => setTimeout(r, 300));
@@ -1409,8 +1415,7 @@ try {
     await tapAt(p.x, p.y);
     if (!(await tipOf("scatter")).show) throw new Error("touch/scroll: no tooltip to start from");
     await page.evaluate(() => window.scrollBy(0, 120));
-    await new Promise((r) => setTimeout(r, 200));
-    if ((await tipOf("scatter")).show) throw new Error("touch/scroll: tooltip survived a scroll that moved the plot");
+    if (!(await until(async () => !(await tipOf("scatter")).show))) throw new Error("touch/scroll: tooltip survived a scroll that moved the plot");
     passed.push("touch/scroll-clears");
 
     await center("axis");
@@ -1420,11 +1425,48 @@ try {
     const r0 = await tipOf("axis");
     if (!r0.show || !r0.text) throw new Error(`touch/readout-tap: ${JSON.stringify(r0)}`);
     passed.push("touch/readout-tap");
+    // Control first: a plain swipe on the plot scrolls the page, so the hold check below tests
+    // the hold.
+    const hitAt = (x, y) => page.evaluate(([x, y]) => {
+      let el = document.elementFromPoint(x, y), out = [];
+      while (el?.shadowRoot) { const inner = el.shadowRoot.elementFromPoint(x, y); if (!inner || inner === el) break; el = inner; }
+      for (let n = el; n && out.length < 4; n = n.parentNode instanceof ShadowRoot ? n.parentNode.host : n.parentElement) out.push(`${n.tagName}.${n.className?.baseVal ?? n.className}`);
+      return out.join(" < ");
+    }, [x, y]);
+    const under = await hitAt(a0.x, a0.y);
+    const swipe = async () => {
+      const y0 = await page.evaluate(() => window.scrollY);
+      const t0 = Date.now();
+      await touch("touchStart", [[a0.x, a0.y]], t0);
+      for (let i = 1; i <= 8; i++) await touch("touchMove", [[a0.x, a0.y - 120 * i / 8]], t0 + 16 * i);
+      await touch("touchEnd", [], t0 + 16 * 9);
+      let y1 = y0;
+      await until(async () => Math.abs((y1 = await page.evaluate(() => window.scrollY)) - y0) >= 20);
+      // Put the plot back where the hold check expects it.
+      await page.evaluate((d) => window.scrollBy(0, d), y0 - y1);
+      await new Promise((r) => setTimeout(r, 200));
+      return y1 - y0;
+    };
+    const moved = await swipe();
+    if (Math.abs(moved) < 20) {
+      // Diagnose: is it the plot, or does the page not scroll for a finger anywhere?
+      await page.evaluate(() => { window.__tmPrev = []; window.addEventListener("touchmove", (e) => window.__tmPrev.push([e.defaultPrevented, e.cancelable, e.composedPath()[0]?.className ?? e.target?.tagName]), { passive: true }); });
+      const m0 = await page.evaluate(() => window.scrollY);
+      await touch("touchStart", [[5, a0.y]]);
+      for (let i = 1; i <= 8; i++) { await touch("touchMove", [[5, a0.y - 120 * i / 8]]); await new Promise((r) => setTimeout(r, 16)); }
+      await touch("touchEnd", []);
+      await new Promise((r) => setTimeout(r, 400));
+      const m1 = await page.evaluate(() => window.scrollY);
+      const prev = await page.evaluate(() => JSON.stringify(window.__tmPrev.slice(0, 3)));
+      throw new Error(`touch/swipe-scrolls: a plain swipe moved the page ${moved}px, so the hold check proves nothing (under the finger: ${under}; a swipe in the page margin moved it ${m1 - m0}px; touchmove ${prev})`);
+    }
+    passed.push("touch/swipe-scrolls");
     const y0 = await page.evaluate(() => window.scrollY);
-    await touch("touchStart", [[a0.x, a0.y]]);
+    const t0 = Date.now();
+    await touch("touchStart", [[a0.x, a0.y]], t0);
     await new Promise((r) => setTimeout(r, 500));
     for (let i = 1; i <= 8; i++) {
-      await touch("touchMove", [[a0.x + (a1.x - a0.x) * i / 8, a0.y + 30 * i / 8]]);
+      await touch("touchMove", [[a0.x + (a1.x - a0.x) * i / 8, a0.y + 30 * i / 8]], t0 + 500 + 30 * i);
       await new Promise((r) => setTimeout(r, 30));
     }
     const mid = await tipOf("axis");
@@ -1436,18 +1478,6 @@ try {
     if (Math.abs(y1 - y0) > 1) throw new Error(`touch/hold-scrub: page scrolled ${y1 - y0}px during the scrub`);
     if (!end.show) throw new Error("touch/hold-scrub: readout gone after lift");
     passed.push("touch/hold-scrub");
-    // Control: the same swipe without the hold scrolls the page, so the check above tests the hold.
-    const c0 = await page.evaluate(() => window.scrollY);
-    await touch("touchStart", [[a0.x, a0.y]]);
-    for (let i = 1; i <= 8; i++) {
-      await touch("touchMove", [[a0.x, a0.y - 120 * i / 8]]);
-      await new Promise((r) => setTimeout(r, 16));
-    }
-    await touch("touchEnd", []);
-    await new Promise((r) => setTimeout(r, 400));
-    const c1 = await page.evaluate(() => window.scrollY);
-    if (Math.abs(c1 - c0) < 20) throw new Error(`touch/swipe-scrolls: a plain swipe moved the page ${c1 - c0}px, so the hold check proves nothing`);
-    passed.push("touch/swipe-scrolls");
     await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
     await cdp.detach();
   }

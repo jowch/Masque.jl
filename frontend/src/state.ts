@@ -230,12 +230,14 @@ export interface TouchState {
     // plot away from it takes the tooltip down.
     pin_: { left: number; top: number } | null
     hold_: { id: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null
+    // Where and when (event timeStamp) the current touch went down.
+    start_: { x: number; y: number; t: number } | null
     scrub_: boolean
     last_: PointerEvent | null
 }
 
 export function createTouchState(): TouchState {
-    return { pin_: null, hold_: null, scrub_: false, last_: null }
+    return { pin_: null, hold_: null, start_: null, scrub_: false, last_: null }
 }
 
 export interface OverlayState {
