@@ -69,7 +69,7 @@ describe("touch hit test", () => {
         expect(hitTestAt(p, 120, 5, ID, "click", null, 1, FINGER)?.index).toBe(0)
     })
 
-    it("keeps shapes inside-only, and a near point over a shape wins", () => {
+    it("keeps shapes inside-only, and an exact hit beats a near one", () => {
         const bars: HitLayer = {
             id: "bars", kind: "rects", axis: "ax", events: ["click"], payloads: [{}], geometry: [300, 300, 40, 100], tol: 6,
         }
@@ -78,9 +78,13 @@ describe("touch hit test", () => {
         expect(hitTestAt(m, 324, 300, ID, "click")?.layer.id).toBe("bars")
         expect(hitTestAt(m, 324, 300, ID, "click", null, 1, FINGER)).toBeNull()
         expect(hitTestAt(m, 310, 300, ID, "click", null, 1, FINGER)?.layer.id).toBe("bars")
-        // A marker drawn over the bar (listed first) within reach takes a tap inside the bar.
+        // Inside the bar is an exact hit: it beats a marker drawn over the bar that is only
+        // within reach, and loses to one the finger is on.
         const over = manifest([circles("pts", [300, 260, 4]), bars])
-        expect(hitTestAt(over, 300, 280, ID, "click", null, 1, FINGER)?.layer.id).toBe("pts")
+        expect(hitTestAt(over, 300, 280, ID, "click", null, 1, FINGER)?.layer.id).toBe("bars")
+        expect(hitTestAt(over, 300, 262, ID, "click", null, 1, FINGER)?.layer.id).toBe("pts")
+        // Above the bar, the marker's reach takes the tap.
+        expect(hitTestAt(over, 300, 240, ID, "click", null, 1, FINGER)?.layer.id).toBe("pts")
         // A marker drawn under it (listed after) doesn't: the bar hides it.
         const under = manifest([bars, circles("pts", [300, 260, 4])])
         expect(hitTestAt(under, 300, 280, ID, "click", null, 1, FINGER)?.layer.id).toBe("bars")

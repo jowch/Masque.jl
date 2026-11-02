@@ -1097,7 +1097,7 @@ function touchAreaHit(layer: HitLayer, px: number, py: number, t?: AxisTransform
 // within the finger's reach instead of the first one whose slack covers the point, so a far
 // mark drawn on top can't take a tap from a nearer one (#528). The layers still go top first:
 // a shape the finger is inside (a bar, a cell, a legend entry) takes the tap unless a point or
-// a line drawn over it is within reach. A mouse and a pen keep the tight rule.
+// a line drawn over it is under the finger too. A mouse and a pen keep the tight rule.
 export function hitTestAt(
     manifest: Manifest, x: number, y: number, photo: PhotoMatrix, event: string, viewId: string | null = null, slop = 1,
     touch: TouchReach | null = null,
@@ -1128,7 +1128,9 @@ export function hitTestAt(
             continue
         }
         const h = touchAreaHit(layer, p.x, p.y, t, slop)
-        if (h) return near ?? { layer, ...h }
+        // An exact hit wins by the top-drawn rule: a point drawn over the shape takes the tap
+        // only when the finger is on it (§3.2 step 1).
+        if (h) return near && nearD === 0 ? near : { layer, ...h }
     }
     return near
 }
