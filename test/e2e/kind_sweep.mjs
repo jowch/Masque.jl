@@ -488,7 +488,9 @@ try {
       return { x: b.left + ix * s, y: b.top + iy * s, top: se.scrollTop, room: se.scrollHeight - se.clientHeight - se.scrollTop, photo: host.dataset.masquePhoto || "" };
     }, [key, g.x + g.w / 2, g.y + g.h / 2]);
     await page.mouse.move(at.x, at.y);
-    const dy = at.room > 300 ? 200 : -200;
+    // A short scroll, so the pointer stays over the plot: once the plot slides out from under
+    // it, the pointer has left and the hint goes with the rest of the tooltip.
+    const dy = at.room > 300 ? 40 : -40;
     await page.mouse.wheel(0, dy);
     await new Promise((r) => setTimeout(r, 150));
     const after = await page.evaluate(([k]) => {
@@ -500,7 +502,7 @@ try {
     }, [key]);
     if (Math.sign(after.top - at.top) !== Math.sign(dy)) throw new Error(`${key}-wheel: a plain wheel over the ${what} view did not scroll the page (${at.top} -> ${after.top})`);
     if (after.photo !== at.photo) throw new Error(`${key}-wheel: a plain wheel zoomed the ${what} view (${JSON.stringify(after.photo)})`);
-    if (!after.shown || !/^(Ctrl|Cmd) \+ scroll to zoom$/.test(after.tip)) throw new Error(`${key}-wheel: no zoom hint after a plain wheel: ${JSON.stringify(after)}`);
+    if (!after.shown || !/^(Ctrl|Cmd) \+ scroll to zoom$/.test(after.tip)) throw new Error(`${key}-wheel: no zoom hint after a plain wheel: ${JSON.stringify({ at, after })}`);
     await page.mouse.move(1, 1);
     await dispatchAt(key, 1, 1, "pointermove");
     // Let the hint lapse so later checks start from a hidden tooltip.

@@ -4980,6 +4980,27 @@ describe("photographic pan / wheel zoom", () => {
         })
     }
 
+    it("a pointer move over empty plot keeps the wheel hint up until its timer", async () => {
+        vi.useFakeTimers()
+        try {
+            const { host, script } = setup()
+            mount(script, withWheel("pan", "modifier"), undefined, vi.fn(async () => ({})))
+            const shadow = shadowOf(host)
+            const surface = shadow.querySelector(".surface") as HTMLElement
+            const tip = shadow.querySelector(".masque-tip") as HTMLElement
+            plainWheel(surface)
+            // The page scrolled under the pointer; the browser sends a move that hits nothing.
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 310, clientY: 210, bubbles: true }))
+            await vi.advanceTimersByTimeAsync(50)
+            expect(tip.classList.contains("show")).toBe(true)
+            expect(tip.textContent).toMatch(/scroll to zoom/)
+            await vi.advanceTimersByTimeAsync(2000)
+            expect(tip.classList.contains("show")).toBe(false)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it("the wheel hint hides only itself: a hover readout that replaced it stays", async () => {
         vi.useFakeTimers()
         try {

@@ -500,7 +500,9 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     } else if (!restoreFocus(ctx, state)) {
         clearHover(ctx, state, true)
         clearLegendLink(ctx, state, true)
-        hideTip(ctx, state)
+        // A page scroll under a still pointer sends a move; a miss there must not take down the
+        // "Ctrl + scroll to zoom" hint that scroll just showed (#526). Its own timer hides it.
+        if (state.wheelHintTimer_ === null) hideTip(ctx, state)
     }
 }
 
