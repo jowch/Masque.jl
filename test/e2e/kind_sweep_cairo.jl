@@ -573,6 +573,39 @@ HTML(
         "<span id=\"axes_threshold_cat\" style=\"display:none\">$(JSON3.write(sweep.threshold_cat.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000190
+@bind ev_threshold_colorbar sweep.threshold_colorbar
+
+# ╔═╡ c1000000-0000-0000-0000-000000000191
+HTML(
+    "<span id=\"out_threshold_colorbar\">THRESHOLD_COLORBAR=$(sweep_field("threshold_colorbar", ev_threshold_colorbar))</span>" *
+        "<span id=\"bond_threshold_colorbar\" style=\"display:none\">$(repr(ev_threshold_colorbar))</span>" *
+        "<span id=\"coords_threshold_colorbar\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar.manifest["layers"]))</span>" *
+        "<span id=\"axes_threshold_colorbar\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar.manifest["transforms"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000192
+@bind ev_threshold_colorbar_h sweep.threshold_colorbar_h
+
+# ╔═╡ c1000000-0000-0000-0000-000000000193
+HTML(
+    "<span id=\"out_threshold_colorbar_h\">THRESHOLD_COLORBAR_H=$(sweep_field("threshold_colorbar_h", ev_threshold_colorbar_h))</span>" *
+        "<span id=\"bond_threshold_colorbar_h\" style=\"display:none\">$(repr(ev_threshold_colorbar_h))</span>" *
+        "<span id=\"coords_threshold_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar_h.manifest["layers"]))</span>" *
+        "<span id=\"axes_threshold_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar_h.manifest["transforms"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000194
+@bind ev_onchange_colorbar sweep.onchange_colorbar
+
+# ╔═╡ c1000000-0000-0000-0000-000000000195
+HTML(
+    "<span id=\"out_onchange_colorbar\">ONCHANGE_COLORBAR=$(sweep_field("onchange_colorbar", ev_onchange_colorbar))</span>" *
+        "<span id=\"bond_onchange_colorbar\" style=\"display:none\">$(repr(ev_onchange_colorbar))</span>" *
+        "<span id=\"coords_onchange_colorbar\" style=\"display:none\">$(JSON3.write(sweep.onchange_colorbar.manifest["layers"]))</span>" *
+        "<span id=\"axes_onchange_colorbar\" style=\"display:none\">$(JSON3.write(sweep.onchange_colorbar.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000119
 @bind ev_colorbar_owner sweep.colorbar_owner
 
@@ -1010,6 +1043,10 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000031
 # ╠═c1000000-0000-0000-0000-000000000062
 # ╠═c1000000-0000-0000-0000-000000000063
+# ╠═c1000000-0000-0000-0000-000000000190
+# ╟─c1000000-0000-0000-0000-000000000191
+# ╠═c1000000-0000-0000-0000-000000000192
+# ╟─c1000000-0000-0000-0000-000000000193
 # ╠═c1000000-0000-0000-0000-000000000119
 # ╟─c1000000-0000-0000-0000-000000000120
 # ╠═c1000000-0000-0000-0000-000000000121
@@ -1044,6 +1081,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000044
 # ╠═c1000000-0000-0000-0000-000000000127
 # ╠═c1000000-0000-0000-0000-000000000128
+# ╠═c1000000-0000-0000-0000-000000000194
+# ╟─c1000000-0000-0000-0000-000000000195
 # ╠═c1000000-0000-0000-0000-000000000160
 # ╠═c1000000-0000-0000-0000-000000000161
 # ╠═c1000000-0000-0000-0000-000000000170

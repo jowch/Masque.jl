@@ -107,6 +107,7 @@ function _tooltip_text(d)
     # Fields the default table adds (frontend/src/hover.ts): a line's nearest sample (its `i`
     # only in a template), a grid cell's value, and its position when it has no payload.
     haskey(d, "points") && union!(ks, (:x, :y))
+    haskey(d, "zpoints") && push!(ks, :z)
     if d["kind"] == "grid"
         push!(ks, :value)
         all(isnothing, payloads) && union!(ks, (:i, :j))

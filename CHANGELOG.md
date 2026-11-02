@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `ThresholdInteractable` takes a `Colorbar`: drag a line across the bar to set a cutoff on the
+  colorbar's scale, `identity`, `log10` or `log`. The line follows the bar, horizontal on a
+  vertical colorbar and vertical on a horizontal one, and hovering or clicking the rest of the
+  bar still reads its value (#499).
+- Hovering a line on an `Axis3` shows `x`, `y` and `z` of the point you plotted nearest the
+  pointer, as a line on a 2D `Axis` does, and a tooltip template can name `z`. This covers
+  `lines!`, `scatterlines!`'s line, `contour3d!` and a 3D `streamplot!`. A click still picks
+  the whole line (#502).
 - A `surface!` on a `PolarAxis`, which is how Makie draws a polar heatmap, responds to hover
   and click like a surface on an `Axis3`: the tooltip shows the point nearest the pointer, and
   a click gives a `GridCellEvent` with its `(i, j)`. Before, `masque` skipped it with a
