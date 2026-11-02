@@ -371,6 +371,10 @@ export interface Manifest {
     width: number
     height: number
     scaling: number
+    // The CSS width the figure is drawn for (`min(scene width, max_width)`). Hit slack is image
+    // px at this width; shown narrower, geometry.ts's slopScale grows it to keep its on-screen
+    // size (#527). Absent: slack stays in image px.
+    cssWidth?: number
     layers: HitLayer[]
     transforms: Record<string, AxisTransform>
     tipStyle?: Record<string, string> // figure-level --masque-tip-* custom properties

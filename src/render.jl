@@ -578,6 +578,9 @@ function build_manifest(
     permute!(layer_owners, perm)
     m = Dict{String, Any}(
         "width" => ctx.width, "height" => ctx.height, "scaling" => ctx.scaling,
+        # The CSS width the figure is drawn for: hit slack keeps its on-screen size when the
+        # figure is shown narrower (frontend `slopScale`, #527).
+        "cssWidth" => round(Int, ctx.width * ctx.display_scale),
         "layers" => layers,
         "transforms" => Dict(string(id) => _transform_dict(t) for (id, t) in ctx.transforms),
     )

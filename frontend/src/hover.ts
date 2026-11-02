@@ -1,4 +1,4 @@
-import { anchorFor, axisPoint, computeAnchoredPlacement, hitTestAt, layerPoint, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layerFrame } from "./geometry"
+import { anchorFor, axisPoint, computeAnchoredPlacement, hitTestAt, layerPoint, resolvePayload, invertAxis, sampleSlice, slopScale, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layerFrame } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
 import { renderTemplate, renderAutoTable, esc, fmtNum, fmtCoord, coordFields, readoutKeys, withReadout } from "./template"
 import { drawHover, clearHover, drawLegendLink, drawPartners, clearLegendLink, markColorFor } from "./highlight"
@@ -437,7 +437,8 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     // reached with drag === null, but keep the guard as defense-in-depth.
     if (state.drag_) return
     const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
-    const dragHit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_)
+    const slop = slopScale(ctx.manifest_, ctx.base_.getBoundingClientRect().width)
+    const dragHit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_, slop)
     // A full-viewport :view hit must not suppress element hover, nor the inside of a band,
     // which is where the reader looks at the marks it holds. A threshold, a band's edge, or an
     // ROI drag-hover still does, and it takes the resize cursor — the cross stays off.
@@ -449,7 +450,7 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
         return
     }
     setDragHoverChrome(ctx, state, null)
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_, slop)
     // The axis frame does not slide, so the viewport and the hair are layout pixels.
     // The sample is the point on the slice axis's pixels under the cursor, so the value
     // follows its slid series.

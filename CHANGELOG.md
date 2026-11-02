@@ -52,6 +52,10 @@ All notable changes to this project are documented here. The format is based on
   and a point's tooltip doesn't show over it (#526).
 
 ### Fixed
+- A figure shown narrower than it was drawn for, as in the docs on a phone or in a narrow
+  Pluto window, keeps its hover and click targets the same size on screen. Before, every
+  target shrank with the picture: on a phone a scatter dot's target was about half its size
+  in Pluto, and a threshold line was hard to grab. Pluto at full width is unchanged (#527).
 - A figure you `resize!` after it is shown keeps its highlights on the marks. The next pan,
   zoom or `onchange` redraw shows the new size, and the hover ring and selection now follow
   it, where they used to land up to a few hundred pixels below the mark (#546).
