@@ -1110,8 +1110,11 @@ try {
   // and the selection use the closed-mark recipe; the tooltip sits over the point. On Cairo the
   // point itself must be on the drawn surface. The polar cases (#514) are the same layer kind
   // on a PolarAxis, full circle and sector.
-  for (const [key, hov, sel, hovIJ] of [
-    ["surface3d", 12, 13, [3, 3]], ["surface_polar", 11, 22, [3, 2]], ["surface_sector", 9, 14, [2, 3]],
+  // The sector's data runs past its limits: points `hidden` lie where the axis masks the
+  // surface (θ = 5π/6, and r = 0.5 inside the inner radius), so hovering there shows nothing.
+  for (const [key, hov, sel, hovIJ, hidden] of [
+    ["surface3d", 12, 13, [3, 3], []], ["surface_polar", 11, 22, [3, 2], []],
+    ["surface_sector", 22, 30, [2, 4], [26, 1]],
   ]) {
     const m = await inspect(key);
     pin(m, key);
@@ -1142,6 +1145,14 @@ try {
       throw new Error(`${key}: tooltip ${JSON.stringify(t.text)} is not point (${hovIJ})`);
     }
     passed.push(`${key}/highlight`);
+    for (const k of hidden) {
+      // Off the figure first, and let the last tooltip and ring finish leaving.
+      await hoverAt(key, 2, 2); await page.waitForTimeout(600);
+      const h = await hoverAt(key, ...pt(k));
+      const ring = [h.hi.fill, h.hi.edge, h.hi.plain].some((c) => c && !/masque-leave/.test(c.className ?? ""));
+      if (h.show || ring) throw new Error(`${key}: masked point ${k} answers hover: ${JSON.stringify(h.text)}`);
+    }
+    if (hidden.length) passed.push(`${key}/masked-silent`);
 
     // Select point `sel` (kind_sweep may already have), check the wash, and leave it as found.
     const clickAt = (x, y) => page.evaluate(([k, ix, iy]) => {

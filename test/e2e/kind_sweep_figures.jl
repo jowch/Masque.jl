@@ -247,10 +247,11 @@ kind_sweep_meta() = [
     Dict(
         # A polar surface on a sector axis turned and mirrored (`thetalimits`, `direction = -1`,
         # `theta_0`) with an inner radius (`rlimits`), so every polar field moves the points.
-        # 4 × 5 θ × r grid: 9 is Julia's (2, 3), 14 is (3, 4).
+        # The data runs past the limits, where the axis hides it (polish_verify checks that part
+        # stays silent). 7 × 7 θ × r grid: 22 is Julia's (2, 4), θ = π/6, r = 2; 30 is (3, 5).
         "key" => "surface_sector", "layerId" => "surface", "layerKind" => "surface",
-        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 14,
-        "tip" => "i3j4", "hoverIndex" => 9, "hoverTip" => "i2j3", "mode" => "element",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 30,
+        "tip" => "i3j5", "hoverIndex" => 22, "hoverTip" => "i2j4", "mode" => "element",
     ),
     Dict(
         # `text!` on Axis3 (#292): "front" sits between "back" and the camera, so their boxes
@@ -1119,8 +1120,8 @@ function build_kind_sweep()
             fig[1, 1]; title = "surface_sector", thetalimits = (0, π / 2), direction = -1,
             theta_0 = π / 4, rlimits = (1, 3),
         )
-        th = range(0, π / 2; length = 4)
-        rs = [1.0, 1.5, 2.0, 2.5, 3.0]
+        th = range(0, π; length = 7)
+        rs = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5]
         surface!(ax, th, rs, [t + r for t in th, r in rs]; shading = NoShading)
         masque(fig)
     end
