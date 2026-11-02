@@ -304,6 +304,9 @@ export interface HitLayer {
     events: string[] // "click" | "hover" | "drag" | "change" (a control)
     style?: LayerStyle
     tol?: number // hit-test slack, image px: :segments/:polyline/:lines (absent → geometry.ts's SEG_TOL fallback); :rects/:polygons reach past the shape's edge (absent → none)
+    // :circles/:segments/:polyline/:lines: how far a finger reaches to this layer's marks, CSS px
+    // (`touch_radius`). Absent → the manifest's `touch` radius.
+    touch?: number
     linewidth?: number // :segments/:polyline/:lines: the drawn line width, image px (absent → Makie's default, 1.5 logical px); fade.ts covers a line with it
     template?: TemplateSegment[] // masque"..." parsed once per layer; $() fields fill from payloads[]
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table
@@ -380,6 +383,9 @@ export interface Manifest {
     tipStyle?: Record<string, string> // figure-level --masque-tip-* custom properties
     overlayStyle?: Record<string, string> // figure-level overlay chrome custom properties (overlaystyle)
     tipDigits?: number // tooltip_sigdigits; absent means the frontend default (4)
+    // `masque(...; touch)`: a finger picks the nearest mark within `radius` CSS px (geometry.ts's
+    // touch rule); `false` gives a finger the mouse's rule. Absent → radius TOUCH_RADIUS.
+    touch?: { radius: number } | false
     background?: string // the figure's background colour (CSS string) — drives the tooltip's light/dark theme
     // Image-px boxes [x, y, w, h] Makie draws over the axes' plots (an opaque legend or `Box`). A data
     // mark's highlight and fade leave them out, as the picture hides the marks under them (#437),

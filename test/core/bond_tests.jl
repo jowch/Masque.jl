@@ -625,7 +625,9 @@ Masque.interactables(ax, p::SeedHeatParts) = (
                 LegendInteractable(leg), RegionInteractable(ax, [(:rect, (1.0, 1.0), 1.0, 1.0)]),
             )
             T = typeof(i)
-            old = T((getfield(i, f) for f in fieldnames(T)[1:(end - 1)])...)
+            # The fields before `select`; a later one (a point's `touch_radius`) has a default too.
+            n = findfirst(==(:select), fieldnames(T))
+            old = T((getfield(i, f) for f in fieldnames(T)[1:(n - 1)])...)
             @test Masque.select_mode(old) === :one
         end
         # A heatmap's cells hold a mask (a GridSelection, tested below).
