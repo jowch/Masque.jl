@@ -953,6 +953,26 @@ try {
       await expectLevel(spec.controlStart, "mount");
       passed.push(`${key}/start-values`);
 
+      // Each control commit runs the cell reading the bond once (#458: a native `input` event
+      // escaping the shadow root sent the bond a second time). `once` waits for Pluto to go
+      // idle, then long enough for a late second run, and counts the runs since `r`.
+      const runs = async () => Number(await textOf(`#count_${key}`));
+      const settle = async () => {
+        for (let i = 0; i < 600; i++) {
+          if (!(await page.evaluate(() => document.querySelectorAll("pluto-cell.running, pluto-cell.queued").length))) break;
+          await new Promise((res) => setTimeout(res, 100));
+        }
+        await new Promise((res) => setTimeout(res, 2500));
+        return runs();
+      };
+      const once = async (what, before) => {
+        const n = await settle();
+        if (n !== before + 1) throw new Error(`${key}/one-run-${what}: the cell reading the bond ran ${n - before} times, want 1`);
+        passed.push(`${key}/one-run-${what}`);
+        return n;
+      };
+      let r = await settle();
+
       // Keyboard: two steps right on the focused slider.
       await ctl("level").focus();
       await page.keyboard.press("ArrowRight");
@@ -960,6 +980,8 @@ try {
       v = await bondReaches(/level = 5,/, v, "keyboard");
       await expectLevel(5, "keyboard");
       passed.push(`${key}/slider-keyboard`);
+      // Two key presses, two commits; Pluto may run them as one, so only count from here.
+      r = await settle();
 
       // Pointer: drag the knob to the right end. The line follows while the knob moves.
       const sb = await ctl("level").boundingBox();
@@ -970,6 +992,7 @@ try {
       await page.mouse.up();
       v = await bondHas(/level = 10,/, v, "drag");
       await expectLevel(10, "drag");
+      r = await once("slider-drag", r);
       passed.push(`${key}/slider-drag`);
 
       // The toggle hides the line, and its knob slides to Makie's off end (#427).
@@ -998,6 +1021,7 @@ try {
       }
       await ctl("show").click();
       v = await bondHas(/show = false,/, v, "toggle");
+      r = await once("toggle", r);
       await expectLevel(null, "toggle");
       await knobAt(geo("show").knobOff, "toggle-knob-off");
       passed.push(`${key}/toggle`);
@@ -1006,6 +1030,7 @@ try {
       await ctl("span", "input >> nth=1").focus();
       await page.keyboard.press("ArrowRight");
       v = await bondHas(/span = \(2, 5\),/, v, "interval");
+      r = await once("interval-key", r);
       // Pointer: drag the low knob (index 1 of 0..4) to the bar's start. The high input sits
       // over the whole box, so this proves each knob takes its own drag.
       const ib = await ctl("span", "input >> nth=0").boundingBox();
@@ -1016,6 +1041,7 @@ try {
       await page.mouse.move(ib.x + 1, iy, { steps: 6 });
       await page.mouse.up();
       v = await bondHas(/span = \(1, 5\),/, v, "interval-low-drag");
+      r = await once("interval-drag", r);
       passed.push(`${key}/interval-low-knob-drag`);
       // The checkbox swaps the menu's options in `onchange`: the menu follows, with nothing chosen.
       await ctl("fine").click();
@@ -1028,6 +1054,9 @@ try {
       const opts = await page.locator(`[data-masque-control="pick"] [role=option]`).allTextContents();
       if (opts.join(",") !== "x,y,z") throw new Error(`${key}/menu-follows: options ${JSON.stringify(opts)}, want x,y,z`);
       passed.push(`${key}/menu-follows-onchange`);
+      // Not counted: `onchange` swaps the menu's options, and the menu then commits its own
+      // cleared pick, so this click runs the cell twice. The plain checkbox below is counted.
+      r = await settle();
       // The menu drawn as Makie draws it (#429): a press opens its list of cells under the box,
       // each `cell` high, in Makie's odd and hover colours.
       {
@@ -1057,12 +1086,14 @@ try {
         await page.keyboard.press("ArrowDown");
         await page.keyboard.press("Enter");
         v = await bondHas(/level = 10, show = false, span = \(1, 5\), fine = true, pick = "z"/, v, "menu");
+        r = await once("menu-pick", r);
         if (await list.isVisible()) throw new Error(`${key}/menu-search: list still open after Enter`);
         passed.push(`${key}/menu-search`);
         // A click on an option picks it.
         await ctl("pick", "input").click();
         await cells.nth(1).click();
         v = await bondHas(/pick = "y"/, v, "menu-click");
+        r = await once("menu-click", r);
         if ((await ctl("pick", "input").inputValue()) !== "y") throw new Error(`${key}/menu-click: box shows ${await ctl("pick", "input").inputValue()}, want y`);
       }
       passed.push(`${key}/interval-checkbox-menu`);
@@ -1106,6 +1137,7 @@ try {
         });
         if (ringed.length !== 1 || ringed[0] !== "grid-0") throw new Error(`${key}/grid: focus ring on ${JSON.stringify(ringed)}, want only grid-0`);
         v = await bondHas(/grid = \(3,\)/, v, "grid");
+        r = await once("grid-key", r);
         if ((await lab.textContent()) !== "3 dB") throw new Error(`${key}/grid: value label ${await lab.textContent()}, want 3 dB`);
         passed.push(`${key}/slider-grid`);
       }
@@ -1115,8 +1147,10 @@ try {
         if ((await b.textContent()) !== "Go") throw new Error(`${key}/button: label ${await b.textContent()}, want Go`);
         await b.click();
         v = await bondHas(/go = 1\b/, v, "button");
+        r = await once("button", r);
         await b.click();
         v = await bondHas(/go = 2\b/, v, "button");
+        r = await once("button-again", r);
         passed.push(`${key}/button`);
       }
       // The text box checks the text as the reader types and stores it on Enter.
@@ -1132,10 +1166,12 @@ try {
         await page.keyboard.press("Enter");
         await page.waitForTimeout(1500);
         if (!/word = nothing/.test(await textOf(`#bond_${key}`))) throw new Error(`${key}/textbox: invalid text was stored`);
+        r = await settle();
         await page.keyboard.press("Backspace");
         await page.keyboard.type("c");
         await page.keyboard.press("Enter");
         v = await bondHas(/word = "abc"/, v, "textbox");
+        r = await once("textbox", r);
         passed.push(`${key}/textbox`);
       }
       // A checkbox drawn as Makie draws it (#428): its square is `size` across in the middle of
@@ -1156,11 +1192,13 @@ try {
         if (await markShown()) throw new Error(`${key}/checkbox-drawn: mark shows before the box is ticked`);
         await ctl("sure").click();
         v = await bondHas(/sure = true/, v, "checkbox-drawn");
+        r = await once("checkbox", r);
         if ((await rect.getAttribute("fill")) !== g.color) throw new Error(`${key}/checkbox-drawn: fill ${await rect.getAttribute("fill")}, want ${g.color}`);
         await page.mouse.move(0, 0);
         if (!(await markShown())) throw new Error(`${key}/checkbox-drawn: mark hidden on a ticked box`);
         await page.keyboard.press("Space");
         v = await bondHas(/sure = false/, v, "checkbox-space");
+        r = await once("checkbox-space", r);
         passed.push(`${key}/checkbox-drawn`);
       }
       console.error(`OK  ${key} — ${v.slice(0, 120)}`);

@@ -736,6 +736,12 @@ HTML(
         "<span id=\"axes_onchange\" style=\"display:none\">$(JSON3.write(sweep.onchange.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000186
+# How many times the cell reading the controls' bond has run: a control commit must run it
+# once (#458). It has no inputs, so Pluto never runs it again. The count shows in a span named
+# `count_controls`: Pluto already gives the page an element with the variable's own name.
+runs_controls = Ref(0)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000170
 @bind ev_controls sweep.controls
 
@@ -745,7 +751,8 @@ HTML(
         "<span id=\"bond_controls\" style=\"display:none\">$(repr(ev_controls))</span>" *
         "<span id=\"coords_controls\" style=\"display:none\">$(JSON3.write(sweep.controls.manifest["layers"]))</span>" *
         "<span id=\"axes_controls\" style=\"display:none\">$(JSON3.write(sweep.controls.manifest["transforms"]))</span>" *
-        "<span id=\"ran_controls\" style=\"display:none\">$(time_ns())</span>",
+        "<span id=\"ran_controls\" style=\"display:none\">$(time_ns())</span>" *
+        "<span id=\"count_controls\" style=\"display:none\">$(runs_controls[] += 1)</span>",
 )
 
 # ╔═╡ c1000000-0000-0000-0000-000000000129
@@ -1022,6 +1029,7 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000128
 # ╠═c1000000-0000-0000-0000-000000000160
 # ╠═c1000000-0000-0000-0000-000000000161
+# ╠═c1000000-0000-0000-0000-000000000186
 # ╠═c1000000-0000-0000-0000-000000000170
 # ╠═c1000000-0000-0000-0000-000000000171
 # ╠═c1000000-0000-0000-0000-000000000129
