@@ -493,6 +493,8 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
   `:circle` at the theme `markersize` (radius ≈0.3525×`markersize`; the theme default
   markersize is 9). Pass a number or vector to override. A matched marker with no readable bbox
   (a `Char`, an image, a per-element vector of markers) keeps the `markersize / 2` bound.
+  When the figure is shown narrower than it was drawn for (the docs on a phone, a narrow Pluto
+  window), the click target grows to keep its size on screen.
 - `radius3d` — per-point data-space half-extents (`Vector{Makie.Vec3f}`), for markers whose
   on-screen size is camera/depth-dependent (e.g. `meshscatter`). When set, overrides `radius`
   with the radius of each point's projected outline: the longest semi-axis of the ellipsoid
@@ -719,7 +721,9 @@ Lines / polylines or disjoint segment pairs. Produces one `:polyline`, `:lines`,
   (1-based) for `:segment`, `(; index)` (1-based) for `:line`.
 - `tol` — hit-test slack around a segment, in logical px (scaled to the rendered image's DPI
   like [`PointInteractable`](@ref)'s `radius`). Must be finite and positive (`ArgumentError`
-  otherwise). Shipped in the manifest as a per-layer `"tol"` field; the overlay's client-side
+  otherwise). When the figure is shown narrower than it was drawn for (the docs on a phone,
+  a narrow Pluto window), the slack grows to keep its size on screen. Shipped in the manifest
+  as a per-layer `"tol"` field; the overlay's client-side
   default (`SEG_TOL` in `frontend/src/geometry.ts`, 8 image px) applies only when this field
   is absent. From a plot object the default is `max(6, linewidth / 2)`, so the whole drawn
   stroke responds (the largest `linewidth` of a per-element vector; `errorbars!`/`rangebars!`
@@ -2563,6 +2567,9 @@ a data point), a `PolarAxis` (a screen rectangle is not an annular sector), a `C
 [`ColorbarInteractable`](@ref) to read a value off it), a categorical axis (bounds
 need numeric limits), or either scale isn't client-invertible (supported: `identity`, `log10`,
 `log`).
+
+The corner and edge grips you drag keep their size on screen when the figure is shown narrower
+than it was drawn for (the docs on a phone, a narrow Pluto window).
 
 # Examples
 ```julia

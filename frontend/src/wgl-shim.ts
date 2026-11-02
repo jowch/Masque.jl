@@ -488,8 +488,11 @@ function initPlot(p: Pool, plot: Plot): void {
         canvas.style.height = "auto"
         plot.canvas = canvas
         plot.phase = "live"
-        installSceneReplacer(canvas as WglCanvas, plot.WGL, plot)
+        // The overlay retargets first: the replacer flushes a frame held while the plot was
+        // asleep, and the overlay only hands a frame to the scene when its base is this canvas.
+        // Flushed onto the old snapshot, the frame would be held again and never shown.
         plot.host.masqueRetargetBase?.(canvas)
+        installSceneReplacer(canvas as WglCanvas, plot.WGL, plot)
     } catch (e) {
         console.error("[masque-wgl] setup_scene_init failed", e)
         // Stay asleep until the viewport (or a gesture) asks again. Leaving `visible`

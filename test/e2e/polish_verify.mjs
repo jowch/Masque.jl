@@ -720,6 +720,72 @@ try {
     passed.push(`${key}/control-ring-visible`);
   }
 
+  // A `Box` over marks (#547): the boxes Makie draws over hid 0 and 1 (made after the axis) and
+  // hid 5 (made before it, `z = 1`) are the two occluders, and the pointer there shows no
+  // tooltip or ring. The plot draws over the box made before the axis and the one with
+  // `z = -1`, so hid 2 and hid 3 show on screen and take the pointer, as does hid 4 in the open.
+  {
+    const key = "box_hidden";
+    const boxes = await page.evaluate((k) => JSON.parse(document.querySelector(`#occluders_${k}`).innerText), key);
+    if (boxes.length !== 2) throw new Error(`${key}: want two occluders, got ${JSON.stringify(boxes)}`);
+    const hid = (await layersOf(key)).find((l) => l.id === "hid").geometry;
+    const at = (k) => [hid[3 * k], hid[3 * k + 1]];
+    const ringOf = (h) => [h.hi.fill, h.hi.edge, h.hi.plain].some((c) => c && !/masque-leave/.test(c.className ?? ""));
+    const away = async () => { await hoverAt(key, 2, 2); await page.waitForTimeout(600); };
+    await away();
+    const rest = await screenOf(key);
+    const orange = (k) => { const [r, g, b] = rest.mean(...at(k), 2); return r > 200 && g > 100 && g < 200 && b < 80; };
+    for (const k of [0, 1, 5]) {
+      const [x, y] = at(k);
+      if (!boxes.some(([bx, by, bw, bh]) => x > bx && x < bx + bw && y > by && y < by + bh)) throw new Error(`${key}: hid ${k} at ${[x, y]} is under no occluder ${JSON.stringify(boxes)}`);
+      if (orange(k)) throw new Error(`${key}: hid ${k} shows through the box on screen (${rest.mean(...at(k), 2)})`);
+      await away();
+      const h = await hoverAt(key, x, y);
+      if (h.show || ringOf(h)) throw new Error(`${key}/hover: the pointer reached hid ${k} through the box (tip ${JSON.stringify(h.text)})`);
+    }
+    for (const k of [2, 3, 4]) {
+      if (!orange(k)) throw new Error(`${key}: hid ${k} is not drawn over its box on screen (${rest.mean(...at(k), 2)})`);
+      await away();
+      const h = await hoverAt(key, ...at(k));
+      if (!h.show || !ringOf(h)) throw new Error(`${key}/control: no tooltip or ring for hid ${k}, which shows (tip ${JSON.stringify(h.text)})`);
+    }
+    await away();
+    passed.push(`${key}/no-hover-through-box`);
+  }
+
+  // A `Box` over each kind of axis (#547): the backends draw it differently, so on each one a
+  // mark is hidden on screen exactly when it sits under a shipped occluder, and every other
+  // mark takes the pointer. Two centre marks hide on each backend (Cairo: after, polar; WebGL:
+  // after, 3D), so the check sees both outcomes.
+  {
+    const key = "box_axes";
+    const boxes = await page.evaluate((k) => JSON.parse(document.querySelector(`#occluders_${k}`).innerText), key);
+    const layers = (await layersOf(key)).filter((l) => /^p[1-6]$/.test(l.id)).sort((a, b) => a.id.localeCompare(b.id));
+    if (layers.length !== 6) throw new Error(`${key}: want six mark layers, got ${JSON.stringify(layers.map((l) => l.id))}`);
+    const ringOf = (h) => [h.hi.fill, h.hi.edge, h.hi.plain].some((c) => c && !/masque-leave/.test(c.className ?? ""));
+    const away = async () => { await hoverAt(key, 2, 2); await page.waitForTimeout(600); };
+    await away();
+    const rest = await screenOf(key);
+    const orange = ([x, y]) => { const [r, g, b] = rest.mean(x, y, 2); return r > 200 && g > 100 && g < 200 && b < 80; };
+    const under = ([x, y]) => boxes.some(([bx, by, bw, bh]) => x > bx && x < bx + bw && y > by && y < by + bh);
+    const hidden = [];
+    for (const l of layers) {
+      for (let k = 0; 3 * k < l.geometry.length; k++) {
+        const at = [l.geometry[3 * k], l.geometry[3 * k + 1]];
+        const occluded = under(at), shown = orange(at);
+        if (occluded === shown) throw new Error(`${key}: ${l.id}:${k} at ${at.map(Math.round)} is ${shown ? "drawn" : "hidden"} on screen but ${occluded ? "under" : "outside"} the occluders ${JSON.stringify(boxes)}`);
+        await away();
+        const h = await hoverAt(key, ...at);
+        if ((h.show && ringOf(h)) === occluded) throw new Error(`${key}/hover: ${l.id}:${k} ${occluded ? "takes the pointer through its box" : "shows but takes no pointer"} (tip ${JSON.stringify(h.text)})`);
+        if (occluded) hidden.push(`${l.id}:${k}`);
+      }
+    }
+    const want = backend === "webgl" ? ["p1:0", "p5:0"] : ["p1:0", "p4:0"];
+    if (JSON.stringify(hidden) !== JSON.stringify(want)) throw new Error(`${key}: hidden marks ${JSON.stringify(hidden)}, want ${JSON.stringify(want)}`);
+    await away();
+    passed.push(`${key}/hidden-exactly-under-occluders`);
+  }
+
   // A band (#500): outside it the picture fades toward the plot area at the preview strength
   // (0.35 of the picture left showing), inside it the picture is untouched, and each edge's grip
   // is white. Measured against the same widget with its overlay hidden.
