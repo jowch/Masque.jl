@@ -2,10 +2,22 @@
 import { isIdentity, type PhotoMatrix } from "./photo"
 import { hitSurface, surfaceVertex } from "./surface"
 import { withRegion } from "./regions"
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry, Limits3, Readout } from "./types"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, SpanGeometry, ROIGeometry, ViewGeometry, SliceGeometry, Limits3, Readout } from "./types"
 
 const HIT_TOL = 4 // px slack for circles/rects
 export const SEG_TOL = 8 // px slack for segments/polylines
+
+// How much to grow every hit slack so it keeps its on-screen size when the figure is shown
+// narrower than it was drawn for (the docs on a phone, a narrow Pluto window) (#527). The slacks
+// above, a layer's `tol` and an ROI's `handle` are image px at the figure's design width
+// (`cssWidth`); shown at `liveCss` CSS px, each image px is smaller on screen by
+// `cssWidth / liveCss`. Never below 1: a figure shown larger keeps today's slack. 1 before layout
+// or when the manifest has no `cssWidth`.
+export function slopScale(manifest: Manifest, liveCss: number): number {
+    const design = manifest.cssWidth
+    if (!design || !(liveCss > 0)) return 1
+    return Math.max(1, design / liveCss)
+}
 
 // closest point on the clamped segment (x0,y0)-(x1,y1) to (px,py) — the projection distToSegment
 // already computes, factored out so anchorFor can reuse the point (not just its distance) for the
@@ -392,7 +404,25 @@ function hitGridSample(gg: GridGeometry, px: number, py: number): Omit<Hit, "lay
 }
 
 // hit-test one layer at (px,py); null if no element under the point
-export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransform): Omit<Hit, "layer"> | null {
+// The circle (`[cx, cy, r]` triples) whose drawn edge is nearest (px, py), among those whose
+// hit circle, `hitRadius(r)` from its centre, reaches it, with that distance past the edge
+// (negative inside). A tie goes to the top-drawn circle: `order` lists them top first, else the
+// last one listed is on top. null when none reaches.
+export function nearestCircle(
+    a: number[], order: number[] | undefined, px: number, py: number, hitRadius: (r: number) => number,
+): { index: number; edge: number } | null {
+    const n = order ? order.length : a.length / 3
+    let near = -1, nd = Infinity
+    for (let m = 0; m < n; m++) {
+        const k = order ? order[m] : n - 1 - m
+        const r = a[3 * k + 2], d = Math.hypot(px - a[3 * k], py - a[3 * k + 1])
+        if (d <= hitRadius(r) && d - r < nd) { near = k; nd = d - r }
+    }
+    return near < 0 ? null : { index: near, edge: nd }
+}
+
+// `slop` scales every hit slack (see slopScale); 1 hits at the design size.
+export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransform, slop = 1): Omit<Hit, "layer"> | null {
     const g = layer.geometry
     switch (layer.kind) {
         case "circles": {
@@ -417,15 +447,18 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
                 }
             }
             // Inside wins over any circle's `HIT_TOL` reach, so a neighbour's reach never takes
-            // the pointer off the marker it is on.
-            for (const reach of [0, HIT_TOL]) {
-                for (let m = 0; m < n; m++) {
-                    const k = order ? order[m] : n - 1 - m
-                    const cx = a[3 * k], cy = a[3 * k + 1], r = a[3 * k + 2]
-                    if ((px - cx) ** 2 + (py - cy) ** 2 <= (r + reach) ** 2) return { index: k, geom_: ["circle", cx, cy, r] }
-                }
+            // the pointer off the marker it is on; inside, the top-drawn one wins.
+            for (let m = 0; m < n; m++) {
+                const k = order ? order[m] : n - 1 - m
+                const cx = a[3 * k], cy = a[3 * k + 1], r = a[3 * k + 2]
+                if ((px - cx) ** 2 + (py - cy) ** 2 <= r * r) return { index: k, geom_: ["circle", cx, cy, r] }
             }
-            return null
+            // Outside every marker, the one whose edge is nearest wins, among those whose hit
+            // circle (radius plus `HIT_TOL`, grown by `slop` to keep its design-width size)
+            // reaches the pointer; a tie goes to the top-drawn one. Nearest, not top-drawn, so
+            // a grown reach never lets a farther mark take the pointer from a nearer one.
+            const near = nearestCircle(a, order, px, py, (r) => (r + HIT_TOL) * slop)
+            return near && { index: near.index, geom_: ["circle", a[3 * near.index], a[3 * near.index + 1], a[3 * near.index + 2]] }
         }
         case "rects": {
             // `tol` reaches past each rect's edge, over its drawn outline (absent → none).
@@ -434,7 +467,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             // `order`, when present, lists them top first (text on an Axis3), and a rect not in
             // it is not drawn; absent, the last one listed is on top.
             const a = g as number[]
-            const tol = layer.tol ?? 0
+            const tol = (layer.tol ?? 0) * slop
             const order = layer.order
             const n = order ? order.length : a.length / 4
             let near = -1, nd = tol * tol
@@ -451,7 +484,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
         }
         case "polyline": {
             const a = g as number[]
-            const tol = layer.tol ?? SEG_TOL
+            const tol = (layer.tol ?? SEG_TOL) * slop
             let best = -1, bd = Infinity
             for (let k = 0; k < a.length / 2 - 1; k++) {
                 const x0 = a[2 * k], y0 = a[2 * k + 1], x1 = a[2 * k + 2], y1 = a[2 * k + 3]
@@ -467,7 +500,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             // is on that path; the hit's identity is the line, and its highlight is the full
             // vertex list (NaN gaps stay gaps inside it).
             const paths = g as number[][]
-            const tol = layer.tol ?? SEG_TOL
+            const tol = (layer.tol ?? SEG_TOL) * slop
             let best = -1, bd = Infinity
             for (let k = 0; k < paths.length; k++) {
                 const hit = closestPointOnPath(px, py, paths[k], Math.min(bd, tol))
@@ -481,7 +514,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
         }
         case "segments": {
             const a = g as number[]
-            const tol = layer.tol ?? SEG_TOL
+            const tol = (layer.tol ?? SEG_TOL) * slop
             let best = -1, bd = Infinity
             for (let k = 0; k < a.length / 4; k++) {
                 const d = distToSegment(px, py, a[4 * k], a[4 * k + 1], a[4 * k + 2], a[4 * k + 3])
@@ -495,7 +528,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             // elements, the nearest outline wins. Where elements overlap, the last one listed
             // is drawn on top and wins.
             const elems = g as (number[] | number[][])[]
-            const tol = layer.tol ?? 0
+            const tol = (layer.tol ?? 0) * slop
             let near = -1, nd = tol
             for (let k = elems.length - 1; k >= 0; k--) {
                 const rings = polygonRings(elems[k])
@@ -536,7 +569,22 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             const y0 = tg.orientation === "h" ? tg.pos : lo
             const x1 = tg.orientation === "h" ? hi : tg.pos
             const y1 = tg.orientation === "h" ? tg.pos : hi
-            if (distToSegment(px, py, x0, y0, x1, y1) <= SEG_TOL) return { index: 0, geom_: ["seg", x0, y0, x1, y1] }
+            if (distToSegment(px, py, x0, y0, x1, y1) <= SEG_TOL * slop) return { index: 0, geom_: ["seg", x0, y0, x1, y1] }
+            return null
+        }
+        case "span": {
+            // An edge, within SEG_TOL of its line and of the line's ends (the grip overhangs a
+            // narrow colorbar), the nearer edge when both are; else the inside of the band.
+            const sg = g as SpanGeometry
+            const h = sg.orientation === "h"
+            const along = h ? py : px, across = h ? px : py
+            const [s0, s1] = sg.span
+            const tol = SEG_TOL * slop
+            if (across < s0 - tol || across > s1 + tol) return null
+            const dlo = Math.abs(along - sg.lo), dhi = Math.abs(along - sg.hi)
+            if (Math.min(dlo, dhi) <= tol) return { index: 0, spanPart_: { edge: dlo <= dhi ? "lo" : "hi" } }
+            if (across < s0 || across > s1) return null
+            if (along > Math.min(sg.lo, sg.hi) && along < Math.max(sg.lo, sg.hi)) return { index: 0, spanPart_: { move: true } }
             return null
         }
         case "roi": {
@@ -546,7 +594,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             // only this midpoint square (no grip).
             // Corners are checked before edges before the body so a small ROI's overlapping
             // corner/edge hit boxes resolve to the (two-axis) corner, not an edge.
-            const halfHit = Math.max(2 * rg.handle, 6)
+            const halfHit = Math.max(2 * rg.handle, 6) * slop
             const corners: [number, number][] = [[rg.x, rg.y], [rg.x + rg.w, rg.y], [rg.x + rg.w, rg.y + rg.h], [rg.x, rg.y + rg.h]]
             for (let k = 0; k < 4; k++) {
                 if (Math.abs(px - corners[k][0]) <= halfHit && Math.abs(py - corners[k][1]) <= halfHit) return { index: 0, roiPart_: { corner: k } }
@@ -812,7 +860,7 @@ function yieldsToOtherAxis(manifest: Manifest, layer: HitLayer, x: number, y: nu
 
 // Masque's own tools (threshold lines, ROI boxes, the view) draw over a legend, and a legend's
 // entries are the legend, so a box Makie draws over the plots hides neither.
-const OVER_OCCLUDERS: ReadonlySet<Kind> = new Set(["threshold", "roi", "view", "control"])
+const OVER_OCCLUDERS: ReadonlySet<Kind> = new Set(["threshold", "span", "roi", "view", "control"])
 
 // Whether (x, y) on `layer`'s marks is inside a box Makie draws over the plots (an opaque
 // legend, `occluders`) that hides them. The picture shows the legend there, not the mark, so
@@ -825,12 +873,12 @@ export function occludedAt(manifest: Manifest, layer: HitLayer, x: number, y: nu
 }
 
 // first layer (in manifest order) with a hit for the given event; null if none
-export function hitTest(manifest: Manifest, px: number, py: number, event: string): Hit | null {
+export function hitTest(manifest: Manifest, px: number, py: number, event: string, slop = 1): Hit | null {
     for (const layer of manifest.layers) {
         if (!layer.events.includes(event)) continue
         if (yieldsToOtherAxis(manifest, layer, px, py, event)) continue
         if (occludedAt(manifest, layer, px, py)) continue
-        const h = hitLayer(layer, px, py, manifest.transforms[layer.axis])
+        const h = hitLayer(layer, px, py, manifest.transforms[layer.axis], slop)
         if (h) return { layer, ...h }
     }
     return null
@@ -965,7 +1013,7 @@ function insideFrame(f: AxisFrame, x: number, y: number): boolean {
 // at all outside that frame's clip; a layer that doesn't move, at the layout point. `viewId`
 // is the pan view that owns the live matrix.
 export function hitTestAt(
-    manifest: Manifest, x: number, y: number, photo: PhotoMatrix, event: string, viewId: string | null = null,
+    manifest: Manifest, x: number, y: number, photo: PhotoMatrix, event: string, viewId: string | null = null, slop = 1,
 ): Hit | null {
     for (const layer of manifest.layers) {
         if (!layer.events.includes(event)) continue
@@ -975,7 +1023,7 @@ export function hitTestAt(
         const p = f ? frameInverse(f, x, y) : { x, y }
         // In the marks' own space: a live photograph moves the legend's pixels with them.
         if (occludedAt(manifest, layer, p.x, p.y)) continue
-        const h = hitLayer(layer, p.x, p.y, manifest.transforms[layer.axis])
+        const h = hitLayer(layer, p.x, p.y, manifest.transforms[layer.axis], slop)
         if (h) return { layer, ...h }
     }
     return null
@@ -998,7 +1046,7 @@ export function resolvePayload(hit: Hit, manifest: Manifest, px: number, py: num
 // an invisible drag handle, or a box being dragged all only make sense relative to the cursor.
 // Checked by layer.kind, not hit.geom's tag, because :threshold's geom is ["seg", …] — byte-
 // identical to :segments — so a geom-first dispatch would wrongly anchor a threshold hover.
-export const CURSOR_FOLLOWING_KINDS: ReadonlySet<Kind> = new Set(["axis", "threshold", "roi", "view"])
+export const CURSOR_FOLLOWING_KINDS: ReadonlySet<Kind> = new Set(["axis", "threshold", "span", "roi", "view"])
 
 export interface Anchor {
     x: number // horizontal center the tooltip box is placed over

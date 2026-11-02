@@ -1,16 +1,17 @@
 import { invertAxis, matrixLimits, panLimits3, projectAxis } from "./geometry"
-import { hideTip, placeTip, setMarkAccent, setTipText, setTipVisible } from "./hover"
+import { hideTip, hideViewReadout, showViewReadout, placeTip, setMarkAccent, setTipText, setTipVisible } from "./hover"
 import { scheduleAnnounce } from "./keyboard"
-import { settleCurrentPan } from "./bond"
+import { resetView, settleCurrentPan } from "./bond"
 import { fmtCoord } from "./template"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
+import * as spanDrag from "./drag/span"
 import * as viewDrag from "./drag/view"
 import { mapPoint, unmapPoint, wheelScale, zoomAt } from "./photo"
-import type { HitLayer, Limits3, ThresholdGeometry, ViewGeometry } from "./types"
+import type { HitLayer, Limits3, SpanGeometry, ThresholdGeometry, ViewGeometry } from "./types"
 
-// Keyboard path for the three drag kinds (#169). Each drag layer gets its own tab stop after
+// Keyboard path for the drag kinds (#169). Each drag layer gets its own tab stop after
 // the plot surface, so arrows on the surface keep walking marks (keyboard.ts) and arrows here
 // nudge the line, the box, or the camera. The stops reuse the pointer path's geometry
 // (drag/*.ts and bond.ts's settle) and keep the pointer's commit rule: the readout updates on
@@ -21,7 +22,7 @@ const PAGE_CSS = 10
 const VIEW_STEP = 0.1 // fraction of the axis viewport per arrow press, pan and orbit alike
 const ZOOM_NOTCH = 100 // one wheel notch, in wheelScale's pixel units
 
-const NUDGE_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", "+", "=", "-", "_"])
+const NUDGE_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", "+", "=", "-", "_", "0"])
 
 export interface DragStops {
     // Re-place each stop over its line, box, or viewport. Cheap: a handful of style writes.
@@ -32,10 +33,14 @@ export interface DragStops {
 const HINTS = {
     thresholdH: "Use Up or Down arrow to move the line, Page Up or Page Down for a larger step, Home or End for the ends.",
     thresholdV: "Use Left or Right arrow to move the line, Page Up or Page Down for a larger step, Home or End for the ends.",
+    spanH: "Use Up or Down arrow to move the band, Page Up or Page Down for a larger step, Home or End for the ends. " +
+        "Alt with an arrow moves that edge out; Alt and Shift with an arrow moves it in.",
+    spanV: "Use Left or Right arrow to move the band, Page Up or Page Down for a larger step, Home or End for the ends. " +
+        "Alt with an arrow moves that edge out; Alt and Shift with an arrow moves it in.",
     roi: "Use arrow keys to move the box, Page Up or Page Down for a larger step. " +
         "Alt with an arrow grows that side; Alt and Shift with an arrow shrinks it.",
-    pan: "Use arrow keys to pan, plus or minus to zoom.",
-    orbit: "Use arrow keys to rotate the view, Shift with an arrow to pan, plus or minus to zoom.",
+    pan: "Use arrow keys to pan, plus or minus to zoom, 0 to reset.",
+    orbit: "Use arrow keys to rotate the view, Shift with an arrow to pan, plus or minus to zoom, 0 to reset.",
 }
 
 function layerById(ctx: OverlayCtx, id: string): HitLayer | undefined {
@@ -64,7 +69,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
 
     for (const layer of ctx.manifest_.layers) {
         if (!layer.events.includes("drag")) continue
-        if (layer.kind !== "threshold" && layer.kind !== "roi" && layer.kind !== "view") continue
+        if (layer.kind !== "threshold" && layer.kind !== "span" && layer.kind !== "roi" && layer.kind !== "view") continue
         const id = layer.id
         const el = document.createElement("div")
         el.className = `drag-stop drag-stop-${layer.kind}`
@@ -83,6 +88,10 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             el.setAttribute("aria-label", layer.label ?? "Threshold")
             el.setAttribute("aria-valuetext", thresholdValue(layer, ctx))
             hint.textContent = h ? HINTS.thresholdH : HINTS.thresholdV
+        } else if (layer.kind === "span") {
+            el.setAttribute("role", "application")
+            el.setAttribute("aria-label", layer.label ?? "Band")
+            hint.textContent = (layer.geometry as SpanGeometry).orientation === "h" ? HINTS.spanH : HINTS.spanV
         } else if (layer.kind === "roi") {
             el.setAttribute("role", "application")
             el.setAttribute("aria-label", layer.label ?? "Selection box")
@@ -121,6 +130,12 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             const cx = (parseFloat(r.left) + parseFloat(r.width) / 2) / 100 * ctx.manifest_.width / s
             const cy = (parseFloat(r.top) + parseFloat(r.height) / 2) / 100 * ctx.manifest_.height / s
             placeTip(ctx, state, Number.isFinite(cx) ? cx : 0, Number.isFinite(cy) ? cy : 0)
+            scheduleAnnounce(ctx, state, text)
+        }
+
+        // A view's readout sits in the figure's corner (#526), as for the mouse and the wheel.
+        const viewReadout = (text: string) => {
+            showViewReadout(ctx, state, text)
             scheduleAnnounce(ctx, state, text)
         }
 
@@ -166,6 +181,56 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             pending = () => {
                 ctx.commit_({ [id]: thresholdDrag.end(d, { x: h ? mid : d.tg_.pos, y: h ? d.tg_.pos : mid }) })
                 el.setAttribute("aria-valuetext", thresholdValue(l, ctx))
+                place()
+            }
+            return true
+        }
+
+        const nudgeSpan = (l: HitLayer, e: KeyboardEvent): boolean => {
+            const band = ctx.spanBands_.get(id)
+            const t = ctx.manifest_.transforms[l.axis]
+            if (!band || !t) return false
+            const g = band.g_, h = g.orientation === "h"
+            const [vx, vy, vw, vh] = t.viewport
+            // Spatial, as a threshold's keys: arrows and Page keys move on screen, Home and End
+            // follow the value.
+            const step = pxPerCss(ctx) * (e.key === "PageUp" || e.key === "PageDown" ? PAGE_CSS : STEP_CSS)
+            const up = h ? -1 : 1
+            const rev = h ? t.yreversed : t.xreversed
+            const loEnd = h ? (rev ? vy : vy + vh) : (rev ? vx + vw : vx) // pixel end of the smallest value
+            const hiEnd = h ? (rev ? vy + vh : vy) : (rev ? vx : vx + vw)
+            const a = Math.min(g.lo, g.hi), b = Math.max(g.lo, g.hi)
+            let dp = 0
+            switch (e.key) {
+                case "ArrowUp": if (!h) return true; dp = -step; break
+                case "ArrowDown": if (!h) return true; dp = step; break
+                case "ArrowLeft": if (h) return true; dp = -step; break
+                case "ArrowRight": if (h) return true; dp = step; break
+                case "PageUp": dp = up * step; break
+                case "PageDown": dp = -up * step; break
+                case "Home": dp = loEnd - (loEnd < hiEnd ? a : b); break
+                case "End": dp = hiEnd - (loEnd < hiEnd ? b : a); break
+                default: return false
+            }
+            const at = (v: number) => ({ x: v, y: v })
+            let d: Extract<Drag, { kind: "span" }>
+            let text: string
+            if (e.altKey && (e.key.startsWith("Arrow") || e.key.startsWith("Page"))) {
+                // The arrow names the edge on that side; Shift moves it in instead of out.
+                const far = dp > 0 ? b : a
+                // A flat band cannot shrink; to grow it, spanDrag.move picks the edge on that side.
+                if (a === b && e.shiftKey) return true
+                const edge = far === g.lo ? "lo" : "hi"
+                d = spanDrag.begin(id, band, { edge }, 0, -1) as typeof d
+                text = spanDrag.move(d, at(far + (e.shiftKey ? -dp : dp)), ctx.tipDigits_)
+            } else {
+                d = spanDrag.begin(id, band, { move: true }, 0, -1) as typeof d
+                text = spanDrag.move(d, at(dp), ctx.tipDigits_)
+            }
+            place()
+            showReadout(text)
+            pending = () => {
+                ctx.commit_({ [id]: spanDrag.envelope(d) })
                 place()
             }
             return true
@@ -245,7 +310,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                     const input = { id, limits: lim, settle: false }
                     state.keyView_ = true
                     ctx.gesture_.request(input)
-                    showReadout(viewDrag.limits3Tip(lim, ctx.tipDigits_, t, ctx.tipExplicit_))
+                    viewReadout(viewDrag.limits3Tip(lim, ctx.tipDigits_, t, ctx.tipExplicit_))
                     pending = () => { state.keyView_ = false; ctx.gesture_.settle({ ...input, settle: true }) }
                     return true
                 }
@@ -257,7 +322,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                 orbitCam = { azimuth: input.azimuth as number, elevation: input.elevation as number }
                 state.keyView_ = true
                 ctx.gesture_.request(input)
-                showReadout(viewDrag.tip(o, p, ctx.tipDigits_, ctx.tipExplicit_))
+                viewReadout(viewDrag.tip(o, p, ctx.tipDigits_, ctx.tipExplicit_))
                 pending = () => { state.keyView_ = false; ctx.gesture_.settle({ ...input, settle: true }) }
                 return true
             }
@@ -277,7 +342,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             ctx.photoPaint_(next)
             state.keyView_ = true
             ctx.gesture_.request({ id, ...lim, settle: false, s: next.s, tx: next.tx, ty: next.ty })
-            showReadout(viewDrag.limitsTip(lim, ctx.tipDigits_, t, ctx.tipExplicit_))
+            viewReadout(viewDrag.limitsTip(lim, ctx.tipDigits_, t, ctx.tipExplicit_))
             pending = () => { state.keyView_ = false; settleCurrentPan(ctx, state, d) }
             return true
         }
@@ -303,6 +368,14 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                     : [{ x: tg.pos, y: tg.span[0] }, { x: tg.pos, y: tg.span[1] }]
                 const p = mapPoint(state.photo_, a), q = mapPoint(state.photo_, b)
                 setBox(Math.min(p.x, q.x), Math.min(p.y, q.y), Math.abs(q.x - p.x), Math.abs(q.y - p.y))
+            } else if (l.kind === "span") {
+                const sg = ctx.spanBands_.get(id)?.g_
+                if (!sg) return
+                const a = Math.min(sg.lo, sg.hi), b = Math.max(sg.lo, sg.hi)
+                const [p, q] = sg.orientation === "h"
+                    ? [mapPoint(state.photo_, { x: sg.span[0], y: a }), mapPoint(state.photo_, { x: sg.span[1], y: b })]
+                    : [mapPoint(state.photo_, { x: a, y: sg.span[0] }), mapPoint(state.photo_, { x: b, y: sg.span[1] })]
+                setBox(Math.min(p.x, q.x), Math.min(p.y, q.y), Math.abs(q.x - p.x), Math.abs(q.y - p.y))
             } else if (l.kind === "roi") {
                 const g = ctx.roiBoxes_.get(id)?.g_
                 if (!g) return
@@ -325,8 +398,21 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             const l = layerById(ctx, id)
             // A pointer drag owns the geometry until it is released.
             if (!l || state.drag_) return
+            // `0` puts a view back where it started (#524). A held key's settle would move it
+            // again, so it goes; the next key starts from the reset camera.
+            if (e.key === "0") {
+                if (l.kind !== "view") return
+                pending = null
+                held.clear()
+                state.keyView_ = false
+                orbitCam = null
+                resetView(ctx, state, id)
+                e.preventDefault(); e.stopPropagation()
+                return
+            }
             const before = pending
             const handled = l.kind === "threshold" ? nudgeThreshold(l, e)
+                : l.kind === "span" ? nudgeSpan(l, e)
                 : l.kind === "roi" ? nudgeROI(e)
                     : l.kind === "view" ? nudgeView(l, e) : false
             if (pending !== before) held.add(e.key)
@@ -341,6 +427,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             flush()
             orbitCam = null
             hideTip(ctx, state)
+            hideViewReadout(ctx)
         }
         el.addEventListener("keydown", onKeydown)
         el.addEventListener("keyup", onKeyup)

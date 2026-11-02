@@ -323,13 +323,14 @@ end
     @test Masque._resolve_backend(nothing) isa _WGLExt.WebGLBackend   # the one loaded
     w = masque(fig)
     @test w isa _WGLExt.WebGLWidget && w.px_per_unit == 2.0 && w.display_css == 600
-    @test w.manifest["scaling"] == 2.0
+    @test w.manifest["scaling"] == 2.0 && w.manifest["cssWidth"] == 600
     err = (@test_throws ArgumentError masque(fig; backend = :cairo)).value
     @test occursin("using CairoMakie", err.msg)
     # max_width sets the density too, as on Cairo (#548)
     w = masque(fig; backend = :webgl, max_width = 300)
     @test w.display_css == 300 && w.px_per_unit == 2 * 300 / 600
     @test w.manifest["scaling"] == w.px_per_unit && w.manifest["width"] == 600
+    @test w.manifest["cssWidth"] == 300                   # hit slack's design width (#527)
     wide = Figure(; size = (1600, 450)); scatter!(Axis(wide[1, 1]), 1:3, 1:3)
     w = masque(wide)
     @test w.display_css == 700 && w.px_per_unit == 2 * 700 / 1600 && w.manifest["width"] == 1400

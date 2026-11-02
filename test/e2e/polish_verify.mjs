@@ -718,6 +718,57 @@ try {
     passed.push(`${key}/control-ring-visible`);
   }
 
+  // A band (#500): outside it the picture fades toward the plot area at the preview strength
+  // (0.35 of the picture left showing), inside it the picture is untouched, and each edge's grip
+  // is white. Measured against the same widget with its overlay hidden.
+  for (const key of ["span_axis", "span_colorbar"]) {
+    const layers = await layersOf(key);
+    const layer = layers.find((l) => l.kind === "span");
+    if (!layer) throw new Error(`${key}: no span layer`);
+    const overlay = (show) => page.evaluate(([k, on]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      for (const svg of sr.querySelectorAll("svg")) svg.style.visibility = on ? "" : "hidden";
+      const bg = getComputedStyle(sr.host).getPropertyValue("--masque-fig-bg");
+      const dim = sr.querySelector("rect.masque-span-dim");
+      const g = (sel) => [...sr.querySelectorAll(sel)].map((r) => ["x", "y", "width", "height", "x1", "y1"].map((a) => Number(r.getAttribute(a))));
+      return { fill: dim ? getComputedStyle(dim).fill : null, bg, lines: g("line.masque-threshold-line"), grips: g("rect.masque-handle") };
+    }, [key, show]);
+    await hoverAt(key, 2, 2);
+    const info = await overlay(false);
+    const bare = await screenOf(key);
+    await overlay(true);
+    await page.waitForTimeout(200);
+    const shot = await screenOf(key);
+    const fill = (info.fill.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+    const h = layer.geometry.orientation === "h";
+    const [s0, s1] = layer.geometry.span;
+    const q = s0 + 0.3 * (s1 - s0);
+    const ed = info.lines.map((l) => (h ? l[5] : l[4])).sort((a, b) => a - b);
+    const at = (p) => (h ? [q, p] : [p, q]);
+    const t = (await page.evaluate((k) => JSON.parse(document.querySelector(`#axes_${k}`).textContent), key))[layer.axis];
+    const [e0, e1] = h ? [t.viewport[1], t.viewport[1] + t.viewport[3]] : [t.viewport[0], t.viewport[0] + t.viewport[2]];
+    const probes = [
+      { p: (e0 + ed[0]) / 2, out: true, what: "below" }, { p: (ed[1] + e1) / 2, out: true, what: "above" },
+      { p: (ed[0] + ed[1]) / 2, out: false, what: "inside" },
+    ];
+    for (const { p, out, what } of probes) {
+      const [x, y] = at(p);
+      const was = bare.mean(x, y, 1.5), now = shot.mean(x, y, 1.5);
+      const want = out ? was.map((c, i) => 0.35 * c + 0.65 * fill[i]) : was;
+      if (now.some((c, i) => Math.abs(c - want[i]) > 10)) {
+        throw new Error(`${key}/${what}: pixel ${now.map(Math.round)} at ${x.toFixed(0)},${y.toFixed(0)}, want ${want.map(Math.round)} (bare ${was.map(Math.round)}, fade toward ${fill})`);
+      }
+    }
+    passed.push(`${key}/fade-outside`);
+    for (const [gx, gy, gw, gh] of info.grips) {
+      const c = shot.mean(gx + gw / 2, gy + gh / 2, 1);
+      if (c.some((v) => v < 235)) throw new Error(`${key}/grip: the grip at ${gx.toFixed(0)},${gy.toFixed(0)} reads ${c.map(Math.round)}, want white`);
+    }
+    passed.push(`${key}/grips`);
+  }
+
   // A plot drawn with `visible = false` (#484): picking legend entry "a" fades line c and leaves
   // the hidden line b's path alone, so the gridlines under it stay whole; hovering b's path
   // shows nothing.
@@ -1226,13 +1277,19 @@ try {
       const b = host.querySelector("img, canvas").getBoundingClientRect();
       const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
       sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", {
-        bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: dy,
+        bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: dy, ctrlKey: true,
       }));
       // Read in the same turn as the wheel: the readout hides 150 ms after the last notch, and
       // on a loaded software-GL page two animation frames can take longer than that.
-      const t = sr.querySelector(".masque-tip");
+      // The readout sits in the figure's bottom-left corner (#526), and no mark tooltip shows.
+      const t = sr.querySelector(".masque-readout");
       const cs = getComputedStyle(t);
-      const during = { show: t.classList.contains("show"), text: t.innerText, bg: cs.backgroundColor, color: cs.color };
+      const tb = t.getBoundingClientRect(), hb = sr.host.getBoundingClientRect();
+      const during = {
+        show: t.classList.contains("show"), text: t.innerText, bg: cs.backgroundColor, color: cs.color,
+        left: tb.left - hb.left, bottom: hb.bottom - tb.bottom,
+        tip: sr.querySelector(".masque-tip").classList.contains("show"),
+      };
       await new Promise((res) => setTimeout(res, 600));   // past the wheel's idle settle
       return { during, after: t.classList.contains("show") };
     }, ["view3d", view3.x + view3.w / 2, view3.y + view3.h / 2, deltaY]);
@@ -1242,6 +1299,10 @@ try {
     if (r.during.bg !== lightTip.bg || r.during.color !== lightTip.color) {
       throw new Error(`view3d/zoom-readout: readout theme ${r.during.bg}/${r.during.color} differs from the hover tooltip's ${lightTip.bg}/${lightTip.color}`);
     }
+    if (!(Math.abs(r.during.left - 8) <= 2 && Math.abs(r.during.bottom - 8) <= 2)) {
+      throw new Error(`view3d/zoom-readout: the readout is not in the figure's bottom-left corner: ${JSON.stringify(r.during)}`);
+    }
+    if (r.during.tip) throw new Error("view3d/zoom-readout: a mark tooltip shows while the view zooms");
     if (r.after) throw new Error("view3d/zoom-readout: the readout is still showing after the zoom settled");
     await wheel3(300);
     passed.push("view3d/zoom-readout");

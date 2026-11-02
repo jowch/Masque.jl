@@ -65,6 +65,10 @@ Measured by `bench/payload_envelope.jl` on CairoMakie 0.15, Julia 1.12, default 
 (`px_per_unit` 2); sizes re-confirmed byte-for-byte on 2026-09-20. PNG is the decoded size,
 manifest the MsgPack size.
 
+Re-run on 2026-11-02 for the `:span` layer (`SpanInteractable`, #500, on top of `20f6849`):
+every row below came out the same. A span is constant-size: on a 10-point scatter it adds
+193 B to the manifest (820 → 1 013 B), the layer plus its starting field.
+
 | Plot | PNG | manifest | note |
 |------|----:|---------:|------|
 | line, 10 pts | 51 KB | 0.6 KB | ~50 KB antialiasing and text floor for any plot |
@@ -128,7 +132,8 @@ repo's own docs build) one widget already warns and two fail.
   cut a line also ships `drawn`, one small integer per drawn vertex.
 - **Not display width.** `px_per_unit` scales the PNG roughly with the square of the width but
   leaves the manifest alone: scatter-1000's PNG is 90 KB at 300 px and 188 KB at 700 px, its
-  manifest 38 KB at both.
+  manifest 38 KB at both. The design width it ships for hit slack (`cssWidth`, #527) is one
+  integer per manifest.
 
 ### Per-kind manifest costs
 
@@ -209,6 +214,7 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `links` | each `LegendInteractable` layer | ~9–11 B/entry (a 3-entry legend layer is 341 B, 32 B of it `links`) |
 | `clip` + `fill` | each 2-D pan view layer | under 50 B |
 | `clip` (in `geometry`) | each `:surface` layer on a `PolarAxis` (#514) | 42 B for the annulus (4 floats), 60 B on a sector (6), measured at `0c23602` on a 50×50 polar surface; the rest of the layer is the Section J surface |
+| `wheel` | each view layer (#526) | 19 B (`"wheel":"modifier",`), counted, not benched |
 | `is3d`, `valueaxis` | each axis transform | 6 B and 11 B |
 | `selects` | each selector ROI layer | one short string |
 | `occluders` | once per manifest, only when an opaque legend overlaps an axis (0.4.3) | key 10 B + 4 numbers (~37 B) per such legend; absent otherwise |
