@@ -58,6 +58,7 @@
             ]
         },
         {
+            "coords": true,
             "kind": "circles",
             "id": "scatter",
             "geometry": [

@@ -2,7 +2,20 @@
     "height": 900,
     "layers": [
         {
-            "bond": "element",
+            "order": [
+                2,
+                1,
+                0
+            ],
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "events": [
+                "click",
+                "hover"
+            ],
+            "coords": true,
             "kind": "circles",
             "id": "scatter",
             "geometry": [
@@ -37,19 +50,7 @@
                 }
             ],
             "colors": "rgb(0,114,178)",
-            "axis": "ax1",
-            "style": {
-                "width": 2
-            },
-            "order": [
-                2,
-                1,
-                0
-            ],
-            "events": [
-                "click",
-                "hover"
-            ]
+            "bond": "element"
         },
         {
             "linewidth": 3,
