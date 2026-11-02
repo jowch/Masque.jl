@@ -11,6 +11,10 @@ All notable changes to this project are documented here. The format is based on
   and click like a surface on an `Axis3`: the tooltip shows the point nearest the pointer, and
   a click gives a `GridCellEvent` with its `(i, j)`. Before, `masque` skipped it with a
   warning (#514).
+- A moved view can go back to where it started: double-click an empty part of the plot, or
+  press `0` while the view has keyboard focus. Limits come back as written, so automatic
+  limits are automatic again, and an `Axis3` gets its azimuth and elevation back. Linked axes
+  and panels go back together. Re-running only the `masque` cell keeps the starting view (#524).
 
 ### Changed
 - Default tooltips and readouts show a coordinate the way its axis labels it. On a

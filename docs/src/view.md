@@ -76,6 +76,22 @@ To pan from the keyboard, press Tab until the view has focus, then use
 the arrow keys, and `+` / `-` to zoom. See
 [Keyboard and screen readers](@ref).
 
+## Go back to the start
+
+Double-click an empty part of the plot to put the view back where it
+started, or press `0` while the view has keyboard focus. Limits you set
+in your code come back, and limits you left automatic are automatic
+again. On an `Axis3` the azimuth and elevation come back too. Axes that
+pan together go back together, and so do panels you link with
+`linkcameras!`.
+
+A double-click on a point is two clicks on the point, so it does not
+move the view. The first click of a double-click on empty space clears
+a single pick, as any click there does.
+
+If you use GLMakie, note that Ctrl+click does not reset the view here:
+in a widget, Ctrl+click (Cmd+click on a Mac) adds a mark to a pick.
+
 ## Orbit an `Axis3`
 
 On an `Axis3`, dragging turns the camera around the plot (azimuth and
@@ -172,7 +188,8 @@ rather than in separate cells.
 
 Dragging changes the axis itself: its limits, and its azimuth and
 elevation on an `Axis3`. So if only the cell with `masque` runs again,
-the plot stays at the view you dragged to.
+the plot stays at the view you dragged to. A double-click still takes
+it back to where it started before the drag.
 
 When the cell that creates the figure runs again, for example because a
 slider changed the data, it creates a new `Axis`, which starts from the
