@@ -675,11 +675,23 @@ describe("hit slack keeps its on-screen size when the figure is shown narrower (
         expect(hitLayer(roi, 70, 20, undefined, 2)).toMatchObject({ roiPart_: { corner: 0 } })
     })
     it("an inside hit still wins over a neighbour's grown reach", () => {
-        // Two dots 20 px apart: at slop 3 the left dot's hit circle ((6 + 4) × 3 = 30) covers the
-        // right dot, listed first so it loses the overlap, but a pointer inside it keeps it.
+        // Two dots 20 px apart: at slop 3 the second dot's hit circle ((6 + 4) × 3 = 30) covers
+        // the first, but a pointer inside the first keeps it.
         const two: HitLayer = { ...circles, payloads: [{}, {}], geometry: [120, 100, 6, 100, 100, 6] }
         expect(hitLayer(two, 118, 100, undefined, 3)).toMatchObject({ index: 0 })
-        expect(hitLayer(two, 112, 100, undefined, 3)).toMatchObject({ index: 1 }) // reach: top dot wins
+        // Outside both, the nearer dot wins, whichever is drawn on top.
+        expect(hitLayer(two, 112, 100, undefined, 3)).toMatchObject({ index: 0 })
+        expect(hitLayer(two, 108, 100, undefined, 3)).toMatchObject({ index: 1 })
+    })
+    it("a top-drawn dot's grown reach never takes the pointer from a nearer dot", () => {
+        // Two r = 9 dots 30 px apart, the second drawn on top; the pointer is 12 px from the
+        // lower dot and 18 px from the top one. Both reaches cover it at the docs-on-a-phone
+        // slop, and the nearer, lower dot wins there as it does at slop 1.
+        const two: HitLayer = { ...circles, payloads: [{}, {}], geometry: [100, 100, 9, 130, 100, 9] }
+        expect(hitLayer(two, 112, 100, undefined, 1)).toMatchObject({ index: 0 })
+        expect(hitLayer(two, 112, 100, undefined, 1.97)).toMatchObject({ index: 0 })
+        // Equally far from both edges: the top-drawn one wins.
+        expect(hitLayer(two, 115, 100, undefined, 1.97)).toMatchObject({ index: 1 })
     })
     it("hitTestAt passes slop to every layer", () => {
         const mm: Manifest = { ...m(600), layers: [seg] }

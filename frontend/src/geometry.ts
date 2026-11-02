@@ -404,6 +404,23 @@ function hitGridSample(gg: GridGeometry, px: number, py: number): Omit<Hit, "lay
 }
 
 // hit-test one layer at (px,py); null if no element under the point
+// The circle (`[cx, cy, r]` triples) whose drawn edge is nearest (px, py), among those whose
+// hit circle, `hitRadius(r)` from its centre, reaches it, with that distance past the edge
+// (negative inside). A tie goes to the top-drawn circle: `order` lists them top first, else the
+// last one listed is on top. null when none reaches.
+export function nearestCircle(
+    a: number[], order: number[] | undefined, px: number, py: number, hitRadius: (r: number) => number,
+): { index: number; edge: number } | null {
+    const n = order ? order.length : a.length / 3
+    let near = -1, nd = Infinity
+    for (let m = 0; m < n; m++) {
+        const k = order ? order[m] : n - 1 - m
+        const r = a[3 * k + 2], d = Math.hypot(px - a[3 * k], py - a[3 * k + 1])
+        if (d <= hitRadius(r) && d - r < nd) { near = k; nd = d - r }
+    }
+    return near < 0 ? null : { index: near, edge: nd }
+}
+
 // `slop` scales every hit slack (see slopScale); 1 hits at the design size.
 export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransform, slop = 1): Omit<Hit, "layer"> | null {
     const g = layer.geometry
@@ -430,17 +447,18 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
                 }
             }
             // Inside wins over any circle's `HIT_TOL` reach, so a neighbour's reach never takes
-            // the pointer off the marker it is on. The reach pass grows the whole hit circle
-            // (radius plus slack) by `slop`, so it keeps the size it has at the design width.
-            for (const grow of [0, 1]) {
-                for (let m = 0; m < n; m++) {
-                    const k = order ? order[m] : n - 1 - m
-                    const cx = a[3 * k], cy = a[3 * k + 1], r = a[3 * k + 2]
-                    const hr = grow ? (r + HIT_TOL) * slop : r
-                    if ((px - cx) ** 2 + (py - cy) ** 2 <= hr ** 2) return { index: k, geom_: ["circle", cx, cy, r] }
-                }
+            // the pointer off the marker it is on; inside, the top-drawn one wins.
+            for (let m = 0; m < n; m++) {
+                const k = order ? order[m] : n - 1 - m
+                const cx = a[3 * k], cy = a[3 * k + 1], r = a[3 * k + 2]
+                if ((px - cx) ** 2 + (py - cy) ** 2 <= r * r) return { index: k, geom_: ["circle", cx, cy, r] }
             }
-            return null
+            // Outside every marker, the one whose edge is nearest wins, among those whose hit
+            // circle (radius plus `HIT_TOL`, grown by `slop` to keep its design-width size)
+            // reaches the pointer; a tie goes to the top-drawn one. Nearest, not top-drawn, so
+            // a grown reach never lets a farther mark take the pointer from a nearer one.
+            const near = nearestCircle(a, order, px, py, (r) => (r + HIT_TOL) * slop)
+            return near && { index: near.index, geom_: ["circle", a[3 * near.index], a[3 * near.index + 1], a[3 * near.index + 2]] }
         }
         case "rects": {
             // `tol` reaches past each rect's edge, over its drawn outline (absent → none).
