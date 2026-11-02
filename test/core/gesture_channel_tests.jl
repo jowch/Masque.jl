@@ -92,6 +92,35 @@ end
         @test m2["transforms"][aid]["fill"] == t0["fill"] == Masque._css_color(:gray20)
     end
 
+    @testset "a frame after resize! carries the new size (#546)" begin
+        fig = Figure(size = (600, 400))
+        ax = Axis(fig[1, 1])
+        scatter!(ax, 11:13, [1, 2.46, 4.17])
+        scatter!(Axis(fig[2, 1]), 21:23, [1, 2.46, 4.17])
+        w = masque(fig, ViewInteractable(ax); auto = false)
+        k = w.manifest["scaling"]
+        @test (w.manifest["width"], w.manifest["height"]) == (600k, 400k)
+        frame(settle) = w.render_frame(
+            Dict("id" => "view", "settle" => settle, "xmin" => 10.0, "xmax" => 14.0, "ymin" => 0.0, "ymax" => 5.0),
+        )
+
+        resize!(fig, 600, 600)
+        resp = frame(true)
+        m2 = resp["manifest"]
+        @test (m2["width"], m2["height"]) == (600k, 600k)
+        @test m2["scaling"] == k
+        @test resp["displayWidth"] == 600
+        img = FileIO.load(IOBuffer(resp["png"]))
+        @test size(img) == (m2["height"], m2["width"])
+        @test frame(false)["displayWidth"] == 600
+
+        # Wider than the column: the widget stops at `max_width`, as it does at mount.
+        resize!(fig, 900, 600)
+        resp = frame(true)
+        @test resp["manifest"]["width"] == 900k
+        @test resp["displayWidth"] == 700
+    end
+
     @testset "a pan moves the axes linked to it (#363)" begin
         _xlims(ax) = (fl = ax.finallimits[]; (fl.origin[1], fl.origin[1] + fl.widths[1]))
         _ylims(ax) = (fl = ax.finallimits[]; (fl.origin[2], fl.origin[2] + fl.widths[2]))
