@@ -57,10 +57,35 @@
             "bond": "element"
         },
         {
+            "points": [
+                [
+                    0,
+                    0,
+                    3,
+                    3,
+                    6,
+                    0
+                ]
+            ],
+            "tol": 12,
+            "zpoints": [
+                [
+                    0,
+                    3,
+                    2
+                ]
+            ],
             "linewidth": 3,
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "events": [
+                "click",
+                "hover"
+            ],
             "kind": "lines",
             "id": "lines",
-            "tol": 12,
             "geometry": [
                 [
                     458,
@@ -76,15 +101,7 @@
                     "index": 1
                 }
             ],
-            "axis": "ax1",
-            "style": {
-                "width": 2
-            },
-            "bond": "element",
-            "events": [
-                "click",
-                "hover"
-            ]
+            "bond": "element"
         }
     ],
     "initial": {

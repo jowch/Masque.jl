@@ -58,6 +58,10 @@ export function fmtCoord(v: unknown, f: CoordFormat | undefined, digits: number,
 // override. A field the user set stays a plain number. Only fields whose axis has a format are
 // listed.
 export type CoordFields = Record<string, CoordFormat>
+// The coordinates a line hover's readout fills in: `x`, `y`, and `z` on an Axis3 line.
+export function readoutKeys(hit: Hit): readonly string[] {
+    return !hit.pt_ ? [] : hit.pt_.length > 3 ? ["x", "y", "z"] : ["x", "y"]
+}
 export function coordFields(t: AxisTransform | undefined, layer: HitLayer, payload: unknown, computed: readonly string[]): CoordFields | undefined {
     if (!t || !(t.xfmt || t.yfmt || t.zfmt)) return undefined
     const own = payload != null && typeof payload === "object" ? payload as Record<string, unknown> : {}
@@ -69,7 +73,8 @@ export function coordFields(t: AxisTransform | undefined, layer: HitLayer, paylo
     return out
 }
 
-// A line hover's readout merged into its payload: `x` and `y` of the nearest sample, and for a
+// A line hover's readout merged into its payload: `x` and `y` of the nearest sample (and `z` on
+// an Axis3), and for a
 // template also `i`, its 1-based index. The default table leaves `i` out, next to the line's own
 // `index` it reads as a second index. Julia sends a categorical or date coordinate as its text;
 // a number on an axis with categories still shows the label Makie puts at that position. As
@@ -77,12 +82,13 @@ export function coordFields(t: AxisTransform | undefined, layer: HitLayer, paylo
 // has nowhere to put fields and is shown as it is.
 export function withReadout(payload: unknown, hit: Hit, t: AxisTransform | undefined, template: boolean): unknown {
     if (!hit.pt_ || (payload != null && typeof payload !== "object")) return payload
-    const [s, x, y] = hit.pt_
+    const [s, x, y, z] = hit.pt_
     const cat = (v: number | string, cats?: string[] | null) => (typeof v === "number" && cats?.length ? cats[Math.round(v) - 1] ?? v : v)
     const own = (payload ?? {}) as Record<string, unknown>
     const readout: Record<string, unknown> = template ? { i: s + 1 } : {}
     readout.x = cat(x, t?.xcats)
     readout.y = cat(y, t?.ycats)
+    if (z !== undefined) readout.z = z
     const out: Record<string, unknown> = { ...own }
     for (const [k, v] of Object.entries(readout)) if (!(k in own)) out[k] = v
     return out
@@ -166,5 +172,5 @@ export function plainTextForHit(hit: Hit, digits: number = DEFAULT_SIGDIGITS, t?
     }
     const payload = layer.payloads[hit.index]
     if (layer.template) return stripToPlain(renderTemplate(layer.template, withReadout(payload, hit, t, true), digits))
-    return renderAutoTablePlain(withReadout(payload, hit, t, false), digits, coordFields(t, layer, payload, hit.pt_ ? ["x", "y"] : []), explicit)
+    return renderAutoTablePlain(withReadout(payload, hit, t, false), digits, coordFields(t, layer, payload, readoutKeys(hit)), explicit)
 }

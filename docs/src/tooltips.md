@@ -53,7 +53,7 @@ What the default tooltip shows depends on what you hover:
 | a mark with `payloads` | the payload's fields, then the mark's own fields, such as a point's `x` and `y`; see [What each mark returns](@ref) |
 | a scatter point without `payloads` | its `index`, `x` and `y` |
 | a line from `lines!`, `stairs!`, `series!` or `scatterlines!` on an `Axis` | its payload, then `x` and `y` of the point you plotted nearest the pointer |
-| a line on an `Axis3` | only its payload |
+| a line on an `Axis3` | its payload, then `x`, `y` and `z` of the point you plotted nearest the pointer |
 | a legend entry | nothing, because its label is already next to the swatch; to add a tooltip, pass a template, as [Legend](@ref) shows |
 | a [`SliceInteractable`](@ref) | the series values at the pointer |
 
@@ -84,8 +84,8 @@ a `PolarAxis`, a point at `(π/2, 2)` shows `θ 90°` and `r 2`. On an axis
 with `ytickformat = "{:.1f} mV"`, `y` shows `3.5 mV`, rounded as the
 format says. The same goes for `MultiplesTicks(4, π, "π")`, which shows
 `1.5π`, and for the readouts of an [`AxisInteractable`](@ref), a
-[`ColorbarInteractable`](@ref), a dragged threshold, an ROI box and a
-view's limits. This covers the `x`, `y` and `z` Masque fills in itself,
+[`ColorbarInteractable`](@ref), a slice, a dragged threshold, an ROI
+box and a view's limits, and for what the keyboard announces. This covers the `x`, `y` and `z` Masque fills in itself,
 next to your own `payloads` fields too: a point's, a text label's and an
 arrow's position, a line's nearest sample, and a surface point. A field
 you set yourself, even one named `x`, and `$(x)` in a template stay plain

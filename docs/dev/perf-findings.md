@@ -114,12 +114,16 @@ repo's own docs build) one widget already warns and two fail.
   1.8 KB of `xy` in a 2.2 KB manifest, 1 000 vertices 17.6 KB in 18.0 KB (~18 B/vertex). The
   raster stays the empty-axis floor (9.8 KB). A view gesture rebuilds the manifest every frame,
   so a slice on a panned axis pays this again per camera move.
-- **Line samples** for the hover readout (`points`, section I, 2026-10-03, #262): a 2D line also
-  carries each sample as two Float32s (~10 B/sample), beside its integer-pixel geometry
-  (~6 B/vertex). That makes a line layer about 2.7× its geometry alone: 100 samples is 1.0 KB of
-  `points` in a 2.0 KB manifest, 1 000 is 9.8 KB in 15.8 KB, 10 000 is 98 KB in 156 KB. That stays
-  under a 10 000-point scatter's 379 KB. Date and category axes carry text instead, which is larger
-  per sample. Axis3 lines carry none.
+- **Line samples** for the hover readout (`points`, section I, 2026-10-03, #262; re-run
+  2026-11-01 on `b930607` plus #502): a 2D line also carries each sample as two Float32s
+  (~10 B/sample), beside its integer-pixel geometry (~6 B/vertex). That makes a line layer about
+  2.7× its geometry alone: 100 samples is 1.0 KB of `points` in a 2.0 KB manifest, 1 000 is
+  9.8 KB in 16.0 KB, 10 000 is 98 KB in 156 KB. That stays under a 10 000-point scatter's
+  379 KB. Date and category axes carry text instead, which is larger per sample. A line on an
+  Axis3 adds each sample's `z` (`zpoints`, ~15 B/sample in all), about 3.5× its geometry: 100
+  samples is 1.5 KB in 2.5 KB, 1 000 is 14.7 KB in 21.0 KB, 10 000 is 147 KB in 206 KB. No
+  cap, as on 2D: at 10 000 samples it is still under the scatter. A zoomed Axis3 whose limits
+  cut a line also ships `drawn`, one small integer per drawn vertex.
 - **Not display width.** `px_per_unit` scales the PNG roughly with the square of the width but
   leaves the manifest alone: scatter-1000's PNG is 90 KB at 300 px and 188 KB at 700 px, its
   manifest 38 KB at both.

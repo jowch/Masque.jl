@@ -1265,6 +1265,62 @@ try {
       continue;
     }
 
+    // `onchange` on a colorbar threshold (#499): the frame caps the heatmap one below the cutoff,
+    // so the colorbar's range ends below the line on every frame. Each drag must still bring a
+    // settled frame (a failed one never stamps), and the line must sit on the bar, at its top end.
+    if (spec.mode === "onchange_colorbar") {
+      const stamp = async () => {
+        const raw = await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          return host?.dataset.masqueGestureFrame ?? "";
+        }, key);
+        return raw ? JSON.parse(raw) : null;
+      };
+      const waitFrame = async (after, what) => {
+        for (let i = 0; i < (backend === "webgl" ? 60 : 40); i++) {
+          await new Promise((r) => setTimeout(r, 250));
+          const st = await stamp();
+          if (st && st.onchange && st.settle && st.n > (after?.n ?? 0)) return st;
+        }
+        throw new Error(`${key}/${what}: no settled onchange frame after ${JSON.stringify(after)}`);
+      };
+      const lineY = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        return Number(sr.querySelector(".masque-threshold-line")?.getAttribute("y1"));
+      }, key);
+      const t = (await transformsOf(key))[layer.axis];
+      const [, vy, , vh] = t.viewport;
+      let st = await stamp();
+      let out = await textOf(`#out_${key}`);
+      // Down a little, then up past the top of the bar (the line starts there, as the mount's
+      // frame already capped the data below it), staying on the figure: a release over the
+      // cell above lands on Pluto, which opens that cell's code and shifts the page. Each release also sets the value, and
+      // the wait for its readout keeps the page from reflowing under the next case's checks.
+      for (const [dy, what] of [[40, "drag-down"], [-30, "drag-past-end"]]) {
+        const y0 = await lineY();
+        const p = hitPoint(layer, 0);
+        await drag(key, p.x, y0, p.x, y0 + dy, false);
+        st = await waitFrame(st, what);
+        out = await waitChange(`#out_${key}`, out, `${key}/${what}`);
+        let y = NaN;
+        for (let i = 0; i < 20; i++) {
+          y = await lineY();
+          if (Math.abs(y - vy) <= 1.5) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        if (!(Math.abs(y - vy) <= 1.5)) throw new Error(`${key}/${what}: line at y=${y}, want the top of the bar at ${vy.toFixed(1)} (bar ${vy.toFixed(1)}..${(vy + vh).toFixed(1)})`);
+        passed.push(`${key}/${what}`);
+      }
+      const v = out;
+      if (!/ThresholdEvent\(:cut, value = /.test(v)) throw new Error(`${key}: value ${JSON.stringify(v)}`);
+      passed.push(`${key}/value`);
+      console.error(`OK  ${key} — ${v.slice(0, 100)}`);
+      continue;
+    }
+
     // `select = :many` (#335, #358): a click adds a pick or takes it out, with or without Ctrl
     // (Linux Chromium, so Ctrl rather than Cmd), a click on empty plot space keeps them (#384),
     // and Escape on the focused figure clears them. Each step checks the printed `@bind` value,
@@ -2372,7 +2428,7 @@ try {
       const ends = catTarget
         ? [[p.x, catTarget.y]]
         : spec.layerKind === "threshold"
-        ? [[p.x, p.y - 50], [p.x, p.y + 50]]
+        ? (layer.geometry.orientation === "v" ? [[p.x - 50, p.y], [p.x + 50, p.y]] : [[p.x, p.y - 50], [p.x, p.y + 50]])
         : spec.layerKind === "roi"
           ? (() => {
             const pts = layers.find((l) => l.kind === "circles");
@@ -2488,6 +2544,33 @@ try {
           throw new Error(`${key}-drag: line at y=${lineY} after release, expected category ${catTarget.k} at y=${catTarget.y.toFixed(1)} (#199 snap)`);
         }
         passed.push(`${key}/line-snaps-to-category`);
+      }
+      // A threshold on a colorbar (#499) leaves the bar's own readout working off the line: a
+      // hover a quarter of the bar away from the line reads the value there.
+      if (spec.colorbarReadout) {
+        const cbl = layers.find((l) => l.id === spec.colorbarReadout);
+        if (!cbl || cbl.axis !== layer.axis) throw new Error(`${key}: no :${spec.colorbarReadout} layer on the threshold's colorbar`);
+        const t = (await transformsOf(key))[layer.axis];
+        const [vx, vy, vw, vh] = t.viewport;
+        const horiz = layer.geometry.orientation === "h";
+        const line = Number(await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const hosts = [...document.querySelectorAll(".ip-host")];
+          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          return sr.querySelector(".masque-threshold-line")?.getAttribute("x1") + "," + sr.querySelector(".masque-threshold-line")?.getAttribute("y1");
+        }, key).then((xy) => xy.split(",")[horiz ? 1 : 0]));
+        const lo = horiz ? vy : vx, len = horiz ? vh : vw;
+        const at = line - lo > len / 2 ? lo + len / 4 : lo + 3 * len / 4;
+        const hx = horiz ? vx + vw / 2 : at, hy = horiz ? at : vy + vh / 2;
+        const tip = await dispatchAt(key, hx, hy, "pointermove");
+        const want = invertAxisJs(t, hx, hy)[horiz ? "y" : "x"];
+        const num = /(-?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s*$/i.exec((tip?.text ?? "").trim());
+        if (!tip?.show || !num || Math.abs(Number(num[1]) - want) > 0.02 * Math.abs(want) + 1e-9) {
+          throw new Error(`${key}/colorbar-readout: hover at ${hx.toFixed(1)},${hy.toFixed(1)} showed ${JSON.stringify(tip?.text)}, want about ${want}`);
+        }
+        passed.push(`${key}/colorbar-readout`);
+        console.error(`OK  ${key}/colorbar-readout — ${JSON.stringify(tip.text)} (want ${want.toPrecision(4)})`);
       }
       console.error(`OK  ${key}/drag — ${after.slice(0, 100)}`);
       continue;
@@ -3730,8 +3813,10 @@ try {
       // A closed mark's pick is drawn by the fade and keeps its hover fill and halo (#394); any
       // other pick, a picked point on a line included, is the hovered mark itself (the line's
       // hover dot sits on the sample just picked), which draws no hover chrome once selected.
+      // An Axis3 line (#502) is picked whole but reads out a point, so the hover dot at that
+      // point stays over the picked line, as the line hover recipe draws it.
       const fadePick = echo.picked.includes(`${layer.id}:${clickIdx}`);
-      const wantHi = fadePick ? 2 : 0;
+      const wantHi = fadePick ? 2 : layer.kind === "lines" && layer.zpoints ? 1 : 0;
       if (echo.hi !== wantHi) throw new Error(`${key}/click-echo: g.hi=${echo.hi} over the echo, expected ${wantHi}`);
       const expectSel = closedHover ? 2 : 1;
       if (echo.sel !== expectSel) {

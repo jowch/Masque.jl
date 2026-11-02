@@ -501,8 +501,11 @@ function _one_event(manifest, owners, js)
     # A line's pick names one of its data points; `index` above is which line.
     s = get(js, "sample", nothing)
     if s !== nothing && kind === :lines && ev isa ElementEvent
-        data = haskey(owners, layer_id) ? _line_data(owners[layer_id].interactable, getfield(ev, :index)) : nothing
-        ev = _line_point(ev, d, Int(s) + 1, data)
+        o = get(owners, layer_id, nothing)
+        k = getfield(ev, :index)
+        data = o === nothing ? nothing : _line_data(o.interactable, k)
+        zdata = o === nothing ? nothing : _line_zdata(o.interactable, k)
+        ev = _line_point(ev, d, Int(s) + 1, data, zdata)
     end
     return ev
 end

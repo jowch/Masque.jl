@@ -201,10 +201,13 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
-        # `lines!` on Axis3: one element, so nothing is baked selected and hover takes it.
+        # `lines!` on Axis3: one element, so nothing is baked selected and hover takes it. A
+        # hover reads out the nearest plotted point's x, y and z (#502); a click still picks
+        # the whole line.
         "key" => "lines3d", "layerId" => "lines", "layerKind" => "lines",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
+        "readout" => Dict("vertex" => 2, "text" => ["x2", "y4", "z3"]),
     ),
     Dict(
         # `meshscatter!` on Axis3: each sphere's hit circle comes from its data-space size.
@@ -376,6 +379,21 @@ kind_sweep_meta() = [
             "layer" => "scatter", "otherClicks" => true,
             "initial" => "threshold = ThresholdEvent\\(:threshold, value = 4\\.0",
         ),
+    ),
+    Dict(
+        # A threshold on a vertical colorbar (#499): a horizontal line across the bar, dragged
+        # along its scale. The colorbar's own readout still answers off the line.
+        "key" => "threshold_colorbar", "layerId" => "cut", "layerKind" => "threshold",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+        "colorbarReadout" => "colorbar",
+    ),
+    Dict(
+        # The same on a horizontal log10 colorbar: a vertical line, dragged left and right.
+        "key" => "threshold_colorbar_h", "layerId" => "cut", "layerKind" => "threshold",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+        "colorbarReadout" => "colorbar",
     ),
     Dict(
         # A colorbar the caller passed is a field of its own, `nothing` until clicked, next to the
@@ -586,6 +604,14 @@ kind_sweep_meta() = [
         "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 1,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "composite", "field" => "*",
         "control" => "cutoff", "controlStart" => 3.0, "line" => "lines", "fields" => ["cutoff", "scatter"],
+    ),
+    Dict(
+        # `onchange` on a colorbar threshold (#499): each frame caps the heatmap one below the
+        # cutoff, so the colorbar's range shrinks under the line. Every redraw must still land,
+        # with the line held at the end of the bar.
+        "key" => "onchange_colorbar", "layerId" => "cut", "layerKind" => "threshold",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "onchange_colorbar",
     ),
     Dict(
         # `onchange` (#334): the red level line sits at the threshold's value plus the number of
@@ -1318,6 +1344,24 @@ function build_kind_sweep()
         masque(fig, ROIInteractable(ax; bounds = (3.0, 6.0, 3.0, 6.0), id = :roi))
     end
 
+    threshold_colorbar = let
+        z = [Float64(i + 3j) for i in 1:4, j in 1:3]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "threshold on a colorbar")
+        hm = heatmap!(ax, 1:4, 1:3, z)
+        cb = Colorbar(fig[1, 2], hm)
+        masque(fig, ThresholdInteractable(cb; value = 9.0, id = :cut))
+    end
+
+    threshold_colorbar_h = let
+        z = [10.0^(i + 4j - 5) for i in 1:4, j in 1:3]
+        fig = Figure(size = (480, 300))
+        ax = Axis(fig[1, 1]; title = "threshold on a log colorbar")
+        hm = heatmap!(ax, 1:4, 1:3, z; colorscale = log10)
+        cb = Colorbar(fig[2, 1], hm; vertical = false)
+        masque(fig, ThresholdInteractable(cb; value = 1000.0, id = :cut))
+    end
+
     colorbar_owner = let
         z = [Float64(i + 3j) for i in 1:4, j in 1:3]
         fig = Figure(size = (480, 260))
@@ -1578,6 +1622,16 @@ function build_kind_sweep()
         )
     end
 
+    onchange_colorbar = let
+        z = [Float64(i + 3j) for i in 1:4, j in 1:3]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "onchange on a colorbar threshold")
+        data = Observable(copy(z))
+        hm = heatmap!(ax, 1:4, 1:3, data)
+        cb = Colorbar(fig[1, 2], hm)
+        masque(fig, (cut = ThresholdInteractable(cb; value = 9.0),); onchange = st -> (data[] = min.(z, st.cut.value - 1)))
+    end
+
     controls = let
         fig = Figure(size = (480, 420))
         ax = Axis(fig[1, 1:2]; title = "controls", limits = (0, 10, 0, 10))
@@ -1743,8 +1797,8 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, legend, series_legend,
-        legend_overlap, legend_template, axis, composite, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_colorbar, threshold_colorbar_h, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, legend, series_legend,
+        legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
 

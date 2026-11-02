@@ -1,6 +1,6 @@
 import { anchorFor, axisPoint, computeAnchoredPlacement, hitTestAt, layerPoint, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layerFrame } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
-import { renderTemplate, renderAutoTable, esc, fmtNum, fmtCoord, coordFields, withReadout } from "./template"
+import { renderTemplate, renderAutoTable, esc, fmtNum, fmtCoord, coordFields, readoutKeys, withReadout } from "./template"
 import { drawHover, clearHover, drawLegendLink, drawPartners, clearLegendLink, markColorFor } from "./highlight"
 import { groupOf, partnerHits } from "./linked"
 import { hideCross, syncCross } from "./cross"
@@ -284,7 +284,7 @@ export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): 
     }
     const t = ctx.manifest_.transforms[layer.axis]
     const payload = hit.layer.payloads[hit.index]
-    return renderAutoTable(withReadout(payload, hit, t, false), ctx.tipDigits_, coordFields(t, layer, payload, hit.pt_ ? ["x", "y"] : []), ctx.tipExplicit_)
+    return renderAutoTable(withReadout(payload, hit, t, false), ctx.tipDigits_, coordFields(t, layer, payload, readoutKeys(hit)), ctx.tipExplicit_)
 }
 
 export function applyTipHtml(ctx: OverlayCtx, state: OverlayState, html: string, hit: Hit | null): void {

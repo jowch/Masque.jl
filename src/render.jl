@@ -206,13 +206,17 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     L.step === nothing || (d["step"] = string(L.step))
     L.order === nothing || (d["order"] = L.order)
     L.ellipses === nothing || (d["ellipses"] = L.ellipses)
+    L.zpoints === nothing || (d["zpoints"] = L.zpoints)
+    L.drawn === nothing || (d["drawn"] = L.drawn)
     spec = tooltip_spec(i)
     spec === true && throw(ArgumentError("tooltip = true is not meaningful — omit `tooltip` for the auto name/value table (the default), pass masque\"…\" for a template, or `false` to suppress."))
     if spec isa Markup
         # A slice has no payloads: the live sample's fields are the probe coordinate plus each series id.
         ks = L.kind === :slice ? _slice_template_keys(L) : _payload_keys(L.payloads)
-        # A line's hover readout adds the nearest sample's `x`, `y`, and 1-based index `i`.
+        # A line's hover readout adds the nearest sample's `x`, `y`, and 1-based index `i`, and
+        # on an Axis3 its `z`.
         L.points === nothing || isempty(ks) || union!(ks, (:x, :y, :i))
+        L.zpoints === nothing || isempty(ks) || push!(ks, :z)
         # A grid cell's template also sees the cell's `i`, `j`, and `value`.
         L.kind === :grid && !isempty(ks) && union!(ks, (:i, :j, :value))
         # A surface point always has its own fields, so its template is checked against them

@@ -10,7 +10,7 @@ import { abortMarquee, clearPicks, commitClick, isToggleClick } from "./bond"
 import { historyKey, stepPicks } from "./history"
 import { plainTextForHit } from "./template"
 import { cssAnchor } from "./state"
-import { anchorFor, lineReadout, samplePoint } from "./geometry"
+import { anchorFor, lineReadout, readoutAt, samplePoint } from "./geometry"
 import type { Anchor } from "./geometry"
 import type { OverlayCtx, OverlayState } from "./state"
 import type { AxisTransform, FocusRef, Hit, HitLayer, Manifest } from "./types"
@@ -120,7 +120,8 @@ function nearestShownSample(hit: Hit, t: AxisTransform | undefined, p: { x: numb
         const at = samplePoint(hit.layer, hit.index, s, t, true)
         if (!at) continue
         const d = Math.hypot(at.x - p.x, at.y - p.y)
-        if (d < bd) { bd = d; best = { pt: [s, pts[2 * s], pts[2 * s + 1]], at } }
+        const pt = readoutAt(hit.layer, hit.index, s)
+        if (pt && d < bd) { bd = d; best = { pt, at } }
     }
     return best
 }
@@ -149,8 +150,9 @@ function stepSample(ctx: OverlayCtx, state: OverlayState, dir: 1 | -1): boolean 
     const t = ctx.manifest_.transforms[hit.layer.axis]
     for (let s = hit.pt_[0] + dir; s >= 0 && s < pts.length / 2; s += dir) {
         const at = samplePoint(hit.layer, hit.index, s, t, true) // a point past the axis limits is not shown
-        if (!at) continue
-        const next: Hit = { ...hit, pt_: [s, pts[2 * s], pts[2 * s + 1]] }
+        const pt = at && readoutAt(hit.layer, hit.index, s)
+        if (!at || !pt) continue
+        const next: Hit = { ...hit, pt_: pt }
         paintFocus(ctx, state, ctx.focusable_[cur], next, anchorFor(next, at))
         return true
     }

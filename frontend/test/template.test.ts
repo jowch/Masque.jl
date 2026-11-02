@@ -141,6 +141,11 @@ describe("withReadout", () => {
         expect(withReadout({ label: "s" }, hit(2), t, false)).toEqual({ label: "s", x: "b", y: 1 })
         expect(withReadout({ label: "s" }, hit(3), t, false)).toEqual({ label: "s", x: 3, y: 1 })
     })
+    it("adds z on an Axis3", () => {
+        const hit: Hit = { layer, index: 0, pt_: [4, 1, 2, 3] }
+        expect(withReadout({}, hit, undefined, false)).toEqual({ x: 1, y: 2, z: 3 })
+        expect(withReadout({ z: "own" }, hit, undefined, true)).toEqual({ i: 5, x: 1, y: 2, z: "own" })
+    })
     it("adds the 1-based index for a template only, and leaves a scalar payload alone", () => {
         const hit: Hit = { layer, index: 0, pt_: [4, 1, 2] }
         expect(withReadout({}, hit, undefined, true)).toEqual({ i: 5, x: 1, y: 2 })

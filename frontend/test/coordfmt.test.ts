@@ -85,6 +85,14 @@ describe("coordinate fields in the default table", () => {
         const c = coordFields({ xfmt: MV, yfmt: MV } as unknown as AxisTransform, L, L.payloads[0], ["x", "y"])
         expect(Object.keys(c!)).toEqual(["x"])
     })
+    it("formats an Axis3 line readout's z with the z tick format", () => {
+        const L = layerOf([{ index: 1 }], { kind: "lines" } as Partial<HitLayer>)
+        const t = { zfmt: { suffix: " K", spec: ".2f" } } as unknown as AxisTransform
+        const hit = { layer: L, index: 0, pt_: [0, 1, 2, 3.14159] } as unknown as Hit
+        expect(plainTextForHit(hit, 4, t)).toBe("index 1, x 1, y 2, z 3.14 K")
+        const flat = { layer: L, index: 0, pt_: [0, 1, 2] } as unknown as Hit
+        expect(plainTextForHit(flat, 4, t)).toBe("index 1, x 1, y 2")
+    })
     it("gives nothing for an axis with no formats", () => {
         expect(coordFields({} as AxisTransform, layerOf([{}], { coords: ["x", "y"] }), {}, ["x"])).toBeUndefined()
         expect(coordFields(undefined, layerOf([{}], { coords: ["x", "y"] }), {}, ["x"])).toBeUndefined()
