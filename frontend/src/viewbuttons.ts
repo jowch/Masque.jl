@@ -179,6 +179,7 @@ export const VIEW_BUTTONS_STYLE = `
        box-shadow: var(--masque-tip-shadow, 0 2px 4px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08));
        transition: opacity ${MOTION_MS}ms ease-out; }
 .masque-vb.row { flex-direction: row; }
+.masque-vb[hidden] { display: none; }
 .masque-vb.show { opacity: 1; pointer-events: auto; }
 .masque-vb button { all: unset; box-sizing: border-box; width: var(--masque-vb-size, 24px); height: var(--masque-vb-size, 24px);
        display: grid; place-items: center; cursor: pointer; color: inherit; }
@@ -247,7 +248,6 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
             b.type = "button"
             b.className = `masque-vb-${key}`
             b.setAttribute("aria-label", LABELS[key])
-            b.title = LABELS[key]
             // Not tab stops: the view's own stop has +, - and 0 for these.
             b.tabIndex = -1
             b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key]}</svg>`
