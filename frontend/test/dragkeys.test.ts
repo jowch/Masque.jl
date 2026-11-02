@@ -387,6 +387,8 @@ describe("drag-layer tab stops", () => {
         const surface = shadow.querySelector(".surface") as HTMLElement
         // happy-dom's WheelEvent drops clientX/clientY, so set them on the instance.
         const we = new WheelEvent("wheel", { deltaY: -100, bubbles: true, cancelable: true })
+        // happy-dom drops ctrlKey from a WheelEvent init (#526).
+        Object.defineProperty(we, "ctrlKey", { value: true })
         Object.defineProperties(we, { clientX: { value: 300 }, clientY: { value: 200 } })
         surface.dispatchEvent(we)
         const stop = stopOf(shadow, "view")
@@ -456,15 +458,43 @@ describe("drag-layer tab stops", () => {
         mount(script, withFields(m), undefined, requestFrame)
         const shadow = (host.lastElementChild as HTMLElement).shadowRoot!
         const stop = stopOf(shadow, "view")
-        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        // The view's readout sits in the figure's corner (#526).
+        const readout = shadow.querySelector(".masque-readout") as HTMLElement
         stop.focus()
         press(stop, "ArrowRight")
         await new Promise((r) => setTimeout(r, 10))
         expect(requestFrame).toHaveBeenCalled()
-        expect(tip.classList.contains("show")).toBe(true)
+        expect(readout.classList.contains("show")).toBe(true)
+        expect(readout.textContent).toContain("x:[")
         release(stop, "ArrowRight")
         await new Promise((r) => setTimeout(r, 10))
-        expect(tip.classList.contains("show")).toBe(false)
+        expect(readout.classList.contains("show")).toBe(false)
+    })
+
+    it("view pan: a settle frame that comes back with an onchange error still hides the readout", async () => {
+        const host = document.createElement("div")
+        const canvas = document.createElement("canvas") as HTMLCanvasElement & {
+            masqueReplaceScene?: (scene: unknown, px?: number, w?: number, h?: number) => void
+        }
+        canvas.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        canvas.masqueReplaceScene = vi.fn()
+        const script = document.createElement("script")
+        host.append(canvas, script)
+        document.body.append(host)
+        const requestFrame = vi.fn(async () => ({ error: "boom" }))
+        mount(script, withFields(viewManifest("pan")), undefined, requestFrame)
+        const shadow = (host.lastElementChild as HTMLElement).shadowRoot!
+        const stop = stopOf(shadow, "view")
+        const readout = shadow.querySelector(".masque-readout") as HTMLElement
+        stop.focus()
+        press(stop, "ArrowRight")
+        expect(readout.classList.contains("show")).toBe(true)
+        release(stop, "ArrowRight")
+        await new Promise((r) => setTimeout(r, 10))
+        expect(requestFrame).toHaveBeenCalled()
+        expect((shadow.querySelector(".masque-note") as HTMLElement).textContent).toBe("boom")
+        expect(readout.classList.contains("show")).toBe(false)
     })
 
     it("cleanup removes the stops' listeners", () => {
