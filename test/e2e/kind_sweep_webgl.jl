@@ -607,6 +607,26 @@ HTML(
         "<span id=\"coords_roi_bounds\" style=\"display:none\">$(JSON3.write(sweep.roi_bounds.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000196
+@bind ev_threshold_default sweep.threshold_default
+
+# ╔═╡ d1000000-0000-0000-0000-000000000197
+HTML(
+    "<span id=\"out_threshold_default\">THRESHOLD_DEFAULT=$(sweep_field("threshold_default", ev_threshold_default))</span>" *
+        "<span id=\"bond_threshold_default\" style=\"display:none\">$(repr(ev_threshold_default))</span>" *
+        "<span id=\"coords_threshold_default\" style=\"display:none\">$(JSON3.write(sweep.threshold_default.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000198
+@bind ev_roi_default sweep.roi_default
+
+# ╔═╡ d1000000-0000-0000-0000-000000000199
+HTML(
+    "<span id=\"out_roi_default\">ROI_DEFAULT=$(sweep_field("roi_default", ev_roi_default))</span>" *
+        "<span id=\"bond_roi_default\" style=\"display:none\">$(repr(ev_roi_default))</span>" *
+        "<span id=\"coords_roi_default\" style=\"display:none\">$(JSON3.write(sweep.roi_default.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000064
 @bind ev_axis_cat sweep.axis_cat
 
@@ -1028,6 +1048,10 @@ HTML(
 # ╟─d1000000-0000-0000-0000-000000000120
 # ╠═d1000000-0000-0000-0000-000000000121
 # ╟─d1000000-0000-0000-0000-000000000122
+# ╠═d1000000-0000-0000-0000-000000000196
+# ╟─d1000000-0000-0000-0000-000000000197
+# ╠═d1000000-0000-0000-0000-000000000198
+# ╟─d1000000-0000-0000-0000-000000000199
 # ╠═d1000000-0000-0000-0000-000000000064
 # ╠═d1000000-0000-0000-0000-000000000065
 # ╠═d1000000-0000-0000-0000-000000000032

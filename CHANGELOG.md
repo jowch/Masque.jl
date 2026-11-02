@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `ThresholdInteractable(ax)` and `ROIInteractable(ax)` work without a `value` or `bounds`.
+  The line starts halfway along the axis, and the box over the middle half of it, as the
+  axis is when `masque` runs: the middle on screen for a log scale, and the middle category
+  in view on a categorical axis. On a `Colorbar`, the line starts mid-scale. A `value` or
+  `bounds` given still sets the start (#513).
 - `ThresholdInteractable` takes a `Colorbar`: drag a line across the bar to set a cutoff on the
   colorbar's scale, `identity`, `log10` or `log`. The line follows the bar, horizontal on a
   vertical colorbar and vertical on a horizontal one, and hovering or clicking the rest of the

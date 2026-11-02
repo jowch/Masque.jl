@@ -59,7 +59,7 @@ function _rebuilt(p::_Plan)
     fresh = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
         p.rebuild()
     end
-    return _Plan(fresh.ints, p.binding, p.onchange, p.rebuild, p.mount, fresh.hidden, fresh.draw)
+    return _Plan(_carry_starts(fresh.ints, p.ints), p.binding, p.onchange, p.rebuild, p.mount, fresh.hidden, fresh.draw)
 end
 
 # The object a name belongs to: a plot for `interactables(plot)`, else the interactable.
