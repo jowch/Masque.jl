@@ -24,7 +24,7 @@ import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx
 import type { HiGroups, HiSet, OverlayCtx } from "./state"
 import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
 import { axisFrame, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
-import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_IDLE_MS } from "./photo"
+import { IDENTITY, isIdentity, mapPoint, panTo, residual, unmapPoint, wheelScale, zoomAt, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
 
 // Keys held for a Cmd/Ctrl/Shift/Alt-click; pressing one is not keyboard use.
@@ -454,7 +454,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // marquee), so the marquee is a mouse and pen gesture. This has to be decided up front, not
     // toggled per-pointerdown: UAs resolve touch-action at the touch's first contact, so setting
     // it later has no effect on the gesture already in flight.
-    if (manifest.layers.some((l) => l.events.includes("drag"))) surface.style.touchAction = "none"
+    // PROTOTYPE (touch-targets E, throwaway): a pan view whose id starts with "twofinger" moves
+    // with two fingers (pan + pinch zoom); one finger scrolls the page and shows a note.
+    const twoFinger = manifest.layers.find((l) => l.kind === "view" && l.id.startsWith("twofinger") && (l.geometry as ViewGeometry).mode === "pan")
+    if (twoFinger) surface.style.touchAction = "pan-x pan-y"
+    else if (manifest.layers.some((l) => l.events.includes("drag"))) surface.style.touchAction = "none"
     const tip = document.createElement("div")
     tip.className = "masque-tip"
     tip.setAttribute("role", "tooltip")
@@ -1186,8 +1190,16 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(overlayTick)
 
-    const down = (e: PointerEvent) => onDown(ctx, state, e)
-    const move = (e: PointerEvent) => { lastMove = e; onPointerMove(ctx, state, e) }
+    const down = (e: PointerEvent) => {
+        // PROTOTYPE: a finger never starts a drag on a two-finger view; a tap still clicks.
+        if (twoFinger && e.pointerType === "touch") { state.justDragged_ = false; return }
+        onDown(ctx, state, e)
+    }
+    const move = (e: PointerEvent) => {
+        // PROTOTYPE: a finger on a two-finger view doesn't hover (no tooltip mid-scroll or mid-pinch).
+        if (twoFinger && e.pointerType === "touch") return
+        lastMove = e; onPointerMove(ctx, state, e)
+    }
     const releaseChrome = (kind: string | undefined) => {
         if ((kind === "roi" || kind === "threshold") && !state.drag_) flushPendingChrome()
     }
@@ -1304,6 +1316,64 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }, WHEEL_IDLE_MS)
     }
 
+    // PROTOTYPE (touch-targets E): two-finger pan and pinch zoom through the photograph, the
+    // same path a wheel notch takes; the release settles like the wheel's idle timer.
+    type Pinch = { id: string; axis: string; d0: number; s0: number; anchor: { x: number; y: number } }
+    let pinch: Pinch | null = null
+    let oneStart: { x: number; y: number } | null = null
+    let noted = false
+    const two = (t: TouchList) => {
+        const a = t[0], b = t[1]
+        return { cx: (a.clientX + b.clientX) / 2, cy: (a.clientY + b.clientY) / 2, d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) }
+    }
+    const touchStart = (e: TouchEvent) => {
+        if (!twoFinger) return
+        if (e.touches.length === 1) { oneStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }; noted = false; return }
+        if (e.touches.length !== 2 || !ctx.manifest_.transforms[twoFinger.axis]) return
+        e.preventDefault()
+        oneStart = null
+        const g = two(e.touches)
+        const layout = layoutImagePx(ctx.base_, ctx.manifest_, g.cx, g.cy)
+        pinch = { id: twoFinger.id, axis: twoFinger.axis, d0: Math.max(g.d, 1), s0: state.photo_.s, anchor: unmapPoint(state.photo_, layout) }
+        hideCross(ctx, state)
+    }
+    const touchMove = (e: TouchEvent) => {
+        if (!twoFinger) return
+        if (pinch && e.touches.length >= 2) {
+            e.preventDefault()
+            const g = two(e.touches)
+            const s = Math.min(16, Math.max(1 / 16, pinch.s0 * (g.d / pinch.d0)))
+            const next = panTo(pinch.anchor, layoutImagePx(ctx.base_, ctx.manifest_, g.cx, g.cy), s)
+            state.photoViewId_ = pinch.id
+            state.photo_ = next
+            paintPhoto(next)
+            const lim = matrixLimits(ctx.manifest_.transforms[pinch.axis], next)
+            if (lim) {
+                ctx.gesture_.request({ id: pinch.id, ...lim, settle: false, s: next.s, tx: next.tx, ty: next.ty })
+                setTipText(ctx, state, limitsTip(lim, ctx.tipDigits_))
+                setTipVisible(ctx, true)
+                const r = surface.getBoundingClientRect()
+                placeTip(ctx, state, g.cx - r.left, g.cy - r.top)
+            }
+            return
+        }
+        if (oneStart && !noted && e.touches.length === 1 && Math.hypot(e.touches[0].clientX - oneStart.x, e.touches[0].clientY - oneStart.y) > 10) {
+            noted = true
+            showNote("Use two fingers to move the plot")
+        }
+    }
+    const touchEnd = (e: TouchEvent) => {
+        if (!twoFinger || !pinch || e.touches.length >= 2) return
+        const p = pinch
+        pinch = null
+        hideTip(ctx, state)
+        const settled = matrixLimits(ctx.manifest_.transforms[p.axis], state.photo_)
+        if (settled) ctx.gesture_.settle({ id: p.id, ...settled, settle: true, s: state.photo_.s, tx: state.photo_.tx, ty: state.photo_.ty })
+    }
+    surface.addEventListener("touchstart", touchStart, { passive: false })
+    surface.addEventListener("touchmove", touchMove, { passive: false })
+    surface.addEventListener("touchend", touchEnd)
+    surface.addEventListener("touchcancel", touchEnd)
     surface.addEventListener("pointerdown", down)
     surface.addEventListener("wheel", onWheel, { passive: false })
     surface.addEventListener("pointermove", move)
