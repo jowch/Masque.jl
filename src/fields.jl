@@ -273,12 +273,12 @@ end
 # ---------------------------------------------------------------------------
 
 # What a built layer holds in the bind value: `:pick` (clicks choose an element), `:control`
-# (a parameter with a start, a threshold or a box's bounds), `:brush` (the elements a
+# (a parameter with a start, a threshold, a span or a box's bounds), `:brush` (the elements a
 # `selects` box holds), or `nothing`.
 function _layer_role(L::HitLayer, d, brushed)
     L.id in brushed && return :brush
     stamp = d["bond"]
-    stamp in ("threshold", "bounds", "control") && return :control
+    stamp in ("threshold", "span", "bounds", "control") && return :control
     stamp == "none" && return nothing
     return "click" in d["events"] ? :pick : nothing
 end

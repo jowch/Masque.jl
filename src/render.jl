@@ -707,7 +707,7 @@ them, or `interactables(plot; …)` for one plot.
 - `interactables(plot; …)` replaces that plot's default layers, at the same position and with
   the same ids.
 - An interactable whose layer id matches a default's replaces that default.
-- Anything else (`ViewInteractable`, `ThresholdInteractable`, `ROIInteractable`,
+- Anything else (`ViewInteractable`, `ThresholdInteractable`, `SpanInteractable`, `ROIInteractable`,
   `PointInteractable(ax, pts)`, …) is added after the defaults, in argument order.
 
 Two layers with the same id raise `ArgumentError`. Legends link to the layers of this call.
@@ -719,8 +719,8 @@ The `@bind` value is a `NamedTuple` with one field per layer a reader can set, n
 id, in the order the layers are listed. A plot that takes clicks holds its pick: `nothing`
 until a click, then one [`InteractionEvent`](@ref), and `nothing` again when the same mark is
 clicked twice. A [`ThresholdInteractable`](@ref) holds a [`ThresholdEvent`](@ref), starting
-at its `value`, and an [`ROIInteractable`](@ref) a [`BoundsEvent`](@ref), starting at its
-`bounds`. A box with `selects` also fills its target's field with what it contains: a
+at its `value`, a [`SpanInteractable`](@ref) a [`SpanEvent`](@ref), starting at its `span`,
+and an [`ROIInteractable`](@ref) a [`BoundsEvent`](@ref), starting at its `bounds`. A box with `selects` also fills its target's field with what it contains: a
 `Vector{ElementEvent}` over points (an empty box is `ElementEvent[]`), one
 [`GridWindowEvent`](@ref) over a grid, starting at what its `bounds` contain. That target
 takes no clicks. A line (`lines!`, `stairs!`, `series!`, the line of a `scatterlines!`) only
@@ -764,7 +764,7 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   `onchange` and still takes clicks. The function changes plots that already exist, with
   Makie's `update!(plot, args...; attrs...)` or `plot[1] = …`; adding or removing a plot
   raises `ArgumentError`. It runs once inside `masque`, before the first picture, then on
-  every click and release, and while a threshold or box moves unless that control was built
+  every click and release, and while a threshold, span or box moves unless that control was built
   with `update_while_dragging = false`. A plot whose number of marks changes loses its picks.
   An error while the reader works the widget keeps the last picture, shows a short note over
   it, and logs the full error. It needs a running kernel: in a static export the picture
@@ -1149,7 +1149,7 @@ function _pick_counts(manifest)
         counts[g["id"]] = reinterpret(Int, hash((g["n"], _group_table(manifest, g))))
     end
     for d in manifest["layers"]
-        d["id"] in fields && get(d, "bond", nothing) ∉ ("threshold", "bounds", "control") || continue
+        d["id"] in fields && get(d, "bond", nothing) ∉ ("threshold", "span", "bounds", "control") || continue
         # A hidden plot has no marks to pick: hiding it clears its picks.
         get(d, "hidden", false) === true && (counts[d["id"]] = 0; continue)
         n = try
@@ -1203,13 +1203,17 @@ function _move_controls!(live::_LiveFigure, manifest, owners, js)
     ints = live.plan.ints
     for k in eachindex(ints)
         i = ints[k]
-        i isa Union{ThresholdInteractable, ROIInteractable} || continue
+        i isa Union{ThresholdInteractable, SpanInteractable, ROIInteractable} || continue
         f = string(i.id)
         haskey(js, f) && js[f] !== nothing || continue
         ev = _field_value(manifest, owners, f, js[f])
-        ints[k] = i isa ThresholdInteractable ?
-            ThresholdInteractable(i.ax, i.orientation, _threshold_value(ev), i.id, i.update_while_dragging) :
+        ints[k] = if i isa ThresholdInteractable
+            ThresholdInteractable(i.ax, i.orientation, _threshold_value(ev), i.id, i.update_while_dragging)
+        elseif i isa SpanInteractable
+            SpanInteractable(i.ax, i.orientation, _span_values(ev)..., i.id, i.update_while_dragging)
+        else
             ROIInteractable(i.ax, _roi_bounds(ev), i.id, i.selects, i.update_while_dragging)
+        end
     end
     return nothing
 end

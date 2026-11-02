@@ -8,7 +8,7 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
 # Fields
 - `id::Symbol` — the layer id; becomes `InteractionEvent.layer` on a hit.
 - `kind::Symbol` — one of `:circles`, `:polyline`, `:lines`, `:segments`, `:rects`, `:grid`,
-  `:surface`, `:polygons`, `:axis`, `:threshold`, `:roi`, `:view`, `:slice`. `geometry`'s layout depends on it:
+  `:surface`, `:polygons`, `:axis`, `:threshold`, `:span`, `:roi`, `:view`, `:slice`. `geometry`'s layout depends on it:
   - `:circles` — flat `Real[]`, `(cx, cy, r)` per element (image px)
   - `:rects` — flat `Real[]`, `(cx, cy, w, h)` per element (image px)
   - `:polyline` / `:segments` — flat `Real[]`, `(x, y)` per vertex — one connected path hit
@@ -32,9 +32,10 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
     Payloads, when present, are one per shipped point, row-major like `xy`
   - `:axis` — `nothing` (whole-axis readout, `AxisInteractable`) or flat `Real[x, y, w, h]`
     (the colorbar's pixel bbox, `ColorbarInteractable`); not element-indexed
-  - `:threshold` / `:roi` / `:view` — a small `Dict` (orientation/position, drag bbox +
-    hit half-size `handle` — the overlay paints the grip at a fixed 7 CSS px — or viewport +
-    camera, respectively); not element-indexed
+  - `:threshold` / `:span` / `:roi` / `:view` — a small `Dict` (orientation/position, the
+    orientation and both edges' positions, drag bbox + hit half-size `handle` — the overlay
+    paints the grip at a fixed 7 CSS px — or viewport + camera, respectively); not
+    element-indexed
   - `:slice` — a `Dict` of data-space series to sample at the cursor (`SliceInteractable`);
     not a hit target. The overlay hair is drawn only when this layer's `crosshair` is true,
     and only the arm named by `orientation`
@@ -77,7 +78,7 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
 """
 struct HitLayer
     id::Symbol
-    kind::Symbol          # :circles|:polyline|:lines|:segments|:rects|:grid|:surface|:polygons|:axis|:threshold|:roi|:view|:slice
+    kind::Symbol          # :circles|:polyline|:lines|:segments|:rects|:grid|:surface|:polygons|:axis|:threshold|:span|:roi|:view|:slice
     geometry::Any
     payloads::Vector{Any}
     axis::Symbol
@@ -119,8 +120,8 @@ HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links) = Hit
 Supertype for everything [`masque`](@ref) can turn into hit-testable JS layers. The built-in
 kinds ([`PointInteractable`](@ref), [`SegmentInteractable`](@ref), [`RectInteractable`](@ref),
 [`PolygonInteractable`](@ref), [`AxisInteractable`](@ref), [`ColorbarInteractable`](@ref),
-[`LegendInteractable`](@ref), [`ThresholdInteractable`](@ref), [`ROIInteractable`](@ref),
-[`TextInteractable`](@ref), [`ViewInteractable`](@ref), [`SliceInteractable`](@ref),
+[`LegendInteractable`](@ref), [`ThresholdInteractable`](@ref), [`SpanInteractable`](@ref),
+[`ROIInteractable`](@ref), [`TextInteractable`](@ref), [`ViewInteractable`](@ref), [`SliceInteractable`](@ref),
 [`RegionInteractable`](@ref), [`FunctionInteractable`](@ref)) cover most needs; implement
 this interface for anything else.
 
@@ -2199,14 +2200,14 @@ end
 # written. A value the browser sends back can sit a rounding error past the end of the bar, and
 # an `onchange` can move the limits under the line; a redraw then draws the line at the end of
 # the bar instead (`_colorbar_pos`).
-function _check_on_bar(cb, v)
+function _check_on_bar(cb, v, who = "ThresholdInteractable", arg = "value")
     lims = cb.limits[]
     lims === nothing && return nothing
     lo, hi = minmax(Float64(lims[1]), Float64(lims[2]))
     lo <= v <= hi || throw(
         ArgumentError(
-            "ThresholdInteractable: value = $(v) is outside the colorbar's limits ($(lo), $(hi)), " *
-                "so the line would sit off the bar. Pick a value inside them."
+            "$(who): $(arg) = $(v) is outside the colorbar's limits ($(lo), $(hi)), " *
+                "so it would sit off the bar. Pick a value inside them."
         )
     )
     return nothing
@@ -2217,7 +2218,7 @@ events(::ThresholdInteractable) = (:drag,)
 function validate(i::ThresholdInteractable, ctx::InteractionContext)
     i.ax isa Makie.Legend && return "ThresholdInteractable: ax is a Legend, not an Axis — a legend has no data-space scalar to drag."
     t = ctx.transforms[axis_id(ctx, i.ax)]
-    i.ax isa Makie.Colorbar && return _validate_colorbar_threshold(i, t)
+    i.ax isa Makie.Colorbar && return _validate_colorbar_line("ThresholdInteractable", i.orientation, t)
     t.is3d && return "ThresholdInteractable: drag inverts a pixel to a data scalar via the axis " *
         "transform, which is undefined on an Axis3 (a screen pixel is a ray, not a data value)."
     t.ispolar && return "ThresholdInteractable: a threshold is not supported on PolarAxis (it drags a " *
@@ -2227,14 +2228,14 @@ function validate(i::ThresholdInteractable, ctx::InteractionContext)
         "invertible $(i.orientation === :horizontal ? "y" : "x")-scale ($(sc) is not; supported: identity/log10/log)."
     return nothing
 end
-function _validate_colorbar_threshold(i, t)
+function _validate_colorbar_line(who, orientation, t)
     vertical = t.valueaxis === :y
     across = vertical ? :horizontal : :vertical
-    i.orientation === across || return "ThresholdInteractable: a $(vertical ? "vertical" : "horizontal") " *
-        "colorbar takes a $(across) line, across the bar; got orientation = :$(i.orientation). " *
+    orientation === across || return "$(who): a $(vertical ? "vertical" : "horizontal") " *
+        "colorbar takes a $(across) line, across the bar; got orientation = :$(orientation). " *
         "Leave orientation out on a Colorbar and it follows the bar."
     sc = vertical ? t.yscale : t.xscale
-    sc in _JS_INVERTIBLE || return "ThresholdInteractable: the colorbar's scale $(sc) is not " *
+    sc in _JS_INVERTIBLE || return "$(who): the colorbar's scale $(sc) is not " *
         "invertible client-side; supported: identity/log10/log."
     return nothing
 end
@@ -2265,6 +2266,100 @@ function hitlayers(i::ThresholdInteractable, ctx)
     geom = Dict{String, Any}("orientation" => orient, "pos" => Float32(pos), "span" => span)
     i.update_while_dragging || (geom["settleOnly"] = true)
     return [HitLayer(i.id, :threshold, geom, Any[], axis_id(ctx, i.ax), events(i))]
+end
+
+# ============================ SpanInteractable =============================
+"""
+    SpanInteractable(ax; span, orientation, id=:span, update_while_dragging=true)
+
+A band between two draggable edges, on an axis or a colorbar: drag an edge to move it, or the
+inside of the band to move both edges. Outside the band the picture fades, as unpicked marks
+do, and each edge carries a small grip. On release both edges invert to data values via
+[`AxisTransform`](@ref). Produces one `:span` [`HitLayer`](@ref).
+
+# Arguments
+- `ax` — a `Makie.Axis`, or a `Makie.Colorbar` to pick a band of its colors.
+- `span` — the band's starting `(lo, hi)` in data space, with `lo < hi` (`ArgumentError`
+  otherwise). On a `Colorbar`, both inside its limits. Accepts a [`SpanEvent`](@ref).
+- `orientation` — `:vertical` (the edges are constant-x lines, so the band is an x interval)
+  or `:horizontal` (constant-y edges, a y interval). Any other value raises `ArgumentError`.
+  Default `:vertical` on an `Axis`. On a `Colorbar` the edges run across the bar, so leave it
+  out: it follows the colorbar.
+- `id` — the layer id; becomes `InteractionEvent.layer` on commit. Default `:span`.
+- `update_while_dragging` — with `onchange` on [`masque`](@ref), redraw the figure while the
+  band moves, not only when it is let go. Default `true`, like Makie's `Slider`. The `@bind`
+  value changes only on release either way.
+
+Its field in the `@bind` value is a [`SpanEvent`](@ref), starting at `span`. An edge stops at
+the other edge, so `lo ≤ hi` holds while dragging.
+
+`masque` raises `ArgumentError` at build time if `ax` is an `Axis3`, a `PolarAxis` or a
+`Legend`; if the dragged scale isn't client-invertible (supported: `identity`, `log10`, `log`);
+if the dragged dimension is categorical; or, on a `Colorbar`, if `orientation` runs along the
+bar instead of across it. If an `onchange` later moves a colorbar's limits past an edge, that
+edge waits at the end of the bar.
+
+# Examples
+```julia
+SpanInteractable(ax; span = (2.0, 5.0))                 # an x window
+
+# a band of the colorbar of a heatmap `hm`
+cb = Colorbar(fig[1, 2], hm)
+SpanInteractable(cb; span = (-0.3, 0.5))
+```
+"""
+struct SpanInteractable <: AbstractInteractable
+    ax; orientation::Symbol; lo::Float64; hi::Float64; id::Symbol
+    update_while_dragging::Bool
+end
+function SpanInteractable(ax; span, orientation = _span_orientation(ax), id = :span, update_while_dragging::Bool = true)
+    orientation in (:horizontal, :vertical) ||
+        throw(ArgumentError("SpanInteractable: orientation must be :horizontal or :vertical, got $(orientation)"))
+    lo, hi = _span_values(span)
+    lo < hi || throw(ArgumentError("SpanInteractable: need lo < hi, got span = $((lo, hi))"))
+    if ax isa Makie.Colorbar
+        _check_on_bar(ax, lo, "SpanInteractable", "span")
+        _check_on_bar(ax, hi, "SpanInteractable", "span")
+    end
+    return SpanInteractable(ax, orientation, lo, hi, id, update_while_dragging)
+end
+# Across the bar on a colorbar, like a threshold; an x window everywhere else.
+_span_orientation(ax) = ax isa Makie.Colorbar ? _threshold_orientation(ax) : :vertical
+events(::SpanInteractable) = (:drag,)
+function validate(i::SpanInteractable, ctx::InteractionContext)
+    i.ax isa Makie.Legend && return "SpanInteractable: ax is a Legend, not an Axis — a legend has no data-space interval to drag."
+    t = ctx.transforms[axis_id(ctx, i.ax)]
+    i.ax isa Makie.Colorbar && return _validate_colorbar_line("SpanInteractable", i.orientation, t)
+    t.is3d && return "SpanInteractable: drag inverts a pixel to a data value via the axis " *
+        "transform, which is undefined on an Axis3 (a screen pixel is a ray, not a data value)."
+    t.ispolar && return "SpanInteractable: a span is not supported on PolarAxis (its edges are " *
+        "straight lines, and constant r is a circle, constant θ a ray). Use AxisInteractable to read (θ, r)."
+    h = i.orientation === :horizontal
+    (h ? t.ycats : t.xcats) === nothing ||
+        return "SpanInteractable: the $(h ? "y" : "x") dimension is categorical, and a band needs " *
+        "numeric limits. Use ThresholdInteractable to pick one category."
+    sc = h ? t.yscale : t.xscale
+    sc in _JS_INVERTIBLE || return "SpanInteractable: $(i.orientation) drag needs a client-side " *
+        "invertible $(h ? "y" : "x")-scale ($(sc) is not; supported: identity/log10/log)."
+    return nothing
+end
+function hitlayers(i::SpanInteractable, ctx)
+    t = ctx.transforms[axis_id(ctx, i.ax)]
+    vx, vy, vw, vh = t.viewport
+    h = i.orientation === :horizontal
+    if i.ax isa Makie.Colorbar
+        lo, hi = _colorbar_pos(t, i.lo), _colorbar_pos(t, i.hi)
+    elseif h
+        lo = _proj(ctx, i.ax, (t.xlims[1], i.lo))[2]
+        hi = _proj(ctx, i.ax, (t.xlims[1], i.hi))[2]
+    else
+        lo = _proj(ctx, i.ax, (i.lo, t.ylims[1]))[1]
+        hi = _proj(ctx, i.ax, (i.hi, t.ylims[1]))[1]
+    end
+    span = h ? Float32[vx, vx + vw] : Float32[vy, vy + vh]
+    geom = Dict{String, Any}("orientation" => h ? "h" : "v", "lo" => Float32(lo), "hi" => Float32(hi), "span" => span)
+    i.update_while_dragging || (geom["settleOnly"] = true)
+    return [HitLayer(i.id, :span, geom, Any[], axis_id(ctx, i.ax), events(i))]
 end
 
 # ============================ ROIInteractable ==============================

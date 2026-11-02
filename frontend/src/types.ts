@@ -10,6 +10,7 @@ export type Kind =
     | "polygons"  // geometry: (number[] | number[][])[]  one ring, or [exterior, ...holes]; even-odd per element
     | "axis"      // geometry: null  — continuous, rides the axis transform
     | "threshold" // geometry: ThresholdGeometry — a draggable h/v line; value computed via AxisTransform on drag
+    | "span"      // geometry: SpanGeometry — a band between two draggable h/v edges; (lo, hi) computed via AxisTransform
     | "roi"       // geometry: ROIGeometry — a draggable+resizable rect; bounds computed via AxisTransform
     | "view"      // geometry: ViewGeometry — drag-to-pan (2D) / drag-to-orbit (Axis3); commit on mouse-up
     | "slice"     // geometry: SliceGeometry — data-space series sampled at the cursor; not a hit target
@@ -58,6 +59,14 @@ export interface ThresholdGeometry {
     orientation: "h" | "v"
     pos: number            // image-px coordinate of the line (y if "h", x if "v")
     span: [number, number] // image-px extent along the axis viewport
+    settleOnly?: true      // `update_while_dragging = false`: `onchange` runs on release only
+}
+
+export interface SpanGeometry {
+    orientation: "h" | "v" // "h": constant-y edges, a y interval; "v": constant-x edges
+    lo: number             // image-px position of the edge at the band's lower value (y if "h", x if "v")
+    hi: number             // the edge at its upper value; on a y axis or a vertical colorbar, above `lo`
+    span: [number, number] // image-px extent of both edges, across the axis viewport or the bar
     settleOnly?: true      // `update_while_dragging = false`: `onchange` runs on release only
 }
 
@@ -261,7 +270,7 @@ export interface HitLayer {
     id: string
     kind: Kind
     // A polygon element is a flat ring (number[]) or, when it has holes, a ring group (number[][]).
-    geometry: number[] | Array<number[] | number[][]> | GridGeometry | SurfaceGeometry | ThresholdGeometry | ROIGeometry | ViewGeometry | SliceGeometry | ControlGeometry | null
+    geometry: number[] | Array<number[] | number[][]> | GridGeometry | SurfaceGeometry | ThresholdGeometry | SpanGeometry | ROIGeometry | ViewGeometry | SliceGeometry | ControlGeometry | null
     payloads: unknown[] // one per element; a :grid layer's are per cell, row-major like values; a :surface layer's per shipped point (empty for none)
     axis: string
     events: string[] // "click" | "hover" | "drag" | "change" (a control)
@@ -374,6 +383,7 @@ export interface Hit {
     region_?: number // a grid cell's region id (regions.ts), when it is in one: the hit stands for the whole region
     axis_?: string // transform id, for continuous inversion
     roiPart_?: { corner?: number; edge?: "n" | "s" | "w" | "e"; move?: boolean } // which sub-part of an :roi a drag grabbed
+    spanPart_?: { edge?: "lo" | "hi"; move?: boolean } // which part of a :span a drag grabbed
 }
 
 // One entry in keyboard.ts's flat, manifest-order nav list — element-indexed kinds only

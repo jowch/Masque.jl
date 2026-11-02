@@ -127,6 +127,14 @@ edge midpoint (8 logical px × scaling, at least 6 image px) still resizes that 
 matching resize cursor. The ROI outline is 1px chrome unless an explicit `hoverstyle` stroke sets
 its own width and colour.
 
+Band chrome (`SpanInteractable`, #500, Jonathan picked look D on 2026-11-02): two edges drawn
+as threshold lines (same class, width and hover thickening), the area outside the band filled
+with the plot area's colour (the figure background on a colorbar) at 0.65 opacity
+(`1 - --masque-preview-opacity`), and a grip on each edge, centred across it, in the ROI
+handles' style (6 × 16 CSS px, white fill, 1px chrome stroke, ~1.5 CSS px radius). Inside the
+band, marks keep their hover and click and a colorbar keeps its readout; the move cursor shows
+only where no mark is under the pointer.
+
 These decisions are settled: cite the recipes above rather than re-litigating identity,
 wash vs ring, first-PR scope, or Pluto coupling.
 
@@ -213,6 +221,7 @@ bake it; hover/click or drag only.
 | HLines / VLines | `:segments` | ring | tip, click `@bind`, persist |
 | Threshold | `:threshold` | none | drag commit → `@bind` |
 | Threshold (categorical y) | `:threshold` | none | release commits the nearest category's 1-based position and its label (`value`, `category`, #192), and the line snaps onto that category (#199) |
+| Band (axis / colorbar) | `:span` | none | edge drag and move-drag commit `SpanEvent` (`lo`, `hi`) → `@bind`; an edge stops at the other; a mark inside keeps hover and click; a colorbar inside keeps its readout |
 | ROI / box-select | `:roi` | none | drag commit → `@bind` (vector if `selects=`; a `selects`-ROI's grid cell-block union rect is fill-layer-only, `"rectfill"`) |
 | View (2D pan / 3D orbit) | `:view` | none | **commits nothing** (§12.3) — drag readout only, no `@bind` write. On both backends, in-drag frames stream over the gesture channel (`with_js_link`, #102/#133) — the picture and hit manifest swap together on every camera move, `px_per_unit` drops to 1 mid-gesture and restores on release, a pre-existing selection on another layer survives the swap. `:cairo`'s picture is a PNG; `:webgl`'s is a serialized scene applied to the existing canvas |
 | Legend | `:rects` | wash (entry row) | no default tooltip card (a `masque"..."` template still shows), screen reader announces the entry label, hover previews linked layers (closed marks: the entry's series kept, the legend's other series faded; lines: the ring in `g.link`, fade on leave; `g.sel` untouched), click `@bind` payload carries `targets`. A `series!` legend entry pins one path (`series:k`), not every series |

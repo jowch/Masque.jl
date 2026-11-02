@@ -4,7 +4,7 @@ import type { CrossEls } from "./cross"
 import type { Fade } from "./fade"
 import type { GestureChannel } from "./gesture"
 import { IDENTITY, type PhotoMatrix } from "./photo"
-import type { AxisTransform, FocusRef, Hit, HitLayer, Limits3, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
+import type { AxisTransform, FocusRef, Hit, HitLayer, Limits3, Manifest, SpanGeometry, ThresholdGeometry, ViewGeometry } from "./types"
 
 // A value that changes as the pointer moves (an axis readout, a slice sample, a drag label):
 // fixed significant figures, trailing zeros kept, so the label does not change width with
@@ -108,6 +108,17 @@ export function oneHome(groups: HiGroups): HiSet {
     return { at_: () => groups, all_: () => [groups] }
 }
 
+// A :span band (drag/span.ts): its fades outside, its two edges and their grips, in the order
+// [lo, hi] where there are two. `k_` is image px per CSS px, which sizes the grips.
+export interface SpanBand {
+    g_: SpanGeometry
+    t_: AxisTransform
+    dims_: [SVGRectElement, SVGRectElement]
+    lines_: [SVGLineElement, SVGLineElement]
+    grips_: [SVGRectElement, SVGRectElement]
+    k_: number
+}
+
 export interface ROIBox {
     rect_: SVGRectElement
     handles_: SVGRectElement[]
@@ -124,6 +135,9 @@ export interface ROIBox {
 // second pointer's move/up/cancel still routed into the first pointer's drag.
 export type Drag =
     | { kind: "threshold"; id_: string; line_: SVGLineElement; tg_: ThresholdGeometry; t_: AxisTransform; pointerId_: number }
+    // `at_` is the press along the drag, `lo0_`/`hi0_` the edges then: a move shifts both by
+    // the pointer's travel from the press.
+    | { kind: "span"; id_: string; band_: SpanBand; mode_: "lo" | "hi" | "move"; at_: number; lo0_: number; hi0_: number; pointerId_: number }
     | {
         kind: "roi"; id_: string; box_: ROIBox
         mode_: { corner: number } | { edge: "n" | "s" | "w" | "e" } | { move: true }
@@ -179,6 +193,7 @@ export interface OverlayCtx {
     fade_: Fade
     thresholdLines_: Map<string, SVGLineElement>
     roiBoxes_: Map<string, ROIBox>
+    spanBands_: Map<string, SpanBand>
     // svg.masque-plain's chrome group for an axis, which moves with that axis's pixels (#391):
     // its ROI boxes, threshold lines, marquee and slice readout dots
     chromeAt_: (axis: string) => SVGGElement
@@ -256,9 +271,9 @@ export interface OverlayState {
     focusTipHtml_: string | null
     focusTipCss_: Anchor | null
     announceTimer_: ReturnType<typeof setTimeout> | null
-    // :threshold layer id currently drawn thicker for drag-hover feedback; cleared on any miss
-    // (hover.ts's setDragHoverChrome) so it can never point at a line no longer under the cursor.
-    hoveredThresholdId_: string | null
+    // The threshold line or span edge drawn thicker for drag-hover feedback; cleared on any
+    // miss (hover.ts's setDragHoverChrome) so it can never point at a line no longer under the cursor.
+    hoveredLine_: SVGLineElement | null
     // True while both masque-cross groups have .is-on. Toggled only when the cross appears or
     // disappears, so a move inside the viewport does not restart the opacity fade.
     crossOn_: boolean
@@ -313,7 +328,7 @@ export function createOverlayState(): OverlayState {
         focusTipHtml_: null,
         focusTipCss_: null,
         announceTimer_: null,
-        hoveredThresholdId_: null,
+        hoveredLine_: null,
         crossOn_: false,
         photo_: IDENTITY,
         photoAnchor_: null,

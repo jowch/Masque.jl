@@ -7,7 +7,7 @@
 
 Abstract type of every value a field of the `masque` `@bind` value holds, other than
 `nothing`. Concrete subtypes carry the fields of that commit: an element pick, a legend entry,
-a grid cell or window, an axis or colorbar click, a threshold, or ROI bounds. Every event has
+a grid cell or window, an axis or colorbar click, a threshold, a span, or ROI bounds. Every event has
 `layer`, the name of the plot or interactable it came from, and `part`, the path to the layer
 inside it for a plot with parts (`(:stems,)` on a `stem!`), else `()`. The target of a
 `selects` ROI over points holds a `Vector{ElementEvent}` instead of one event. Field names on the struct win over a payload key
@@ -27,6 +27,7 @@ include("events/legend.jl")
 include("events/grid.jl")
 include("events/readout.jl")
 include("events/bounds.jl")
+include("events/span.jl")
 
 # Events whose payload fields read through as properties. A grid cell forwards only when its
 # grid has `payloads`.

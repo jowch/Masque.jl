@@ -11,6 +11,10 @@ All notable changes to this project are documented here. The format is based on
   colorbar's scale, `identity`, `log10` or `log`. The line follows the bar, horizontal on a
   vertical colorbar and vertical on a horizontal one, and hovering or clicking the rest of the
   bar still reads its value (#499).
+- `SpanInteractable` drags a band, a `(lo, hi)` range, on an `Axis` or a `Colorbar`. Drag an
+  edge to move that end, or inside the band to move both. The plot outside the band is faded
+  and each edge has a grip. Its field is a `SpanEvent` with `lo` and `hi`, and marks inside
+  the band still answer hover and click (#500).
 - Hovering a line on an `Axis3` shows `x`, `y` and `z` of the point you plotted nearest the
   pointer, as a line on a 2D `Axis` does, and a tooltip template can name `z`. This covers
   `lines!`, `scatterlines!`'s line, `contour3d!` and a 3D `streamplot!`. A click still picks

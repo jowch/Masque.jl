@@ -11,6 +11,7 @@ import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, FieldPick, FieldSelection, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
+import * as spanDrag from "./drag/span"
 import * as viewDrag from "./drag/view"
 import * as marquee from "./drag/marquee"
 import { panTo, unmapPoint } from "./photo"
@@ -80,7 +81,7 @@ function pointerSpace(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): {
     return { layout, content: (axis) => axisPoint(ctx.manifest_, state.photo_, state.photoViewId_, axis, layout) }
 }
 
-// The axis a marquee, threshold or ROI drag draws on.
+// The axis a marquee, threshold, span or ROI drag draws on.
 function dragAxis(ctx: OverlayCtx, d: Exclude<Drag, { kind: "view" }>): string {
     if (d.kind === "marquee") return d.axis_
     return ctx.manifest_.layers.find((l) => l.id === d.id_)?.axis ?? ""
@@ -110,6 +111,9 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
     } else if (d.kind === "threshold") {
         text = thresholdDrag.move(d, content, ctx.tipDigits_)
         if (liveDrag(ctx, d.id_)) requestState(ctx, { [d.id_]: thresholdDrag.envelopeAt(d, content) })
+    } else if (d.kind === "span") {
+        text = spanDrag.move(d, content, ctx.tipDigits_)
+        if (liveDrag(ctx, d.id_)) requestState(ctx, { [d.id_]: spanDrag.envelope(d) })
     } else if (d.kind === "view") {
         if (d.g_.mode === "orbit") {
             text = viewDrag.tip(d, layout, ctx.tipDigits_)
@@ -289,6 +293,17 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         const line = ctx.thresholdLines_.get(hit.layer.id)
         if (!line) return
         state.drag_ = thresholdDrag.begin(hit.layer.id, line, hit.layer.geometry as ThresholdGeometry, ctx.manifest_.transforms[hit.layer.axis], e.pointerId)
+    } else if (hit.layer.kind === "span" && hit.spanPart_) {
+        const band = ctx.spanBands_.get(hit.layer.id)
+        if (!band) return
+        // Inside the band a mark under the press keeps its click; the band moves from
+        // anywhere else inside it.
+        if (hit.spanPart_.move) {
+            const under = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_)
+            if (under && SELECTED_KINDS.has(under.layer.kind)) return
+        }
+        const p = content(hit.layer.axis)
+        state.drag_ = spanDrag.begin(hit.layer.id, band, hit.spanPart_, band.g_.orientation === "h" ? p.y : p.x, e.pointerId)
     } else if (hit.layer.kind === "roi" && hit.roiPart_) {
         const box = ctx.roiBoxes_.get(hit.layer.id)
         if (!box) return
@@ -352,6 +367,8 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     const { layout, content } = pointerSpace(ctx, state, e)
     if (d.kind === "threshold") {
         ctx.commit_({ [d.id_]: thresholdDrag.end(d, content(dragAxis(ctx, d))) })
+    } else if (d.kind === "span") {
+        ctx.commit_({ [d.id_]: spanDrag.envelope(d) })
     } else if (d.kind === "view") {
         // §12.3: a view gesture commits nothing — no bond write, no "input" event.
         // Settle is gated on whether a request actually went out during this drag

@@ -10,7 +10,7 @@ import { cancel as cancelMarquee } from "./drag/marquee"
 import { hasRegions, regionOf } from "./regions"
 import { fmt, cssAnchor, layoutImagePx, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { OverlayCtx, OverlayState } from "./state"
-import type { Hit, HitLayer, Manifest, SliceGeometry, ThresholdGeometry } from "./types"
+import type { Hit, HitLayer, Manifest, SliceGeometry, SpanGeometry, ThresholdGeometry } from "./types"
 
 const TIP_GAP = 8
 const TIP_OFFSET = 10
@@ -41,6 +41,10 @@ export function cursorForDragHit(hit: Hit): string {
     if (hit.layer.kind === "threshold") {
         return (hit.layer.geometry as ThresholdGeometry).orientation === "h" ? "ns-resize" : "ew-resize"
     }
+    if (hit.layer.kind === "span" && hit.spanPart_) {
+        if (hit.spanPart_.move) return "move"
+        return (hit.layer.geometry as SpanGeometry).orientation === "h" ? "ns-resize" : "ew-resize"
+    }
     if (hit.layer.kind === "roi" && hit.roiPart_) {
         if (hit.roiPart_.move) return "move"
         if (hit.roiPart_.edge) return hit.roiPart_.edge === "n" || hit.roiPart_.edge === "s" ? "ns-resize" : "ew-resize"
@@ -53,16 +57,18 @@ export function cursorForDragHit(hit: Hit): string {
     return "grab"
 }
 
-// Sets the cursor class AND toggles the one hovered :threshold line's thicker-stroke class
+// Sets the cursor class AND toggles the one hovered threshold line's or span edge's thicker-stroke class
 // (`hovered`, drag/threshold.ts) — the two are the same "this is what a drag would grab" signal,
 // so they're driven from a single call site to keep them from drifting out of sync.
 export function setDragHoverChrome(ctx: OverlayCtx, state: OverlayState, hit: Hit | null): void {
     setCursorClass(ctx.surface_, hit ? cursorForDragHit(hit) : null)
-    const thresholdId = hit && hit.layer.kind === "threshold" ? hit.layer.id : null
-    if (state.hoveredThresholdId_ === thresholdId) return
-    if (state.hoveredThresholdId_) ctx.thresholdLines_.get(state.hoveredThresholdId_)?.classList.remove("hovered")
-    if (thresholdId) ctx.thresholdLines_.get(thresholdId)?.classList.add("hovered")
-    state.hoveredThresholdId_ = thresholdId
+    let line: SVGLineElement | null = null
+    if (hit?.layer.kind === "threshold") line = ctx.thresholdLines_.get(hit.layer.id) ?? null
+    else if (hit?.layer.kind === "span" && hit.spanPart_?.edge) line = ctx.spanBands_.get(hit.layer.id)?.lines_[hit.spanPart_.edge === "lo" ? 0 : 1] ?? null
+    if (state.hoveredLine_ === line) return
+    state.hoveredLine_?.classList.remove("hovered")
+    line?.classList.add("hovered")
+    state.hoveredLine_ = line
 }
 
 // role="tooltip" is static markup (set at creation); aria-hidden tracks the same visibility
@@ -407,9 +413,11 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     if (state.drag_) return
     const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
     const dragHit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_)
-    // A full-viewport :view hit must not suppress element hover. A threshold/ROI drag-hover
-    // still does, and it takes the resize cursor — the cross stays off.
-    if (dragHit && dragHit.layer.kind !== "view") {
+    // A full-viewport :view hit must not suppress element hover, nor the inside of a band,
+    // which is where the reader looks at the marks it holds. A threshold, a band's edge, or an
+    // ROI drag-hover still does, and it takes the resize cursor — the cross stays off.
+    const bandInside = dragHit?.layer.kind === "span" && dragHit.spanPart_?.move === true
+    if (dragHit && dragHit.layer.kind !== "view" && !bandInside) {
         if (!restoreFocus(ctx, state)) { clearHover(ctx, state, true); clearLegendLink(ctx, state, true); hideTip(ctx, state) }
         setDragHoverChrome(ctx, state, dragHit); ctx.surface_.classList.remove("hot")
         hideCross(ctx, state)
@@ -465,6 +473,8 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     if (press) ctx.surface_.classList.add("hot")
     else ctx.surface_.classList.remove("hot")
     if (viewGrab) setCursorClass(ctx.surface_, "grab")
+    // Inside a band with no mark under the pointer, a press moves the band (bond.ts's onDown).
+    if (bandInside && !press && dragHit) setCursorClass(ctx.surface_, cursorForDragHit(dragHit))
 
     if (sliceTip && sliceLayer && sampled) {
         // A covered polygon's wash would sit under the cross; the sample tooltip replaces it.
