@@ -1285,31 +1285,51 @@ try {
           await page.waitForTimeout(300);
           const after = await figClip();
           let diff = 0;
-          for (let o = 0; o < Math.min(before.data.length, after.data.length); o++) if (before.data[o] !== after.data[o]) diff++;
-          if (before.width !== after.width || before.height !== after.height || diff > 0) throw new Error(`${key}/touch-reach: ${diff} pixels changed with touch on`);
+          const bb = [Infinity, Infinity, -Infinity, -Infinity];
+          if (before.width === after.width && before.height === after.height) {
+            for (let o = 0; o < before.data.length; o += 4) {
+              // Re-rasterising can move an antialiased edge by a level or two; a drawn change is more.
+              if (Math.max(Math.abs(before.data[o] - after.data[o]), Math.abs(before.data[o + 1] - after.data[o + 1]), Math.abs(before.data[o + 2] - after.data[o + 2])) <= 3) continue;
+              diff++;
+              const px = (o / 4) % before.width, py = Math.floor(o / 4 / before.width);
+              bb[0] = Math.min(bb[0], px); bb[1] = Math.min(bb[1], py); bb[2] = Math.max(bb[2], px); bb[3] = Math.max(bb[3], py);
+            }
+          }
+          if (before.width !== after.width || before.height !== after.height || diff > 0) {
+            if (artifactDir) {
+              writeFileSync(join(artifactDir, `touch-reach-${backend}-before.png`), PNG.sync.write(before));
+              writeFileSync(join(artifactDir, `touch-reach-${backend}-after.png`), PNG.sync.write(after));
+            }
+            throw new Error(`${key}/touch-reach: ${diff} pixels changed with touch on, in ${JSON.stringify(bb)} of ${before.width}×${before.height} (${after.width}×${after.height} after)`);
+          }
           passed.push(`${key}/touch-reach`);
 
+          // A finger's tap, sent as touch input (the page's context has no touchscreen of its own).
+          const tap = async (x, y) => {
+            await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+            await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+          };
           // A tap past the drawn box works: the slider's left end, under its bar.
           const lv = a.out.level;
           const below = (lv.box[3] + lv.hit[3]) / 2;
           if (lv.hit[3] - lv.box[3] < 3) throw new Error(`${key}/touch-tap: the slider reaches only ${(lv.hit[3] - lv.box[3]).toFixed(1)} px below its bar`);
-          await page.touchscreen.tap(lv.box[0] + 2, below);
+          await tap(lv.box[0] + 2, below);
           v = await bondHas(/level = 0,/, v, "touch-slider");
           r = await settle();
           // The toggle, above its track.
           const sh = a.out.show;
           const wasOn = /show = true/.test(v);
-          await page.touchscreen.tap((sh.box[0] + sh.box[2]) / 2, (sh.box[1] + sh.hit[1]) / 2);
+          await tap((sh.box[0] + sh.box[2]) / 2, (sh.box[1] + sh.hit[1]) / 2);
           v = await bondHas(wasOn ? /show = false/ : /show = true/, v, "touch-toggle");
           r = await settle();
           // The interval slider's bar, under it, near its start: the low knob comes there.
           const sp = a.out.span;
           const lowWas = Number(/span = \((\d+), (\d+)\)/.exec(v)[1]);
-          const target = lowWas === 1 ? 3 : 1;
+          const target = lowWas === 1 ? 2 : 1;
           // Five values, so value k sits at (k - 1) / 4 of the knob's travel.
           const knob = sp.box[3] - sp.box[1];
           const tx = sp.box[0] + knob / 2 + ((target - 1) / 4) * (sp.box[2] - sp.box[0] - knob);
-          await page.touchscreen.tap(tx, (sp.box[3] + sp.hit[3]) / 2);
+          await tap(tx, (sp.box[3] + sp.hit[3]) / 2);
           v = await bondHas(new RegExp(`span = \\(${target}, `), v, "touch-interval");
           r = await settle();
           passed.push(`${key}/touch-tap`);
