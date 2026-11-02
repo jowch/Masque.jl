@@ -589,14 +589,20 @@ function PolygonInteractable(ax, p::Makie.Contourf; id = :contourf, payloads = n
     return PolygonInteractable(ax, rings; id, payloads = pl, holes, tooltip, label)
 end
 
-# Payload x is read from Makie's converted category data (not ring geometry) to avoid Float32
-# projection noise; each ring's geometry-center is used only to snap to the nearest category.
+# The category is read from Makie's converted category data (not ring geometry) to avoid
+# Float32 projection noise; each ring's geometry-center is used only to snap to the nearest
+# category. A horizontal violin is drawn with x and y swapped (`flip_xy`), so its category
+# runs along y: the snap reads the ring's y extent and the field is `y`, which then follows
+# the y axis's categories and tick format (#558).
 function _violin_payloads(p, rings)
     cats = sort(unique(Float64.(_conv(p)[1])))
+    horiz = p.orientation[] === :horizontal
+    d = horiz ? 2 : 1
     return Any[
-        let xs = [Float64(pt[1]) for pt in ring]
-            ctr = (minimum(xs) + maximum(xs)) / 2
-            (; x = cats[argmin(abs.(cats .- ctr))])
+        let vs = [Float64(pt[d]) for pt in ring]
+            ctr = (minimum(vs) + maximum(vs)) / 2
+            c = cats[argmin(abs.(cats .- ctr))]
+            horiz ? (; y = c) : (; x = c)
         end
             for ring in rings
     ]

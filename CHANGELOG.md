@@ -52,6 +52,9 @@ All notable changes to this project are documented here. The format is based on
   and a point's tooltip doesn't show over it (#526).
 
 ### Fixed
+- A horizontal violin, `violin!(…; orientation = :horizontal)`, names its own category in
+  its tooltip and payload, as the field `y` since the category runs along the y axis. Before,
+  it gave an `x` read from the value axis, which could name the wrong category (#558).
 - A figure shown narrower than it was drawn for, as in the docs on a phone or in a narrow
   Pluto window, keeps its hover and click targets the same size on screen. Before, every
   target shrank with the picture: on a phone a scatter dot's target was about half its size

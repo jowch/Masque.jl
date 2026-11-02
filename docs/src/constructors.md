@@ -133,7 +133,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `Surface` | `SurfaceInteractable` | `i`, `j`, `x`, `y`, `z`; `value` when `color` is a separate matrix | `:surface` |
 | `Poly` / `Band` / `Density` / `Voronoiplot` | `PolygonInteractable` | `index` | `:poly`, `:band`, … |
 | `Contourf` | `PolygonInteractable` | `low`, `high` | `:contourf` |
-| `Violin` | `PolygonInteractable` | `x` | `:violin` |
+| `Violin` | `PolygonInteractable` | `x` (`y` when horizontal) | `:violin` |
 | `Hexbin` | `PolygonInteractable` | `x`, `y`, `count` | `:hexbin` |
 | `Text` | `TextInteractable` | `text`, `index`, `x`, `y` | `:text` |
 | `Stem` | `interactables(p)` | points, and stems as a second layer | `stem.points`, `stem.stems` |
