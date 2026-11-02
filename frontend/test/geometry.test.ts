@@ -3,7 +3,7 @@ import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, panLimits3,
     anchorFor, axisFrame, computeAnchoredPlacement, layerPoint, occludedAt, previewWindows, lineReadout, readoutAt, samplePoint,
-    closestPointOnPath, slopScale,
+    closestPointOnPath, slopScale, innermostView,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
 import { begin as beginView, tip as viewTip, limitsTip, view3Base, rememberView3, seedView3Homes, zoom3 } from "../src/drag/view"
@@ -1507,5 +1507,35 @@ describe("samplePoint", () => {
         const t: AxisTransform = { xlims: [0, 4], ylims: [0, 2], xscale: "identity", yscale: "identity",
             viewport: [0, -200, 400, 200], xreversed: false, yreversed: false }
         expect(samplePoint(center, 0, 1, t)).toEqual({ x: 100, y: -100 })
+    })
+})
+
+// #559: of nested views, the smallest that holds the point takes it.
+describe("innermostView", () => {
+    const view = (id: string, x: number, y: number, w: number, h: number): HitLayer =>
+        ({ id, kind: "view", axis: id, events: ["drag"], payloads: [], geometry: { x, y, w, h, mode: "pan" } }) as HitLayer
+    const m = (layers: HitLayer[]): Manifest => ({ width: 1000, height: 1000, scaling: 1, transforms: {}, layers })
+
+    it("picks the inset over its parent, whichever is listed first", () => {
+        for (const layers of [[view("out", 0, 0, 1000, 1000), view("in", 100, 100, 200, 200)],
+            [view("in", 100, 100, 200, 200), view("out", 0, 0, 1000, 1000)]]) {
+            expect(innermostView(m(layers), 150, 150)?.id).toBe("in")
+            expect(innermostView(m(layers), 500, 500)?.id).toBe("out")
+            expect(hitTest(m(layers), 150, 150, "drag")?.layer.id).toBe("in")
+            expect(hitTestAt(m(layers), 150, 150, IDENTITY, "drag")?.layer.id).toBe("in")
+            expect(hitTestAt(m(layers), 500, 500, IDENTITY, "drag")?.layer.id).toBe("out")
+        }
+    })
+
+    it("gives two views of the same size (twin axes) to the first listed", () => {
+        const layers = [view("a", 0, 0, 500, 500), view("b", 0, 0, 500, 500)]
+        expect(innermostView(m(layers), 10, 10)?.id).toBe("a")
+        expect(hitTest(m(layers), 10, 10, "drag")?.layer.id).toBe("a")
+    })
+
+    it("leaves a point to the parent when the inset can't take it", () => {
+        const layers = [view("out", 0, 0, 1000, 1000), view("in", 100, 100, 200, 200)]
+        expect(innermostView(m(layers), 150, 150, "drag", (l) => l.id !== "in")?.id).toBe("out")
+        expect(innermostView(m(layers), 2000, 2000)).toBeNull()
     })
 })

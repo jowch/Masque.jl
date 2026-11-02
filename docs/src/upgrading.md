@@ -10,9 +10,9 @@ has every change.
 
 In Masque 0.5, a plot with a [`ViewInteractable`](@ref) no longer takes
 the page's scroll. Scrolling over the plot scrolls the page instead of
-zooming. To zoom, hold Ctrl (Cmd on a Mac) while scrolling; in Chrome
-and Firefox a trackpad pinch zooms too. To zoom on a plain scroll as 0.4
-did, pass `wheel = :always`:
+zooming. To zoom, hold Ctrl (Cmd on a Mac) while scrolling; a trackpad
+pinch zooms too. To zoom on a plain scroll as 0.4 did, pass
+`wheel = :always`:
 
 | 0.4 | 0.5 |
 |---|---|
