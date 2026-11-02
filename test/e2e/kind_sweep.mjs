@@ -4715,12 +4715,13 @@ try {
         await settle();
         return fieldValue("barplot", field);
       };
-      // Inside: picked. Then 6 CSS px past its top edge, in empty space: a miss, which clears it.
+      // 6 CSS px past its top edge, in empty space: a miss, which clears the field. Then inside:
+      // picked. (In that order: a tap on the bar it already holds would take the pick back.)
+      const top = Math.min(b.y - b.h / 2, b.y + b.h / 2);
+      const outside = await tap(b.x, top - 6 / sc.s);
+      if (outside !== null) throw new Error(`touch/barplot: a tap 6 CSS px above bar ${idx} picked ${JSON.stringify(outside)}; bars are inside-only`);
       const inside = await tap(b.x, b.y);
       if (inside?.index !== idx) throw new Error(`touch/barplot: a tap inside bar ${idx} picked ${JSON.stringify(inside)}`);
-      const top = Math.min(b.y - b.h / 2, b.y + b.h / 2);
-      const outside = await tap(b.x, top - 6 * sc.s);
-      if (outside !== null) throw new Error(`touch/barplot: a tap 6 CSS px above bar ${idx} picked ${JSON.stringify(outside)}; bars are inside-only`);
       passed.push("barplot/touch-inside-only");
       console.error("OK  barplot — a tap picks a bar only inside it");
     }
