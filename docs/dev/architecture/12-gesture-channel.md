@@ -188,9 +188,10 @@ leaving only the residual if the pointer has moved on. It is not a client camera
 substitute for the frame itself. A wheel has no pointer release, so the terminal request is one
 settle 150ms (`WHEEL_IDLE_MS`, `frontend/src/photo.ts`) after the last notch. A new notch resets
 that wait. Which wheels a view takes is its layer's `wheel` (#526): `modifier` (the default) takes only
-Ctrl/Cmd+wheel, which is also how Chrome and Firefox send a trackpad pinch, and leaves a plain
-wheel to the page with a hint in the corner note; `always` takes every wheel; `none` takes none.
-A wheel the view doesn't take is never `preventDefault`ed. Orbit ignores the wheel. A request's matrix is relative to the frame on screen when it
+Ctrl/Cmd+wheel, which is also how Chrome and Firefox send a trackpad pinch (Safari sends
+`gesturestart`/`gesturechange`/`gestureend`, which zoom by the change in `scale` through the same
+path and idle settle, #541), and leaves a plain wheel to the page with a hint in the corner note; `always` takes every wheel; `none` takes none.
+A wheel the view doesn't take is never `preventDefault`ed. An orbit with no limits ignores the wheel. A request's matrix is relative to the frame on screen when it
 was built, and one round trip at a time means a request can land after an earlier frame has
 already replaced that base (a wheel settle behind its own preview, a pan released mid-flight). The
 overlay re-expresses such a request through each frame that landed since it was built before

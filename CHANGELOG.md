@@ -8,9 +8,9 @@ All notable changes to this project are documented here. The format is based on
 
 ### Breaking
 - Scrolling over a plot with a `ViewInteractable` scrolls the page, as it does everywhere else
-  on the page. To zoom, hold Ctrl (Cmd on a Mac) while scrolling; in Chrome and Firefox a
-  trackpad pinch zooms too. A plain scroll over the plot shows a short hint in its corner
-  saying so. Before, any scroll over the plot zoomed it and the page stopped scrolling.
+  on the page. To zoom, hold Ctrl (Cmd on a Mac) while scrolling; a trackpad pinch zooms
+  too, now in Safari as well (#541). A plain scroll over the plot shows a short hint in its
+  corner saying so. Before, any scroll over the plot zoomed it and the page stopped scrolling.
   `ViewInteractable(ax; wheel = :always)` brings back the old behavior, and `wheel = :none`
   turns wheel zoom off. An axis whose scroll zoom is turned off in Makie, with
   `deregister_interaction!(ax, :scrollzoom)`, `deactivate_interaction!(ax, :scrollzoom)` or

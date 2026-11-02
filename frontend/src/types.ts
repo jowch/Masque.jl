@@ -211,8 +211,8 @@ export interface ViewGeometry {
     fill?: string
     // pan only: axes tied to this one by Makie's `linkaxes!` (#363), whose data slides too.
     links?: ViewLink[]
-    // What a wheel over the axis does (#526). "modifier": Ctrl/Cmd+wheel (and a trackpad pinch,
-    // which Chrome and Firefox send as Ctrl+wheel) zooms, a plain wheel scrolls the page and
+    // What a wheel over the axis does (#526). "modifier": Ctrl/Cmd+wheel (and a trackpad pinch:
+    // Ctrl+wheel in Chrome and Firefox, gesture events in Safari, #541) zooms, a plain wheel scrolls the page and
     // shows a hint. "always": any wheel zooms. "none": the wheel never zooms. Absent means
     // "modifier", the Julia default.
     wheel?: "modifier" | "always" | "none"

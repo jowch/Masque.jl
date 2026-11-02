@@ -4990,6 +4990,103 @@ describe("photographic pan / wheel zoom", () => {
         })
     }
 
+    // #541: Safari sends a trackpad pinch as gesture* events with a cumulative `scale`.
+    const gesture = (surface: HTMLElement, type: string, scale: number, x = 100, y = 200) => {
+        const ev = new Event(type, { bubbles: true, cancelable: true })
+        Object.defineProperty(ev, "scale", { value: scale })
+        Object.defineProperty(ev, "clientX", { value: x })
+        Object.defineProperty(ev, "clientY", { value: y })
+        surface.dispatchEvent(ev)
+        return ev
+    }
+    const photoOf = (host: HTMLElement) => {
+        const p = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+        return { s: p[0], tx: p[1], ty: p[2] }
+    }
+
+    for (const wheel of ["modifier", "always", undefined] as const) {
+        it(`pan: with wheel = ${wheel ?? "default"}, a Safari pinch zooms about its point and settles when idle`, async () => {
+            vi.useFakeTimers()
+            try {
+                const { host, script } = setup()
+                const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+                mount(script, withWheel("pan", wheel), undefined, requestFrame)
+                const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+                // Client (100, 200) on the 600x400 image is layout pixel (200, 400).
+                const at = { x: 100 / 600 * 1200, y: 200 / 400 * 800 }
+                expect(gesture(surface, "gesturestart", 1).defaultPrevented).toBe(true)
+                expect(gesture(surface, "gesturechange", 1.5).defaultPrevented).toBe(true)
+                let photo = photoOf(host)
+                expect(photo.s).toBeCloseTo(1.5)
+                expect(mapPoint(photo, at).x).toBeCloseTo(at.x)
+                expect(mapPoint(photo, at).y).toBeCloseTo(at.y)
+                // `scale` is cumulative: 2 after 1.5 zooms by 4/3 more, still about the point.
+                gesture(surface, "gesturechange", 2)
+                photo = photoOf(host)
+                expect(photo.s).toBeCloseTo(2)
+                expect(mapPoint(photo, at).x).toBeCloseTo(at.x)
+                expect(mapPoint(photo, at).y).toBeCloseTo(at.y)
+                await Promise.resolve()
+                expect(requestFrame).toHaveBeenCalled()
+                expect((requestFrame.mock.calls as unknown as [Record<string, unknown>][])[0][0]).toMatchObject({ id: "view", settle: false })
+                expect(gesture(surface, "gestureend", 2).defaultPrevented).toBe(true)
+                await vi.advanceTimersByTimeAsync(200)
+                const calls = requestFrame.mock.calls as unknown as [Record<string, unknown>][]
+                expect(calls[calls.length - 1][0]).toMatchObject({ id: "view", settle: true })
+            } finally {
+                vi.useRealTimers()
+            }
+        })
+    }
+
+    it("pan: a pinch-in zooms out, and a Ctrl+wheel Safari sends during a pinch does not zoom twice", () => {
+        const { host, script } = setup()
+        mount(script, withWheel("pan", "modifier"), undefined, vi.fn(async () => ({ png: new Uint8Array([1]) })))
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        gesture(surface, "gesturestart", 1)
+        gesture(surface, "gesturechange", 0.5)
+        expect(photoOf(host).s).toBeCloseTo(0.5)
+        const ev = plainWheel(surface, { ctrlKey: true })
+        expect(ev.defaultPrevented).toBe(true)
+        expect(photoOf(host).s).toBeCloseTo(0.5)
+        gesture(surface, "gestureend", 0.5)
+        plainWheel(surface, { ctrlKey: true }) // after the pinch, a Ctrl+wheel zooms again
+        expect(photoOf(host).s).toBeGreaterThan(0.5)
+    })
+
+    it("orbit: a Safari pinch asks for zoomed Axis3 limits", async () => {
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+        mount(script, withWheel("orbit", "modifier"), undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        expect(gesture(surface, "gesturestart", 1).defaultPrevented).toBe(true)
+        expect(gesture(surface, "gesturechange", 2).defaultPrevented).toBe(true)
+        await Promise.resolve()
+        expect(requestFrame).toHaveBeenCalled()
+        const calls = requestFrame.mock.calls as unknown as [{ id: string; limits: number[]; settle: boolean }][]
+        const { limits, settle } = calls[0][0]
+        expect(settle).toBe(false)
+        // Twice as close: each axis spans half its 10 units, about the center.
+        expect(limits[1] - limits[0]).toBeCloseTo(5)
+        expect((limits[0] + limits[1]) / 2).toBeCloseTo(5)
+        gesture(surface, "gestureend", 2)
+    })
+
+    for (const mode of ["pan", "orbit"] as const) {
+        it(`${mode}: with wheel = none a Safari pinch is left to the page`, async () => {
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+            mount(script, withWheel(mode, "none"), undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            for (const [type, scale] of [["gesturestart", 1], ["gesturechange", 1.5], ["gestureend", 1.5]] as const) {
+                expect(gesture(surface, type, scale).defaultPrevented).toBe(false)
+            }
+            expect(host.dataset.masquePhoto ?? "").toBe("")
+            await Promise.resolve()
+            expect(requestFrame).not.toHaveBeenCalled()
+        })
+    }
+
     it("a wheel zoom shows its readout in the corner, hides a mark's tooltip, and clears when idle", async () => {
         vi.useFakeTimers()
         try {
