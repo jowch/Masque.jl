@@ -11,6 +11,11 @@ All notable changes to this project are documented here. The format is based on
   and click like a surface on an `Axis3`: the tooltip shows the point nearest the pointer, and
   a click gives a `GridCellEvent` with its `(i, j)`. Before, `masque` skipped it with a
   warning (#514).
+- Sliders, toggles and checkboxes are easier to hit with a finger. On a touch screen each
+  one answers a touch a little past its drawn edge, up to 44 px across, but never more than
+  halfway to the next control or axis, so the rows of a `SliderGrid` don't take each other's
+  touches. Nothing drawn changes, and on a computer without a touch screen they answer
+  exactly where they did (#531).
 
 ### Changed
 - Default tooltips and readouts show a coordinate the way its axis labels it. On a

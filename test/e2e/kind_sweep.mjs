@@ -1227,6 +1227,104 @@ try {
         r = await once("checkbox-space", r);
         passed.push(`${key}/checkbox-drawn`);
       }
+      // A finger (#531): where some input is coarse, each slider, toggle and checkbox takes the
+      // pointer past its drawn box, up to 44 CSS px across, but only halfway to the next control
+      // or axis; nothing drawn changes. Chromium's touch emulation turns on `any-pointer: coarse`.
+      {
+        const reachers = ["level", "show", "span", "fine", "tall", "sure", "grid"];
+        // Each control's hit area (its inputs' union; the interval slider's box reaches as far
+        // as its inputs) and drawn box, in CSS px, plus the boxes a finger must not reach into.
+        const areas = () => page.evaluate(([k, ids]) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          const rect = (r) => [r.left, r.top, r.right, r.bottom];
+          const out = {};
+          for (const box of sr.querySelectorAll(".masque-control")) {
+            if (box.classList.contains("masque-ctl-slidergrid")) continue;
+            const top = box.closest("[data-masque-control]:not([data-masque-control*='-'])") ?? box;
+            const id = box.dataset.masqueControl;
+            const ins = [...box.querySelectorAll(":scope > input, :scope > button, :scope > select")].map((i) => i.getBoundingClientRect());
+            const hit = ins.length ? [Math.min(...ins.map((r) => r.left)), Math.min(...ins.map((r) => r.top)), Math.max(...ins.map((r) => r.right)), Math.max(...ins.map((r) => r.bottom))] : rect(box.getBoundingClientRect());
+            out[id] = { top: top.dataset.masqueControl, box: rect(box.getBoundingClientRect()), hit, reach: ids.includes(top.dataset.masqueControl) && !box.classList.contains("masque-ctl-menu") };
+          }
+          const img = host.querySelector("img, canvas").getBoundingClientRect();
+          return { out, img: rect(img), coarse: matchMedia("(any-pointer: coarse)").matches };
+        }, [key, reachers]);
+        const s1 = await screenOf();
+        const axisBox = [s1.left + ax.viewport[0] * s1.sc, s1.top + ax.viewport[1] * s1.sc, s1.left + (ax.viewport[0] + ax.viewport[2]) * s1.sc, s1.top + (ax.viewport[1] + ax.viewport[3]) * s1.sc];
+        await page.mouse.move(0, 0);
+        const figClip = async () => {
+          const { img } = await areas();
+          return PNG.sync.read(await page.screenshot({ clip: { x: img[0], y: img[1], width: img[2] - img[0], height: img[3] - img[1] } }));
+        };
+        const before = await figClip();
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+        try {
+          const a = await areas();
+          if (!a.coarse) throw new Error(`${key}/touch-reach: touch emulation didn't turn on any-pointer: coarse`);
+          const overlap = (p, q) => p[0] < q[2] - 0.5 && q[0] < p[2] - 0.5 && p[1] < q[3] - 0.5 && q[1] < p[3] - 0.5;
+          const ids = Object.keys(a.out);
+          let grown = 0;
+          for (const id of ids) {
+            const { box, hit, reach } = a.out[id];
+            const w = hit[2] - hit[0], h = hit[3] - hit[1];
+            if (!reach) continue;
+            // It covers what's drawn, and grows only up to 44 CSS px across.
+            const drawn = id === "fine" || id === "sure" ? null : box;
+            if (drawn && (hit[0] > drawn[0] + 0.5 || hit[1] > drawn[1] + 0.5 || hit[2] < drawn[2] - 0.5 || hit[3] < drawn[3] - 0.5)) throw new Error(`${key}/touch-reach: ${id} hit ${JSON.stringify(hit)} doesn't cover its box ${JSON.stringify(box)}`);
+            if ((w > 44.5 && w > box[2] - box[0] + 0.5) || (h > 44.5 && h > box[3] - box[1] + 0.5)) throw new Error(`${key}/touch-reach: ${id} hit ${w.toFixed(1)}×${h.toFixed(1)} grows past 44 px`);
+            if (h > box[3] - box[1] + 2 || w > box[2] - box[0] + 2) grown++;
+            // It never reaches into another control's area, or the axis.
+            for (const other of ids) if (other !== id && a.out[other].top !== a.out[id].top && overlap(hit, a.out[other].hit)) throw new Error(`${key}/touch-reach: ${id} ${JSON.stringify(hit)} overlaps ${other} ${JSON.stringify(a.out[other].hit)}`);
+            if (overlap(hit, axisBox)) throw new Error(`${key}/touch-reach: ${id} ${JSON.stringify(hit)} reaches into the axis ${JSON.stringify(axisBox)}`);
+          }
+          if (grown < 4) throw new Error(`${key}/touch-reach: only ${grown} controls grew their hit area: ${JSON.stringify(a.out)}`);
+          // Nothing drawn moved: the figure's pixels are the same with touch on.
+          await page.waitForTimeout(300);
+          const after = await figClip();
+          let diff = 0;
+          for (let o = 0; o < Math.min(before.data.length, after.data.length); o++) if (before.data[o] !== after.data[o]) diff++;
+          if (before.width !== after.width || before.height !== after.height || diff > 0) throw new Error(`${key}/touch-reach: ${diff} pixels changed with touch on`);
+          passed.push(`${key}/touch-reach`);
+
+          // A tap past the drawn box works: the slider's left end, under its bar.
+          const lv = a.out.level;
+          const below = (lv.box[3] + lv.hit[3]) / 2;
+          if (lv.hit[3] - lv.box[3] < 3) throw new Error(`${key}/touch-tap: the slider reaches only ${(lv.hit[3] - lv.box[3]).toFixed(1)} px below its bar`);
+          await page.touchscreen.tap(lv.box[0] + 2, below);
+          v = await bondHas(/level = 0,/, v, "touch-slider");
+          r = await settle();
+          // The toggle, above its track.
+          const sh = a.out.show;
+          const wasOn = /show = true/.test(v);
+          await page.touchscreen.tap((sh.box[0] + sh.box[2]) / 2, (sh.box[1] + sh.hit[1]) / 2);
+          v = await bondHas(wasOn ? /show = false/ : /show = true/, v, "touch-toggle");
+          r = await settle();
+          // The interval slider's bar, under it, near its start: the low knob comes there.
+          const sp = a.out.span;
+          const lowWas = Number(/span = \((\d+), (\d+)\)/.exec(v)[1]);
+          const target = lowWas === 1 ? 3 : 1;
+          // Five values, so value k sits at (k - 1) / 4 of the knob's travel.
+          const knob = sp.box[3] - sp.box[1];
+          const tx = sp.box[0] + knob / 2 + ((target - 1) / 4) * (sp.box[2] - sp.box[0] - knob);
+          await page.touchscreen.tap(tx, (sp.box[3] + sp.hit[3]) / 2);
+          v = await bondHas(new RegExp(`span = \\(${target}, `), v, "touch-interval");
+          r = await settle();
+          passed.push(`${key}/touch-tap`);
+        } finally {
+          await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+          await cdp.detach();
+        }
+        // With touch off again, the hit areas are the drawn boxes.
+        const off = await areas();
+        for (const id of ["level", "show"]) {
+          const { box, hit } = off.out[id];
+          if (box.some((c, i) => Math.abs(c - hit[i]) > 0.5)) throw new Error(`${key}/touch-reach-off: ${id} hit ${JSON.stringify(hit)} past its box ${JSON.stringify(box)} without touch`);
+        }
+        passed.push(`${key}/touch-reach-off`);
+      }
       console.error(`OK  ${key} — ${v.slice(0, 120)}`);
       continue;
     }
