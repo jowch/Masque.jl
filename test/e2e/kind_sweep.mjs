@@ -3034,7 +3034,15 @@ try {
           const log = await page.evaluate(() => window.__releaseLog);
           let late = t;
           for (let i = 0; i < 100 && late === prev; i++) { await new Promise((r) => setTimeout(r, 200)); late = await textOf(`#out_${key}`); }
-          console.error(`${key}/release-fractional: pointerdown ${log?.downs}, pointerup ${log?.ups}, inputs ${JSON.stringify(log?.inputs)}; 20 s later #out_${key} ${late === prev ? "still unchanged" : `became ${JSON.stringify(late)}`}`);
+          const out = t !== prev ? `changed to ${JSON.stringify(t)} (no wait)` : late === prev ? "still unchanged 20 s later" : `became ${JSON.stringify(late)} within 20 s more`;
+          // The host's value now: Pluto writes its server value back into the host, so a stale
+          // value here with the new one in `inputs` means it wrote an old one back (#567).
+          const hostValue = await page.evaluate((k) => {
+            const span = document.querySelector(`#coords_${k}`);
+            const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+            return JSON.stringify(host.value).slice(0, 160);
+          }, key);
+          console.error(`${key}/release-fractional: pointerdown ${log?.downs}, pointerup ${log?.ups}, inputs ${JSON.stringify(log?.inputs)}; #out_${key} ${out}; host value ${hostValue}`);
           throw new Error(`${key}/release-fractional: committed ${JSON.stringify(t)}, want the tooltip's ${JSON.stringify(tipText)}`);
         }
         passed.push(`${key}/release-fractional`);
