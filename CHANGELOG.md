@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `ThresholdInteractable` takes a `Colorbar`: drag a line across the bar to set a cutoff on the
+  colorbar's scale, `identity`, `log10` or `log`. The line follows the bar, horizontal on a
+  vertical colorbar and vertical on a horizontal one, and hovering or clicking the rest of the
+  bar still reads its value (#499).
+- Hovering a line on an `Axis3` shows `x`, `y` and `z` of the point you plotted nearest the
+  pointer, as a line on a 2D `Axis` does, and a tooltip template can name `z`. This covers
+  `lines!`, `scatterlines!`'s line, `contour3d!` and a 3D `streamplot!`. A click still picks
+  the whole line (#502).
 - A moved view can go back to where it started: double-click an empty part of the plot, or
   press `0` while the view has keyboard focus. Limits come back as written, so automatic
   limits are automatic again, and an `Axis3` gets its azimuth and elevation back. Linked axes

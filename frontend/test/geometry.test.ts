@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, panLimits3,
-    anchorFor, axisFrame, computeAnchoredPlacement, layerPoint, occludedAt, previewWindows, lineReadout, samplePoint,
+    anchorFor, axisFrame, computeAnchoredPlacement, layerPoint, occludedAt, previewWindows, lineReadout, readoutAt, samplePoint,
     closestPointOnPath,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
@@ -1382,6 +1382,38 @@ describe("lineReadout", () => {
         const L = layer([[0, 100, 100, 100, 200, 100]], [[1, 5, 2, 6, 3, 7]])
         expect(hitLayer(L, 95, 102)?.pt_).toEqual([1, 2, 6])
         expect(hitLayer({ ...L, points: undefined }, 95, 102)?.pt_).toBeUndefined()
+    })
+
+    // A line on an Axis3 (#502): a pixel is a ray, so each sample's z ships beside x and y.
+    it("adds z on an Axis3", () => {
+        const L = { ...layer([[0, 100, 100, 100, 200, 100]], [[1, 5, 2, 6, 3, 7]]), zpoints: [[10, 20, 30]] }
+        expect(lineReadout(L, 0, 60, 95)).toEqual([1, 2, 6, 20])
+        expect(hitLayer(L, 195, 102)?.pt_).toEqual([2, 3, 7, 30])
+        expect(lineReadout({ ...L, zpoints: [[10, NaN, 30]] }, 0, 60, 95)).toBeNull()
+        expect(readoutAt(L, 0, 0)).toEqual([0, 1, 5, 10])
+    })
+
+    // A zoomed Axis3 cuts the path at its limits (#502). Samples at x = 0, 100, 200, 300 px; the
+    // limits cut the first edge at x = 50 and the last at x = 250, so the drawn path is
+    // 50, 100, 200, 250: a cut, sample 1, sample 2, a cut.
+    it("maps a cut path's vertices to its samples", () => {
+        const L: HitLayer = {
+            ...layer([[50, 0, 100, 0, 200, 0, 250, 0]], [[0, 0, 1, 0, 2, 0, 3, 0]]),
+            zpoints: [[0, 1, 2, 3]], drawn: [[1, 2, 4, 5]],
+        }
+        expect(samplePoint(L, 0, 0)).toBeNull() // cut away
+        expect(samplePoint(L, 0, 1)).toEqual({ x: 100, y: 0 })
+        expect(samplePoint(L, 0, 2)).toEqual({ x: 200, y: 0 })
+        expect(lineReadout(L, 0, 60, 0)).toEqual([1, 1, 0, 1]) // the cut stub: the sample still drawn
+        expect(lineReadout(L, 0, 140, 0)).toEqual([1, 1, 0, 1])
+        expect(lineReadout(L, 0, 160, 0)).toEqual([2, 2, 0, 2])
+        expect(lineReadout(L, 0, 245, 0)).toEqual([2, 2, 0, 2])
+        // The edge from sample 0 cut on both ends, a gap, then the edge from sample 1 cut on
+        // entry: the first piece has no drawn sample to read, the second reads sample 2.
+        const gap: HitLayer = { ...L, geometry: [[20, 0, 40, 0, NaN, NaN, 150, 0, 200, 0, 300, 0]], drawn: [[1, 1, -1, 3, 4, 6]] }
+        expect(lineReadout(gap, 0, 30, 0)).toBeNull()
+        expect(lineReadout(gap, 0, 160, 0)).toEqual([2, 2, 0, 2])
+        expect(samplePoint(gap, 0, 3)).toEqual({ x: 300, y: 0 })
     })
 })
 
