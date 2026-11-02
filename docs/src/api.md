@@ -17,6 +17,7 @@ GridWindowEvent
 GridSelection
 AxisEvent
 ThresholdEvent
+SpanEvent
 ColorbarEvent
 BoundsEvent
 bondtype
@@ -37,6 +38,7 @@ ColorbarInteractable
 LegendInteractable
 TextInteractable
 ThresholdInteractable
+SpanInteractable
 ROIInteractable
 ViewInteractable
 LinkedInteractable

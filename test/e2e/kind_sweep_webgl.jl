@@ -607,6 +607,39 @@ HTML(
         "<span id=\"axes_threshold_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar_h.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000206
+@bind ev_span_axis sweep.span_axis
+
+# ╔═╡ d1000000-0000-0000-0000-000000000207
+HTML(
+    "<span id=\"out_span_axis\">SPAN_AXIS=$(sweep_field("span_axis", ev_span_axis))</span>" *
+        "<span id=\"bond_span_axis\" style=\"display:none\">$(repr(ev_span_axis))</span>" *
+        "<span id=\"coords_span_axis\" style=\"display:none\">$(JSON3.write(sweep.span_axis.manifest["layers"]))</span>" *
+        "<span id=\"axes_span_axis\" style=\"display:none\">$(JSON3.write(sweep.span_axis.manifest["transforms"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000208
+@bind ev_span_colorbar sweep.span_colorbar
+
+# ╔═╡ d1000000-0000-0000-0000-000000000209
+HTML(
+    "<span id=\"out_span_colorbar\">SPAN_COLORBAR=$(sweep_field("span_colorbar", ev_span_colorbar))</span>" *
+        "<span id=\"bond_span_colorbar\" style=\"display:none\">$(repr(ev_span_colorbar))</span>" *
+        "<span id=\"coords_span_colorbar\" style=\"display:none\">$(JSON3.write(sweep.span_colorbar.manifest["layers"]))</span>" *
+        "<span id=\"axes_span_colorbar\" style=\"display:none\">$(JSON3.write(sweep.span_colorbar.manifest["transforms"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000204
+@bind ev_span_colorbar_h sweep.span_colorbar_h
+
+# ╔═╡ d1000000-0000-0000-0000-000000000205
+HTML(
+    "<span id=\"out_span_colorbar_h\">SPAN_COLORBAR_H=$(sweep_field("span_colorbar_h", ev_span_colorbar_h))</span>" *
+        "<span id=\"bond_span_colorbar_h\" style=\"display:none\">$(repr(ev_span_colorbar_h))</span>" *
+        "<span id=\"coords_span_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.span_colorbar_h.manifest["layers"]))</span>" *
+        "<span id=\"axes_span_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.span_colorbar_h.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000194
 @bind ev_onchange_colorbar sweep.onchange_colorbar
 
@@ -696,7 +729,8 @@ HTML(
 HTML(
     "<span id=\"out_view\">VIEW=$(sweep_field("view", ev_view))</span>" *
         "<span id=\"bond_view\" style=\"display:none\">$(repr(ev_view))</span>" *
-        "<span id=\"coords_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["layers"]))</span>",
+        "<span id=\"coords_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["layers"]))</span>" *
+        "<span id=\"axes_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["transforms"]))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000146
@@ -706,7 +740,8 @@ HTML(
 HTML(
     "<span id=\"out_view_linked\">VIEW_LINKED=$(sweep_field("view_linked", ev_view_linked))</span>" *
         "<span id=\"bond_view_linked\" style=\"display:none\">$(repr(ev_view_linked))</span>" *
-        "<span id=\"coords_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["layers"]))</span>",
+        "<span id=\"coords_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["layers"]))</span>" *
+        "<span id=\"axes_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["transforms"]))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000172
@@ -747,6 +782,16 @@ HTML(
     "<span id=\"out_view3d_linked\">VIEW3D_LINKED=$(sweep_field("view3d_linked", ev_view3d_linked))</span>" *
         "<span id=\"bond_view3d_linked\" style=\"display:none\">$(repr(ev_view3d_linked))</span>" *
         "<span id=\"coords_view3d_linked\" style=\"display:none\">$(JSON3.write(sweep.view3d_linked.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000202
+@bind ev_view_wheel sweep.view_wheel
+
+# ╔═╡ d1000000-0000-0000-0000-000000000203
+HTML(
+    "<span id=\"out_view_wheel\">VIEW_WHEEL=$(sweep_field("view_wheel", ev_view_wheel))</span>" *
+        "<span id=\"bond_view_wheel\" style=\"display:none\">$(repr(ev_view_wheel))</span>" *
+        "<span id=\"coords_view_wheel\" style=\"display:none\">$(JSON3.write(sweep.view_wheel.manifest["layers"]))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000038
@@ -1088,6 +1133,12 @@ HTML(
 # ╟─d1000000-0000-0000-0000-000000000191
 # ╠═d1000000-0000-0000-0000-000000000192
 # ╟─d1000000-0000-0000-0000-000000000193
+# ╠═d1000000-0000-0000-0000-000000000206
+# ╟─d1000000-0000-0000-0000-000000000207
+# ╠═d1000000-0000-0000-0000-000000000208
+# ╟─d1000000-0000-0000-0000-000000000209
+# ╠═d1000000-0000-0000-0000-000000000204
+# ╟─d1000000-0000-0000-0000-000000000205
 # ╠═d1000000-0000-0000-0000-000000000119
 # ╟─d1000000-0000-0000-0000-000000000120
 # ╠═d1000000-0000-0000-0000-000000000121
@@ -1114,6 +1165,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000116
 # ╠═d1000000-0000-0000-0000-000000000152
 # ╠═d1000000-0000-0000-0000-000000000153
+# ╠═d1000000-0000-0000-0000-000000000202
+# ╠═d1000000-0000-0000-0000-000000000203
 # ╠═d1000000-0000-0000-0000-000000000038
 # ╠═d1000000-0000-0000-0000-000000000039
 # ╠═d1000000-0000-0000-0000-000000000047

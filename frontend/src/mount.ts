@@ -1,9 +1,9 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, surfaceSelection } from "./selection"
 import { emptyMask, maskHit } from "./gridmask"
-import { applyMove, onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip, replaceTip } from "./hover"
+import { applyMove, onLeave, hideTip, hideViewReadout, showViewReadout, syncFocusTip, replaceTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
-import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
+import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onDoubleClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import { buildDragStops } from "./dragkeys"
 import { fieldSelection, recordPicks } from "./history"
@@ -11,6 +11,7 @@ import { groupById, groupEnvelope, groupSelection } from "./linked"
 import type { DragStops } from "./dragkeys"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
+import * as spanDrag from "./drag/span"
 import { limitsTip } from "./drag/view"
 import * as viewDrag from "./drag/view"
 import { createGestureChannel } from "./gesture"
@@ -24,7 +25,7 @@ import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx
 import type { HiGroups, HiSet, OverlayCtx } from "./state"
 import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
 import { axisFrame, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
-import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_IDLE_MS } from "./photo"
+import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_HINT_MS, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
 
 // Keys held for a Cmd/Ctrl/Shift/Alt-click; pressing one is not keyboard use.
@@ -72,6 +73,9 @@ const STYLE = `
 .surface.cur-move { cursor: move; }
 .masque-threshold-line { stroke-width: var(--masque-line-w, 2); }
 .masque-threshold-line.hovered { stroke-width: calc(var(--masque-line-w, 2) * 1.75); }
+/* A band's outside (drag/span.ts) fades toward the plot area's colour, inline as fill, at the
+   preview fade's strength, so the band reads as the part left showing. */
+.masque-span-dim { stroke: none; fill-opacity: calc(1 - var(--masque-preview-opacity, ${PREVIEW_OPACITY})); }
 .masque-cross { opacity: 0; transition: opacity ${MOTION_MS}ms ease-out; }
 .masque-cross.is-on { opacity: 1; }
 /* Halo first (figure background, wider), hairline on top at 80%. The fringe only shows where
@@ -242,14 +246,23 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-halo-ink, var(--ma
        display: var(--masque-tip-caret, block); }
 .masque-tip.flip-y::before { top: auto; bottom: -5px; border-bottom: none;
        border-top: 5px solid var(--masque-tip-bg-resolved); }
-/* An \`onchange\` error: the last picture stays, and this says why it didn't change. */
-.masque-note { position: absolute; left: 8px; bottom: 8px; opacity: 0; pointer-events: none; z-index: 11;
-       padding: 4px 8px; border-radius: var(--masque-tip-radius, 4px);
+/* The figure's bottom-left corner (#526): the note over the readout of a moving view. A
+   column, so a readout that wraps (an Axis3's three ranges on a narrow figure) pushes the note
+   up instead of under it. The view buttons (#525) never use this corner. */
+.masque-corner { position: absolute; left: 8px; bottom: 8px; display: flex; flex-direction: column;
+       align-items: flex-start; gap: 4px; max-width: calc(100% - 32px); pointer-events: none; z-index: 11; }
+.masque-note, .masque-readout { padding: 4px 8px; border-radius: var(--masque-tip-radius, 4px);
        background: var(--masque-tip-bg-resolved); color: var(--masque-tip-color-resolved);
        border: 1px solid var(--masque-tip-border-resolved);
-       font: var(--masque-tip-font-size, 11px)/1.4 var(--masque-tip-font, system-ui, -apple-system, sans-serif);
-       max-width: calc(100% - 32px); transition: opacity ${MOTION_MS}ms ease-out; }
+       font: var(--masque-tip-font-size, 11px)/1.4 var(--masque-tip-font, system-ui, -apple-system, sans-serif); }
+/* An \`onchange\` error (the last picture stays, and this says why), or a hint such as the wheel's. */
+.masque-note { opacity: 0; transition: opacity ${MOTION_MS}ms ease-out; }
+.masque-note:empty { display: none; }
 .masque-note.show { opacity: 1; }
+/* A moving view's readout: shown and hidden at once, as the readout it replaces followed the
+   pointer without a fade. */
+.masque-readout { display: none; font-variant-numeric: tabular-nums; }
+.masque-readout.show { display: block; }
 .masque-tip-row { display: flex; gap: 8px; justify-content: space-between; }
 .masque-tip-key { color: var(--masque-tip-accent, #6b7280); }
 .masque-tip-val { font-variant-numeric: tabular-nums; }
@@ -489,27 +502,41 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     liveRegion.setAttribute("aria-live", "polite")
     liveRegion.setAttribute("aria-atomic", "true")
 
+    const corner = document.createElement("div")
+    corner.className = "masque-corner"
+    const readout = document.createElement("div")
+    readout.className = "masque-readout"
+    readout.setAttribute("aria-hidden", "true") // the keys announce their readout themselves
     const note = document.createElement("div")
     note.className = "masque-note"
     note.setAttribute("role", "status")
     let noteTimer: ReturnType<typeof setTimeout> | null = null
+    let noteKind: "error" | "hint" | null = null
     // The same error again (a drag that keeps failing) keeps the note up without announcing
     // it again. The text goes once the note has faded, so a screen reader doesn't find it later.
-    const showNote = (text: string) => {
+    // An error always wins; a hint (the wheel's, #537's touch one) replaces a hint but never
+    // covers an error, and isn't announced: it repeats as a reader scrolls past each view.
+    const showNote = (text: string, kind: "error" | "hint" = "error", ms = NOTE_MS) => {
+        if (kind === "hint" && noteKind === "error" && note.classList.contains("show")) return
+        noteKind = kind
+        if (kind === "hint") note.setAttribute("aria-hidden", "true")
+        else note.removeAttribute("aria-hidden")
         if (note.textContent !== text) note.textContent = text
         note.classList.add("show")
         if (noteTimer !== null) clearTimeout(noteTimer)
         noteTimer = setTimeout(() => {
             note.classList.remove("show")
-            noteTimer = setTimeout(() => { noteTimer = null; note.textContent = "" }, MOTION_MS)
-        }, NOTE_MS)
+            noteTimer = setTimeout(() => { noteTimer = null; noteKind = null; note.textContent = "" }, MOTION_MS)
+        }, ms)
     }
 
     // The closed-mark selected look's canvases (fade.ts), one pair per axis, under every svg so
     // the hover fill dodges over them.
+    corner.append(note, readout)
+
     const fadeRoot = document.createElement("div")
     fadeRoot.className = "masque-fades"
-    shadow.append(style, fadeRoot, fillSvg, edgeSvg, plainSvg, surface, tip, kbdHint, liveRegion, note)
+    shadow.append(style, fadeRoot, fillSvg, edgeSvg, plainSvg, surface, tip, kbdHint, liveRegion, corner)
     // Named Makie blocks, drawn as HTML over the empty boxes Julia left for them. A release
     // commits like any field; a slider moving under `onchange` redraws as it goes.
     const controls = buildControls(shadow, manifest, {
@@ -555,6 +582,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // plain svg, after every home, so the first <line> in the shadow is still a threshold line.
     const thresholdLines = thresholdDrag.buildThresholdLines(manifest, chromeAt)
     const roiBoxes = roiDrag.buildROIBoxes(manifest, chromeAt, base)
+    const spanBands = spanDrag.buildSpanBands(manifest, chromeAt, base)
     const cross = buildCross(plainSvg)
     const focusable = buildFocusable(manifest)
     const layerStarts = computeLayerStarts(focusable)
@@ -591,13 +619,18 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     let photoFrames = 0
     const adoptedMatrices = new Map<number, PhotoMatrix>()
     const builtAt = new WeakMap<Record<string, unknown>, number>()
+    // A pan, zoom or orbit request moves its view at once (#524); the frame confirms it.
+    const noteMoved = (input: Record<string, unknown>) => {
+        if (typeof input.id === "string" && input.reset !== true && input.onchange !== true) state.viewMoved_.add(input.id)
+    }
     const channel: GestureChannel = {
-        request(input) { builtAt.set(input, photoFrames); route(input.onchange === true).request(input) },
+        request(input) { builtAt.set(input, photoFrames); noteMoved(input); route(input.onchange === true).request(input) },
         settle(input, slot) {
             const ch = route(slot === "onchange")
             // A built-when-sent input is relative to the frame on screen when it is sent.
             if (typeof input === "function") return ch.settle(() => { const o = input(); builtAt.set(o, photoFrames); return o }, slot)
             builtAt.set(input, photoFrames)
+            noteMoved(input)
             return ch.settle(input, slot)
         },
         dispose() { rawChannel.dispose(); replayChannel?.dispose() },
@@ -614,9 +647,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         },
     })
     const ctx: OverlayCtx = {
-        manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, tipExplicit_: manifest.tipDigits !== undefined, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
+        manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, tipExplicit_: manifest.tipDigits !== undefined, host_: host, base_: base, surface_: surface, tip_: tip, readout_: readout, hiGroup_: hiGroup, selGroup_: selGroup,
         hiFixed_: hiFixed, selFixed_: selFixed, linkGroup_: linkGroup, fade_: fade,
-        thresholdLines_: thresholdLines, roiBoxes_: roiBoxes, chromeAt_: chromeAt,
+        thresholdLines_: thresholdLines, roiBoxes_: roiBoxes, spanBands_: spanBands, chromeAt_: chromeAt,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
         cross_: cross,
         gesture_: channel,
@@ -654,6 +687,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     const state = createOverlayState()
     viewDrag.seedView3Homes(state, manifest.layers)
+    noteViewsMoved(manifest, false)
     // Each field starts highlighted at its `initial` value: a `selected=` pick, or what a box
     // over marks or cells holds at its starting bounds.
     const restoreSelection = (v: Record<string, unknown>) => {
@@ -734,7 +768,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
 
     function chromeHeld(): boolean {
         const k = state.drag_?.kind
-        return k === "roi" || k === "threshold"
+        return k === "roi" || k === "threshold" || k === "span"
     }
 
     function replaceDraggedChrome(man: Manifest): void {
@@ -745,6 +779,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         ctx.thresholdLines_ = thresholdDrag.buildThresholdLines(man, chromeAt)
         ctx.roiBoxes_ = roiDrag.buildROIBoxes(man, chromeAt, ctx.base_)
+        for (const band of ctx.spanBands_.values()) spanDrag.removeSpanBand(band)
+        ctx.spanBands_ = spanDrag.buildSpanBands(man, chromeAt, ctx.base_)
     }
 
     function flushPendingChrome(): void {
@@ -765,6 +801,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // \`onchange\` threw: the picture on screen is the last good one, and stays.
         if (typeof r.error === "string") {
             showNote(r.error)
+            // The frame that would have hidden a settled gesture's readout isn't coming.
+            if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) hideViewReadout(ctx)
             ;(host as unknown as { dataset: DOMStringMap }).dataset.masqueOnchangeError = r.error
             return
         }
@@ -836,7 +874,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const keepControls = onchangeFrame && input.settle !== true
         if (keepControls) {
             newManifest.layers = newManifest.layers.map((l) =>
-                l.kind === "threshold" || l.kind === "roi" ? ctx.manifest_.layers.find((o) => o.id === l.id && o.kind === l.kind) ?? l : l)
+                l.kind === "threshold" || l.kind === "span" || l.kind === "roi" ? ctx.manifest_.layers.find((o) => o.id === l.id && o.kind === l.kind) ?? l : l)
         }
         // An \`onchange\` frame comes from a click or a key, and the pointer or the keyboard is
         // still on the mark: the focus and the hover come back on the new picture.
@@ -886,7 +924,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ctx.fade_.hover_(null, null, [])
         // A frame that lands mid-pan, mid-wheel, or mid-key would wipe the readout the gesture is
         // still showing. Pointer-up, the wheel idle timer, and the key's settle frame hide it.
-        if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) hideTip(ctx, state)
+        if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) {
+            hideTip(ctx, state)
+            hideViewReadout(ctx)
+        }
 
         // Re-key the LIVE selection against the new layer objects — do NOT re-derive it from
         // the mount manifest's `initial`, which is only the starting value (a frame's manifest
@@ -935,7 +976,13 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             state.sel_.set(f, sel.items_ ? { ...sel, hits_: nextSel, items_: keptPicks(newManifest, sel.items_) } : { ...sel, hits_: nextSel })
         }
         renderSelection(ctx, state)
-        adoptPhoto(input)
+        noteViewsMoved(newManifest, input.settle === true)
+        // A reset's frame is the starting view, drawn whole: no preview matrix is left over it.
+        if (input.reset === true) {
+            state.photo_ = IDENTITY
+            state.photoAnchor_ = null
+            paintPhoto(IDENTITY)
+        } else adoptPhoto(input)
         dragStops?.sync_()
         if (focused && !state.drag_) {
             const k = ctx.focusable_.findIndex((f) => f.layer_.id === focused.id && f.index_ === focused.index)
@@ -949,7 +996,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const viewLayer = newManifest.layers.find((l) => l.id === input.id)
         const geom = viewLayer?.geometry as ViewGeometry | undefined
         // An Axis3 frame's limits decode as a typed array, which JSON writes as an object.
-        const camera: Record<string, number | number[]> = "azimuth" in input || "limits" in input
+        const camera: Record<string, number | number[]> = geom?.mode === "orbit" || "azimuth" in input || "limits" in input
             ? { azimuth: geom?.azimuth ?? NaN, elevation: geom?.elevation ?? NaN, ...(geom?.limits ? { limits: Array.from(geom.limits) } : {}) }
             : (() => {
                 const t = viewLayer ? newManifest.transforms[viewLayer.axis] : undefined
@@ -963,8 +1010,19 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             })()
         gestureFrameCount += 1
         ;(host as unknown as { dataset: DOMStringMap }).dataset.masqueGestureFrame = JSON.stringify({
-            n: gestureFrameCount, settle: input.settle === true, ...(input.onchange ? { onchange: true } : {}), ...camera,
+            n: gestureFrameCount, settle: input.settle === true, ...(input.onchange ? { onchange: true } : {}),
+            ...(input.reset ? { reset: true } : {}), ...camera,
         })
+    }
+
+    // Which views are away from where they started, from a manifest's `moved` (#524). A frame
+    // can trail a request still in flight, so only a settle frame takes a view out.
+    function noteViewsMoved(man: Manifest, settled: boolean): void {
+        for (const l of man.layers) {
+            if (l.kind !== "view") continue
+            if ((l.geometry as ViewGeometry).moved) state.viewMoved_.add(l.id)
+            else if (settled) state.viewMoved_.delete(l.id)
+        }
     }
 
     // A plot \`onchange\` gave a different number of marks loses its picks (Julia names them).
@@ -1024,6 +1082,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         shadowHost.style.height = `${br.height}px`
         shadowHost.style.setProperty("--masque-k", String(ctx.manifest_.width / br.width))
         roiDrag.syncHandleDraw(ctx.roiBoxes_, ctx.manifest_.width, br.width, ctx.manifest_.scaling)
+        spanDrag.syncGripDraw(ctx.spanBands_, ctx.manifest_.width, br.width, ctx.manifest_.scaling)
         ctx.fade_.refresh_()
         state.surfaceSized_ = false
         replaceTip(ctx, state)
@@ -1189,7 +1248,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const down = (e: PointerEvent) => onDown(ctx, state, e)
     const move = (e: PointerEvent) => { lastMove = e; onPointerMove(ctx, state, e) }
     const releaseChrome = (kind: string | undefined) => {
-        if ((kind === "roi" || kind === "threshold") && !state.drag_) flushPendingChrome()
+        if ((kind === "roi" || kind === "threshold" || kind === "span") && !state.drag_) flushPendingChrome()
     }
     const up = (e: PointerEvent) => {
         const kind = state.drag_?.kind
@@ -1216,6 +1275,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         releaseChrome(kind)
     }
     const click = (e: MouseEvent) => onClick(ctx, state, e)
+    const dblclick = (e: MouseEvent) => onDoubleClick(ctx, state, e)
     const keydown = (e: KeyboardEvent) => {
         // A key shows where keys go (pointer-focus). Not a modifier held for Cmd/Ctrl-click, and
         // not a Cmd/Ctrl/Alt chord: undo after a click (#386) or a browser shortcut is not
@@ -1233,6 +1293,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         focusTo(ctx, state, null)
     }
 
+    // A plain wheel over a `wheel = :modifier` view says how to zoom, in the note at the
+    // figure's corner, as maps do (#526). An `onchange` error the note is showing wins.
+    const wheelHint = `${isApplePlatform() ? "Cmd" : "Ctrl"} + scroll to zoom`
+    const showWheelHint = () => showNote(wheelHint, "hint", WHEEL_HINT_MS)
+
     const onWheel = (e: WheelEvent) => {
         if (state.drag_) return
         // The axis viewport is in layout pixels. The zoom anchor is the content pixel
@@ -1241,6 +1306,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         let id = ""
         let axis = ""
         let limits3: Limits3 | null = null // an Axis3 view's limits, on screen now
+        let wheel: ViewGeometry["wheel"] = "modifier"
         for (const layer of ctx.manifest_.layers) {
             if (layer.kind !== "view" || !layer.events.includes("drag")) continue
             const g = layer.geometry as ViewGeometry
@@ -1249,14 +1315,23 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                 if (!g.limits) continue
                 id = layer.id
                 limits3 = g.limits
+                wheel = g.wheel ?? "modifier"
                 break
             }
             if (!ctx.manifest_.transforms[layer.axis]) continue
             id = layer.id
             axis = layer.axis
+            wheel = g.wheel ?? "modifier"
             break
         }
         if (!id) return
+        // #526: a plain wheel scrolls the page unless the view asked for `wheel = :always`.
+        // A trackpad pinch arrives as Ctrl+wheel in Chrome and Firefox, so it still zooms.
+        if (wheel === "none") return
+        if (wheel === "modifier" && !e.ctrlKey && !e.metaKey) {
+            if (e.deltaY !== 0) showWheelHint() // a sideways scroll is no attempt to zoom
+            return
+        }
         e.preventDefault()
         if (limits3) {
             const shown = limits3
@@ -1264,15 +1339,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             // their center; the idle timer settles the last ones at full resolution.
             const lim = viewDrag.zoom3(state, id, shown, wheelScale(e.deltaY, e.deltaMode))
             ctx.gesture_.request({ id, limits: lim, settle: false })
-            setTipText(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
-            setTipVisible(ctx, true)
-            const tp = tipOffset(ctx, e)
-            placeTip(ctx, state, tp.x, tp.y)
+            showViewReadout(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
             if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
             const wheelId = id
             state.wheelTimer_ = setTimeout(() => {
                 state.wheelTimer_ = null
-                hideTip(ctx, state)
+                hideViewReadout(ctx)
                 ctx.gesture_.settle({ id: wheelId, limits: viewDrag.view3Base(state, wheelId, shown), settle: true })
             }, WHEEL_IDLE_MS)
             return
@@ -1285,17 +1357,14 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const lim = matrixLimits(ctx.manifest_.transforms[axis], next)
         if (lim) {
             ctx.gesture_.request({ id, ...lim, settle: false, s: next.s, tx: next.tx, ty: next.ty })
-            setTipText(ctx, state, limitsTip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
-            setTipVisible(ctx, true)
-            const tp = tipOffset(ctx, e)
-            placeTip(ctx, state, tp.x, tp.y)
+            showViewReadout(ctx, state, limitsTip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
         }
         if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
         const wheelId = id
         const wheelAxis = axis
         state.wheelTimer_ = setTimeout(() => {
             state.wheelTimer_ = null
-            hideTip(ctx, state)
+            hideViewReadout(ctx)
             const layer = ctx.manifest_.layers.find((l) => l.id === wheelId)
             const shown = layer ? ctx.manifest_.transforms[layer.axis] : ctx.manifest_.transforms[wheelAxis]
             if (!shown) return
@@ -1312,6 +1381,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     surface.addEventListener("pointerleave", leave)
     surface.addEventListener("lostpointercapture", lostCapture)
     surface.addEventListener("click", click)
+    surface.addEventListener("dblclick", dblclick)
     surface.addEventListener("keydown", keydown)
     surface.addEventListener("focusout", focusout)
     // After the surface in the shadow root, so Tab reaches the plot first, then each drag layer.
@@ -1337,6 +1407,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         surface.removeEventListener("pointerleave", leave)
         surface.removeEventListener("lostpointercapture", lostCapture)
         surface.removeEventListener("click", click)
+        surface.removeEventListener("dblclick", dblclick)
         surface.removeEventListener("keydown", keydown)
         surface.removeEventListener("focusout", focusout)
         dragStops?.cleanup_()

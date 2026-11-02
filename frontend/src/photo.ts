@@ -16,6 +16,8 @@ const S_MIN = 1 / 16
 const S_MAX = 16
 
 export const WHEEL_IDLE_MS = 150
+// How long the "Ctrl + scroll to zoom" hint stays after the last plain wheel over a view.
+export const WHEEL_HINT_MS = 1500
 
 export function isIdentity(m: PhotoMatrix): boolean {
     return Math.abs(m.s - 1) < 1e-6 && Math.abs(m.tx) < 1e-3 && Math.abs(m.ty) < 1e-3

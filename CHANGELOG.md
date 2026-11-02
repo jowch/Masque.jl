@@ -6,11 +6,32 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Breaking
+- Scrolling over a plot with a `ViewInteractable` scrolls the page, as it does everywhere else
+  on the page. To zoom, hold Ctrl (Cmd on a Mac) while scrolling; in Chrome and Firefox a
+  trackpad pinch zooms too. A plain scroll over the plot shows a short hint in its corner
+  saying so. Before, any scroll over the plot zoomed it and the page stopped scrolling.
+  `ViewInteractable(ax; wheel = :always)` brings back the old behavior, and `wheel = :none`
+  turns wheel zoom off. An axis whose scroll zoom is turned off in Makie, with
+  `deregister_interaction!(ax, :scrollzoom)`, `deactivate_interaction!(ax, :scrollzoom)` or
+  both `xzoomlock` and `yzoomlock`, gets `wheel = :none` unless the call says otherwise;
+  Masque 0.4 ignored those settings. See
+  [Upgrading](https://jowch.github.io/Masque.jl/stable/upgrading/) (#526).
+
 ### Added
 - A `surface!` on a `PolarAxis`, which is how Makie draws a polar heatmap, responds to hover
   and click like a surface on an `Axis3`: the tooltip shows the point nearest the pointer, and
   a click gives a `GridCellEvent` with its `(i, j)`. Before, `masque` skipped it with a
   warning (#514).
+- A moved view can go back to where it started: double-click an empty part of the plot, or
+  press `0` while the view has keyboard focus. Limits come back as written, so automatic
+  limits are automatic again, and an `Axis3` gets its azimuth and elevation back. Linked axes
+  and panels go back together. Re-running only the `masque` cell keeps the starting view (#524).
+- `SpanInteractable` drags a band, a `(lo, hi)` range, on an `Axis` or a `Colorbar`. Drag an
+  edge to move that end, or inside the band to move both. The plot outside the band is faded
+  and each edge has a grip. Its field is a `SpanEvent` with `lo` and `hi`. Points, lines, bars
+  and shapes inside the band still answer hover and click; a heatmap or image inside it
+  answers hover, and a press on it moves the band (#500).
 
 ### Changed
 - Default tooltips and readouts show a coordinate the way its axis labels it. On a
@@ -30,6 +51,9 @@ All notable changes to this project are documented here. The format is based on
   that point's position in your data, `pick.line` says which line it is on, and `pick.x`,
   `pick.y` and `pick.z` hold it. `selected=` indices on such a line name points too. To
   upgrade, code that read `pick.index` as the line now reads `pick.line` (#518).
+- While you pan, zoom or turn a view, its readout (the axis limits, or an `Axis3`'s angles
+  while it turns) shows in the bottom-left corner of the figure instead of beside the pointer,
+  and a point's tooltip doesn't show over it (#526).
 
 ## [0.4.5] - 2026-11-02
 
