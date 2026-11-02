@@ -1326,8 +1326,11 @@ try {
       return { x: b.left + g.x * s, y: b.top + g.y * s, w: g.w * s, h: g.h * s };
     }, key);
     await page.mouse.move(vp.x + vp.w / 2, vp.y + vp.h / 2);
-    await new Promise((r) => setTimeout(r, 300));
-    const st = await page.evaluate((k) => {
+    // Read once the fade in has ended (a busy WebGL page can start it late), for up to 3 s.
+    let st = null;
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      st = await page.evaluate((k) => {
       const span = document.querySelector(`#coords_${k}`);
       const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
@@ -1347,7 +1350,9 @@ try {
         reset: getComputedStyle(box.querySelector(".masque-vb-reset")).display,
         rect: { x: r.left, y: r.top, w: r.width, h: r.height },
       };
-    }, key);
+      }, key);
+      if (st.show && st.opacity >= 0.99) break;
+    }
     const fail = (m) => { throw new Error(`${key}-view-buttons: ${m} (${JSON.stringify(st)})`); };
     if (!st.show || st.opacity < 0.99) fail("hover did not show the box");
     if (st.corner !== corner) fail(`corner ${st.corner}, expected ${corner}`);
