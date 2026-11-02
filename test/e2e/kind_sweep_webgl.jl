@@ -474,6 +474,16 @@ HTML(
         "<span id=\"coords_violin\" style=\"display:none\">$(JSON3.write(sweep.violin.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000549
+@bind ev_violin_h sweep.violin_h
+
+# ╔═╡ d1000000-0000-0000-0000-00000000054a
+HTML(
+    "<span id=\"out_violin_h\">VIOLIN_H=$(sweep_field("violin_h", ev_violin_h))</span>" *
+        "<span id=\"bond_violin_h\" style=\"display:none\">$(repr(ev_violin_h))</span>" *
+        "<span id=\"coords_violin_h\" style=\"display:none\">$(JSON3.write(sweep.violin_h.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000111
 @bind ev_stairs sweep.stairs
 
@@ -1126,6 +1136,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-00000000010e
 # ╠═d1000000-0000-0000-0000-00000000010f
 # ╠═d1000000-0000-0000-0000-000000000110
+# ╠═d1000000-0000-0000-0000-000000000549
+# ╠═d1000000-0000-0000-0000-00000000054a
 # ╠═d1000000-0000-0000-0000-000000000111
 # ╠═d1000000-0000-0000-0000-000000000112
 # ╠═d1000000-0000-0000-0000-0000000000b5
