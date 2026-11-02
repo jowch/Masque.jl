@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Breaking
+- Scrolling over a plot with a `ViewInteractable` scrolls the page, as it does everywhere else
+  on the page. To zoom, hold Ctrl (Cmd on a Mac) while scrolling; in Chrome and Firefox a
+  trackpad pinch zooms too. A plain scroll over the plot shows a short hint in its corner
+  saying so. Before, any scroll over the plot zoomed it and the page stopped scrolling.
+  `ViewInteractable(ax; wheel = :always)` brings back the old behavior, and `wheel = :none`
+  turns wheel zoom off. An axis whose scroll zoom is turned off in Makie, with
+  `deregister_interaction!(ax, :scrollzoom)`, `deactivate_interaction!(ax, :scrollzoom)` or
+  both `xzoomlock` and `yzoomlock`, gets `wheel = :none` unless the call says otherwise;
+  Masque 0.4 ignored those settings. See
+  [Upgrading](https://jowch.github.io/Masque.jl/stable/upgrading/) (#526).
+
 ### Added
 - A `surface!` on a `PolarAxis`, which is how Makie draws a polar heatmap, responds to hover
   and click like a surface on an `Axis3`: the tooltip shows the point nearest the pointer, and
@@ -34,6 +46,9 @@ All notable changes to this project are documented here. The format is based on
   that point's position in your data, `pick.line` says which line it is on, and `pick.x`,
   `pick.y` and `pick.z` hold it. `selected=` indices on such a line name points too. To
   upgrade, code that read `pick.index` as the line now reads `pick.line` (#518).
+- While you pan, zoom or turn a view, its readout (the axis limits, or an `Axis3`'s angles
+  while it turns) shows in the bottom-left corner of the figure instead of beside the pointer,
+  and a point's tooltip doesn't show over it (#526).
 
 ## [0.4.5] - 2026-11-02
 

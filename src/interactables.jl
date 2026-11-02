@@ -2046,7 +2046,7 @@ end
 
 # ============================ ViewInteractable =============================
 """
-    ViewInteractable(ax; id=:view, controls=:hover)
+    ViewInteractable(ax; id=:view, wheel=nothing, controls=:hover)
 
 Drag-to-pan and wheel zoom (2D `Axis`), or drag-to-orbit, wheel zoom and Shift+drag pan
 (`Axis3`). Produces one `:view` [`HitLayer`](@ref)
@@ -2057,6 +2057,14 @@ drag on those wins without a modifier — **Shift+drag** forces the view gesture
 # Arguments
 - `ax` — a `Makie.Axis` (pan) or `Makie.Axis3` (orbit). `id` — the layer id, used to route
   gesture-channel frame requests back to this axis. Default `:view`.
+- `wheel` — what the scroll wheel does over the axis. `:modifier`: Ctrl+scroll (Cmd+scroll
+  on macOS) zooms, as does a trackpad pinch in Chrome and Firefox, and a plain scroll scrolls
+  the page, with a short hint saying how to zoom. `:always`: any scroll over the axis zooms it
+  and the page stays put (Masque 0.4). `:none`: the wheel never zooms; `+`/`-` still do from
+  the keyboard. Left out (`nothing`), it is `:modifier`, except on an axis whose scroll zoom
+  is turned off in Makie (`deregister_interaction!(ax, :scrollzoom)`,
+  `deactivate_interaction!(ax, :scrollzoom)`, or both `xzoomlock` and `yzoomlock`), which
+  gets `:none`.
 - `controls` — the zoom in, zoom out and reset buttons in a corner of the plot: `:hover`
   (default) shows them while the pointer is over the plot, while the view has keyboard focus,
   and after a touch on the plot; `:always` keeps them shown; `:none` leaves them out.
@@ -2100,19 +2108,43 @@ ViewInteractable(ax)
 ```
 """
 struct ViewInteractable <: AbstractInteractable
-    ax; id::Symbol; controls::Symbol
+    ax; id::Symbol
+    wheel::Union{Symbol, Nothing} # `nothing`: follow Makie's own scroll zoom, see `_view_wheel`
+    controls::Symbol
 end
+const _WHEEL_MODES = (:modifier, :always, :none)
 const _VIEW_CONTROLS = (:hover, :always, :none)
-function ViewInteractable(ax; id = :view, controls::Symbol = :hover)
+function ViewInteractable(ax; id = :view, wheel = nothing, controls::Symbol = :hover)
+    wheel === nothing || wheel in _WHEEL_MODES ||
+        throw(ArgumentError("ViewInteractable: wheel = $(repr(wheel)) is not one of :modifier, :always or :none."))
     controls in _VIEW_CONTROLS || throw(
         ArgumentError(
             "ViewInteractable: controls = :$(controls) is not one of :hover, :always or :none."
         )
     )
-    return ViewInteractable(ax, id, controls)
+    return ViewInteractable(ax, id, wheel, controls)
 end
-# The two-field form from before `controls` (0.4).
-ViewInteractable(ax, id::Symbol) = ViewInteractable(ax, id, :hover)
+# The positional forms from before `controls`.
+ViewInteractable(ax, id::Symbol) = ViewInteractable(ax, id, nothing, :hover)
+ViewInteractable(ax, id::Symbol, wheel::Union{Symbol, Nothing}) = ViewInteractable(ax, id, wheel, :hover)
+# The wheel policy a view ships. An explicit `wheel` wins. Without one, an axis whose scroll
+# zoom the author turned off in Makie, with `deregister_interaction!(ax, :scrollzoom)`,
+# `deactivate_interaction!(ax, :scrollzoom)` or (2D) both `xzoomlock` and `yzoomlock`, doesn't zoom on the wheel either; any other axis takes the
+# Masque default, `:modifier` (#526).
+function _view_wheel(i::ViewInteractable)
+    i.wheel === nothing || return i.wheel
+    ax = i.ax
+    if hasproperty(ax, :interactions)
+        # `deregister_interaction!` removes the entry; `deactivate_interaction!` keeps it as
+        # `(false, interaction)`.
+        zoom = get(ax.interactions, :scrollzoom, nothing)
+        (zoom === nothing || !first(zoom)) && return :none
+    end
+    if ax isa Makie.Axis && ax.xzoomlock[] && ax.yzoomlock[]
+        return :none
+    end
+    return :modifier
+end
 events(::ViewInteractable) = (:drag,)
 function validate(i::ViewInteractable, ctx::InteractionContext)
     i.ax isa Makie.Legend && return "ViewInteractable: ax is a Legend, not an Axis/Axis3 — a legend has no pan/orbit view."
@@ -2198,6 +2230,7 @@ function hitlayers(i::ViewInteractable, ctx)
         "x" => Float32(vx), "y" => Float32(vy),
         "w" => Float32(vw), "h" => Float32(vh),
         "mode" => t.is3d ? "orbit" : "pan",
+        "wheel" => String(_view_wheel(i)),
     )
     # Away from where it started (#524): a reset has somewhere to go. Left out at home.
     _view_moved(i.ax) && (geom["moved"] = true)

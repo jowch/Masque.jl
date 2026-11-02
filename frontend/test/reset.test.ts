@@ -184,9 +184,10 @@ describe("reset a moved view (#524)", () => {
 
     it("a reset takes over a wheel zoom still waiting for its idle settle", async () => {
         const { surface, requestFrame } = setup(manifestOf())
-        // happy-dom's WheelEvent drops clientX/clientY, so set them on the instance.
+        // happy-dom's WheelEvent drops clientX/clientY and ctrlKey, so set them on the instance.
+        // Ctrl, because a plain wheel scrolls the page (#526).
         const we = new WheelEvent("wheel", { deltaY: -100, bubbles: true, cancelable: true })
-        Object.defineProperties(we, { clientX: { value: 300 }, clientY: { value: 300 } })
+        Object.defineProperties(we, { clientX: { value: 300 }, clientY: { value: 300 }, ctrlKey: { value: true } })
         surface.dispatchEvent(we)
         await tick()
         doubleClick(surface, 300, 300)

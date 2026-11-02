@@ -1,6 +1,6 @@
 import { axisPoint, findBin, hitTestAt, layerPoint, lineReadout, matrixLimits, resolvePayload } from "./geometry"
 import { drawHover, renderSelection } from "./highlight"
-import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent, updateLinkForHit } from "./hover"
+import { onMove, hideTip, hideViewReadout, showViewReadout, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent, updateLinkForHit } from "./hover"
 import { hideCross } from "./cross"
 import { cellRange, elementPicks, legendEdit, linePointHit, linkedIndices, manyHits, picksPoints, selectionFor, SELECTED_KINDS } from "./selection"
 import { emptyMask, encodeMask, maskCount, maskHit, setBlock } from "./gridmask"
@@ -138,6 +138,10 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
     } else {
         text = roiDrag.move(ctx, state, d, content)
         if (liveDrag(ctx, d.id_)) requestState(ctx, roiDrag.fieldsNow(ctx, d))
+    }
+    if (d.kind === "view") {
+        showViewReadout(ctx, state, text)
+        return
     }
     setMarkAccent(ctx, null) // a drag readout is never a coloured element's tooltip
     setTipText(ctx, state, text)
@@ -371,7 +375,7 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     } else {
         ctx.commit_(roiDrag.end(ctx, state, d))
     }
-    hideTip(ctx, state); ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
+    hideTip(ctx, state); hideViewReadout(ctx); ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     if (d.kind === "view") {
         const dist = Math.hypot(layout.x - d.x0_, layout.y - d.y0_)
         state.justDragged_ = dist >= viewDrag.VIEW_MIN_PX
@@ -395,6 +399,7 @@ export function onCancel(ctx: OverlayCtx, state: OverlayState, e: PointerEvent):
     if (ctx.surface_.hasPointerCapture(e.pointerId)) ctx.surface_.releasePointerCapture(e.pointerId)
     ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     hideTip(ctx, state)
+    hideViewReadout(ctx)
     if (d.kind === "marquee") { marquee.cancel(ctx, state, d); return }
     // §12.5 (round-1 review, finding #2): a cancelled gesture is not a commit, but if it already
     // sent an in-drag (ppu=1) request it still owes the ppu restore — nothing else ever
@@ -431,6 +436,7 @@ export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
     const d = state.drag_ // claim before nulling, same reentrancy hazard onUp documents
     ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     hideTip(ctx, state)
+    hideViewReadout(ctx)
     state.drag_ = null
     if (d.kind === "marquee") { marquee.cancel(ctx, state, d); return }
     // Same §12.5 obligation as onCancel — but this handler gets no event/position at all, so the

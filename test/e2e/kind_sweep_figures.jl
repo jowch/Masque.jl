@@ -555,6 +555,14 @@ kind_sweep_meta() = [
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
     ),
     Dict(
+        # The other wheel policies (#526): `wheel = :always` on the left takes a plain wheel
+        # (the page stays put, the view zooms); on the right, scroll zoom turned off in Makie
+        # with `deactivate_interaction!` gives `:none`, so even Ctrl+wheel is the browser's.
+        "key" => "view_wheel", "layerId" => "view", "layerKind" => "view",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "wheel",
+    ),
+    Dict(
         "key" => "legend", "layerId" => "legend", "layerKind" => "rects",
         "selected" => nothing, "halo" => false, "selectedIndex" => 2, "clickIndex" => 2,
         "tip" => "pts", "mode" => "element",
@@ -1528,6 +1536,20 @@ function build_kind_sweep()
         )
     end
 
+    view_wheel = let
+        pts = [(1.0, 1.0), (7.0, 1.0), (1.0, 7.0), (7.0, 7.0)]
+        fig = Figure(size = (620, 260))
+        a1 = Axis(fig[1, 1]; title = "wheel = :always", limits = (0, 8, 0, 8))
+        a2 = Axis(fig[1, 2]; title = "scroll zoom off in Makie", limits = (0, 8, 0, 8))
+        s1 = scatter!(a1, first.(pts), last.(pts); markersize = 14, color = :gray)
+        s2 = scatter!(a2, first.(pts), last.(pts); markersize = 14, color = :teal)
+        Makie.deactivate_interaction!(a2, :scrollzoom)
+        masque(
+            fig, interactables(s1; id = :pts), interactables(s2; id = :pts2),
+            ViewInteractable(a1; id = :view, wheel = :always), ViewInteractable(a2; id = :view_none),
+        )
+    end
+
     view_twin = let
         fig = Figure(size = (480, 300))
         a1 = Axis(fig[1, 1]; title = "view-twin", limits = (0, 8, 0, 8))
@@ -1896,7 +1918,7 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view_dark, view3d, view3d_linked, legend, series_legend,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

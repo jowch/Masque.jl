@@ -1,5 +1,5 @@
 import { invertAxis, matrixLimits, panLimits3, projectAxis } from "./geometry"
-import { hideTip, placeTip, setMarkAccent, setTipText, setTipVisible } from "./hover"
+import { hideTip, hideViewReadout, showViewReadout, placeTip, setMarkAccent, setTipText, setTipVisible } from "./hover"
 import { scheduleAnnounce } from "./keyboard"
 import { resetView, settleCurrentPan } from "./bond"
 import { fmtCoord } from "./template"
@@ -120,6 +120,12 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             const cx = (parseFloat(r.left) + parseFloat(r.width) / 2) / 100 * ctx.manifest_.width / s
             const cy = (parseFloat(r.top) + parseFloat(r.height) / 2) / 100 * ctx.manifest_.height / s
             placeTip(ctx, state, Number.isFinite(cx) ? cx : 0, Number.isFinite(cy) ? cy : 0)
+            scheduleAnnounce(ctx, state, text)
+        }
+
+        // A view's readout sits in the figure's corner (#526), as for the mouse and the wheel.
+        const viewReadout = (text: string) => {
+            showViewReadout(ctx, state, text)
             scheduleAnnounce(ctx, state, text)
         }
 
@@ -244,7 +250,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                     const input = { id, limits: lim, settle: false }
                     state.keyView_ = true
                     ctx.gesture_.request(input)
-                    showReadout(viewDrag.limits3Tip(lim, ctx.tipDigits_, t, ctx.tipExplicit_))
+                    viewReadout(viewDrag.limits3Tip(lim, ctx.tipDigits_, t, ctx.tipExplicit_))
                     pending = () => { state.keyView_ = false; ctx.gesture_.settle({ ...input, settle: true }) }
                     return true
                 }
@@ -256,7 +262,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                 orbitCam = { azimuth: input.azimuth as number, elevation: input.elevation as number }
                 state.keyView_ = true
                 ctx.gesture_.request(input)
-                showReadout(viewDrag.tip(o, p, ctx.tipDigits_, ctx.tipExplicit_))
+                viewReadout(viewDrag.tip(o, p, ctx.tipDigits_, ctx.tipExplicit_))
                 pending = () => { state.keyView_ = false; ctx.gesture_.settle({ ...input, settle: true }) }
                 return true
             }
@@ -276,7 +282,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             ctx.photoPaint_(next)
             state.keyView_ = true
             ctx.gesture_.request({ id, ...lim, settle: false, s: next.s, tx: next.tx, ty: next.ty })
-            showReadout(viewDrag.limitsTip(lim, ctx.tipDigits_, t, ctx.tipExplicit_))
+            viewReadout(viewDrag.limitsTip(lim, ctx.tipDigits_, t, ctx.tipExplicit_))
             pending = () => { state.keyView_ = false; settleCurrentPan(ctx, state, d) }
             return true
         }
@@ -352,6 +358,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             flush()
             orbitCam = null
             hideTip(ctx, state)
+            hideViewReadout(ctx)
         }
         el.addEventListener("keydown", onKeydown)
         el.addEventListener("keyup", onKeyup)

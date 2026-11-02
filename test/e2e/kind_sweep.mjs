@@ -587,6 +587,69 @@ try {
     return null;
   };
 
+  // #526: on a default `wheel = :modifier` view a plain wheel scrolls the page, leaves the view
+  // alone, and shows the "Ctrl + scroll to zoom" hint in the corner note. A real wheel (no
+  // modifier) at the view's center; scrolls up instead when the page is near its bottom.
+  const plainWheelScrolls = async (key, g, what) => {
+    if ((g.wheel ?? "modifier") !== "modifier") throw new Error(`${key}: expected the default wheel = modifier, got ${JSON.stringify(g.wheel)}`);
+    const at = await page.evaluate(([k, ix, iy]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      const se = document.scrollingElement;
+      return { x: b.left + ix * s, y: b.top + iy * s, top: se.scrollTop, room: se.scrollHeight - se.clientHeight - se.scrollTop, photo: host.dataset.masquePhoto || "" };
+    }, [key, g.x + g.w / 2, g.y + g.h / 2]);
+    await page.evaluate(() => {
+      window.__masqueWheelSeen = [];
+      if (!window.__masqueWheelSpy) {
+        window.__masqueWheelSpy = true;
+        // Bubble phase on window: runs after the target's own handlers, so it sees whether any
+        // of them took the wheel.
+        window.addEventListener("wheel", (e) => {
+          const t = e.composedPath()[0];
+          window.__masqueWheelSeen.push({ prevented: e.defaultPrevented, target: `${t?.tagName ?? "?"}.${t?.className?.baseVal ?? t?.className ?? ""}` });
+        }, { passive: true });
+      }
+    });
+    await page.mouse.move(at.x, at.y);
+    // A short scroll, so the pointer stays over the plot.
+    const dy = at.room > 300 ? 40 : -40;
+    await page.mouse.wheel(0, dy);
+    // Playwright doesn't wait for the scroll, and a busy WebGL page can take a while to apply it.
+    // The hint can lapse first, so it is read on every poll.
+    let hint = "";
+    for (let i = 0; i < 30; i++) {
+      const now = await page.evaluate(([k]) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const note = sr.querySelector(".masque-note");
+        return { top: document.scrollingElement.scrollTop, hint: note?.classList.contains("show") ? note.textContent : "" };
+      }, [key]);
+      if (now.hint) hint = now.hint;
+      if (now.top !== at.top && hint) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    const after = await page.evaluate(([k]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      return { seen: window.__masqueWheelSeen, top: document.scrollingElement.scrollTop, photo: host.dataset.masquePhoto || "" };
+    }, [key]);
+    if (Math.sign(after.top - at.top) !== Math.sign(dy)) throw new Error(`${key}-wheel: a plain wheel over the ${what} view did not scroll the page (${at.top} -> ${after.top}): ${JSON.stringify({ at, after })}`);
+    if (after.photo !== at.photo) throw new Error(`${key}-wheel: a plain wheel zoomed the ${what} view (${JSON.stringify(after.photo)})`);
+    if (!/^(Ctrl|Cmd) \+ scroll to zoom$/.test(hint)) throw new Error(`${key}-wheel: no zoom hint in the corner note after a plain wheel: ${JSON.stringify({ at, after, hint })}`);
+    await page.mouse.move(1, 1);
+    await dispatchAt(key, 1, 1, "pointermove");
+    // Let the hint lapse so later checks start from a hidden note.
+    await new Promise((r) => setTimeout(r, 1700));
+    passed.push(`${key}/plain-wheel-scrolls`);
+    console.error(`OK  ${key} — a plain wheel scrolled the page by ${after.top - at.top} px and showed "${hint}"`);
+  };
+
   const dispatchAt = async (key, x, y, type, mod = {}) => page.evaluate(async ([k, ix, iy, typ, md, haloCapture]) => {
     const span = document.querySelector(`#coords_${k}`);
     const hosts = [...document.querySelectorAll(".ip-host")];
@@ -920,6 +983,93 @@ try {
       }
       passed.push(`${key}/overlap-order`);
       passed.push(`${key}/overlap-pixel-contested`);
+    }
+
+    // The other wheel policies (#526). `wheel = :always` takes a plain wheel: the page stays
+    // put and the view zooms, with its readout in the corner. Scroll zoom turned off in Makie
+    // (`deactivate_interaction!`) gives `wheel = :none`: a plain wheel scrolls the page with no
+    // hint, and Ctrl+wheel is left to the browser (not prevented, no zoom).
+    if (spec.mode === "wheel") {
+      const gAlways = layers.find((l) => l.id === "view")?.geometry;
+      const gNone = layers.find((l) => l.id === "view_none")?.geometry;
+      if (gAlways?.wheel !== "always" || gNone?.wheel !== "none") {
+        throw new Error(`${key}: expected wheel always/none, got ${JSON.stringify([gAlways?.wheel, gNone?.wheel])}`);
+      }
+      const state = (k) => page.evaluate(([kk]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const note = sr.querySelector(".masque-note"), ro = sr.querySelector(".masque-readout");
+        return {
+          top: document.scrollingElement.scrollTop, photo: host.dataset.masquePhoto || "",
+          hint: note.classList.contains("show") ? note.textContent : "",
+          readout: ro.classList.contains("show") ? ro.textContent : "",
+        };
+      }, [k]);
+      const centerOf = (g) => page.evaluate(([kk, ix, iy]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        const se = document.scrollingElement;
+        return { x: b.left + ix * s, y: b.top + iy * s, room: se.scrollHeight - se.clientHeight - se.scrollTop };
+      }, [key, g.x + g.w / 2, g.y + g.h / 2]);
+      // Polls for up to 3 s, keeping the first time each field showed.
+      const watch = async (start, done) => {
+        const seen = { top: start.top, photo: "", hint: "", readout: "" };
+        for (let i = 0; i < 30; i++) {
+          const st = await state(key);
+          seen.top = st.top;
+          for (const f of ["photo", "hint", "readout"]) if (st[f] && !seen[f]) seen[f] = st[f];
+          if (done(seen)) break;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        return seen;
+      };
+
+      // :always — a real plain wheel zooms and leaves the page where it is.
+      let c = await centerOf(gAlways);
+      await page.mouse.move(c.x, c.y);
+      let s0 = await state(key);
+      await page.mouse.wheel(0, c.room > 300 ? -120 : 120);
+      let seen = await watch(s0, (x) => x.photo && x.readout);
+      if (seen.top !== s0.top) throw new Error(`${key}: a plain wheel over a wheel = :always view scrolled the page (${s0.top} -> ${seen.top})`);
+      if (!seen.photo) throw new Error(`${key}: a plain wheel over a wheel = :always view did not zoom it`);
+      if (!/x:\[/.test(seen.readout)) throw new Error(`${key}: no corner readout while the :always view zoomed: ${JSON.stringify(seen)}`);
+      if (seen.hint) throw new Error(`${key}: a wheel = :always view showed the zoom hint "${seen.hint}"`);
+      passed.push(`${key}/always-plain-wheel-zooms`);
+      // Let the zoom settle before the next view.
+      for (let i = 0; ; i++) {
+        const st = await state(key);
+        if (!st.photo && !st.readout) break;
+        if (i > 100) throw new Error(`${key}: the :always zoom never settled: ${JSON.stringify(st)}`);
+        await new Promise((r) => setTimeout(r, 200));
+      }
+
+      // :none — Ctrl+wheel is not taken, and a real plain wheel scrolls the page with no hint.
+      c = await centerOf(gNone);
+      const ctrl = await page.evaluate(([kk, x, y]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: x, clientY: y, deltaY: -120, ctrlKey: true });
+        sr.querySelector(".surface").dispatchEvent(ev);
+        return { prevented: ev.defaultPrevented, photo: host.dataset.masquePhoto || "" };
+      }, [key, c.x, c.y]);
+      if (ctrl.prevented || ctrl.photo) throw new Error(`${key}: Ctrl+wheel was taken by a view whose scroll zoom is off in Makie: ${JSON.stringify(ctrl)}`);
+      await page.mouse.move(c.x, c.y);
+      s0 = await state(key);
+      const dy = c.room > 300 ? 40 : -40;
+      await page.mouse.wheel(0, dy);
+      seen = await watch(s0, (x) => x.top !== s0.top);
+      if (Math.sign(seen.top - s0.top) !== Math.sign(dy)) throw new Error(`${key}: a plain wheel over a wheel = :none view did not scroll the page (${s0.top} -> ${seen.top})`);
+      if (seen.photo || seen.hint || seen.readout) throw new Error(`${key}: a wheel = :none view responded to a plain wheel: ${JSON.stringify(seen)}`);
+      passed.push(`${key}/none-wheel-left-to-page`);
+      await page.mouse.move(1, 1);
+      console.error(`OK  ${key} — :always zoomed on a plain wheel; Makie-off view left Ctrl+wheel and scroll to the page`);
+      continue;
     }
 
     // Several fields at once (#335): a click on a point sets `scatter`, a drag of the threshold
@@ -2186,7 +2336,7 @@ try {
           let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
           const b = host.querySelector("img, canvas").getBoundingClientRect();
           const sc = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
-          sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * sc, clientY: b.top + iy * sc, deltaY: -300 }));
+          sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * sc, clientY: b.top + iy * sc, deltaY: -300, ctrlKey: true }));
         }, [key, vg.x + vg.w / 2, vg.y + vg.h / 2]);
         for (let i = 0; i < tries; i++) {
           await new Promise((r) => setTimeout(r, delayMs));
@@ -2260,6 +2410,7 @@ try {
       const g = layer.geometry;
       const lim0 = g.limits;
       if (!Array.isArray(lim0) || lim0.length !== 6) throw new Error(`${key}: view geometry has no Axis3 limits: ${JSON.stringify(g)}`);
+      await plainWheelScrolls(key, g, "Axis3");
       const s0 = await stamp3();
       const prevented = await page.evaluate(([k, ix, iy]) => {
         const span = document.querySelector(`#coords_${k}`);
@@ -2268,11 +2419,11 @@ try {
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         const b = host.querySelector("img, canvas").getBoundingClientRect();
         const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
-        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -600 });
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -600, ctrlKey: true });
         sr.querySelector(".surface").dispatchEvent(ev);
         return ev.defaultPrevented;
       }, [key, g.x + g.w / 2, g.y + g.h / 2]);
-      if (!prevented) throw new Error(`${key}-wheel: the wheel was not taken by the Axis3 view`);
+      if (!prevented) throw new Error(`${key}-wheel: the Ctrl+wheel was not taken by the Axis3 view`);
       const w = (l, i) => l[2 * i + 1] - l[2 * i];
       const zs = await waitStamp(s0, "wheel", (st) => Array.isArray(st.limits) && [0, 1, 2].every((i) => w(st.limits, i) < 0.75 * w(lim0, i)));
       passed.push(`${key}/wheel-zoom`);
@@ -2386,6 +2537,7 @@ try {
       }
 
       if (layer.geometry && layer.geometry.mode === "pan") {
+        await plainWheelScrolls(key, layer.geometry, "pan");
         // #379: a mark on each axis off the pan axis. The drag above moved a linked axis's
         // marks off this page's manifest, so there the probe is its pick's ring, which the
         // overlay draws where that axis now has the mark; an unlinked axis's first mark has not
@@ -2410,7 +2562,7 @@ try {
           const s = b.width / vb.width;
           const ev = new WheelEvent("wheel", {
             bubbles: true, cancelable: true,
-            clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -120,
+            clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -120, ctrlKey: true,
           });
           surface.dispatchEvent(ev);
           const base = host.querySelector("img, canvas");

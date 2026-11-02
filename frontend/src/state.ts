@@ -169,6 +169,9 @@ export interface OverlayCtx {
     base_: HTMLElement
     surface_: HTMLElement
     tip_: HTMLElement
+    // The live limits readout of a moving view (pan, zoom, orbit, any input), at the figure's
+    // bottom-left corner instead of following the pointer, so it is never under a finger.
+    readout_: HTMLElement
     hiGroup_: HiSet
     selGroup_: HiSet
     // Legend, colorbar, and axis rings. Siblings of the photograph clip, so a live matrix

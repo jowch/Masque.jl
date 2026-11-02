@@ -16,6 +16,8 @@ const S_MIN = 1 / 16
 const S_MAX = 16
 
 export const WHEEL_IDLE_MS = 150
+// How long the "Ctrl + scroll to zoom" hint stays after the last plain wheel over a view.
+export const WHEEL_HINT_MS = 1500
 
 // One wheel notch, in wheelScale's pixel units: the zoom step of `+`, `-` and the corner buttons.
 export const ZOOM_NOTCH = 100
