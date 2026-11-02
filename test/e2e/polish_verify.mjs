@@ -1359,6 +1359,99 @@ try {
   }
   passed.push("readout-caret-on-pointer");
 
+  // Touch (#529): a real tap through CDP touch emulation, so the browser itself sends
+  // down/up/leave/click with pointerType "touch". The tap picks the mark and its tooltip stays
+  // up after the finger lifts; a tap on empty space, or a scroll that moves the plot, takes it
+  // down. On the axis readout a held finger scrubs: the readout follows it and the page holds still.
+  {
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+    const touch = (type, pts) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts.map(([x, y]) => ({ x, y, id: 1 })) });
+    const tapAt = async (x, y) => { await touch("touchStart", [[x, y]]); await touch("touchEnd", []); await new Promise((r) => setTimeout(r, 250)); };
+    // Client px of image px (ix, iy), or of a fraction of the figure when frac is set.
+    const clientOf = (key, ix, iy, frac = false) => page.evaluate(([k, ix, iy, frac]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      return frac ? { x: b.left + ix * b.width, y: b.top + iy * b.height } : { x: b.left + ix * s, y: b.top + iy * s };
+    }, [key, ix, iy, frac]);
+    const tipOf = (key) => page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const t = sr.querySelector(".masque-tip");
+      return { show: t.classList.contains("show"), text: t.innerText, out: document.querySelector(`#out_${k}`)?.innerText ?? "" };
+    }, key);
+    const center = (key) => page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center", behavior: "instant" });
+    }, key);
+    await page.mouse.move(1, 1);
+    await center("scatter");
+    await new Promise((r) => setTimeout(r, 300));
+    const before = await tipOf("scatter");
+    let p = await clientOf("scatter", hx, hy);
+    await tapAt(p.x, p.y);
+    let t = await tipOf("scatter");
+    if (!t.show || !/alpha/i.test(t.text)) throw new Error(`touch/tap-tooltip: ${JSON.stringify(t)}`);
+    for (let a = 0; a < 40 && t.out === before.out; a++) { await new Promise((r) => setTimeout(r, 250)); t = await tipOf("scatter"); }
+    if (t.out === before.out) throw new Error(`touch/tap-picks: bond did not change (${t.out})`);
+    if (!(await tipOf("scatter")).show) throw new Error("touch/tap-tooltip: gone after the bond round-trip");
+    passed.push("touch/tap-tooltip", "touch/tap-picks");
+    const empty = await clientOf("scatter", 0.98, 0.98, true);
+    await tapAt(empty.x, empty.y);
+    if ((await tipOf("scatter")).show) throw new Error("touch/tap-elsewhere: tooltip still up");
+    passed.push("touch/tap-elsewhere-clears");
+    p = await clientOf("scatter", hx, hy);
+    await tapAt(p.x, p.y);
+    if (!(await tipOf("scatter")).show) throw new Error("touch/scroll: no tooltip to start from");
+    await page.evaluate(() => window.scrollBy(0, 120));
+    await new Promise((r) => setTimeout(r, 200));
+    if ((await tipOf("scatter")).show) throw new Error("touch/scroll: tooltip survived a scroll that moved the plot");
+    passed.push("touch/scroll-clears");
+
+    await center("axis");
+    await new Promise((r) => setTimeout(r, 300));
+    const a0 = await clientOf("axis", 0.3, 0.4, true), a1 = await clientOf("axis", 0.6, 0.4, true);
+    await tapAt(a0.x, a0.y);
+    const r0 = await tipOf("axis");
+    if (!r0.show || !r0.text) throw new Error(`touch/readout-tap: ${JSON.stringify(r0)}`);
+    passed.push("touch/readout-tap");
+    const y0 = await page.evaluate(() => window.scrollY);
+    await touch("touchStart", [[a0.x, a0.y]]);
+    await new Promise((r) => setTimeout(r, 500));
+    for (let i = 1; i <= 8; i++) {
+      await touch("touchMove", [[a0.x + (a1.x - a0.x) * i / 8, a0.y + 30 * i / 8]]);
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    const mid = await tipOf("axis");
+    const y1 = await page.evaluate(() => window.scrollY);
+    await touch("touchEnd", []);
+    await new Promise((r) => setTimeout(r, 250));
+    const end = await tipOf("axis");
+    if (!mid.show || mid.text === r0.text) throw new Error(`touch/hold-scrub: readout did not follow (${r0.text} -> ${mid.text})`);
+    if (Math.abs(y1 - y0) > 1) throw new Error(`touch/hold-scrub: page scrolled ${y1 - y0}px during the scrub`);
+    if (!end.show) throw new Error("touch/hold-scrub: readout gone after lift");
+    passed.push("touch/hold-scrub");
+    // Control: the same swipe without the hold scrolls the page, so the check above tests the hold.
+    const c0 = await page.evaluate(() => window.scrollY);
+    await touch("touchStart", [[a0.x, a0.y]]);
+    for (let i = 1; i <= 8; i++) {
+      await touch("touchMove", [[a0.x, a0.y - 120 * i / 8]]);
+      await new Promise((r) => setTimeout(r, 16));
+    }
+    await touch("touchEnd", []);
+    await new Promise((r) => setTimeout(r, 400));
+    const c1 = await page.evaluate(() => window.scrollY);
+    if (Math.abs(c1 - c0) < 20) throw new Error(`touch/swipe-scrolls: a plain swipe moved the page ${c1 - c0}px, so the hold check proves nothing`);
+    passed.push("touch/swipe-scrolls");
+    await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+    await cdp.detach();
+  }
+
   await assertTooltipColorScheme(page, {
     css: () => inspect("scatter").then((m) => m.css),
     computedFor: async (which) => {
