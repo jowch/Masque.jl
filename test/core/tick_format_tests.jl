@@ -138,9 +138,14 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         g = repeat([1, 2], 10)
         @test coords(only(IP._construct_unplaced(ax, boxplot!(ax, g, randn(20)), :box))) == on(:y, :q1, :median, :q3)
         @test coords(only(IP._construct_unplaced(ax, boxplot!(ax, g, randn(20); orientation = :horizontal), :box))) == on(:x, :q1, :median, :q3)
+        notched = only(IP._construct_unplaced(ax, boxplot!(ax, repeat([1, 2], 100), Float64.(1:200); show_notch = true), :box))
+        @test notched isa PolygonInteractable
+        @test coords(notched) == on(:y, :q1, :median, :q3)
         # A field the user sets stays plain; the rest still follow the axis.
         bp = barplot!(ax, [1, 2], [3.0, 4.0])
         @test coords(RectInteractable(ax, bp; payloads = [(; value = 1), (; name = "b")])) == on(:y, :low, :high)
+        @test coords(RectInteractable(ax, bp; payloads = [Dict("value" => 1), Dict("name" => "b")])) == on(:y, :low, :high)
+        @test coords(RectInteractable(ax, bp; payloads = [Dict(:high => 1), Dict(:name => "b")])) == on(:y, :low, :value)
         # Colour values are read off a colorbar, not an axis: plain.
         @test coords(PolygonInteractable(ax, contourf!(ax, rand(5, 5)))) == Dict{String, String}()
     end

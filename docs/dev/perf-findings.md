@@ -226,8 +226,10 @@ manifest and PNG size is unchanged at the precision above. Which fields Masque f
 recorded when the payloads are merged, so finding `coords` costs a lookup, not a pass over them.
 
 Re-running `payload_envelope.jl` when `coords` became a field → axis map (#543, 2026-11-02, on
-`b85691f`) moved the 100-point scatter manifest from 4.0 to 4.1 KB and the violin by 1 B per
-element. It is per layer, not per element, so no other table row moved at the precision above.
+`b85691f`) grew each layer's `coords` by a few bytes (`["x","y"]` became `{"x":"x","y":"y"}`),
+once per layer, not per element. That moved the 100-point scatter manifest from 4.0 to 4.1 KB
+and the violin layer by 3 B (its `["x"]`), under the 0.1 KB precision of the tables above, so
+no other row moved.
 
 Re-running `payload_envelope.jl` for the composite bind value (#335, 2026-10-10) moved no
 manifest in the tables above by more than 0.1 KB; `fields` and `initial` replace the old

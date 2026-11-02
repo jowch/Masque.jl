@@ -2808,7 +2808,7 @@ try {
         const r = hitPoint(L, 0);
         let tip = null;
         for (let a = 0; a < 6; a++) {
-          tip = await dispatchAt(key, r.x + r.w / 2, r.y + r.h / 2, "pointermove");
+          tip = await dispatchAt(key, r.x, r.y, "pointermove");   // rects are [cx, cy, w, h]
           if (tip?.show && want.every((w) => w.test(tip.text))) break;
           await new Promise((res) => setTimeout(res, 200));
         }

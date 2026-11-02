@@ -85,17 +85,17 @@ with `ytickformat = "{:.1f} mV"`, `y` shows `3.5 mV`, rounded as the
 format says. The same goes for `MultiplesTicks(4, π, "π")`, which shows
 `1.5π`, and for the readouts of an [`AxisInteractable`](@ref), a
 [`ColorbarInteractable`](@ref), a slice, a dragged threshold, an ROI
-box and a view's limits, and for what the keyboard announces. This covers the `x`, `y` and `z` Masque fills in itself,
-next to your own `payloads` fields too: a point's, a text label's and an
-arrow's position, a line's nearest sample, and a surface point. A bar's
-`low`, `high` and `value` read in the unit of the axis the bar stands
-along, and so do a box plot's quartiles, a crossbar's values and a
-span's edges. A histogram's `value` reads in the count axis's unit and
+box and a view's limits, and for what the keyboard announces. This
+covers the `x`, `y` and `z` Masque fills in itself, next to your own
+`payloads` fields too: a point's, a text label's and an arrow's
+position, a line's nearest sample, and a surface point. A bar's `low`,
+`high` and `value` read in the unit of the axis its height runs along,
+and so do a waterfall's, a box plot's quartiles, a crossbar's values and
+a span's edges. A histogram's `value` reads in the value axis's unit and
 its `low` and `high`, the bin's edges, in the other axis's. A heatmap
 cell's `value` and a filled contour's levels are colors, so they stay
-plain numbers. A field
-you set yourself, even one named `x`, and `$(x)` in a template stay plain
-numbers. To print one in the axis's unit, give it a spec in a template,
+plain numbers. A field you set yourself, even one named `x`, and `$(x)`
+in a template stay plain numbers. To print one in the axis's unit, give it a spec in a template,
 such as `$(y:.1f) mV`.
 
 Set `tooltip_sigdigits` and it wins over the format's own precision:
