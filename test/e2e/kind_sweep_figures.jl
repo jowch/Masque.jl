@@ -539,6 +539,14 @@ kind_sweep_meta() = [
         "inside" => 2, "outside" => 0,
     ),
     Dict(
+        # Corner view buttons (#525): a dark figure with its legend in the top-right corner.
+        # kind_sweep.mjs drives the buttons and polish_verify.mjs checks their look.
+        "key" => "view_dark", "layerId" => "view", "layerKind" => "view",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "view_buttons",
+        "corner" => "tl",
+    ),
+    Dict(
         # Two Axis3 panels linked by `linkcameras!(...; limits = true)` (#362), a view on each.
         # Orbiting the left one must turn the right panel's picture and move its hit areas, and
         # wheel zooms that alternate between the panels must each start from the shared limits.
@@ -1568,6 +1576,19 @@ function build_kind_sweep()
         # drawn, so it must still hover.
         ln = lines!(ax, [0, 2.6, 4], [2.8, 2.8, 2.8], [2, 2, 2]; color = :steelblue)
         masque(fig, interactables(sc; id = :pts), interactables(ln; id = :line), ViewInteractable(ax; id = :view))
+    end
+
+    # Corner view buttons (#525) on a dark figure whose legend takes the top-right corner: the
+    # buttons go top left, in the dark tooltip theme.
+    view_dark = let
+        fig = Figure(size = (480, 300); backgroundcolor = :gray12)
+        ax = Axis(
+            fig[1, 1]; title = "view-dark", limits = (0, 8, 0, 8), backgroundcolor = :gray20,
+            titlecolor = :gray90, xtickcolor = :gray80, ytickcolor = :gray80,
+        )
+        sc = scatter!(ax, [1.0, 4.0, 2.0], [1.0, 4.0, 6.0]; markersize = 14, color = :orange, label = "pts")
+        axislegend(ax)
+        masque(fig, interactables(sc; id = :pts), ViewInteractable(ax; id = :view))
     end
 
     view3d_linked = let

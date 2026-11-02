@@ -485,6 +485,77 @@ try {
     }
     throw new Error(`${key}-reset: no reset frame landed after a double-click at ${JSON.stringify(spot)} (last ${JSON.stringify(await readStamp())})`);
   };
+  // #525: the corner view buttons, through Chromium's own input path. A real hover over the
+  // view's viewport shows its box in the expected corner, 8 CSS px in; zoom in lands a settled
+  // frame with narrower limits and brings reset in; reset lands the reset frame and takes reset
+  // out; nothing commits; leaving the plot hides the box.
+  const driveButtons = async (key, layer, corner) => {
+    const g = layer.geometry;
+    const probe = () => page.evaluate(([k, id]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const box = sr.querySelector(`.masque-vb[data-view="${id}"]`);
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      const rect = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
+      const btn = (c) => { const el = box?.querySelector(`.masque-vb-${c}`); return el && getComputedStyle(el).display !== "none" ? rect(el) : null; };
+      return {
+        stamp: host.dataset.masqueGestureFrame ?? "", base: { x: b.left, y: b.top, s },
+        box: box && !box.hidden ? { corner: box.dataset.corner, show: box.classList.contains("show"), opacity: Number(getComputedStyle(box).opacity), r: rect(box), in: btn("in"), out: btn("out"), reset: btn("reset") } : null,
+      };
+    }, [key, layer.id]);
+    await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1).scrollIntoView({ block: "center" });
+    }, key);
+    await page.mouse.move(1, 1);
+    let p = await probe();
+    if (!p.box) throw new Error(`${key}-buttons: no button box for view ${layer.id}`);
+    if (p.box.show) throw new Error(`${key}-buttons: the box shows before any hover`);
+    const vp = { x: p.base.x + g.x * p.base.s, y: p.base.y + g.y * p.base.s, w: g.w * p.base.s, h: g.h * p.base.s };
+    await page.mouse.move(vp.x + vp.w / 2, vp.y + vp.h / 2);
+    await new Promise((r) => setTimeout(r, 250));
+    p = await probe();
+    if (!p.box.show || p.box.opacity < 0.99) throw new Error(`${key}-buttons: hover did not show the box (${JSON.stringify(p.box)})`);
+    if (p.box.corner !== corner) throw new Error(`${key}-buttons: box in corner ${p.box.corner}, expected ${corner}`);
+    const r = p.box.r, near = (a, b) => Math.abs(a - b) <= 1.5;
+    const xOk = corner === "tl" ? near(r.x, vp.x + 8) : near(r.x + r.w, vp.x + vp.w - 8);
+    const yOk = corner === "br" ? near(r.y + r.h, vp.y + vp.h - 8) : near(r.y, vp.y + 8);
+    if (!xOk || !yOk) throw new Error(`${key}-buttons: box ${JSON.stringify(r)} is not 8 px inside the ${corner} corner of ${JSON.stringify(vp)}`);
+    if (p.box.reset) throw new Error(`${key}-buttons: reset shows before the view has moved`);
+    const before = await textOf(`#out_${key}`);
+    const waitStamp = async (n0, want) => {
+      const tries = backend === "webgl" ? 50 : 25, delayMs = backend === "webgl" ? 300 : 200;
+      for (let i = 0; i < tries; i++) {
+        await new Promise((res) => setTimeout(res, delayMs));
+        const st = (await probe()).stamp;
+        if (st) { const o = JSON.parse(st); if (o.n > n0 && want(o)) return o; }
+      }
+      throw new Error(`${key}-buttons: no frame landed (last ${(await probe()).stamp})`);
+    };
+    const n0 = p.stamp ? JSON.parse(p.stamp).n : 0;
+    await page.mouse.click(p.box.in.x + p.box.in.w / 2, p.box.in.y + p.box.in.h / 2);
+    const z = await waitStamp(n0, (o) => o.settle === true && o.reset !== true);
+    const width = (o) => (Array.isArray(o.limits) ? o.limits[1] - o.limits[0] : o.xmax - o.xmin);
+    const home = g.mode === "orbit" ? g.limits[1] - g.limits[0] : null;
+    if (home !== null ? !(width(z) < 0.99 * home) : !(width(z) > 0)) throw new Error(`${key}-buttons: zoom in did not narrow the limits (${JSON.stringify(z)})`);
+    p = await probe();
+    if (!p.box.reset) throw new Error(`${key}-buttons: reset did not join after zoom in`);
+    if (!p.box.show) throw new Error(`${key}-buttons: the box hid while the pointer was on it`);
+    await page.mouse.click(p.box.reset.x + p.box.reset.w / 2, p.box.reset.y + p.box.reset.h / 2);
+    await waitStamp(z.n, (o) => o.reset === true && o.settle === true);
+    p = await probe();
+    if (p.box.reset) throw new Error(`${key}-buttons: reset still shows after the view went home`);
+    const after = await textOf(`#out_${key}`);
+    if (after !== before) throw new Error(`${key}-buttons: a button press committed ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+    await page.mouse.move(1, 1);
+    await new Promise((res) => setTimeout(res, 250));
+    if ((await probe()).box.show) throw new Error(`${key}-buttons: the box stayed after the pointer left`);
+    passed.push(`${key}/view-buttons`);
+    console.error(`OK  ${key}/buttons — ${corner} corner, zoom in then reset, nothing committed`);
+  };
+
   // Within a millionth of the span: the limits a reset lands at are the mount's own.
   const sameLims = (a, b) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= 1e-6 * Math.max(1, Math.abs(b[i]), Math.abs(b[i ^ 1] - b[i])));
 
@@ -2239,7 +2310,13 @@ try {
       continue;
     }
 
+    if (spec.mode === "view_buttons") {
+      await driveButtons(key, layer, spec.corner);
+      continue;
+    }
     if (spec.mode === "drag" && spec.layerKind === "view") {
+      // #525: the corner buttons drive each view and leave it where it started.
+      await driveButtons(key, layer, key === "view_twin" ? "tl" : "tr");
       // #102/§12.3: a view gesture commits nothing anymore — the OLD assertion here waited for
       // #out_view's bond text to change and would now fail for the right reason (nothing ever
       // commits) for the WRONG reason (the test still expects a commit). Asserting "the bond
