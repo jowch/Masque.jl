@@ -182,10 +182,10 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         "events" => [string(e) for e in L.events],
         "style" => style,
     )
-    # The coordinate fields Masque filled in (`_merge_payloads`): the default tooltip prints
-    # them in the axis's format (#510).
+    # The fields Masque filled in that are measured along an axis (`_merge_payloads`), each
+    # with that axis: the default tooltip prints them in the axis's format (#510, #543).
     ck = _coord_keys(L.payloads)
-    isempty(ck) || (d["coords"] = String[string(k) for k in ck])
+    isempty(ck) || (d["coords"] = Dict{String, String}(string(k) => string(dim) for (k, dim) in ck))
     if L.kind in (:segments, :polyline, :lines, :rects, :polygons)
         t = hit_tol(i)
         t === nothing || (d["tol"] = round(Int, t * ctx.scaling))

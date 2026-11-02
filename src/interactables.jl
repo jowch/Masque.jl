@@ -341,45 +341,56 @@ _check_payloads(payloads, n, what) = expand_payloads(payloads, n, what)
 # that isn't key-value (a bare string) replaces the default, as there is nothing to merge.
 #
 # The `x`, `y` and `z` Masque fills in are the mark's coordinates, so its default tooltip prints
-# them in the axis's format (#510). `_merge_payloads` records which of them it filled in for
-# every element, keyed by the returned vector, and `_coord_keys` reads that back when the
-# manifest is built. A field the user's own payload sets, and every field of a payload that
-# isn't key-value, stays theirs: a plain number.
-function _merge_payloads(defaults, payloads, who)
+# them in the axis's format (#510). Other default fields measured along one axis (a bar's
+# `low`/`high`/`value`, a box's quartiles) do the same, and `dims` names that axis per field:
+# `(; low = :y, high = :y, value = :y)` (#543). A length such as a bar's `value` prints like a
+# position, which holds because a `CoordFormat` is a scale plus affixes with no offset; an
+# offset joining it would need lengths flagged here. `_merge_payloads` records which fields it
+# filled in for every element, with their axis, keyed by the returned vector, and
+# `_coord_keys` reads that back when the manifest is built. A field the user's own payload
+# sets, and every field of a payload that isn't key-value, stays theirs: a plain number.
+function _merge_payloads(defaults, payloads, who; dims::NamedTuple = (;))
     defaults = convert(Vector{Any}, defaults)
     if payloads === nothing
-        _note_coord_keys!(defaults, _default_coord_keys(defaults))
+        _note_coord_keys!(defaults, _default_coord_keys(defaults, dims))
         return defaults
     end
     pl = expand_payloads(payloads, length(defaults), who)
     out = Any[_merge_payload(d, p) for (d, p) in zip(defaults, pl)]
-    ks = _default_coord_keys(defaults)
+    ks = _default_coord_keys(defaults, dims)
     for p in pl
         isempty(ks) && break
         if p isa NamedTuple
-            ks = filter(k -> !haskey(p, k), ks)
+            ks = filter(kd -> !haskey(p, kd[1]), ks)
         elseif p isa AbstractDict && keytype(p) in (Symbol, String)
-            ks = filter(k -> !haskey(p, keytype(p) === Symbol ? k : string(k)), ks)
+            ks = filter(kd -> !haskey(p, keytype(p) === Symbol ? kd[1] : string(kd[1])), ks)
         else
-            ks = Symbol[]
+            ks = Pair{Symbol, Symbol}[]
         end
     end
     _note_coord_keys!(out, ks)
     return out
 end
 
-# The coordinate fields every default payload has.
-function _default_coord_keys(defaults)
-    isempty(defaults) && return Symbol[]
-    return Symbol[k for k in (:x, :y, :z) if all(d -> d isa NamedTuple && haskey(d, k), defaults)]
+# The fields every default payload has that are measured along an axis, each with that axis:
+# `x`, `y` and `z` along their own, and those `dims` names along the one it gives.
+function _default_coord_keys(defaults, dims::NamedTuple = (;))
+    isempty(defaults) && return Pair{Symbol, Symbol}[]
+    has(k) = all(d -> d isa NamedTuple && haskey(d, k), defaults)
+    ks = Pair{Symbol, Symbol}[k => k for k in (:x, :y, :z) if has(k)]
+    for (k, dim) in pairs(dims)
+        has(k) && !any(kd -> kd[1] === k, ks) && push!(ks, k => dim)
+    end
+    return ks
 end
 
-# A weak identity table: payload vector => the coordinate fields Masque filled in. Keyed by
-# `objectid` and checked with `===` through a `WeakRef`, so it neither keeps a vector alive nor
-# answers for a different vector that reuses the id. Dead entries are dropped as new ones come.
-const _COORD_KEYS = Dict{UInt, Tuple{WeakRef, Vector{Symbol}}}()
+# A weak identity table: payload vector => the coordinate fields Masque filled in, each with its
+# axis. Keyed by `objectid` and checked with `===` through a `WeakRef`, so it neither keeps a
+# vector alive nor answers for a different vector that reuses the id. Dead entries are dropped
+# as new ones come.
+const _COORD_KEYS = Dict{UInt, Tuple{WeakRef, Vector{Pair{Symbol, Symbol}}}}()
 const _COORD_KEYS_LOCK = ReentrantLock()
-function _note_coord_keys!(v::Vector{Any}, ks::Vector{Symbol})
+function _note_coord_keys!(v::Vector{Any}, ks::Vector{Pair{Symbol, Symbol}})
     return lock(_COORD_KEYS_LOCK) do
         length(_COORD_KEYS) > 64 && filter!(kv -> kv[2][1].value !== nothing, _COORD_KEYS)
         if isempty(ks)
@@ -393,7 +404,7 @@ end
 function _coord_keys(v)
     return lock(_COORD_KEYS_LOCK) do
         e = get(_COORD_KEYS, objectid(v), nothing)
-        (e === nothing || e[1].value !== v) ? Symbol[] : e[2]
+        (e === nothing || e[1].value !== v) ? Pair{Symbol, Symbol}[] : e[2]
     end
 end
 _default_fields(d::NamedTuple) = Base.structdiff(d, NamedTuple{(:index, :segment_index)})

@@ -2792,6 +2792,31 @@ try {
         console.error(`OK  ${key}/${which} — ${tip.text}`);
       }
       if (seen.size !== 3) throw new Error(`${key}: expected the polar, mV and function axes, saw ${[...seen]}`);
+      // #543: a bar's low/high/value print in its value axis's format, a hist's value in its
+      // value axis's and its low/high (the bin edges) in the bin axis's.
+      const rectWant = {
+        bars: { coords: { low: "y", high: "y", value: "y" }, want: [/\blow 0\.0 mV\b/, /\bhigh 3\.5 mV\b/, /\bvalue 3\.5 mV\b/], never: [/3\.472/] },
+        hist: { coords: { value: "y", low: "x", high: "x" }, want: [/\bvalue 3 n\b/, /\blow 0\.0 s\b/, /\bhigh 1\.0 s\b/], never: [/\bvalue 3 s\b/, /\blow 0 n\b/] },
+      };
+      const rects = layers.filter((l) => l.kind === "rects");
+      if (rects.length !== 2) throw new Error(`${key}: expected 2 rects layers, got ${rects.length}`);
+      for (const L of rects) {
+        const which = L.id.startsWith("hist") ? "hist" : "bars";
+        const { coords, want, never } = rectWant[which];
+        if (JSON.stringify(Object.entries(L.coords ?? {}).sort()) !== JSON.stringify(Object.entries(coords).sort()))
+          throw new Error(`${key}/${which}: coords ${JSON.stringify(L.coords)}, want ${JSON.stringify(coords)}`);
+        const r = hitPoint(L, 0);
+        let tip = null;
+        for (let a = 0; a < 6; a++) {
+          tip = await dispatchAt(key, r.x + r.w / 2, r.y + r.h / 2, "pointermove");
+          if (tip?.show && want.every((w) => w.test(tip.text))) break;
+          await new Promise((res) => setTimeout(res, 200));
+        }
+        for (const w of want) if (!w.test(tip?.text ?? "")) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip?.text)} should match ${w}`);
+        for (const w of never) if (w.test(tip.text)) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip.text)} should not match ${w}`);
+        passed.push(`${key}/${which}`);
+        console.error(`OK  ${key}/${which} — ${tip.text}`);
+      }
       await dispatchAt(key, 1, 1, "pointermove");
       continue;
     }

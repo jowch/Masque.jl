@@ -150,9 +150,11 @@ kind_sweep_meta() = [
         "anchorKey" => "polar", "anchorIndex" => 1, "theta" => π / 2, "r" => 2.0, "rmax" => 2.5,
     ),
     Dict(
-        # Default tooltips follow the axis's tick format (#510): one auto widget, three axes.
+        # Default tooltips follow the axis's tick format (#510): one auto widget, five axes.
         # Each scatter's first point is hovered; the driver picks the expectation by the axis's
-        # transform (polar, a `"{:.1f} mV"` format, a function format left plain).
+        # transform (polar, a `"{:.1f} mV"` format, a function format left plain). The first bar
+        # and the first hist bin are hovered too: their fields follow the axis each is measured
+        # along (#543).
         "key" => "tick_units", "layerId" => "", "layerKind" => "circles",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "tick_units",
@@ -954,13 +956,18 @@ function build_kind_sweep()
     end
 
     tick_units = let
-        fig = Figure(size = (720, 260))
+        fig = Figure(size = (720, 480))
         ax_mv = Axis(fig[1, 1]; title = "mV", ytickformat = "{:.1f} mV", limits = (0, 3, 0, 5))
         scatter!(ax_mv, [1.0, 2.0], [3.4721, 1.5]; color = :gray, markersize = 22)
         ax_fn = Axis(fig[1, 2]; title = "function", ytickformat = vs -> string.(vs) .* "!", limits = (0, 3, 0, 5))
         scatter!(ax_fn, [1.0, 2.0], [3.4721, 1.5]; color = :gray, markersize = 22)
         ax_p = PolarAxis(fig[1, 3])
         scatter!(ax_p, [π / 2, π], [2.0, 1.0]; color = :gray, markersize = 22)
+        # A bar's low/high/value follow its value axis, a hist's low/high its bin axis (#543).
+        ax_bar = Axis(fig[2, 1]; title = "bars", ytickformat = "{:.1f} mV", limits = (0, 3, 0, 5))
+        barplot!(ax_bar, [1, 2], [3.4721, 1.5]; color = :gray)
+        ax_hist = Axis(fig[2, 2]; title = "hist", xtickformat = "{:.1f} s", ytickformat = "{:.0f} n")
+        hist!(ax_hist, [0.2, 0.4, 0.6, 1.5]; bins = [0.0, 1.0, 2.0], color = :gray)
         masque(fig)
     end
 
