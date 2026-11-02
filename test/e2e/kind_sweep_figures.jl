@@ -1118,6 +1118,47 @@ function build_kind_sweep()
         )
     end
 
+    # A `Box` over marks (#547): Makie draws the opaque top-left box over hid 0 and hid 1, and
+    # the top-right one (made before the axis, but `z = 1`) over hid 5, so the pointer there
+    # finds the box, not the points. The bottom-left box was made before the axis and the
+    # bottom-right one has `z = -1`, so the plot draws over both: hid 2 and hid 3 show and take
+    # the pointer, and two occluders ship. hid 4 is in the open. Not in kind_sweep_meta();
+    # polish_verify.mjs checks it.
+    box_hidden = let
+        fig = Figure(size = (480, 260))
+        boxed(h, v; kw...) = Box(fig[1, 1]; width = 70, height = 50, halign = h, valign = v, color = :white, tellwidth = false, tellheight = false, kw...)
+        boxed(0.03, 0.03)
+        boxed(0.97, 0.97; z = 1)
+        ax = Axis(fig[1, 1]; title = "box-hidden", limits = (0, 10, 0, 10))
+        hid = scatter!(ax, [0.8, 1.6, 1.0, 9.0, 5.0, 9.0], [9.0, 8.3, 1.2, 1.2, 5.0, 8.8]; color = :orange, markersize = 18)
+        boxed(0.02, 0.98; width = 110, height = 70)
+        boxed(0.97, 0.03; z = -1)
+        masque(fig, interactables(hid; id = :hid); auto = false)
+    end
+
+    # A `Box` over each kind of axis (#547), where the backends draw it differently. Each panel
+    # has a white Box over the mark at its centre and a mark in the open. The Box hides the
+    # centre mark on both backends in panel 1 (made after the axis), on neither in panels 2
+    # (made before), 3 (the plot raised to z 5) and 6 (an Axis3 with the Box at z -50), on
+    # Cairo only in panel 4 (a PolarAxis made after a z 1 Box) and on WebGL only in panel 5 (an
+    # Axis3 made after a z 0 Box). Not in kind_sweep_meta(); polish_verify.mjs checks that a mark
+    # hides on screen exactly where an occluder ships, and takes the pointer everywhere else.
+    box_axes = let
+        fig = Figure(size = (690, 440))
+        boxed(pos; kw...) = Box(pos; width = 56, height = 44, color = :white, tellwidth = false, tellheight = false, kw...)
+        pts2 = ([0.0, 0.8], [0.0, 0.8])
+        pts3 = ([0.0, 1.0, -1.0], [0.0, 1.0, -1.0], [0.0, 1.0, -1.0])
+        mark(ax, pts...; kw...) = scatter!(ax, pts...; color = :orange, markersize = 18, kw...)
+        lim = (-1, 1, -1, 1)
+        ax1 = Axis(fig[1, 1]; title = "after", limits = lim); p1 = mark(ax1, pts2...); boxed(fig[1, 1])
+        boxed(fig[1, 2]); ax2 = Axis(fig[1, 2]; title = "before", limits = lim); p2 = mark(ax2, pts2...)
+        ax3 = Axis(fig[1, 3]; title = "raised", limits = lim); p3 = mark(ax3, pts2...); translate!(p3, 0, 0, 5); boxed(fig[1, 3])
+        boxed(fig[2, 1]; z = 1); ax4 = PolarAxis(fig[2, 1]; title = "polar"); p4 = mark(ax4, [0.0, 1.6], [0.0, 0.9]); rlims!(ax4, 0, 1)
+        boxed(fig[2, 2]); ax5 = Axis3(fig[2, 2]; title = "3D"); p5 = mark(ax5, pts3...)
+        ax6 = Axis3(fig[2, 3]; title = "3D z -50"); p6 = mark(ax6, pts3...); boxed(fig[2, 3]; z = -50)
+        masque(fig, (interactables(p; id = Symbol(:p, i)) for (i, p) in enumerate((p1, p2, p3, p4, p5, p6)))...; auto = false)
+    end
+
     # A plot drawn with `visible = false` (#484): picking a legend entry fades the shown lines and
     # leaves the hidden line's path alone, so the gridlines under it stay whole. The legend
     # sits beside the axis, off every line. Not in kind_sweep_meta(); polish_verify.mjs checks it.
@@ -2000,7 +2041,7 @@ function build_kind_sweep()
 
     return (;
         scatter, scatter_low, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
+        polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, box_hidden, box_axes, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_resized, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
