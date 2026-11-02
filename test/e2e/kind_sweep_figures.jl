@@ -388,6 +388,28 @@ kind_sweep_meta() = [
         "colorbarReadout" => "colorbar",
     ),
     Dict(
+        # A band on an axis (#500): an x window over a scatter, faded outside, a grip on each
+        # edge. An edge drag resizes it, a drag inside moves it, a mark inside keeps its hover.
+        "key" => "span_axis", "layerId" => "span", "layerKind" => "span",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "span",
+        "start" => [3.0, 6.0], "markInside" => "scatter",
+    ),
+    Dict(
+        # A band of a vertical colorbar (#500): the colorbar's own readout still answers inside it.
+        "key" => "span_colorbar", "layerId" => "band", "layerKind" => "span",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "span",
+        "start" => [6.0, 11.0], "colorbarReadout" => "colorbar",
+    ),
+    Dict(
+        # The same on a horizontal log10 colorbar: the edges are vertical, dragged left and right.
+        "key" => "span_colorbar_h", "layerId" => "band", "layerKind" => "span",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "span",
+        "start" => [100.0, 10000.0], "colorbarReadout" => "colorbar",
+    ),
+    Dict(
         # A colorbar the caller passed is a field of its own, `nothing` until clicked, next to the
         # heatmap's, which a click on a cell sets (#335).
         "key" => "colorbar_owner", "layerId" => "colorbar", "layerKind" => "axis",
@@ -1343,6 +1365,31 @@ function build_kind_sweep()
         masque(fig, ThresholdInteractable(cb; value = 1000.0, id = :cut))
     end
 
+    span_axis = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "span on an axis", limits = (0, 10, 0, 10))
+        scatter!(ax, [1.0, 4.5, 8.0], [5.0, 5.0, 5.0]; markersize = 16)
+        masque(fig, SpanInteractable(ax; span = (3.0, 6.0)))
+    end
+
+    span_colorbar = let
+        z = [Float64(i + 3j) for i in 1:4, j in 1:3]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "span on a colorbar")
+        hm = heatmap!(ax, 1:4, 1:3, z)
+        cb = Colorbar(fig[1, 2], hm)
+        masque(fig, SpanInteractable(cb; span = (6.0, 11.0), id = :band))
+    end
+
+    span_colorbar_h = let
+        z = [10.0^(i + 4j - 5) for i in 1:4, j in 1:3]
+        fig = Figure(size = (480, 300))
+        ax = Axis(fig[1, 1]; title = "span on a log colorbar")
+        hm = heatmap!(ax, 1:4, 1:3, z; colorscale = log10)
+        cb = Colorbar(fig[2, 1], hm; vertical = false)
+        masque(fig, SpanInteractable(cb; span = (100.0, 10000.0), id = :band))
+    end
+
     colorbar_owner = let
         z = [Float64(i + 3j) for i in 1:4, j in 1:3]
         fig = Figure(size = (480, 260))
@@ -1778,7 +1825,7 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_colorbar, threshold_colorbar_h, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, legend, series_legend,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

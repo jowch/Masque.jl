@@ -707,6 +707,50 @@ try {
       await page.keyboard.press("Escape");
     }
 
+    // Span (#500): an x window, so Left/Right move it and Up/Down are swallowed; Alt moves the
+    // edge on the arrow's side out, Alt+Shift moves it back in. Each release writes the bond once.
+    {
+      const key = "span_axis", id = "span";
+      const edgesOf = (k) => page.evaluate((kk) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        return [...sr.querySelectorAll("line.masque-threshold-line")].map((l) => Number(l.getAttribute("x1")));
+      }, k);
+      let s = await tabToStop(key, id);
+      if (s.role !== "application") throw new Error(`${key}: stop role ${s.role}`);
+      if (!/Left or Right/.test(s.hint) || !/Alt/.test(s.hint)) throw new Error(`${key}: hint ${JSON.stringify(s.hint)}`);
+      const pxPerCss = s.pxPerCss, n0 = s.inputs, before = await textOf(`#out_${key}`);
+      let e = await edgesOf(key);
+      // An earlier driver may have left the band at an end or flat: page it back to the start.
+      await page.keyboard.press("Home");
+      const e0 = await edgesOf(key);
+      await page.keyboard.press("ArrowUp");
+      s = await dragState(key, id);
+      e = await edgesOf(key);
+      if (JSON.stringify(e) !== JSON.stringify(e0) || s.inputs !== n0 + 1) throw new Error(`${key}: ArrowUp moved the band or wrote the bond ${JSON.stringify({ e, e0, inputs: s.inputs - n0 })}`);
+      passed.push(`${key}/cross-axis-swallowed`);
+      await hold("ArrowRight", 4);
+      s = await dragState(key, id);
+      e = await edgesOf(key);
+      if (e.some((x, i) => Math.abs(x - e0[i] - 4 * pxPerCss) > 0.5)) throw new Error(`${key}: ArrowRight ×4 gave ${JSON.stringify(e)} from ${JSON.stringify(e0)}`);
+      if (s.inputs !== n0 + 2) throw new Error(`${key}: expected one bond write for the hold, got ${s.inputs - n0 - 1}`);
+      if (!/\[.*,.*\]/.test(s.tip ?? "")) throw new Error(`${key}: readout ${JSON.stringify(s.tip)}`);
+      const e1 = e;
+      await page.keyboard.press("Alt+ArrowRight");
+      e = await edgesOf(key);
+      if (Math.abs(e[1] - e1[1] - pxPerCss) > 0.5 || e[0] !== e1[0]) throw new Error(`${key}: Alt+ArrowRight gave ${JSON.stringify(e)} from ${JSON.stringify(e1)}`);
+      await page.keyboard.press("Alt+Shift+ArrowRight");
+      e = await edgesOf(key);
+      if (Math.abs(e[1] - e1[1]) > 0.5) throw new Error(`${key}: Alt+Shift+ArrowRight did not move the edge back: ${JSON.stringify(e)}`);
+      const after = await waitFor(async () => { const t = await textOf(`#out_${key}`); return { ok: t !== before, t }; }, `${key} bond`);
+      if (!/SpanEvent\(:span, lo = /.test(after.t)) throw new Error(`${key}: bond readout ${after.t.slice(0, 200)}`);
+      s = await waitForLiveRegion(key, /\d/);
+      if (!/\d/.test(s.liveText)) throw new Error(`${key}: live region did not announce the band: ${JSON.stringify(s.liveText)}`);
+      passed.push(`${key}/arrow-move+alt-resize+single-bind+announce`);
+      await page.keyboard.press("Escape");
+    }
+
     // View (pan): arrows and + preview through the gesture channel and settle once on keyup.
     // The bond never moves.
     {

@@ -148,13 +148,14 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | [`AxisInteractable`](@ref) | `(ax; id=:axis)` | [`AxisEvent`](@ref): `x`, `y` | [Read coordinates](@ref) |
 | [`ColorbarInteractable`](@ref) | `(cb; id=:colorbar)` | [`ColorbarEvent`](@ref): `value` | [Read coordinates](@ref) |
 | [`ThresholdInteractable`](@ref) | `(ax; orientation=:horizontal, value, id=:threshold)` | [`ThresholdEvent`](@ref): `value`, starting at `value` | [Read coordinates](@ref) |
+| [`SpanInteractable`](@ref) | `(ax; span, orientation=:vertical, id=:span)` | [`SpanEvent`](@ref): `lo`, `hi`, starting at `span` | [Drag a band](@ref) |
 | [`LegendInteractable`](@ref) | `(leg; targets=nothing, tooltip=nothing, id=:legend)` | [`LegendEvent`](@ref): `label`, `group`, `targets` | [Legend](@ref) |
 | [`ROIInteractable`](@ref) | `(ax; bounds, selects=nothing, id=:roi)` | [`BoundsEvent`](@ref), starting at `bounds`; with `selects`, the target's field holds the marks or cells inside | [Brush a region](@ref) |
 | [`ViewInteractable`](@ref) | `(ax; id=:view)` | no field | [Pan, zoom and orbit](@ref) |
 | [`SliceInteractable`](@ref) | `(plots)`, `(ax, plots)`, or `(ax; series, orientation=:vertical, crosshair=true, covers, tooltip)` | no field; hover only | [Slice across series](@ref) |
 
-A threshold's `value` and a box's `bounds` also accept the event they
-produce, so one widget can set where another starts. Without `targets`, a
+A threshold's `value`, a band's `span` and a box's `bounds` also accept
+the event they produce, so one widget can set where another starts. Without `targets`, a
 legend links each entry to the layers its plots have in the same
 `masque` call.
 

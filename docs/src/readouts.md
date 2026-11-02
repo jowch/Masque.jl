@@ -185,6 +185,7 @@ high = ThresholdInteractable(ax; orientation = :horizontal, value = 0.8)
 Then `band.low.value` and `band.high.value` are the two lines'
 positions, and moving one leaves the other's field as it was.
 
+To drag one band with both edges at once, see [Drag a band](@ref).
 To drag a box instead of a line, see [Brush a region](@ref).
 
 ## Drag a cutoff on a colorbar
@@ -234,6 +235,38 @@ from the line still shows the value under the pointer. With `onchange`
 (see [Update the figure](@ref)), a redraw that moves the colorbar's
 limits past the line leaves the line at the end of the bar until you
 drag it.
+
+## Drag a band
+
+[`SpanInteractable`](@ref) is a range you drag as one piece: two
+edges, with the plot outside them faded. Drag an edge to move that
+end, or drag inside the band to move both:
+
+```julia
+window = SpanInteractable(ax; span = (2.0, 5.0))
+@bind win masque(fig; bind = window)
+```
+
+```julia
+"$(count(x -> win.lo <= x <= win.hi, xs)) points from $(round(win.lo; digits = 2)) to $(round(win.hi; digits = 2))"
+```
+
+`win.lo` is always the lower value and `win.hi` the higher one;
+an edge you drag stops at the other edge. The edges are vertical lines
+across the axis, so the band picks out a range of `x`. Pass
+`orientation = :horizontal` for a range of `y`. Hovering or clicking a
+point inside the band still works as it does elsewhere.
+
+On a colorbar, the band picks out a range of the colorbar's values,
+and `span` must lie inside its limits:
+
+```julia
+cb = Colorbar(fig[1, 2], hm)
+@bind levels masque(fig; bind = SpanInteractable(cb; span = (-0.5, 0.5)))
+```
+
+Hovering the bar inside the band still shows the value under the
+pointer.
 
 ## Supported axes
 

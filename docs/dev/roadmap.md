@@ -56,7 +56,6 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 - *idea* — Escape aborts a drag and restores its start.
 - *idea* — links across layers and across figures; across widgets this needs a registry.
 - #499 — drag a threshold on a `Colorbar`.
-- #500 — `SpanInteractable`: a two-handle `(lo, hi)` interval on an axis or a colorbar.
 - *idea* — lasso select beside the box ROI.
 - *idea* — more controls: a line profile (two ends, an ImageJ-style profile), a point handle
   (one `(x, y)` that always has a value), a persistent polygon, a circle, an angle, and a

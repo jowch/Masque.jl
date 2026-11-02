@@ -37,6 +37,10 @@ function initial_envelope(i::ThresholdInteractable, ctx, layers)
     payload = 1 <= k <= length(something(cats, ())) ? cats[k] : i.value
     return Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => payload)
 end
+function initial_envelope(i::SpanInteractable, ctx, layers)
+    payload = Dict{String, Any}("lo" => i.lo, "hi" => i.hi)
+    return Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => payload)
+end
 function initial_envelope(i::ROIInteractable, ctx, layers)
     xmin, xmax, ymin, ymax = i.bounds
     payload = Dict{String, Any}("xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax)
@@ -113,7 +117,7 @@ end
     transform_bond(interactable, layer, index, js_payload) -> InteractionEvent
 
 Build one event from a wire hit. `index` is already 1-based for an element kind, or `nothing`
-for axis / colorbar / threshold / ROI / grid (those read the browser payload). Custom
+for axis / colorbar / threshold / span / ROI / grid (those read the browser payload). Custom
 interactables implement this (and [`bondtype`](@ref)) when the default [`ElementEvent`](@ref)
 is not enough; a type that only wants `ElementEvent` writes [`hitlayers`](@ref) and inherits
 the default.
@@ -137,6 +141,7 @@ function transform_bond(i::FunctionInteractable, layer::HitLayer, index, js_payl
     k in (:grid, :surface) && return _grid_cell_event(layer.id, js_payload, layer.payloads, layer.geometry)
     k === :axis && return _axis_event(layer.id, js_payload)
     k === :threshold && return _threshold_event(layer.id, js_payload)
+    k === :span && return _span_event(layer.id, js_payload)
     k === :roi && return _bounds_event(layer.id, js_payload)
     k === :view && throw(ArgumentError("bond: layer :$(layer.id) commits nothing"))
     return _element_event(layer.id, index, layer.payloads)
@@ -151,6 +156,7 @@ function kind_bond_stamp(kind::Symbol)
     kind in (:grid, :surface) && return "gridcell"
     kind === :axis && return "axis"
     kind === :threshold && return "threshold"
+    kind === :span && return "span"
     kind === :roi && return "bounds"
     kind === :view && return "none"
     kind === :slice && return "none"
@@ -163,6 +169,7 @@ function bond_stamp(i::AbstractInteractable, L::HitLayer)
     i isa AxisInteractable && return "axis"
     i isa ColorbarInteractable && return "colorbar"
     i isa ThresholdInteractable && return "threshold"
+    i isa SpanInteractable && return "span"
     i isa ROIInteractable && return "bounds"
     i isa BlockControl && return "control"
     i isa Union{GridInteractable, SurfaceInteractable} && return "gridcell"
@@ -201,6 +208,7 @@ function event_from_stamp(d::AbstractDict, index, js_payload)
     bond == "axis" && return _axis_event(id, js_payload)
     bond == "colorbar" && return _colorbar_event(id, js_payload)
     bond == "threshold" && return _threshold_event(id, js_payload)
+    bond == "span" && return _span_event(id, js_payload)
     bond == "bounds" && return _bounds_event(id, js_payload)
     bond == "none" && throw(ArgumentError("bond: layer :$id commits nothing"))
     bond == "control" && throw(ArgumentError("bond: control :$id needs its block to decode; pass the widget's owners"))
@@ -387,7 +395,7 @@ function _layer_n_elements(kind::Symbol, geometry)
     elseif kind === :grid
         Int(geometry["ncols"]) * Int(geometry["nrows"])
     else
-        0   # :axis / :threshold / :roi / :view — not element-indexed for selected=
+        0   # :axis / :threshold / :span / :roi / :view — not element-indexed for selected=
     end
 end
 

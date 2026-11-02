@@ -24,6 +24,7 @@ radius under the pointer.
 | Hover a surface to read its height | no ⁶ | yes | no |
 | Read `(x, y)` ([`AxisInteractable`](@ref)) | yes ¹ | no | yes ³ |
 | Drag a threshold ([`ThresholdInteractable`](@ref)) | yes ¹ | no | no |
+| Drag a band ([`SpanInteractable`](@ref)) | yes ⁸ | no | no |
 | Draw a box you can move and resize ([`ROIInteractable`](@ref)) | yes ² | no | no |
 | Slice across series ([`SliceInteractable`](@ref)) | yes ² | no | no |
 | Pan or orbit ([`ViewInteractable`](@ref)) | pan ² | orbit | no |
@@ -49,9 +50,12 @@ turns the view, so hold Alt (Option on a Mac) to draw the box.
 ⁷ The tooltip shows `x`, `y` and `z`, but a click picks the whole
 line, not the point.
 
-A "no" in the last five rows, a scale outside that list (such as
+⁸ The scale the band moves along must be `identity`, `log10`, or
+`log`, and that axis must be numeric.
+
+A "no" in the last six rows, a scale outside that list (such as
 `Makie.pseudolog10` or `Makie.Symlog10`), or a categorical axis where ²
-requires a numeric one raises an `ArgumentError` when `masque` runs,
+or ⁸ requires a numeric one raises an `ArgumentError` when `masque` runs,
 instead of giving a wrong coordinate. The other "no" cells don't raise:
 a `surface!` is skipped with a warning. Orbiting an `Axis3` has no
 scale requirement.
@@ -61,8 +65,8 @@ Legends, colorbars, and the sliders, toggles and menus of
 [Sliders, toggles and menus](@ref) belong to the figure, not to an
 axis, so they work next to any `Axis`, `Axis3`, or `PolarAxis`. A
 [`ColorbarInteractable`](@ref) reads values on `identity`, `log10`, and
-`log` colorbars, and a [`ThresholdInteractable`](@ref) drags a cutoff
-along them.
+`log` colorbars, a [`ThresholdInteractable`](@ref) drags a cutoff
+along them, and a [`SpanInteractable`](@ref) drags a band along them.
 
 `LScene` is not supported: on both backends, `masque` raises an error
 for a figure that contains one, so nothing in that figure responds, not

@@ -712,6 +712,155 @@ try {
     const layers = await layersOf(key);
     const layer = findLayer(layers, spec);
 
+    // A band (#500): its chrome (the outside faded at the preview strength in the plot area's
+    // colour, an edge line and a grip on each edge), an edge drag that moves one edge, a drag
+    // inside that moves both, a mark or a colorbar readout inside the band still answering, and
+    // an edge that stops at the other one. Each release sets the field to the band's drawn
+    // edges, read back through the axis's own inversion.
+    if (spec.mode === "span") {
+      if (layer.kind !== "span") throw new Error(`${key}: layer ${layer.id} is a ${layer.kind}`);
+      const t = (await transformsOf(key))[layer.axis];
+      const h = layer.geometry.orientation === "h";
+      const [s0, s1] = layer.geometry.span;
+      const mid = (s0 + s1) / 2;
+      const log = /log/.test(h ? t.yscale : t.xscale);
+      const lims = h ? t.ylims : t.xlims;
+      const valueAt = (p) => invertAxisJs(t, h ? mid : p, h ? p : mid)[h ? "y" : "x"];
+      const near = (a, b) => Math.abs(a - b) <= (log ? 0.01 * Math.abs(b) : 0.005 * Math.abs(lims[1] - lims[0]));
+      const at = (p) => (h ? [mid, p] : [p, mid]);
+      const chrome = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((hh) => (hh.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const box = (r) => ["x", "y", "width", "height"].map((a) => Number(r.getAttribute(a)));
+        return {
+          dims: [...sr.querySelectorAll("rect.masque-span-dim")].map((r) => ({ box: box(r), fill: getComputedStyle(r).fill, op: Number(getComputedStyle(r).fillOpacity) })),
+          lines: [...sr.querySelectorAll("line.masque-threshold-line")].map((l) => ["x1", "y1", "x2", "y2"].map((a) => Number(l.getAttribute(a)))),
+          grips: [...sr.querySelectorAll("rect.masque-handle")].map(box),
+        };
+      }, key);
+      const edges = async () => (await chrome()).lines.map((l) => (h ? l[1] : l[0]));
+      const value = (text) => {
+        const m = /SpanEvent\(:(\w+), lo = ([-+\d.e]+), hi = ([-+\d.e]+)\)/.exec(text);
+        if (!m) throw new Error(`${key}: value ${JSON.stringify(text)} is not a SpanEvent`);
+        return { id: m[1], lo: Number(m[2]), hi: Number(m[3]) };
+      };
+      // The field reads the drawn band.
+      const reads = async (text, what) => {
+        const v = value(text);
+        const [a, b] = await edges();
+        const want = [valueAt(a), valueAt(b)].sort((p, q) => p - q);
+        if (!near(v.lo, want[0]) || !near(v.hi, want[1])) throw new Error(`${key}/${what}: field ${JSON.stringify(v)}, the drawn edges read ${JSON.stringify(want)}`);
+        return v;
+      };
+
+      let c = await chrome();
+      if (c.dims.length !== 2 || c.lines.length !== 2 || c.grips.length !== 2) throw new Error(`${key}: chrome ${JSON.stringify({ dims: c.dims.length, lines: c.lines.length, grips: c.grips.length })}, want 2 of each`);
+      // The plot area's colour: the axis's own fill, else the figure's background.
+      const plotFill = t.fill ?? await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((hh) => (hh.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sh = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sh = el; });
+        return sh.style.getPropertyValue("--masque-fig-bg");
+      }, key);
+      const rgb = (css) => (css.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).join(",");
+      for (const d of c.dims) {
+        if (Math.abs(d.op - 0.65) > 0.01) throw new Error(`${key}: the outside fades at ${d.op}, want 0.65 (the preview strength)`);
+        if (!plotFill || rgb(d.fill) !== rgb(plotFill)) throw new Error(`${key}: the outside fades toward ${d.fill}, want the plot area's ${plotFill}`);
+      }
+      for (let k = 0; k < 2; k++) {
+        const [gx, gy, gw, gh] = c.grips[k];
+        const centre = h ? gy + gh / 2 : gx + gw / 2, across = h ? gx + gw / 2 : gy + gh / 2;
+        const line = h ? c.lines[k][1] : c.lines[k][0];
+        if (Math.abs(centre - line) > 0.5 || Math.abs(across - mid) > 0.5) throw new Error(`${key}: grip ${k} at ${JSON.stringify(c.grips[k])} is off its edge ${line} / the middle ${mid}`);
+      }
+      // Julia drew the edges where the browser reads the starting band. (The field itself may
+      // already hold an earlier run's drags, so it is read against the drawn edges.)
+      const g0 = [valueAt(layer.geometry.lo), valueAt(layer.geometry.hi)];
+      if (!near(g0[0], spec.start[0]) || !near(g0[1], spec.start[1])) throw new Error(`${key}: the edges are drawn at ${JSON.stringify(g0)}, want ${spec.start}`);
+      let out = await textOf(`#out_${key}`);
+      let v = await reads(out, "start");
+      passed.push(`${key}/chrome`);
+
+      // The lo edge, 30 image px further out (or in, when an earlier run left it at the end).
+      let [pLo, pHi] = await edges();
+      const hi0 = v.hi;
+      const [e0, e1] = h ? [t.viewport[1], t.viewport[1] + t.viewport[3]] : [t.viewport[0], t.viewport[0] + t.viewport[2]];
+      let out1 = Math.sign(pLo - pHi) || (h ? 1 : -1);
+      if (pLo + 30 * out1 < e0 || pLo + 30 * out1 > e1) out1 = -out1;
+      await drag(key, ...at(pLo), ...at(pLo + 30 * out1));
+      out = await waitChange(`#out_${key}`, out, `${key}/edge`);
+      const after = await edges();
+      if (Math.abs(after[0] - (pLo + 30 * out1)) > 1 || Math.abs(after[1] - pHi) > 0.5) throw new Error(`${key}/edge: edges ${JSON.stringify(after)}, want lo at ${pLo + 30 * out1} and hi kept at ${pHi}`);
+      v = await reads(out, "edge");
+      if (!near(v.hi, hi0)) throw new Error(`${key}/edge: hi moved from ${hi0} to ${v.hi}`);
+      passed.push(`${key}/edge-drag`);
+
+      // Inside, off any mark: 20 px toward the hi edge moves both edges by 20.
+      [pLo, pHi] = await edges();
+      // The middle of the band, a quarter of the way across, clear of the edges and the marks.
+      const inside = (pLo + pHi) / 2, q = s0 + 0.25 * (s1 - s0);
+      let step = 20 * (Math.sign(pHi - pLo) || 1);
+      const fits = (d) => [pLo + d, pHi + d].every((p) => p >= e0 && p <= e1);
+      if (!fits(step)) step = -step;
+      const atQ = (p) => (h ? [q, p] : [p, q]);
+      await drag(key, ...atQ(inside), ...atQ(inside + step));
+      out = await waitChange(`#out_${key}`, out, `${key}/move`);
+      const moved = await edges();
+      if (Math.abs(moved[0] - pLo - step) > 1 || Math.abs(moved[1] - pHi - step) > 1) throw new Error(`${key}/move: edges ${JSON.stringify(moved)}, want ${[pLo + step, pHi + step]}`);
+      await reads(out, "move");
+      passed.push(`${key}/move-drag`);
+
+      // A mark inside the band keeps its hover and its click; the band stays put.
+      if (spec.markInside) {
+        const marks = layers.find((l) => l.id === spec.markInside);
+        const [a, b] = (await edges()).sort((p, q) => p - q);
+        let idx = -1;
+        for (let i = 0; i < marks.geometry.length / 3; i++) {
+          const along = h ? marks.geometry[3 * i + 1] : marks.geometry[3 * i];
+          if (along > a + 8 && along < b - 8) idx = i;
+        }
+        if (idx < 0) throw new Error(`${key}: no ${spec.markInside} mark inside the band ${a}..${b}`);
+        const p = hitPoint(marks, idx);
+        const tip = await dispatchAt(key, p.x, p.y, "pointermove");
+        if (!tip.show || !tip.text) throw new Error(`${key}/mark-hover: no tooltip on the mark inside the band`);
+        const before = await edges();
+        const bond = await textOf(`#bond_${key}`);
+        await dispatchAt(key, p.x, p.y, "click");
+        const bondAfter = await waitChange(`#bond_${key}`, bond, `${key}/mark-click`);
+        if (!/scatter = ElementEvent/.test(bondAfter)) throw new Error(`${key}/mark-click: value ${JSON.stringify(bondAfter)} has no pick`);
+        if (JSON.stringify(await edges()) !== JSON.stringify(before)) throw new Error(`${key}/mark-click: the band moved under a click on a mark`);
+        await dispatchAt(key, 2, 2, "pointermove");
+        passed.push(`${key}/mark-inside`);
+      }
+
+      // The colorbar's own readout answers inside the band.
+      if (spec.colorbarReadout) {
+        const [a, b] = await edges();
+        const p = (a + b) / 2;
+        const tip = await dispatchAt(key, ...at(p), "pointermove");
+        const want = valueAt(p);
+        const num = /(-?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s*$/i.exec((tip?.text ?? "").trim());
+        if (!tip?.show || !num || !(Math.abs(Number(num[1]) - want) <= 0.02 * Math.abs(want) + 1e-9)) {
+          throw new Error(`${key}/colorbar-readout: hover inside the band showed ${JSON.stringify(tip?.text)}, want about ${want}`);
+        }
+        await dispatchAt(key, 2, 2, "pointermove");
+        passed.push(`${key}/colorbar-readout`);
+      }
+
+      // The lo edge dragged past the hi edge stops on it.
+      [pLo, pHi] = await edges();
+      await drag(key, ...at(pLo), ...at(pHi + (pHi - pLo) / 2));
+      out = await waitChange(`#out_${key}`, out, `${key}/cross`);
+      const flat = await edges();
+      if (Math.abs(flat[0] - pHi) > 0.5 || Math.abs(flat[1] - pHi) > 0.5) throw new Error(`${key}/cross: edges ${JSON.stringify(flat)}, want both at ${pHi}`);
+      v = await reads(out, "cross");
+      if (v.lo !== v.hi) throw new Error(`${key}/cross: ${JSON.stringify(v)}, want lo == hi`);
+      passed.push(`${key}/edge-stops`);
+      console.error(`OK  ${key} — ${out.slice(0, 100)}`);
+      continue;
+    }
+
     // Regression check for the `build_manifest` precedence fix (src/render.jl ~line 259):
     // a `LegendInteractable` layer drawn over filled plot geometry must sort BEFORE that
     // geometry's layer in the manifest, or the frontend's first-match `hitTest` gives every

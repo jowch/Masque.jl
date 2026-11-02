@@ -11,6 +11,7 @@ import { groupById, groupEnvelope, groupSelection } from "./linked"
 import type { DragStops } from "./dragkeys"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
+import * as spanDrag from "./drag/span"
 import { limitsTip } from "./drag/view"
 import * as viewDrag from "./drag/view"
 import { createGestureChannel } from "./gesture"
@@ -72,6 +73,9 @@ const STYLE = `
 .surface.cur-move { cursor: move; }
 .masque-threshold-line { stroke-width: var(--masque-line-w, 2); }
 .masque-threshold-line.hovered { stroke-width: calc(var(--masque-line-w, 2) * 1.75); }
+/* A band's outside (drag/span.ts) fades toward the plot area's colour, inline as fill, at the
+   preview fade's strength, so the band reads as the part left showing. */
+.masque-span-dim { stroke: none; fill-opacity: calc(1 - var(--masque-preview-opacity, ${PREVIEW_OPACITY})); }
 .masque-cross { opacity: 0; transition: opacity ${MOTION_MS}ms ease-out; }
 .masque-cross.is-on { opacity: 1; }
 /* Halo first (figure background, wider), hairline on top at 80%. The fringe only shows where
@@ -555,6 +559,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // plain svg, after every home, so the first <line> in the shadow is still a threshold line.
     const thresholdLines = thresholdDrag.buildThresholdLines(manifest, chromeAt)
     const roiBoxes = roiDrag.buildROIBoxes(manifest, chromeAt, base)
+    const spanBands = spanDrag.buildSpanBands(manifest, chromeAt, base)
     const cross = buildCross(plainSvg)
     const focusable = buildFocusable(manifest)
     const layerStarts = computeLayerStarts(focusable)
@@ -616,7 +621,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const ctx: OverlayCtx = {
         manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
         hiFixed_: hiFixed, selFixed_: selFixed, linkGroup_: linkGroup, fade_: fade,
-        thresholdLines_: thresholdLines, roiBoxes_: roiBoxes, chromeAt_: chromeAt,
+        thresholdLines_: thresholdLines, roiBoxes_: roiBoxes, spanBands_: spanBands, chromeAt_: chromeAt,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
         cross_: cross,
         gesture_: channel,
@@ -734,7 +739,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
 
     function chromeHeld(): boolean {
         const k = state.drag_?.kind
-        return k === "roi" || k === "threshold"
+        return k === "roi" || k === "threshold" || k === "span"
     }
 
     function replaceDraggedChrome(man: Manifest): void {
@@ -745,6 +750,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         ctx.thresholdLines_ = thresholdDrag.buildThresholdLines(man, chromeAt)
         ctx.roiBoxes_ = roiDrag.buildROIBoxes(man, chromeAt, ctx.base_)
+        for (const band of ctx.spanBands_.values()) spanDrag.removeSpanBand(band)
+        ctx.spanBands_ = spanDrag.buildSpanBands(man, chromeAt, ctx.base_)
     }
 
     function flushPendingChrome(): void {
@@ -836,7 +843,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const keepControls = onchangeFrame && input.settle !== true
         if (keepControls) {
             newManifest.layers = newManifest.layers.map((l) =>
-                l.kind === "threshold" || l.kind === "roi" ? ctx.manifest_.layers.find((o) => o.id === l.id && o.kind === l.kind) ?? l : l)
+                l.kind === "threshold" || l.kind === "span" || l.kind === "roi" ? ctx.manifest_.layers.find((o) => o.id === l.id && o.kind === l.kind) ?? l : l)
         }
         // An \`onchange\` frame comes from a click or a key, and the pointer or the keyboard is
         // still on the mark: the focus and the hover come back on the new picture.
@@ -1024,6 +1031,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         shadowHost.style.height = `${br.height}px`
         shadowHost.style.setProperty("--masque-k", String(ctx.manifest_.width / br.width))
         roiDrag.syncHandleDraw(ctx.roiBoxes_, ctx.manifest_.width, br.width, ctx.manifest_.scaling)
+        spanDrag.syncGripDraw(ctx.spanBands_, ctx.manifest_.width, br.width, ctx.manifest_.scaling)
         ctx.fade_.refresh_()
         state.surfaceSized_ = false
         replaceTip(ctx, state)
@@ -1189,7 +1197,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const down = (e: PointerEvent) => onDown(ctx, state, e)
     const move = (e: PointerEvent) => { lastMove = e; onPointerMove(ctx, state, e) }
     const releaseChrome = (kind: string | undefined) => {
-        if ((kind === "roi" || kind === "threshold") && !state.drag_) flushPendingChrome()
+        if ((kind === "roi" || kind === "threshold" || kind === "span") && !state.drag_) flushPendingChrome()
     }
     const up = (e: PointerEvent) => {
         const kind = state.drag_?.kind
