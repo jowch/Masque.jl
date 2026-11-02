@@ -164,6 +164,7 @@ export interface OverlayCtx {
     // Significant figures for a tooltip number with no format spec. Read once from the mount
     // manifest: a pan frame's manifest (mount.ts's revealFrame) does not carry it.
     tipDigits_: number
+    tipExplicit_: boolean // the user set tooltip_sigdigits: it outranks an axis format's precision (#510)
     host_: HTMLElement
     base_: HTMLElement
     surface_: HTMLElement

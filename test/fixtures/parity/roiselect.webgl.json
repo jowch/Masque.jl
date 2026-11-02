@@ -3,6 +3,17 @@
     "layers": [
         {
             "brush": "elements",
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "events": [
+                "hover"
+            ],
+            "coords": [
+                "x",
+                "y"
+            ],
             "kind": "circles",
             "id": "pts",
             "geometry": [
@@ -42,14 +53,7 @@
                 }
             ],
             "colors": "rgb(0,114,178)",
-            "axis": "ax1",
-            "style": {
-                "width": 2
-            },
-            "bond": "element",
-            "events": [
-                "hover"
-            ]
+            "bond": "element"
         },
         {
             "selects": "pts",

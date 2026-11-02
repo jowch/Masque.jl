@@ -2656,9 +2656,10 @@ try {
       if (!t?.ispolar || !t.polar) throw new Error(`${key}: expected a polar transform, got ${JSON.stringify(t)}`);
       const anchor = (await layersOf(spec.anchorKey)).find((l) => l.kind === "circles");
       const pt = { x: anchor.geometry[3 * spec.anchorIndex], y: anchor.geometry[3 * spec.anchorIndex + 1] };
+      // The readout names θ and r and reads θ in the axis's degrees (#510): `θ=90.00°, r=2.000`.
       const read = (text) => {
-        const m = /x=(-?[\d.e+-]+), y=(-?[\d.e+-]+)/.exec(text ?? "");
-        return m ? { x: Number(m[1]), y: Number(m[2]) } : null;
+        const m = /θ=(-?[\d.e+-]+)°, r=(-?[\d.e+-]+)/.exec(text ?? "");
+        return m ? { x: Number(m[1]) * Math.PI / 180, y: Number(m[2]) } : null;
       };
       const near = (v, want, tol) => v !== null && Math.abs(v - want) <= tol;
       // The anchor is rounded to whole image px, and Chromium truncates a synthetic click's
@@ -2696,6 +2697,38 @@ try {
       if (!matches(after)) throw new Error(`${key}/click: expected AxisEvent at θ≈${spec.theta}, r≈${spec.r}, got ${JSON.stringify(after).slice(0, 200)}`);
       passed.push(`${key}/click-theta-r`);
       console.error(`OK  ${key}/click — ${after.slice(0, 100)} (tolerance r ±${tolR.toFixed(3)}, θ ±${tolT.toFixed(3)})`);
+      continue;
+    }
+
+    if (spec.mode === "tick_units") {
+      // #510: each scatter's first point reads the way its axis labels it. The expectation is
+      // picked by the axis's transform: a `"{:.1f} mV"` format, a function format (plain), or a
+      // PolarAxis (θ in degrees, r).
+      const axes = await transformsOf(key);
+      const circles = layers.filter((l) => l.kind === "circles");
+      if (circles.length !== 3) throw new Error(`${key}: expected 3 scatter layers, got ${circles.length}`);
+      const seen = new Set();
+      for (const L of circles) {
+        const t = axes[L.axis];
+        if (!L.coords) throw new Error(`${key}/${L.id}: a scatter's default payloads should be flagged coords`);
+        const which = t.ispolar ? "polar" : t.yfmt?.suffix === " mV" ? "mV" : "function";
+        // The card's text is its rows run together: "index 1 x 1 y 3.5 mV".
+        const want = { polar: [/(^| )θ 90°( |$)/, /\br 2\b/], mV: [/\bx 1\b/, /\by 3\.5 mV\b/], function: [/\bx 1\b/, /\by 3\.472\b/] }[which];
+        const never = { polar: [/\bx \d/, /\by \d/, /1\.571/], mV: [/3\.472/], function: [/mV/, /!/] }[which];
+        let tip = null;
+        for (let a = 0; a < 6; a++) {
+          tip = await dispatchAt(key, L.geometry[0], L.geometry[1], "pointermove");
+          if (tip?.show && want.every((w) => w.test(tip.text))) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        for (const w of want) if (!w.test(tip?.text ?? "")) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip?.text)} should match ${w}`);
+        for (const w of never) if (w.test(tip.text)) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip.text)} should not match ${w}`);
+        seen.add(which);
+        passed.push(`${key}/${which}`);
+        console.error(`OK  ${key}/${which} — ${tip.text}`);
+      }
+      if (seen.size !== 3) throw new Error(`${key}: expected the polar, mV and function axes, saw ${[...seen]}`);
+      await dispatchAt(key, 1, 1, "pointermove");
       continue;
     }
 

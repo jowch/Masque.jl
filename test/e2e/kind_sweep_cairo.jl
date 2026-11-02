@@ -181,6 +181,17 @@ HTML(
         "<span id=\"axes_axis_polar\" style=\"display:none\">$(JSON3.write(sweep.axis_polar.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000186
+@bind ev_tick_units sweep.tick_units
+
+# ╔═╡ c1000000-0000-0000-0000-000000000187
+HTML(
+    "<span id=\"out_tick_units\">TICK_UNITS=$(sweep_field("tick_units", ev_tick_units))</span>" *
+        "<span id=\"bond_tick_units\" style=\"display:none\">$(repr(ev_tick_units))</span>" *
+        "<span id=\"coords_tick_units\" style=\"display:none\">$(JSON3.write(sweep.tick_units.manifest["layers"]))</span>" *
+        "<span id=\"axes_tick_units\" style=\"display:none\">$(JSON3.write(sweep.tick_units.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000036
 @bind ev_scatter_dark sweep.scatter_dark
 
@@ -945,6 +956,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000025
 # ╠═c1000000-0000-0000-0000-000000000074
 # ╠═c1000000-0000-0000-0000-000000000075
+# ╠═c1000000-0000-0000-0000-000000000186
+# ╠═c1000000-0000-0000-0000-000000000187
 # ╠═c1000000-0000-0000-0000-000000000036
 # ╠═c1000000-0000-0000-0000-000000000037
 # ╠═c1000000-0000-0000-0000-000000000068

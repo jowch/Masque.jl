@@ -136,7 +136,7 @@ function paintFocus(ctx: OverlayCtx, state: OverlayState, ref: FocusRef, hit: Hi
     const html = showTipAt(ctx, state, hit, anchor.x, anchor.y, css)
     state.focusTipHtml_ = html
     state.focusTipCss_ = html === null ? null : css
-    scheduleAnnounce(ctx, state, announceText(ref, plainTextForHit(hit, ctx.tipDigits_, ctx.manifest_.transforms[hit.layer.axis])))
+    scheduleAnnounce(ctx, state, announceText(ref, plainTextForHit(hit, ctx.tipDigits_, ctx.manifest_.transforms[hit.layer.axis], ctx.tipExplicit_)))
 }
 
 // Shift+←/→ on a focused line with data points moves the readout to the previous or next
