@@ -716,7 +716,9 @@ Lines / polylines or disjoint segment pairs. Produces one `:polyline`, `:lines`,
   (1-based) for `:segment`, `(; index)` (1-based) for `:line`.
 - `tol` — hit-test slack around a segment, in logical px (scaled to the rendered image's DPI
   like [`PointInteractable`](@ref)'s `radius`). Must be finite and positive (`ArgumentError`
-  otherwise). Shipped in the manifest as a per-layer `"tol"` field; the overlay's client-side
+  otherwise). When the figure is shown narrower than it was drawn for (the docs on a phone,
+  a narrow Pluto window), the slack grows to keep its size on screen. Shipped in the manifest
+  as a per-layer `"tol"` field; the overlay's client-side
   default (`SEG_TOL` in `frontend/src/geometry.ts`, 8 image px) applies only when this field
   is absent. From a plot object the default is `max(6, linewidth / 2)`, so the whole drawn
   stroke responds (the largest `linewidth` of a per-element vector; `errorbars!`/`rangebars!`

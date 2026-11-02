@@ -7,6 +7,18 @@ import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarF
 const HIT_TOL = 4 // px slack for circles/rects
 export const SEG_TOL = 8 // px slack for segments/polylines
 
+// How much to grow every hit slack so it keeps its on-screen size when the figure is shown
+// narrower than it was drawn for (the docs on a phone, a narrow Pluto window) (#527). The slacks
+// above, a layer's `tol` and an ROI's `handle` are image px at the figure's design width
+// (`cssWidth`); shown at `liveCss` CSS px, each image px is smaller on screen by
+// `cssWidth / liveCss`. Never below 1: a figure shown larger keeps today's slack. 1 before layout
+// or when the manifest has no `cssWidth`.
+export function slopScale(manifest: Manifest, liveCss: number): number {
+    const design = manifest.cssWidth
+    if (!design || !(liveCss > 0)) return 1
+    return Math.max(1, design / liveCss)
+}
+
 // closest point on the clamped segment (x0,y0)-(x1,y1) to (px,py) — the projection distToSegment
 // already computes, factored out so anchorFor can reuse the point (not just its distance) for the
 // "tooltip slides along the line" placement rule.
@@ -392,7 +404,8 @@ function hitGridSample(gg: GridGeometry, px: number, py: number): Omit<Hit, "lay
 }
 
 // hit-test one layer at (px,py); null if no element under the point
-export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransform): Omit<Hit, "layer"> | null {
+// `slop` scales every hit slack (see slopScale); 1 hits at the design size.
+export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransform, slop = 1): Omit<Hit, "layer"> | null {
     const g = layer.geometry
     switch (layer.kind) {
         case "circles": {
@@ -417,12 +430,14 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
                 }
             }
             // Inside wins over any circle's `HIT_TOL` reach, so a neighbour's reach never takes
-            // the pointer off the marker it is on.
-            for (const reach of [0, HIT_TOL]) {
+            // the pointer off the marker it is on. The reach pass grows the whole hit circle
+            // (radius plus slack) by `slop`, so it keeps the size it has at the design width.
+            for (const grow of [0, 1]) {
                 for (let m = 0; m < n; m++) {
                     const k = order ? order[m] : n - 1 - m
                     const cx = a[3 * k], cy = a[3 * k + 1], r = a[3 * k + 2]
-                    if ((px - cx) ** 2 + (py - cy) ** 2 <= (r + reach) ** 2) return { index: k, geom_: ["circle", cx, cy, r] }
+                    const hr = grow ? (r + HIT_TOL) * slop : r
+                    if ((px - cx) ** 2 + (py - cy) ** 2 <= hr ** 2) return { index: k, geom_: ["circle", cx, cy, r] }
                 }
             }
             return null
@@ -434,7 +449,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             // `order`, when present, lists them top first (text on an Axis3), and a rect not in
             // it is not drawn; absent, the last one listed is on top.
             const a = g as number[]
-            const tol = layer.tol ?? 0
+            const tol = (layer.tol ?? 0) * slop
             const order = layer.order
             const n = order ? order.length : a.length / 4
             let near = -1, nd = tol * tol
@@ -451,7 +466,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
         }
         case "polyline": {
             const a = g as number[]
-            const tol = layer.tol ?? SEG_TOL
+            const tol = (layer.tol ?? SEG_TOL) * slop
             let best = -1, bd = Infinity
             for (let k = 0; k < a.length / 2 - 1; k++) {
                 const x0 = a[2 * k], y0 = a[2 * k + 1], x1 = a[2 * k + 2], y1 = a[2 * k + 3]
@@ -467,7 +482,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             // is on that path; the hit's identity is the line, and its highlight is the full
             // vertex list (NaN gaps stay gaps inside it).
             const paths = g as number[][]
-            const tol = layer.tol ?? SEG_TOL
+            const tol = (layer.tol ?? SEG_TOL) * slop
             let best = -1, bd = Infinity
             for (let k = 0; k < paths.length; k++) {
                 const hit = closestPointOnPath(px, py, paths[k], Math.min(bd, tol))
@@ -481,7 +496,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
         }
         case "segments": {
             const a = g as number[]
-            const tol = layer.tol ?? SEG_TOL
+            const tol = (layer.tol ?? SEG_TOL) * slop
             let best = -1, bd = Infinity
             for (let k = 0; k < a.length / 4; k++) {
                 const d = distToSegment(px, py, a[4 * k], a[4 * k + 1], a[4 * k + 2], a[4 * k + 3])
@@ -495,7 +510,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             // elements, the nearest outline wins. Where elements overlap, the last one listed
             // is drawn on top and wins.
             const elems = g as (number[] | number[][])[]
-            const tol = layer.tol ?? 0
+            const tol = (layer.tol ?? 0) * slop
             let near = -1, nd = tol
             for (let k = elems.length - 1; k >= 0; k--) {
                 const rings = polygonRings(elems[k])
@@ -536,7 +551,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             const y0 = tg.orientation === "h" ? tg.pos : lo
             const x1 = tg.orientation === "h" ? hi : tg.pos
             const y1 = tg.orientation === "h" ? tg.pos : hi
-            if (distToSegment(px, py, x0, y0, x1, y1) <= SEG_TOL) return { index: 0, geom_: ["seg", x0, y0, x1, y1] }
+            if (distToSegment(px, py, x0, y0, x1, y1) <= SEG_TOL * slop) return { index: 0, geom_: ["seg", x0, y0, x1, y1] }
             return null
         }
         case "roi": {
@@ -546,7 +561,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             // only this midpoint square (no grip).
             // Corners are checked before edges before the body so a small ROI's overlapping
             // corner/edge hit boxes resolve to the (two-axis) corner, not an edge.
-            const halfHit = Math.max(2 * rg.handle, 6)
+            const halfHit = Math.max(2 * rg.handle, 6) * slop
             const corners: [number, number][] = [[rg.x, rg.y], [rg.x + rg.w, rg.y], [rg.x + rg.w, rg.y + rg.h], [rg.x, rg.y + rg.h]]
             for (let k = 0; k < 4; k++) {
                 if (Math.abs(px - corners[k][0]) <= halfHit && Math.abs(py - corners[k][1]) <= halfHit) return { index: 0, roiPart_: { corner: k } }
@@ -825,12 +840,12 @@ export function occludedAt(manifest: Manifest, layer: HitLayer, x: number, y: nu
 }
 
 // first layer (in manifest order) with a hit for the given event; null if none
-export function hitTest(manifest: Manifest, px: number, py: number, event: string): Hit | null {
+export function hitTest(manifest: Manifest, px: number, py: number, event: string, slop = 1): Hit | null {
     for (const layer of manifest.layers) {
         if (!layer.events.includes(event)) continue
         if (yieldsToOtherAxis(manifest, layer, px, py, event)) continue
         if (occludedAt(manifest, layer, px, py)) continue
-        const h = hitLayer(layer, px, py, manifest.transforms[layer.axis])
+        const h = hitLayer(layer, px, py, manifest.transforms[layer.axis], slop)
         if (h) return { layer, ...h }
     }
     return null
@@ -965,7 +980,7 @@ function insideFrame(f: AxisFrame, x: number, y: number): boolean {
 // at all outside that frame's clip; a layer that doesn't move, at the layout point. `viewId`
 // is the pan view that owns the live matrix.
 export function hitTestAt(
-    manifest: Manifest, x: number, y: number, photo: PhotoMatrix, event: string, viewId: string | null = null,
+    manifest: Manifest, x: number, y: number, photo: PhotoMatrix, event: string, viewId: string | null = null, slop = 1,
 ): Hit | null {
     for (const layer of manifest.layers) {
         if (!layer.events.includes(event)) continue
@@ -975,7 +990,7 @@ export function hitTestAt(
         const p = f ? frameInverse(f, x, y) : { x, y }
         // In the marks' own space: a live photograph moves the legend's pixels with them.
         if (occludedAt(manifest, layer, p.x, p.y)) continue
-        const h = hitLayer(layer, p.x, p.y, manifest.transforms[layer.axis])
+        const h = hitLayer(layer, p.x, p.y, manifest.transforms[layer.axis], slop)
         if (h) return { layer, ...h }
     }
     return null

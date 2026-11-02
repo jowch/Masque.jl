@@ -1,4 +1,4 @@
-import { axisPoint, findBin, hitTestAt, layerPoint, lineReadout, matrixLimits, resolvePayload } from "./geometry"
+import { axisPoint, findBin, hitTestAt, layerPoint, lineReadout, matrixLimits, resolvePayload, slopScale } from "./geometry"
 import { drawHover, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent, updateLinkForHit } from "./hover"
 import { hideCross } from "./cross"
@@ -249,11 +249,12 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
     ctx.surface_.classList.add("pointer-focus")
     ctx.surface_.focus({ preventScroll: true })
     const { layout, content } = pointerSpace(ctx, state, e)
+    const slop = slopScale(ctx.manifest_, ctx.base_.getBoundingClientRect().width)
     // Shift+drag forces view (arbitration vs box-select / ROI / threshold).
     if (e.shiftKey) {
         const viewLayer = ctx.manifest_.layers.find((l) => {
             if (l.kind !== "view" || !l.events.includes("drag")) return false
-            return hitTestAt({ ...ctx.manifest_, layers: [l] }, layout.x, layout.y, state.photo_, "drag", state.photoViewId_) !== null
+            return hitTestAt({ ...ctx.manifest_, layers: [l] }, layout.x, layout.y, state.photo_, "drag", state.photoViewId_, slop) !== null
         })
         if (viewLayer) {
             const g = viewLayer.geometry as ViewGeometry
@@ -268,14 +269,14 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             return
         }
     }
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_, slop)
     // A marquee: a drag on a plot with no view, or Alt-drag on any plot, where a field holds
     // several picks. A threshold line or an ROI box under the press still takes the drag.
     if (!hit || (hit.layer.kind === "view" && e.altKey)) {
         const axis = marquee.marqueeAxis(ctx, axesAt(ctx, layout.x, layout.y))
         const targets = axis === null ? [] : marquee.marqueeTargets(ctx, axis)
         // A press on a legend inside the axis is a press on the legend.
-        const under = targets.length ? hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_) : null
+        const under = targets.length ? hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_, slop) : null
         if (axis !== null && targets.length && !under?.layer.links) {
             const p = content(axis)
             state.drag_ = marquee.begin(state, axis, targets, marqueeMode(ctx.manifest_, state, under, targets, p), p.x, p.y, { x: e.clientX, y: e.clientY }, e.pointerId)
@@ -760,14 +761,15 @@ export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): vo
     // Chromium still dispatches click after a Mac ctrl-click.
     if (isMacContextClick(e)) return
     const layout = layoutImagePx(ctx.base_, ctx.manifest_, at.x, at.y)
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_)
+    const slop = slopScale(ctx.manifest_, ctx.base_.getBoundingClientRect().width)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_, slop)
     if (!hit) {
         // A click on an empty part of a plot clears the one-pick fields there; a `many` field
         // keeps its picks, since a near miss among many small marks is the likeliest slip and
         // Escape clears them (#384). A mark that only shows a tooltip isn't empty space, and a
         // Cmd/Ctrl-click that misses keeps the picks, as a modified miss does in a file browser.
         if (isToggleClick(e)) return
-        if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_)) return
+        if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_, slop)) return
         // A click inside an opaque legend that takes no clicks is on the legend too (#472).
         if (ctx.manifest_.occluders?.some(([bx, by, bw, bh]) => layout.x >= bx && layout.x <= bx + bw && layout.y >= by && layout.y <= by + bh)) return
         const axes = axesAt(ctx, layout.x, layout.y)

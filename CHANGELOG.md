@@ -27,6 +27,12 @@ All notable changes to this project are documented here. The format is based on
   `pick.y` and `pick.z` hold it. `selected=` indices on such a line name points too. To
   upgrade, code that read `pick.index` as the line now reads `pick.line` (#518).
 
+### Fixed
+- A figure shown narrower than it was drawn for, as in the docs on a phone or in a narrow
+  Pluto window, keeps its hover and click targets the same size on screen. Before, every
+  target shrank with the picture: on a phone a scatter dot's target was about half its size
+  in Pluto, and a threshold line was hard to grab. Pluto at full width is unchanged (#527).
+
 ## [0.4.5] - 2026-11-02
 
 ### Added
