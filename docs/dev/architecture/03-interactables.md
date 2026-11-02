@@ -99,6 +99,20 @@ A point inside an element still wins over another element's outline. `:circles` 
 centers the outline on the marker's edge, and all of it on WebGL, which paints it outside).
 `:circles` and the other kinds' manifests are untouched by this field.
 
+A finger reaches further than a mouse (#528). On a `pointerType === "touch"` event,
+`hitTestAt` walks the layers in the same order but asks each `:circles`, `:lines`, `:polyline`
+and `:segments` layer for its nearest element and how far the finger is from its drawn edge (a
+circle's rim, or half the line's `linewidth` from the path). The nearest of those within the
+finger's reach wins, not the first layer whose slack covers the point, so a far mark drawn on
+top can't take a tap from a nearer one; equally near elements fall back to the top-drawn rule.
+Every other kind is hit inside its shape only (a `:rects` or `:polygons` layer's `tol` is the
+mouse's), and the first such hit ends the walk, unless a point or line drawn over it (earlier
+in the manifest) is within reach. The reach is CSS px on screen: per layer `"touch"` (from
+`touch_radius`, CSS px, not scaled like `tol`), else the manifest's `"touch": {radius}` (from
+`masque(...; touch)`), else 16. The overlay converts it with the live image-px-per-CSS-px ratio
+and the live zoom. `"touch": false` gives a finger the mouse's rule. Both fields are sent only
+when set.
+
 `points` (optional, `:lines`) is one flat `[x1, y1, x2, y2, …]` per element:
 the line's own data samples, which the hover readout snaps to ([§10](10-tooltips.md)). The
 geometry is rounded to image pixels and a stairs path adds corners between samples, so the

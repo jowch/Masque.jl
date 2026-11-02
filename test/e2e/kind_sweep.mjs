@@ -4601,6 +4601,132 @@ try {
     passed.push("tooltip-theme-follows-figure-bg");
   }
 
+  // --- Touch (#528): a finger picks the nearest point or line within 16 CSS px of it ---
+  // Real taps (CDP touch emulation, so the browser sends pointerType "touch" and its own
+  // click), at a spot 8–14 CSS px off a mark's drawn edge: past a mouse's slack, inside a
+  // finger's reach. A real mouse click there first must miss. Last in the sweep, since touch
+  // emulation stays on for the page.
+  {
+    const TOUCH_SPECS = [
+      { key: "scatter" }, { key: "lines", sample: true }, { key: "segments" },
+      { key: "scatter3d" }, { key: "lines3d", sample: true },
+    ];
+    const cssScale = (key) => page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const vb = sr.querySelector("svg.masque-plain").viewBox.baseVal;
+      return { s: b.width / vb.width, left: b.left, top: b.top, w: vb.width, h: vb.height };
+    }, key);
+    // Distance from (x, y) to element k's drawn edge, image px, and the nearest element.
+    const segDist = (px, py, x0, y0, x1, y1) => {
+      const dx = x1 - x0, dy = y1 - y0, l2 = dx * dx + dy * dy;
+      const t = l2 ? Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / l2)) : 0;
+      return Math.hypot(px - (x0 + t * dx), py - (y0 + t * dy));
+    };
+    const nearestOf = (layer, x, y) => {
+      const g = layer.geometry, half = (layer.linewidth ?? 0) / 2;
+      const ds = [];
+      if (layer.kind === "circles") for (let k = 0; k < g.length / 3; k++) ds.push(Math.max(0, Math.hypot(x - g[3 * k], y - g[3 * k + 1]) - g[3 * k + 2]));
+      if (layer.kind === "segments") for (let k = 0; k < g.length / 4; k++) ds.push(Math.max(0, segDist(x, y, g[4 * k], g[4 * k + 1], g[4 * k + 2], g[4 * k + 3]) - half));
+      if (layer.kind === "lines") for (const a of g) {
+        let d = Infinity;
+        for (let i = 0; i < a.length / 2 - 1; i++) {
+          if (![a[2 * i], a[2 * i + 1], a[2 * i + 2], a[2 * i + 3]].every(Number.isFinite)) continue;
+          d = Math.min(d, segDist(x, y, a[2 * i], a[2 * i + 1], a[2 * i + 2], a[2 * i + 3]));
+        }
+        ds.push(Math.max(0, d - half));
+      }
+      let best = -1;
+      ds.forEach((d, k) => { if (best < 0 || d < ds[best]) best = k; });
+      return { index: best, dist: ds[best], second: Math.min(...ds.filter((_, k) => k !== best), Infinity) };
+    };
+    const tapPoint = (layer, idx, anchor, sc) => {
+      for (const css of [10, 9, 11, 12, 8, 13, 14]) {
+        for (let a = 0; a < 16; a++) {
+          const th = (a * Math.PI) / 8;
+          // Off the anchor by the mark's own radius plus `css` CSS px, then measured exactly.
+          const reach = (anchor.r ?? 0) + css / sc.s
+          const x = anchor.x + Math.cos(th) * reach, y = anchor.y + Math.sin(th) * reach;
+          if (x < 4 || y < 4 || x > sc.w - 4 || y > sc.h - 4) continue;
+          const n = nearestOf(layer, x, y);
+          // `sc.s` is CSS px per image px.
+          const dCss = n.dist * sc.s;
+          // A clear winner: the target, 8–14 CSS px off its edge, others at least 4 CSS px further.
+          if (n.index === idx && dCss >= 8 && dCss <= 14 && (n.second - n.dist) * sc.s >= 4) return { x, y, dCss };
+        }
+      }
+      return null;
+    };
+    const fieldValue = async (key, field) => (await inspect(key)).bondAll?.[field] ?? null;
+    const settle = () => new Promise((r) => setTimeout(r, 400));
+    const cdp = await context.newCDPSession(page);
+    const plans = [];
+    for (const t of TOUCH_SPECS) {
+      const spec = meta.find((m) => m.key === t.key);
+      if (!spec) throw new Error(`touch: no kind-sweep spec ${t.key}`);
+      const layer = findLayer(await layersOf(t.key), spec);
+      const sc = await cssScale(t.key);
+      const idx = spec.clickIndex ?? 0;
+      const anchor = layer.kind === "lines"
+        ? { x: layer.geometry[idx][2 * spec.clickSample], y: layer.geometry[idx][2 * spec.clickSample + 1] }
+        : hitPoint(layer, idx);
+      const at = tapPoint(layer, idx, anchor, sc);
+      if (!at) throw new Error(`touch/${t.key}: no spot 8–14 CSS px off element ${idx} with it clearly nearest`);
+      const field = spec.field ?? spec.layerId;
+      // A real mouse click there misses: past the mouse's slack, a one-pick field clears.
+      await page.mouse.click(sc.left + at.x * sc.s, sc.top + at.y * sc.s);
+      await settle();
+      const missed = await fieldValue(t.key, field);
+      if (missed !== null) throw new Error(`touch/${t.key}: a mouse click ${at.dCss.toFixed(1)} CSS px off the mark picked ${JSON.stringify(missed)}; want no pick`);
+      plans.push({ ...t, spec, layer, idx, at, field });
+    }
+    await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+    for (const p of plans) {
+      const sc = await cssScale(p.key);
+      const x = sc.left + p.at.x * sc.s, y = sc.top + p.at.y * sc.s;
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await settle();
+      const v = await fieldValue(p.key, p.field);
+      if (!v || v.index === undefined) throw new Error(`touch/${p.key}: a tap ${p.at.dCss.toFixed(1)} CSS px off element ${p.idx} picked nothing (${JSON.stringify(v)})`);
+      // The envelope names the pick by its 0-based element, or, for a line's point, by its line
+      // and sample (bond.ts's commitClick).
+      const got = p.sample ? v.sample ?? v.index : v.index;
+      const want = p.sample ? p.spec.clickSample : p.idx;
+      if (got !== want) throw new Error(`touch/${p.key}: a tap near element ${p.idx}${p.sample ? ` sample ${want}` : ""} picked ${JSON.stringify(v)}`);
+      passed.push(`${p.key}/touch-nearest`);
+      console.error(`OK  ${p.key} — touch ${p.at.dCss.toFixed(1)} CSS px off the mark picks it; a mouse there misses`);
+    }
+    // A bar takes a tap inside it only.
+    {
+      const spec = meta.find((m) => m.key === "barplot");
+      const layer = findLayer(await layersOf("barplot"), spec);
+      const field = spec.field ?? spec.layerId;
+      const idx = spec.clickIndex ?? 0;
+      const b = hitPoint(layer, idx);
+      const sc = await cssScale("barplot");
+      const tap = async (ix, iy) => {
+        const x = sc.left + ix * sc.s, y = sc.top + iy * sc.s;
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await settle();
+        return fieldValue("barplot", field);
+      };
+      // Inside: picked. Then 6 CSS px past its top edge, in empty space: a miss, which clears it.
+      const inside = await tap(b.x, b.y);
+      if (inside?.index !== idx) throw new Error(`touch/barplot: a tap inside bar ${idx} picked ${JSON.stringify(inside)}`);
+      const top = Math.min(b.y - b.h / 2, b.y + b.h / 2);
+      const outside = await tap(b.x, top - 6 * sc.s);
+      if (outside !== null) throw new Error(`touch/barplot: a tap 6 CSS px above bar ${idx} picked ${JSON.stringify(outside)}; bars are inside-only`);
+      passed.push("barplot/touch-inside-only");
+      console.error("OK  barplot — a tap picks a bar only inside it");
+    }
+    await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+  }
+
   if (unexpected.length) throw new Error(`page errors: ${unexpected.join(" | ")}`);
   passed.push("no-console-errors");
   console.log(`KIND SWEEP OK — ${backend}: ${passed.join(", ")}`);

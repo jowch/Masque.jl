@@ -867,6 +867,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         newManifest.background ??= ctx.manifest_.background
         newManifest.overlayStyle ??= ctx.manifest_.overlayStyle
         newManifest.tipStyle ??= ctx.manifest_.tipStyle
+        newManifest.touch ??= ctx.manifest_.touch
         const onchangeFrame = input.onchange === true
         // An in-drag \`onchange\` frame trails the pointer by a round trip. Its lines and boxes
         // would pull the control back to where it was then, so the ones on screen stay, with

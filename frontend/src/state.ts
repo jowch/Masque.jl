@@ -1,5 +1,5 @@
 import type { GridMask } from "./gridmask"
-import type { Anchor } from "./geometry"
+import type { Anchor, TouchReach } from "./geometry"
 import type { CrossEls } from "./cross"
 import type { Fade } from "./fade"
 import type { GestureChannel } from "./gesture"
@@ -45,6 +45,14 @@ export const imgPx = (base: HTMLElement, manifest: Manifest, e: MouseEvent): { x
 // pan wants as `cur`. Wheel zoom and the grabbed pan anchor want the content pixel,
 // `unmapPoint(photo, layoutImagePx(...))`. A zero `offsetWidth` (happy-dom, or not laid
 // out yet) falls back to the border box.
+// A finger's hit test for an event from a touch (`pointerType`), with the live image px per CSS
+// px; null for a mouse or a pen, which keep the tight rule (geometry.ts's hitTestAt).
+export function touchReach(base: HTMLElement, manifest: Manifest, pointerType: string | undefined): TouchReach | null {
+    if (pointerType !== "touch") return null
+    const w = base.getBoundingClientRect().width
+    return { pxPerCss_: w > 0 ? manifest.width / w : manifest.scaling }
+}
+
 export function layoutImagePx(base: HTMLElement, manifest: Manifest, clientX: number, clientY: number): { x: number; y: number } {
     const r = base.getBoundingClientRect()
     const boxW = base.offsetWidth > 0 ? base.offsetWidth : r.width
@@ -230,7 +238,7 @@ export interface OverlayState {
     justDragged_: boolean
     // The last primary pointerup, in client px. Chromium rounds a click's clientX/Y to whole
     // px but not a pointer event's, so onClick reads this to commit the value hover showed (#448).
-    lastUp_: { x: number, y: number } | null
+    lastUp_: { x: number, y: number, type_: string } | null
     // Hover chrome still in g.hi, live or mid-leave. Null once those nodes are gone.
     // drawSelection reads it to drop a ring whose key just entered the selection (#97).
     hiKey_: string | null

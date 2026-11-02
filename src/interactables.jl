@@ -202,6 +202,16 @@ hoverstyle(::AbstractInteractable) = (; stroke = nothing, width = 2)
 hit_tol(::AbstractInteractable) = nothing
 # Logical-px drawn width of a :segments/:polyline/:lines layer's lines; nothing omits the field.
 line_width(::AbstractInteractable) = nothing
+# CSS-px reach of a finger to a :circles/:segments/:polyline/:lines layer's marks; nothing
+# omits the field, and the overlay takes `masque`'s `touch` radius.
+touch_radius(i::AbstractInteractable) = hasfield(typeof(i), :touch_radius) ? getfield(i, :touch_radius) : nothing
+# `touch_radius`: CSS px, finite and at least 0, or `nothing`.
+_check_touch_radius(::Nothing) = nothing
+function _check_touch_radius(r)
+    r isa Real && isfinite(r) && r >= 0 ||
+        throw(ArgumentError("touch_radius must be a finite number of CSS px, at least 0, or `nothing`; got $(repr(r))"))
+    return Float64(r)
+end
 
 """
     AbstractSelector
@@ -469,7 +479,7 @@ _check_tol(tol) =
 
 # ============================ PointInteractable ============================
 """
-    PointInteractable(ax, points; id=:points, payloads=<auto>, radius=nothing, radius3d=nothing, tooltip=nothing, label=nothing)
+    PointInteractable(ax, points; id=:points, payloads=<auto>, radius=nothing, radius3d=nothing, tooltip=nothing, label=nothing, touch_radius=nothing)
     PointInteractable(ax, p::Makie.Scatter; id=:scatter, payloads=nothing, radius=nothing, tooltip=nothing, label=nothing)
     PointInteractable(ax, p::Makie.MeshScatter; id=:meshscatter, payloads=nothing, radius=nothing, radius3d=nothing, tooltip=nothing, label=nothing)
 
@@ -513,6 +523,11 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
   `Vector` of CSS colour strings (one per point), or `(; palette, index)` with one 1-based
   `index` per point into `palette`. Default `nothing` (no accent). Not derived automatically
   here — only `PointInteractable(ax, p::Makie.Scatter)` resolves it, from `p`'s own colour.
+- `touch_radius` — how far a finger reaches to the points, in CSS px on screen: a touch picks
+  the nearest point whose drawn edge is within it. Default `nothing`, which takes `masque`'s
+  `touch` radius (16). `0` picks only a point the finger lands on. A mouse or a pen keeps the
+  drawn circle plus a few pixels of slack. From a plot object, pass it to
+  [`interactables`](@ref).
 
 # From a plot object
 `PointInteractable(ax, p::Makie.Scatter)` is the usual call. It reads points from `p`'s
@@ -574,15 +589,20 @@ struct PointInteractable <: AbstractInteractable
     # an Axis3, whose camera-facing markers keep their size when the limits change.
     billboard::Bool
     select::Symbol
+    # How far a finger reaches to these points, in CSS px; `nothing` takes `masque`'s `touch`.
+    touch_radius::Union{Nothing, Float64}
 end
 PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke, billboard::Bool = false) =
     PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke, billboard, :one)
+PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke, billboard::Bool, select::Symbol) =
+    PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke, billboard, select, nothing)
 function PointInteractable(
         ax, points; id = :points, payloads = nothing,
         radius = nothing, radius3d = nothing, tooltip = nothing, label = nothing, colors = nothing,
-        select = :one,
+        select = :one, touch_radius = nothing,
     )
     _check_select(PointInteractable, select)
+    touch_radius = _check_touch_radius(touch_radius)
     _check_tooltip(tooltip)
     pts = [_pt3(p) for p in points]
     defaults = _unconvert_payloads(
@@ -602,7 +622,7 @@ function PointInteractable(
     # including the `9` the MeshScatter constructor still forwards when it has no pixel radius.
     r, s = radius === nothing ? _point_radius(ax, pts) : (radius, 0.0)
     r = _check_radius(r, length(pts))
-    return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors, Makie.Vec2f(0, 0), s, false, select)
+    return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors, Makie.Vec2f(0, 0), s, false, select, touch_radius)
 end
 function _check_radius(r, n)
     r isa AbstractVector || return Float64(r)
@@ -698,7 +718,7 @@ end
 
 # ============================ SegmentInteractable ==========================
 """
-    SegmentInteractable(ax, vertices; mode=:polyline, unit=:segment, id=:segments, payloads=nothing, tol=6, tooltip=nothing, label=nothing)
+    SegmentInteractable(ax, vertices; mode=:polyline, unit=:segment, id=:segments, payloads=nothing, tol=6, tooltip=nothing, label=nothing, touch_radius=nothing)
     SegmentInteractable(ax, p; id=<kind-specific>, payloads=nothing, tol=<from p's linewidth>, tooltip=nothing, label=nothing)   # from a plot object
 
 Lines / polylines or disjoint segment pairs. Produces one `:polyline`, `:lines`, or `:segments`
@@ -719,11 +739,12 @@ Lines / polylines or disjoint segment pairs. Produces one `:polyline`, `:lines`,
 - `payloads` — one entry per element (per segment when `unit = :segment`, one entry when
   `unit = :line`); `ArgumentError` if the length doesn't match. Default: `(; segment_index)`
   (1-based) for `:segment`, `(; index)` (1-based) for `:line`.
-- `tol` — hit-test slack around a segment, in logical px (scaled to the rendered image's DPI
-  like [`PointInteractable`](@ref)'s `radius`). Must be finite and positive (`ArgumentError`
-  otherwise). When the figure is shown narrower than it was drawn for (the docs on a phone,
-  a narrow Pluto window), the slack grows to keep its size on screen. Shipped in the manifest
-  as a per-layer `"tol"` field; the overlay's client-side
+- `tol` — the mouse's and pen's hit-test slack around a segment, in logical px (scaled to the
+  rendered image's DPI like [`PointInteractable`](@ref)'s `radius`). A finger reaches by
+  `touch_radius` instead, so a small `tol` doesn't make a line hard to tap. Must be finite and
+  positive (`ArgumentError` otherwise). When the figure is shown narrower than it was drawn for
+  (the docs on a phone, a narrow Pluto window), the slack grows to keep its size on screen.
+  Shipped in the manifest as a per-layer `"tol"` field; the overlay's client-side
   default (`SEG_TOL` in `frontend/src/geometry.ts`, 8 image px) applies only when this field
   is absent. From a plot object the default is `max(6, linewidth / 2)`, so the whole drawn
   stroke responds (the largest `linewidth` of a per-element vector; `errorbars!`/`rangebars!`
@@ -732,6 +753,10 @@ Lines / polylines or disjoint segment pairs. Produces one `:polyline`, `:lines`,
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
 - `label` — the layer's name, which screen readers announce (see [`PointInteractable`](@ref)).
   Default `nothing`; from a plot object, the plot's own Makie `label`.
+- `touch_radius` — how far a finger reaches to the lines, in CSS px on screen, from the edge of
+  the drawn stroke: a touch picks the nearest line within it. Default `nothing`, which takes
+  `masque`'s `touch` radius (16). `0` picks only a line the finger lands on. From a plot
+  object, pass it to [`interactables`](@ref).
 
 # From a plot object
 `SegmentInteractable(ax, p)` reads vertices from `p` (no `mode`/`unit` keyword — those are fixed
@@ -787,16 +812,21 @@ struct SegmentInteractable <: AbstractInteractable
     # The plot's drawn line width in logical px, which the overlay's fade covers a line with.
     # `nothing` (a layer built from bare vertices) falls back to Makie's default width there.
     linewidth::Union{Nothing, Float64}
+    # How far a finger reaches to these lines, in CSS px; `nothing` takes `masque`'s `touch`.
+    touch_radius::Union{Nothing, Float64}
 end
 SegmentInteractable(ax, vertices, mode, id, payloads, tol, tooltip, resolve, label, unit, paths, samples) =
     SegmentInteractable(ax, vertices, mode, id, payloads, tol, tooltip, resolve, label, unit, paths, samples, :one)
 SegmentInteractable(ax, vertices, mode, id, payloads, tol, tooltip, resolve, label, unit, paths, samples, select::Symbol) =
     SegmentInteractable(ax, vertices, mode, id, payloads, tol, tooltip, resolve, label, unit, paths, samples, select, nothing)
+SegmentInteractable(ax, vertices, mode, id, payloads, tol, tooltip, resolve, label, unit, paths, samples, select::Symbol, linewidth) =
+    SegmentInteractable(ax, vertices, mode, id, payloads, tol, tooltip, resolve, label, unit, paths, samples, select, linewidth, nothing)
 function SegmentInteractable(
         ax, vertices; mode = :polyline, unit = :segment, id = :segments,
-        payloads = nothing, tol = 6, tooltip = nothing, label = nothing, select = :one,
+        payloads = nothing, tol = 6, tooltip = nothing, label = nothing, select = :one, touch_radius = nothing,
     )
     _check_tooltip(tooltip)
+    touch_radius = _check_touch_radius(touch_radius)
     _check_select(SegmentInteractable, select)
     mode in (:polyline, :pairs) ||
         throw(ArgumentError("SegmentInteractable: mode must be :polyline or :pairs, got :$mode"))
@@ -816,7 +846,7 @@ function SegmentInteractable(
         ax, vs, mode, id, pl, Float64(tol), tooltip, nothing,
         label === nothing ? nothing : String(label), unit, nothing,
         # A line's data points keep full precision for the `@bind` pick; `vs` is Float32.
-        unit === :line ? (nothing, [[_pt3d(v) for v in vertices]]) : nothing, select,
+        unit === :line ? (nothing, [[_pt3d(v) for v in vertices]]) : nothing, select, nothing, touch_radius,
     )
 end
 # Internal-only: construct with a lazy `resolve(ax) -> vertices`. Called directly by the
