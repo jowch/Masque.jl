@@ -3,7 +3,7 @@ import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, surfa
 import { emptyMask, maskHit } from "./gridmask"
 import { applyMove, onLeave, hideTip, hideViewReadout, showViewReadout, syncFocusTip, replaceTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
-import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onDoubleClick, onPointerMove } from "./bond"
+import { isApplePlatform, photoHeldByOther, onDown, onUp, onCancel, onLostCapture, onClick, onDoubleClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import { buildDragStops } from "./dragkeys"
 import { fieldSelection, recordPicks } from "./history"
@@ -1343,6 +1343,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             return
         }
         e.preventDefault()
+        if (!limits3 && photoHeldByOther(state, id)) return
         if (limits3) {
             const shown = limits3
             // Axis3 (#321): no photograph to scale. Each notch asks for limits scaled about

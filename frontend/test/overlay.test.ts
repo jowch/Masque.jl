@@ -7780,9 +7780,16 @@ describe("nested views", () => {
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: x + 20, clientY: y + 10, shiftKey, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: x + 20, clientY: y + 10, shiftKey, bubbles: true }))
     }
+    // Each frame's picture loads (happy-dom never fires the load itself).
+    const landFrames = async (a: { host: HTMLElement; img: HTMLImageElement }) => {
+        for (let i = 0; i < 10 && a.host.dataset.masquePhoto; i++) {
+            a.img.dispatchEvent(new Event("load"))
+            for (let k = 0; k < 10; k++) await Promise.resolve()
+        }
+    }
     const mounted = () => {
         const { host, img, script } = setup()
-        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]), manifest: nested() }))
         mount(script, nested(), undefined, requestFrame)
         // display scale 1200/600 = 2: client (300, 200) is image (600, 400), inside the inset
         img.getBoundingClientRect = () =>
@@ -7790,7 +7797,7 @@ describe("nested views", () => {
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
         const calls = () => requestFrame.mock.calls.map((c) => (c as unknown[])[0] as { id: string; settle?: boolean })
         const ids = () => calls().map((c) => c.id)
-        return { surface, ids, calls }
+        return { surface, ids, calls, host, img }
     }
 
     it("a wheel over the inset zooms the inset, and outside it the parent", async () => {
@@ -7816,6 +7823,7 @@ describe("nested views", () => {
             expect(new Set(a.ids())).toEqual(new Set(["vout"]))
             const settles = a.calls().filter((i) => i.settle === true)
             expect(settles).toHaveLength(1)
+            await landFrames(a)
             // Once that gesture has settled, a new one over the inset is the inset's.
             wheel(a.surface, 300, 200)
             await vi.advanceTimersByTimeAsync(2000)
@@ -7823,6 +7831,27 @@ describe("nested views", () => {
         } finally {
             vi.useRealTimers()
         }
+    })
+
+    it("a pan on the inset waits while the parent's preview is still on screen", async () => {
+        const a = mounted()
+        drag(a.surface, 100, 100) // the parent: its frame arrives but its picture hasn't loaded
+        for (let i = 0; i < 20; i++) await Promise.resolve()
+        expect(a.host.dataset.masquePhoto).not.toBe("")
+        drag(a.surface, 300, 200) // the inset, still under the parent's photograph
+        for (let i = 0; i < 20; i++) await Promise.resolve()
+        expect(new Set(a.ids())).toEqual(new Set(["vout"]))
+        // Once the parent's picture is in, the inset pans from its own place.
+        await landFrames(a)
+        expect(a.host.dataset.masquePhoto).toBe("")
+        drag(a.surface, 300, 200)
+        for (let i = 0; i < 20; i++) await Promise.resolve()
+        const pan = a.calls().filter((c) => c.id === "vin")
+        expect(pan.length).toBeGreaterThan(0)
+        // A 20 px drag across the inset's 300 px, a third of a unit wide... in image px: 40 of 300.
+        const last = pan[pan.length - 1] as unknown as { xmin: number; xmax: number }
+        expect(last.xmax - last.xmin).toBeCloseTo(1)
+        expect(last.xmin).toBeCloseTo(-40 / 300)
     })
 
     it("a drag over the inset pans the inset, and outside it the parent", async () => {

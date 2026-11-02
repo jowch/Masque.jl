@@ -14,7 +14,7 @@ import * as roiDrag from "./drag/roi"
 import * as spanDrag from "./drag/span"
 import * as viewDrag from "./drag/view"
 import * as marquee from "./drag/marquee"
-import { panTo, unmapPoint } from "./photo"
+import { isIdentity, panTo, unmapPoint } from "./photo"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Limits3, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 
 // setPointerCapture throws InvalidPointerId if the UA doesn't consider this pointerId active
@@ -42,6 +42,13 @@ function clearWheelTimer(state: OverlayState): boolean {
     clearTimeout(state.wheelTimer_)
     state.wheelTimer_ = null
     return true
+}
+
+// One photograph previews one view's pan or zoom at a time. Until that view's frame lands, a
+// pan or zoom on another view would start from the first view's matrix and jump, so it waits
+// (#559: an inset is grabbed right after its parent is panned).
+export function photoHeldByOther(state: OverlayState, id: string): boolean {
+    return state.photoViewId_ !== null && state.photoViewId_ !== id && !isIdentity(state.photo_)
 }
 
 function armPan(ctx: OverlayCtx, state: OverlayState, e: PointerEvent, viewId: string): void {
@@ -264,6 +271,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         const viewLayer = innermostView(ctx.manifest_, layout.x, layout.y)
         if (viewLayer) {
             const g = viewLayer.geometry as ViewGeometry
+            if (g.mode === "pan" && photoHeldByOther(state, viewLayer.id)) { e.preventDefault(); return }
             // On an Axis3, Shift+drag pans the limits instead of orbiting (#321).
             const base = g.mode === "orbit" && g.limits ? viewDrag.view3Base(state, viewLayer.id, g.limits) : undefined
             state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], layout.x, layout.y, e.pointerId, true, base)
@@ -329,6 +337,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         }
     } else if (hit.layer.kind === "view") {
         const g = hit.layer.geometry as ViewGeometry
+        if (g.mode === "pan" && photoHeldByOther(state, hit.layer.id)) { e.preventDefault(); return }
         state.drag_ = viewDrag.begin(hit.layer.id, g, ctx.manifest_.transforms[hit.layer.axis], layout.x, layout.y, e.pointerId)
         if (g.mode === "pan") armPan(ctx, state, e, hit.layer.id)
     } else return
