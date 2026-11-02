@@ -602,6 +602,8 @@ try {
         lineY: line ? Number(line.getAttribute("y1")) : null,
         rect: rect ? ["x", "y", "width", "height"].map((a) => Number(rect.getAttribute(a))) : null,
         tip: sr.querySelector(".masque-tip")?.classList.contains("show") ? sr.querySelector(".masque-tip").textContent : null,
+        // A view's live readout sits in the figure's corner (#526).
+        readout: sr.querySelector(".masque-readout")?.classList.contains("show") ? sr.querySelector(".masque-readout").textContent : null,
         liveText: live?.textContent ?? "",
         inputs: window.__masqueKbdInputs[k],
         frame: host.dataset.masqueGestureFrame ? JSON.parse(host.dataset.masqueGestureFrame) : null,
@@ -728,7 +730,7 @@ try {
       }, `${key} preview frame`);
       await page.waitForTimeout(200);
       const held = await dragState(key, id);
-      if (!held.tip || !/x:\[/.test(held.tip)) throw new Error(`${key}: a preview frame hid the readout ${JSON.stringify({ tip: held.tip, frame: preview.d.frame })}`);
+      if (!held.readout || !/x:\[/.test(held.readout)) throw new Error(`${key}: a preview frame hid the readout ${JSON.stringify({ readout: held.readout, frame: preview.d.frame })}`);
       await page.keyboard.up("ArrowRight");
       const first = await settleAfter(s.frame?.n ?? 0, `${key} settle frame`);
       await page.keyboard.press("ArrowRight");

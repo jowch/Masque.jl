@@ -104,6 +104,17 @@ export function hideTip(ctx: OverlayCtx, state: OverlayState): void {
     }, delay)
 }
 
+// A view's live limits readout (#526). A mark tooltip goes while the view moves.
+export function showViewReadout(ctx: OverlayCtx, state: OverlayState, text: string): void {
+    if (ctx.tip_.classList.contains("show")) hideTip(ctx, state)
+    if (ctx.readout_.textContent !== text) ctx.readout_.textContent = text
+    ctx.readout_.classList.add("show")
+}
+
+export function hideViewReadout(ctx: OverlayCtx): void {
+    ctx.readout_.classList.remove("show")
+}
+
 export function tipOffset(ctx: OverlayCtx, e: MouseEvent): { x: number; y: number } {
     const r = ctx.surface_.getBoundingClientRect()
     if (r.width > 0 && r.height > 0) return { x: e.clientX - r.left, y: e.clientY - r.top }

@@ -1,7 +1,7 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, surfaceSelection } from "./selection"
 import { emptyMask, maskHit } from "./gridmask"
-import { applyMove, onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip, replaceTip } from "./hover"
+import { applyMove, onLeave, hideTip, hideViewReadout, showViewReadout, syncFocusTip, replaceTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
 import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onDoubleClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
@@ -24,7 +24,7 @@ import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx
 import type { HiGroups, HiSet, OverlayCtx } from "./state"
 import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
 import { axisFrame, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
-import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_IDLE_MS } from "./photo"
+import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_HINT_MS, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
 
 // Keys held for a Cmd/Ctrl/Shift/Alt-click; pressing one is not keyboard use.
@@ -242,14 +242,23 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-halo-ink, var(--ma
        display: var(--masque-tip-caret, block); }
 .masque-tip.flip-y::before { top: auto; bottom: -5px; border-bottom: none;
        border-top: 5px solid var(--masque-tip-bg-resolved); }
-/* An \`onchange\` error: the last picture stays, and this says why it didn't change. */
-.masque-note { position: absolute; left: 8px; bottom: 8px; opacity: 0; pointer-events: none; z-index: 11;
-       padding: 4px 8px; border-radius: var(--masque-tip-radius, 4px);
+/* The figure's bottom-left corner (#526): the note over the readout of a moving view. A
+   column, so a readout that wraps (an Axis3's three ranges on a narrow figure) pushes the note
+   up instead of under it. The view buttons (#525) never use this corner. */
+.masque-corner { position: absolute; left: 8px; bottom: 8px; display: flex; flex-direction: column;
+       align-items: flex-start; gap: 4px; max-width: calc(100% - 32px); pointer-events: none; z-index: 11; }
+.masque-note, .masque-readout { padding: 4px 8px; border-radius: var(--masque-tip-radius, 4px);
        background: var(--masque-tip-bg-resolved); color: var(--masque-tip-color-resolved);
        border: 1px solid var(--masque-tip-border-resolved);
-       font: var(--masque-tip-font-size, 11px)/1.4 var(--masque-tip-font, system-ui, -apple-system, sans-serif);
-       max-width: calc(100% - 32px); transition: opacity ${MOTION_MS}ms ease-out; }
+       font: var(--masque-tip-font-size, 11px)/1.4 var(--masque-tip-font, system-ui, -apple-system, sans-serif); }
+/* An \`onchange\` error (the last picture stays, and this says why), or a hint such as the wheel's. */
+.masque-note { opacity: 0; transition: opacity ${MOTION_MS}ms ease-out; }
+.masque-note:empty { display: none; }
 .masque-note.show { opacity: 1; }
+/* A moving view's readout: shown and hidden at once, as the readout it replaces followed the
+   pointer without a fade. */
+.masque-readout { display: none; font-variant-numeric: tabular-nums; }
+.masque-readout.show { display: block; }
 .masque-tip-row { display: flex; gap: 8px; justify-content: space-between; }
 .masque-tip-key { color: var(--masque-tip-accent, #6b7280); }
 .masque-tip-val { font-variant-numeric: tabular-nums; }
@@ -489,27 +498,41 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     liveRegion.setAttribute("aria-live", "polite")
     liveRegion.setAttribute("aria-atomic", "true")
 
+    const corner = document.createElement("div")
+    corner.className = "masque-corner"
+    const readout = document.createElement("div")
+    readout.className = "masque-readout"
+    readout.setAttribute("aria-hidden", "true") // the keys announce their readout themselves
     const note = document.createElement("div")
     note.className = "masque-note"
     note.setAttribute("role", "status")
     let noteTimer: ReturnType<typeof setTimeout> | null = null
+    let noteKind: "error" | "hint" | null = null
     // The same error again (a drag that keeps failing) keeps the note up without announcing
     // it again. The text goes once the note has faded, so a screen reader doesn't find it later.
-    const showNote = (text: string) => {
+    // An error always wins; a hint (the wheel's, #537's touch one) replaces a hint but never
+    // covers an error, and isn't announced: it repeats as a reader scrolls past each view.
+    const showNote = (text: string, kind: "error" | "hint" = "error", ms = NOTE_MS) => {
+        if (kind === "hint" && noteKind === "error" && note.classList.contains("show")) return
+        noteKind = kind
+        if (kind === "hint") note.setAttribute("aria-hidden", "true")
+        else note.removeAttribute("aria-hidden")
         if (note.textContent !== text) note.textContent = text
         note.classList.add("show")
         if (noteTimer !== null) clearTimeout(noteTimer)
         noteTimer = setTimeout(() => {
             note.classList.remove("show")
-            noteTimer = setTimeout(() => { noteTimer = null; note.textContent = "" }, MOTION_MS)
-        }, NOTE_MS)
+            noteTimer = setTimeout(() => { noteTimer = null; noteKind = null; note.textContent = "" }, MOTION_MS)
+        }, ms)
     }
 
     // The closed-mark selected look's canvases (fade.ts), one pair per axis, under every svg so
     // the hover fill dodges over them.
+    corner.append(note, readout)
+
     const fadeRoot = document.createElement("div")
     fadeRoot.className = "masque-fades"
-    shadow.append(style, fadeRoot, fillSvg, edgeSvg, plainSvg, surface, tip, kbdHint, liveRegion, note)
+    shadow.append(style, fadeRoot, fillSvg, edgeSvg, plainSvg, surface, tip, kbdHint, liveRegion, corner)
     // Named Makie blocks, drawn as HTML over the empty boxes Julia left for them. A release
     // commits like any field; a slider moving under `onchange` redraws as it goes.
     const controls = buildControls(shadow, manifest, {
@@ -619,7 +642,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         },
     })
     const ctx: OverlayCtx = {
-        manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, tipExplicit_: manifest.tipDigits !== undefined, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
+        manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, tipExplicit_: manifest.tipDigits !== undefined, host_: host, base_: base, surface_: surface, tip_: tip, readout_: readout, hiGroup_: hiGroup, selGroup_: selGroup,
         hiFixed_: hiFixed, selFixed_: selFixed, linkGroup_: linkGroup, fade_: fade,
         thresholdLines_: thresholdLines, roiBoxes_: roiBoxes, chromeAt_: chromeAt,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
@@ -771,6 +794,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // \`onchange\` threw: the picture on screen is the last good one, and stays.
         if (typeof r.error === "string") {
             showNote(r.error)
+            // The frame that would have hidden a settled gesture's readout isn't coming.
+            if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) hideViewReadout(ctx)
             ;(host as unknown as { dataset: DOMStringMap }).dataset.masqueOnchangeError = r.error
             return
         }
@@ -892,7 +917,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ctx.fade_.hover_(null, null, [])
         // A frame that lands mid-pan, mid-wheel, or mid-key would wipe the readout the gesture is
         // still showing. Pointer-up, the wheel idle timer, and the key's settle frame hide it.
-        if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) hideTip(ctx, state)
+        if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) {
+            hideTip(ctx, state)
+            hideViewReadout(ctx)
+        }
 
         // Re-key the LIVE selection against the new layer objects — do NOT re-derive it from
         // the mount manifest's `initial`, which is only the starting value (a frame's manifest
@@ -1257,6 +1285,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         focusTo(ctx, state, null)
     }
 
+    // A plain wheel over a `wheel = :modifier` view says how to zoom, in the note at the
+    // figure's corner, as maps do (#526). An `onchange` error the note is showing wins.
+    const wheelHint = `${isApplePlatform() ? "Cmd" : "Ctrl"} + scroll to zoom`
+    const showWheelHint = () => showNote(wheelHint, "hint", WHEEL_HINT_MS)
+
     const onWheel = (e: WheelEvent) => {
         if (state.drag_) return
         // The axis viewport is in layout pixels. The zoom anchor is the content pixel
@@ -1265,6 +1298,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         let id = ""
         let axis = ""
         let limits3: Limits3 | null = null // an Axis3 view's limits, on screen now
+        let wheel: ViewGeometry["wheel"] = "modifier"
         for (const layer of ctx.manifest_.layers) {
             if (layer.kind !== "view" || !layer.events.includes("drag")) continue
             const g = layer.geometry as ViewGeometry
@@ -1273,14 +1307,23 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                 if (!g.limits) continue
                 id = layer.id
                 limits3 = g.limits
+                wheel = g.wheel ?? "modifier"
                 break
             }
             if (!ctx.manifest_.transforms[layer.axis]) continue
             id = layer.id
             axis = layer.axis
+            wheel = g.wheel ?? "modifier"
             break
         }
         if (!id) return
+        // #526: a plain wheel scrolls the page unless the view asked for `wheel = :always`.
+        // A trackpad pinch arrives as Ctrl+wheel in Chrome and Firefox, so it still zooms.
+        if (wheel === "none") return
+        if (wheel === "modifier" && !e.ctrlKey && !e.metaKey) {
+            if (e.deltaY !== 0) showWheelHint() // a sideways scroll is no attempt to zoom
+            return
+        }
         e.preventDefault()
         if (limits3) {
             const shown = limits3
@@ -1288,15 +1331,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             // their center; the idle timer settles the last ones at full resolution.
             const lim = viewDrag.zoom3(state, id, shown, wheelScale(e.deltaY, e.deltaMode))
             ctx.gesture_.request({ id, limits: lim, settle: false })
-            setTipText(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
-            setTipVisible(ctx, true)
-            const tp = tipOffset(ctx, e)
-            placeTip(ctx, state, tp.x, tp.y)
+            showViewReadout(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
             if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
             const wheelId = id
             state.wheelTimer_ = setTimeout(() => {
                 state.wheelTimer_ = null
-                hideTip(ctx, state)
+                hideViewReadout(ctx)
                 ctx.gesture_.settle({ id: wheelId, limits: viewDrag.view3Base(state, wheelId, shown), settle: true })
             }, WHEEL_IDLE_MS)
             return
@@ -1309,17 +1349,14 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const lim = matrixLimits(ctx.manifest_.transforms[axis], next)
         if (lim) {
             ctx.gesture_.request({ id, ...lim, settle: false, s: next.s, tx: next.tx, ty: next.ty })
-            setTipText(ctx, state, limitsTip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
-            setTipVisible(ctx, true)
-            const tp = tipOffset(ctx, e)
-            placeTip(ctx, state, tp.x, tp.y)
+            showViewReadout(ctx, state, limitsTip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
         }
         if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
         const wheelId = id
         const wheelAxis = axis
         state.wheelTimer_ = setTimeout(() => {
             state.wheelTimer_ = null
-            hideTip(ctx, state)
+            hideViewReadout(ctx)
             const layer = ctx.manifest_.layers.find((l) => l.id === wheelId)
             const shown = layer ? ctx.manifest_.transforms[layer.axis] : ctx.manifest_.transforms[wheelAxis]
             if (!shown) return
