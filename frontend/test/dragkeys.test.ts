@@ -471,6 +471,32 @@ describe("drag-layer tab stops", () => {
         expect(readout.classList.contains("show")).toBe(false)
     })
 
+    it("view pan: a settle frame that comes back with an onchange error still hides the readout", async () => {
+        const host = document.createElement("div")
+        const canvas = document.createElement("canvas") as HTMLCanvasElement & {
+            masqueReplaceScene?: (scene: unknown, px?: number, w?: number, h?: number) => void
+        }
+        canvas.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        canvas.masqueReplaceScene = vi.fn()
+        const script = document.createElement("script")
+        host.append(canvas, script)
+        document.body.append(host)
+        const requestFrame = vi.fn(async () => ({ error: "boom" }))
+        mount(script, withFields(viewManifest("pan")), undefined, requestFrame)
+        const shadow = (host.lastElementChild as HTMLElement).shadowRoot!
+        const stop = stopOf(shadow, "view")
+        const readout = shadow.querySelector(".masque-readout") as HTMLElement
+        stop.focus()
+        press(stop, "ArrowRight")
+        expect(readout.classList.contains("show")).toBe(true)
+        release(stop, "ArrowRight")
+        await new Promise((r) => setTimeout(r, 10))
+        expect(requestFrame).toHaveBeenCalled()
+        expect((shadow.querySelector(".masque-note") as HTMLElement).textContent).toBe("boom")
+        expect(readout.classList.contains("show")).toBe(false)
+    })
+
     it("cleanup removes the stops' listeners", () => {
         const host = document.createElement("div")
         const img = document.createElement("img")

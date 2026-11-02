@@ -153,11 +153,22 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         f = Figure(); a = Axis(f[1, 1]; xzoomlock = true); scatter!(a, [1.0, 2.0], [1.0, 2.0])
         _, _, c = ctx_for(f)
         @test wheel_of(ViewInteractable(a), c) == "modifier"
+        # `deactivate_interaction!` keeps the entry as `(false, …)`; it counts as off too, and
+        # turning it back on restores the default.
+        f = Figure(); a = Axis(f[1, 1]); scatter!(a, [1.0, 2.0], [1.0, 2.0])
+        Makie.deactivate_interaction!(a, :scrollzoom)
+        _, _, c = ctx_for(f)
+        @test wheel_of(ViewInteractable(a), c) == "none"
+        @test wheel_of(ViewInteractable(a; wheel = :modifier), c) == "modifier"
+        Makie.activate_interaction!(a, :scrollzoom)
+        @test wheel_of(ViewInteractable(a), c) == "modifier"
         # Axis3 carries the policy too, and follows its own `:scrollzoom`.
         f3 = Figure(); a3 = Axis3(f3[1, 1]); scatter!(a3, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
         _, _, c3 = ctx_for(f3)
         @test wheel_of(ViewInteractable(a3), c3) == "modifier"
         @test wheel_of(ViewInteractable(a3; wheel = :always), c3) == "always"
+        Makie.deactivate_interaction!(a3, :scrollzoom)
+        @test wheel_of(ViewInteractable(a3), c3) == "none"
         Makie.deregister_interaction!(a3, :scrollzoom)
         @test wheel_of(ViewInteractable(a3), c3) == "none"
     end

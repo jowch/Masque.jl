@@ -48,8 +48,8 @@ one that labels points into classes.
        aria-label="Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera"></video>
 ```
 
-Drag a 2D axis to pan, or an `Axis3` to orbit, and Ctrl+scroll to zoom
-either. See [Pan, zoom and orbit](@ref).
+Drag a 2D axis to pan, or an `Axis3` to orbit, and Ctrl+scroll
+(Cmd+scroll on a Mac) to zoom either. See [Pan, zoom and orbit](@ref).
 
 ## Highlight from the legend
 

@@ -242,25 +242,23 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-halo-ink, var(--ma
        display: var(--masque-tip-caret, block); }
 .masque-tip.flip-y::before { top: auto; bottom: -5px; border-bottom: none;
        border-top: 5px solid var(--masque-tip-bg-resolved); }
-/* An \`onchange\` error: the last picture stays, and this says why it didn't change. */
-.masque-note { position: absolute; left: 8px; bottom: 8px; opacity: 0; pointer-events: none; z-index: 11;
-       padding: 4px 8px; border-radius: var(--masque-tip-radius, 4px);
+/* The figure's bottom-left corner (#526): the note over the readout of a moving view. A
+   column, so a readout that wraps (an Axis3's three ranges on a narrow figure) pushes the note
+   up instead of under it. The view buttons (#525) never use this corner. */
+.masque-corner { position: absolute; left: 8px; bottom: 8px; display: flex; flex-direction: column;
+       align-items: flex-start; gap: 4px; max-width: calc(100% - 32px); pointer-events: none; z-index: 11; }
+.masque-note, .masque-readout { padding: 4px 8px; border-radius: var(--masque-tip-radius, 4px);
        background: var(--masque-tip-bg-resolved); color: var(--masque-tip-color-resolved);
        border: 1px solid var(--masque-tip-border-resolved);
-       font: var(--masque-tip-font-size, 11px)/1.4 var(--masque-tip-font, system-ui, -apple-system, sans-serif);
-       max-width: calc(100% - 32px); transition: opacity ${MOTION_MS}ms ease-out; }
+       font: var(--masque-tip-font-size, 11px)/1.4 var(--masque-tip-font, system-ui, -apple-system, sans-serif); }
+/* An \`onchange\` error (the last picture stays, and this says why), or a hint such as the wheel's. */
+.masque-note { opacity: 0; transition: opacity ${MOTION_MS}ms ease-out; }
+.masque-note:empty { display: none; }
 .masque-note.show { opacity: 1; }
-/* A moving view's limits readout (#526): the note's box, in the same corner. Shown and hidden
-   at once, as the readout it replaces followed the pointer without a fade. An error note that
-   lands meanwhile sits above it. */
-.masque-readout { position: absolute; left: 8px; bottom: 8px; display: none; pointer-events: none; z-index: 11;
-       padding: 4px 8px; border-radius: var(--masque-tip-radius, 4px);
-       background: var(--masque-tip-bg-resolved); color: var(--masque-tip-color-resolved);
-       border: 1px solid var(--masque-tip-border-resolved);
-       font: var(--masque-tip-font-size, 11px)/1.4 var(--masque-tip-font, system-ui, -apple-system, sans-serif);
-       font-variant-numeric: tabular-nums; max-width: calc(100% - 32px); }
+/* A moving view's readout: shown and hidden at once, as the readout it replaces followed the
+   pointer without a fade. */
+.masque-readout { display: none; font-variant-numeric: tabular-nums; }
 .masque-readout.show { display: block; }
-.masque-readout.show ~ .masque-note { bottom: calc(18px + 1.4 * var(--masque-tip-font-size, 11px) + 10px); }
 .masque-tip-row { display: flex; gap: 8px; justify-content: space-between; }
 .masque-tip-key { color: var(--masque-tip-accent, #6b7280); }
 .masque-tip-val { font-variant-numeric: tabular-nums; }
@@ -500,6 +498,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     liveRegion.setAttribute("aria-live", "polite")
     liveRegion.setAttribute("aria-atomic", "true")
 
+    const corner = document.createElement("div")
+    corner.className = "masque-corner"
     const readout = document.createElement("div")
     readout.className = "masque-readout"
     readout.setAttribute("aria-hidden", "true") // the keys announce their readout themselves
@@ -507,23 +507,32 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     note.className = "masque-note"
     note.setAttribute("role", "status")
     let noteTimer: ReturnType<typeof setTimeout> | null = null
+    let noteKind: "error" | "hint" | null = null
     // The same error again (a drag that keeps failing) keeps the note up without announcing
     // it again. The text goes once the note has faded, so a screen reader doesn't find it later.
-    const showNote = (text: string, ms = NOTE_MS) => {
+    // An error always wins; a hint (the wheel's, #537's touch one) replaces a hint but never
+    // covers an error, and isn't announced: it repeats as a reader scrolls past each view.
+    const showNote = (text: string, kind: "error" | "hint" = "error", ms = NOTE_MS) => {
+        if (kind === "hint" && noteKind === "error" && note.classList.contains("show")) return
+        noteKind = kind
+        if (kind === "hint") note.setAttribute("aria-hidden", "true")
+        else note.removeAttribute("aria-hidden")
         if (note.textContent !== text) note.textContent = text
         note.classList.add("show")
         if (noteTimer !== null) clearTimeout(noteTimer)
         noteTimer = setTimeout(() => {
             note.classList.remove("show")
-            noteTimer = setTimeout(() => { noteTimer = null; note.textContent = "" }, MOTION_MS)
+            noteTimer = setTimeout(() => { noteTimer = null; noteKind = null; note.textContent = "" }, MOTION_MS)
         }, ms)
     }
 
     // The closed-mark selected look's canvases (fade.ts), one pair per axis, under every svg so
     // the hover fill dodges over them.
+    corner.append(note, readout)
+
     const fadeRoot = document.createElement("div")
     fadeRoot.className = "masque-fades"
-    shadow.append(style, fadeRoot, fillSvg, edgeSvg, plainSvg, surface, tip, kbdHint, liveRegion, readout, note)
+    shadow.append(style, fadeRoot, fillSvg, edgeSvg, plainSvg, surface, tip, kbdHint, liveRegion, corner)
     // Named Makie blocks, drawn as HTML over the empty boxes Julia left for them. A release
     // commits like any field; a slider moving under `onchange` redraws as it goes.
     const controls = buildControls(shadow, manifest, {
@@ -779,6 +788,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // \`onchange\` threw: the picture on screen is the last good one, and stays.
         if (typeof r.error === "string") {
             showNote(r.error)
+            // The frame that would have hidden a settled gesture's readout isn't coming.
+            if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) hideViewReadout(ctx)
             ;(host as unknown as { dataset: DOMStringMap }).dataset.masqueOnchangeError = r.error
             return
         }
@@ -1253,10 +1264,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // A plain wheel over a `wheel = :modifier` view says how to zoom, in the note at the
     // figure's corner, as maps do (#526). An `onchange` error the note is showing wins.
     const wheelHint = `${isApplePlatform() ? "Cmd" : "Ctrl"} + scroll to zoom`
-    const showWheelHint = () => {
-        if (note.classList.contains("show") && note.textContent !== wheelHint) return
-        showNote(wheelHint, WHEEL_HINT_MS)
-    }
+    const showWheelHint = () => showNote(wheelHint, "hint", WHEEL_HINT_MS)
 
     const onWheel = (e: WheelEvent) => {
         if (state.drag_) return
@@ -1289,7 +1297,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // A trackpad pinch arrives as Ctrl+wheel in Chrome and Firefox, so it still zooms.
         if (wheel === "none") return
         if (wheel === "modifier" && !e.ctrlKey && !e.metaKey) {
-            showWheelHint()
+            if (e.deltaY !== 0) showWheelHint() // a sideways scroll is no attempt to zoom
             return
         }
         e.preventDefault()

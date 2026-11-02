@@ -5015,6 +5015,27 @@ describe("photographic pan / wheel zoom", () => {
         }
     })
 
+    it("the wheel hint is not announced, and a sideways scroll shows none", async () => {
+        vi.useFakeTimers()
+        try {
+            const { host, script } = setup()
+            mount(script, withWheel("pan", "modifier"), undefined, vi.fn(async () => ({})))
+            const shadow = shadowOf(host)
+            const surface = shadow.querySelector(".surface") as HTMLElement
+            const note = shadow.querySelector(".masque-note") as HTMLElement
+            const side = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaX: 80 })
+            Object.defineProperty(side, "deltaY", { value: 0 })
+            surface.dispatchEvent(side)
+            expect(side.defaultPrevented).toBe(false)
+            expect(note.classList.contains("show")).toBe(false)
+            plainWheel(surface)
+            expect(note.classList.contains("show")).toBe(true)
+            expect(note.getAttribute("aria-hidden")).toBe("true")
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it("the wheel hint leaves an onchange error in the note alone", async () => {
         vi.useFakeTimers()
         try {
@@ -5027,6 +5048,7 @@ describe("photographic pan / wheel zoom", () => {
             plainWheel(surface, { ctrlKey: true })
             await vi.advanceTimersByTimeAsync(200) // the idle settle comes back with the error
             expect(note.textContent).toBe("boom")
+            expect(note.hasAttribute("aria-hidden")).toBe(false) // an error is announced
             plainWheel(surface)
             expect(note.textContent).toBe("boom")
             expect(note.classList.contains("show")).toBe(true)

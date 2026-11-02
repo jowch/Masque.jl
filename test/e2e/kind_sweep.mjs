@@ -850,6 +850,93 @@ try {
       passed.push(`${key}/overlap-pixel-contested`);
     }
 
+    // The other wheel policies (#526). `wheel = :always` takes a plain wheel: the page stays
+    // put and the view zooms, with its readout in the corner. Scroll zoom turned off in Makie
+    // (`deactivate_interaction!`) gives `wheel = :none`: a plain wheel scrolls the page with no
+    // hint, and Ctrl+wheel is left to the browser (not prevented, no zoom).
+    if (spec.mode === "wheel") {
+      const gAlways = layers.find((l) => l.id === "view")?.geometry;
+      const gNone = layers.find((l) => l.id === "view_none")?.geometry;
+      if (gAlways?.wheel !== "always" || gNone?.wheel !== "none") {
+        throw new Error(`${key}: expected wheel always/none, got ${JSON.stringify([gAlways?.wheel, gNone?.wheel])}`);
+      }
+      const state = (k) => page.evaluate(([kk]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const note = sr.querySelector(".masque-note"), ro = sr.querySelector(".masque-readout");
+        return {
+          top: document.scrollingElement.scrollTop, photo: host.dataset.masquePhoto || "",
+          hint: note.classList.contains("show") ? note.textContent : "",
+          readout: ro.classList.contains("show") ? ro.textContent : "",
+        };
+      }, [k]);
+      const centerOf = (g) => page.evaluate(([kk, ix, iy]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        const se = document.scrollingElement;
+        return { x: b.left + ix * s, y: b.top + iy * s, room: se.scrollHeight - se.clientHeight - se.scrollTop };
+      }, [key, g.x + g.w / 2, g.y + g.h / 2]);
+      // Polls for up to 3 s, keeping the first time each field showed.
+      const watch = async (start, done) => {
+        const seen = { top: start.top, photo: "", hint: "", readout: "" };
+        for (let i = 0; i < 30; i++) {
+          const st = await state(key);
+          seen.top = st.top;
+          for (const f of ["photo", "hint", "readout"]) if (st[f] && !seen[f]) seen[f] = st[f];
+          if (done(seen)) break;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        return seen;
+      };
+
+      // :always — a real plain wheel zooms and leaves the page where it is.
+      let c = await centerOf(gAlways);
+      await page.mouse.move(c.x, c.y);
+      let s0 = await state(key);
+      await page.mouse.wheel(0, c.room > 300 ? -120 : 120);
+      let seen = await watch(s0, (x) => x.photo && x.readout);
+      if (seen.top !== s0.top) throw new Error(`${key}: a plain wheel over a wheel = :always view scrolled the page (${s0.top} -> ${seen.top})`);
+      if (!seen.photo) throw new Error(`${key}: a plain wheel over a wheel = :always view did not zoom it`);
+      if (!/x:\[/.test(seen.readout)) throw new Error(`${key}: no corner readout while the :always view zoomed: ${JSON.stringify(seen)}`);
+      if (seen.hint) throw new Error(`${key}: a wheel = :always view showed the zoom hint "${seen.hint}"`);
+      passed.push(`${key}/always-plain-wheel-zooms`);
+      // Let the zoom settle before the next view.
+      for (let i = 0; ; i++) {
+        const st = await state(key);
+        if (!st.photo && !st.readout) break;
+        if (i > 100) throw new Error(`${key}: the :always zoom never settled: ${JSON.stringify(st)}`);
+        await new Promise((r) => setTimeout(r, 200));
+      }
+
+      // :none — Ctrl+wheel is not taken, and a real plain wheel scrolls the page with no hint.
+      c = await centerOf(gNone);
+      const ctrl = await page.evaluate(([kk, x, y]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: x, clientY: y, deltaY: -120, ctrlKey: true });
+        sr.querySelector(".surface").dispatchEvent(ev);
+        return { prevented: ev.defaultPrevented, photo: host.dataset.masquePhoto || "" };
+      }, [key, c.x, c.y]);
+      if (ctrl.prevented || ctrl.photo) throw new Error(`${key}: Ctrl+wheel was taken by a view whose scroll zoom is off in Makie: ${JSON.stringify(ctrl)}`);
+      await page.mouse.move(c.x, c.y);
+      s0 = await state(key);
+      const dy = c.room > 300 ? 40 : -40;
+      await page.mouse.wheel(0, dy);
+      seen = await watch(s0, (x) => x.top !== s0.top);
+      if (Math.sign(seen.top - s0.top) !== Math.sign(dy)) throw new Error(`${key}: a plain wheel over a wheel = :none view did not scroll the page (${s0.top} -> ${seen.top})`);
+      if (seen.photo || seen.hint || seen.readout) throw new Error(`${key}: a wheel = :none view responded to a plain wheel: ${JSON.stringify(seen)}`);
+      passed.push(`${key}/none-wheel-left-to-page`);
+      await page.mouse.move(1, 1);
+      console.error(`OK  ${key} — :always zoomed on a plain wheel; Makie-off view left Ctrl+wheel and scroll to the page`);
+      continue;
+    }
+
     // Several fields at once (#335): a click on a point sets `scatter`, a drag of the threshold
     // sets its own field, both print in the `@bind` value, and a default line beside them shows
     // its tooltip but has no field and takes no click.

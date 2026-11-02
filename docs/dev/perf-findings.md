@@ -202,6 +202,7 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `colors`, colormapped | same | a fixed 32-stop palette + ~1–2 B/element for the index |
 | `links` | each `LegendInteractable` layer | ~9–11 B/entry (a 3-entry legend layer is 341 B, 32 B of it `links`) |
 | `clip` + `fill` | each 2-D pan view layer | under 50 B |
+| `wheel` | each view layer (#526) | 19 B (`"wheel":"modifier",`), counted, not benched |
 | `is3d`, `valueaxis` | each axis transform | 6 B and 11 B |
 | `selects` | each selector ROI layer | one short string |
 | `occluders` | once per manifest, only when an opaque legend overlaps an axis (0.4.3) | key 10 B + 4 numbers (~37 B) per such legend; absent otherwise |
