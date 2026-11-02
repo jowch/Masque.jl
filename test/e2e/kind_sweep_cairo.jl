@@ -617,6 +617,26 @@ HTML(
         "<span id=\"coords_roi_bounds\" style=\"display:none\">$(JSON3.write(sweep.roi_bounds.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000196
+@bind ev_threshold_default sweep.threshold_default
+
+# ╔═╡ c1000000-0000-0000-0000-000000000197
+HTML(
+    "<span id=\"out_threshold_default\">THRESHOLD_DEFAULT=$(sweep_field("threshold_default", ev_threshold_default))</span>" *
+        "<span id=\"bond_threshold_default\" style=\"display:none\">$(repr(ev_threshold_default))</span>" *
+        "<span id=\"coords_threshold_default\" style=\"display:none\">$(JSON3.write(sweep.threshold_default.manifest["layers"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000198
+@bind ev_roi_default sweep.roi_default
+
+# ╔═╡ c1000000-0000-0000-0000-000000000199
+HTML(
+    "<span id=\"out_roi_default\">ROI_DEFAULT=$(sweep_field("roi_default", ev_roi_default))</span>" *
+        "<span id=\"bond_roi_default\" style=\"display:none\">$(repr(ev_roi_default))</span>" *
+        "<span id=\"coords_roi_default\" style=\"display:none\">$(JSON3.write(sweep.roi_default.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000064
 @bind ev_axis_cat sweep.axis_cat
 
@@ -780,6 +800,12 @@ HTML(
         "<span id=\"axes_onchange\" style=\"display:none\">$(JSON3.write(sweep.onchange.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000535
+# How many times the cell reading the controls' bond has run: a control commit must run it
+# once (#458). It has no inputs, so Pluto never runs it again. The count shows in a span named
+# `count_controls`: Pluto already gives the page an element with the variable's own name.
+runs_controls = Ref(0)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000170
 @bind ev_controls sweep.controls
 
@@ -789,7 +815,8 @@ HTML(
         "<span id=\"bond_controls\" style=\"display:none\">$(repr(ev_controls))</span>" *
         "<span id=\"coords_controls\" style=\"display:none\">$(JSON3.write(sweep.controls.manifest["layers"]))</span>" *
         "<span id=\"axes_controls\" style=\"display:none\">$(JSON3.write(sweep.controls.manifest["transforms"]))</span>" *
-        "<span id=\"ran_controls\" style=\"display:none\">$(time_ns())</span>",
+        "<span id=\"ran_controls\" style=\"display:none\">$(time_ns())</span>" *
+        "<span id=\"count_controls\" style=\"display:none\">$(runs_controls[] += 1)</span>",
 )
 
 # ╔═╡ c1000000-0000-0000-0000-000000000129
@@ -1040,6 +1067,10 @@ HTML(
 # ╟─c1000000-0000-0000-0000-000000000120
 # ╠═c1000000-0000-0000-0000-000000000121
 # ╟─c1000000-0000-0000-0000-000000000122
+# ╠═c1000000-0000-0000-0000-000000000196
+# ╟─c1000000-0000-0000-0000-000000000197
+# ╠═c1000000-0000-0000-0000-000000000198
+# ╟─c1000000-0000-0000-0000-000000000199
 # ╠═c1000000-0000-0000-0000-000000000064
 # ╠═c1000000-0000-0000-0000-000000000065
 # ╠═c1000000-0000-0000-0000-000000000032
@@ -1074,6 +1105,7 @@ HTML(
 # ╟─c1000000-0000-0000-0000-000000000195
 # ╠═c1000000-0000-0000-0000-000000000160
 # ╠═c1000000-0000-0000-0000-000000000161
+# ╠═c1000000-0000-0000-0000-000000000535
 # ╠═c1000000-0000-0000-0000-000000000170
 # ╠═c1000000-0000-0000-0000-000000000171
 # ╠═c1000000-0000-0000-0000-000000000129

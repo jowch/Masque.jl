@@ -6,16 +6,6 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-### Added
-- `ThresholdInteractable` takes a `Colorbar`: drag a line across the bar to set a cutoff on the
-  colorbar's scale, `identity`, `log10` or `log`. The line follows the bar, horizontal on a
-  vertical colorbar and vertical on a horizontal one, and hovering or clicking the rest of the
-  bar still reads its value (#499).
-- Hovering a line on an `Axis3` shows `x`, `y` and `z` of the point you plotted nearest the
-  pointer, as a line on a 2D `Axis` does, and a tooltip template can name `z`. This covers
-  `lines!`, `scatterlines!`'s line, `contour3d!` and a 3D `streamplot!`. A click still picks
-  the whole line (#502).
-
 ### Changed
 - Default tooltips and readouts show a coordinate the way its axis labels it. On a
   `PolarAxis` a point reads `θ 90°` and `r 2` instead of `x 1.571` and `y 2`. An axis with
@@ -25,6 +15,23 @@ All notable changes to this project are documented here. The format is based on
   your own `payloads` fields. Templates and the fields you set yourself are unchanged, and so
   is the `@bind` value. A set `tooltip_sigdigits` wins over the
   format's precision. See "Axis units" on the Tooltips page (#510).
+
+## [0.4.5] - 2026-11-02
+
+### Added
+- `ThresholdInteractable(ax)` and `ROIInteractable(ax)` work without a `value` or `bounds`.
+  The line starts halfway along the axis, and the box over the middle half of it, as the
+  axis is when `masque` runs: the middle on screen for a log scale, and the middle category
+  in view on a categorical axis. On a `Colorbar`, the line starts mid-scale. A `value` or
+  `bounds` given still sets the start (#513).
+- `ThresholdInteractable` takes a `Colorbar`: drag a line across the bar to set a cutoff on the
+  colorbar's scale, `identity`, `log10` or `log`. The line follows the bar, horizontal on a
+  vertical colorbar and vertical on a horizontal one, and hovering or clicking the rest of the
+  bar still reads its value (#499).
+- Hovering a line on an `Axis3` shows `x`, `y` and `z` of the point you plotted nearest the
+  pointer, as a line on a 2D `Axis` does, and a tooltip template can name `z`. This covers
+  `lines!`, `scatterlines!`'s line, `contour3d!` and a 3D `streamplot!`. A click still picks
+  the whole line (#502).
 
 ## [0.4.4] - 2026-11-01
 
@@ -781,7 +788,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/jowch/Masque.jl/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/jowch/Masque.jl/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/jowch/Masque.jl/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/jowch/Masque.jl/compare/v0.4.1...v0.4.2
