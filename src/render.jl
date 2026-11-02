@@ -728,7 +728,7 @@ them, or `interactables(plot; …)` for one plot.
 - `interactables(plot; …)` replaces that plot's default layers, at the same position and with
   the same ids.
 - An interactable whose layer id matches a default's replaces that default.
-- Anything else (`ViewInteractable`, `ThresholdInteractable`, `ROIInteractable`,
+- Anything else (`ViewInteractable`, `ThresholdInteractable`, `SpanInteractable`, `ROIInteractable`,
   `PointInteractable(ax, pts)`, …) is added after the defaults, in argument order.
 
 Two layers with the same id raise `ArgumentError`. Legends link to the layers of this call.
@@ -740,7 +740,8 @@ The `@bind` value is a `NamedTuple` with one field per layer a reader can set, n
 id, in the order the layers are listed. A plot that takes clicks holds its pick: `nothing`
 until a click, then one [`InteractionEvent`](@ref), and `nothing` again when the same mark is
 clicked twice. A [`ThresholdInteractable`](@ref) holds a [`ThresholdEvent`](@ref), starting
-at its `value` (or the middle of the axis without one), and an [`ROIInteractable`](@ref) a
+at its `value` (or the middle of the axis without one), a [`SpanInteractable`](@ref) a
+[`SpanEvent`](@ref), starting at its `span`, and an [`ROIInteractable`](@ref) a
 [`BoundsEvent`](@ref), starting at its `bounds` (or the middle half of the axis without
 them). A box with `selects` also fills its target's field with what it contains: a
 `Vector{ElementEvent}` over points (an empty box is `ElementEvent[]`), one
@@ -786,7 +787,7 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   `onchange` and still takes clicks. The function changes plots that already exist, with
   Makie's `update!(plot, args...; attrs...)` or `plot[1] = …`; adding or removing a plot
   raises `ArgumentError`. It runs once inside `masque`, before the first picture, then on
-  every click and release, and while a threshold or box moves unless that control was built
+  every click and release, and while a threshold, span or box moves unless that control was built
   with `update_while_dragging = false`. A plot whose number of marks changes loses its picks.
   An error while the reader works the widget keeps the last picture, shows a short note over
   it, and logs the full error. It needs a running kernel: in a static export the picture
@@ -873,6 +874,8 @@ function _masque(
     bg0 = fig.scene.backgroundcolor[]
     try
         fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
+        # Before anything draws: a view's home is the limits the author wrote (#524).
+        _record_view_homes!(interactables)
         _finalize!(fig)        # finalize once; render + context share it
         _pin_pan_ticklabelspace!(fig, interactables)
         ppu = something(px_per_unit, _ppu(backend, fig, max_width))
@@ -1174,7 +1177,7 @@ function _pick_counts(manifest)
         counts[g["id"]] = reinterpret(Int, hash((g["n"], _group_table(manifest, g))))
     end
     for d in manifest["layers"]
-        d["id"] in fields && get(d, "bond", nothing) ∉ ("threshold", "bounds", "control") || continue
+        d["id"] in fields && get(d, "bond", nothing) ∉ ("threshold", "span", "bounds", "control") || continue
         # A hidden plot has no marks to pick: hiding it clears its picks.
         get(d, "hidden", false) === true && (counts[d["id"]] = 0; continue)
         n = try
@@ -1228,13 +1231,17 @@ function _move_controls!(live::_LiveFigure, manifest, owners, js)
     ints = live.plan.ints
     for k in eachindex(ints)
         i = ints[k]
-        i isa Union{ThresholdInteractable, ROIInteractable} || continue
+        i isa Union{ThresholdInteractable, SpanInteractable, ROIInteractable} || continue
         f = string(i.id)
         haskey(js, f) && js[f] !== nothing || continue
         ev = _field_value(manifest, owners, f, js[f])
-        ints[k] = i isa ThresholdInteractable ?
-            ThresholdInteractable(i.ax, i.orientation, _threshold_value(ev), i.id, i.update_while_dragging) :
+        ints[k] = if i isa ThresholdInteractable
+            ThresholdInteractable(i.ax, i.orientation, _threshold_value(ev), i.id, i.update_while_dragging)
+        elseif i isa SpanInteractable
+            SpanInteractable(i.ax, i.orientation, _span_values(ev)..., i.id, i.update_while_dragging)
+        else
             ROIInteractable(i.ax, _roi_bounds(ev), i.id, i.selects, i.update_while_dragging)
+        end
     end
     return nothing
 end
@@ -1299,7 +1306,9 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
     ax === nothing && throw(
         ArgumentError("Masque gesture channel: no ViewInteractable with id :$(id) on this widget"),
     )
-    if haskey(input, "azimuth") || haskey(input, "limits")
+    if get(input, "reset", false) === true
+        _reset_view!(ax)
+    elseif haskey(input, "azimuth") || haskey(input, "limits")
         if haskey(input, "azimuth")
             ax.azimuth[] = Float64(input["azimuth"])
             ax.elevation[] = Float64(input["elevation"])
@@ -1316,6 +1325,7 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
         ax.limits[] = (xlims..., ylims...)
         _pan_linked_axes!(ax, xlims, ylims)
     end
+    _note_view_left!(view_axes)
     live === nothing && return _render_gesture_frame(input, backend, fig, interactables, ppu, max_width)
     owners_out = Ref(Dict{String, LayerOwner}())
     frame = _render_gesture_frame(input, backend, fig, live.plan, ppu, max_width; owners_out)
@@ -1329,7 +1339,8 @@ function _render_gesture_frame(input, backend, fig, interactables, ppu, max_widt
     # mount ppu's coordinate space below, so image-px geometry (viewBox, hit regions) never
     # moves out from under the overlay; only the PNG's own pixel density changes (the <img>
     # is width:100% CSS-scaled — see frontend-delivery.md — so that's decoupled from its
-    # intrinsic size).
+    # intrinsic size). A figure `resize!`d after display changes the manifest's width and
+    # height, at the same scale, and the frontend resizes the overlay to match (#546).
     render_ppu = get(input, "settle", false) === true ? ppu : 1.0
     bg0 = fig.scene.backgroundcolor[]
     try
@@ -1345,6 +1356,8 @@ function _render_gesture_frame(input, backend, fig, interactables, ppu, max_widt
         result = _with_blocks_hidden(() -> render(backend, fig, render_ppu), interactables)
         frame = _gesture_frame(result)
         frame["manifest"] = manifest
+        # The figure can be resized after display (#546); the widget follows it, as at mount.
+        frame["displayWidth"] = round(Int, min(size(fig.scene)[1], max_width))
         return frame
     finally
         fig.scene.backgroundcolor[] = bg0
@@ -1393,7 +1406,12 @@ _suspended_surface(i::SurfaceInteractable, ctx) =
 # one farther pose cover the compile a coalesced first drag otherwise still pays. `stop`
 # bails between frames when the cell is replaced; the camera is put back either way.
 function _warm_view_render_frame!(frame, view_axes; stop = () -> false, extra = ())
-    _warm_view_poses!(frame, view_axes, stop)
+    left = _view_left_snapshot(view_axes)
+    try
+        _warm_view_poses!(frame, view_axes, stop)
+    finally
+        _restore_view_left!(left)
+    end
     for input in extra
         stop() && break
         frame(input)

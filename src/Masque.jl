@@ -96,6 +96,7 @@ include("fields.jl")
 include("events.jl")
 include("bond.jl")
 include("render.jl")
+include("viewhome.jl")
 include("describe.jl")
 include("hints.jl")
 include("link.jl")
@@ -105,11 +106,11 @@ export AbstractBackend
 export AbstractInteractable, AbstractSelector, HitLayer, InteractionContext, AxisTransform
 export PointInteractable, SegmentInteractable, RectInteractable, GridInteractable, PolygonInteractable,
     AxisInteractable, ColorbarInteractable, LegendInteractable, RegionInteractable, FunctionInteractable,
-    ThresholdInteractable, ROIInteractable, TextInteractable, ViewInteractable, SliceInteractable,
+    ThresholdInteractable, SpanInteractable, ROIInteractable, TextInteractable, ViewInteractable, SliceInteractable,
     SurfaceInteractable, LinkedInteractable
 export masque, interactables, linked, data_to_image_px, hitlayers, bondtype, transform_bond, linkcameras!
 export InteractionEvent, ElementEvent, LegendEvent, GridCellEvent, GridWindowEvent, GridSelection,
-    AxisEvent, ThresholdEvent, ColorbarEvent, BoundsEvent
+    AxisEvent, ThresholdEvent, ColorbarEvent, BoundsEvent, SpanEvent
 export Markup, @masque_str
 
 end # module Masque

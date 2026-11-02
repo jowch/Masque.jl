@@ -2,7 +2,7 @@
 import { isIdentity, type PhotoMatrix } from "./photo"
 import { hitSurface, surfaceVertex } from "./surface"
 import { withRegion } from "./regions"
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry, Limits3, Readout } from "./types"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, SpanGeometry, ROIGeometry, ViewGeometry, SliceGeometry, Limits3, Readout } from "./types"
 
 const HIT_TOL = 4 // px slack for circles/rects
 export const SEG_TOL = 8 // px slack for segments/polylines
@@ -539,6 +539,20 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             if (distToSegment(px, py, x0, y0, x1, y1) <= SEG_TOL) return { index: 0, geom_: ["seg", x0, y0, x1, y1] }
             return null
         }
+        case "span": {
+            // An edge, within SEG_TOL of its line and of the line's ends (the grip overhangs a
+            // narrow colorbar), the nearer edge when both are; else the inside of the band.
+            const sg = g as SpanGeometry
+            const h = sg.orientation === "h"
+            const along = h ? py : px, across = h ? px : py
+            const [s0, s1] = sg.span
+            if (across < s0 - SEG_TOL || across > s1 + SEG_TOL) return null
+            const dlo = Math.abs(along - sg.lo), dhi = Math.abs(along - sg.hi)
+            if (Math.min(dlo, dhi) <= SEG_TOL) return { index: 0, spanPart_: { edge: dlo <= dhi ? "lo" : "hi" } }
+            if (across < s0 || across > s1) return null
+            if (along > Math.min(sg.lo, sg.hi) && along < Math.max(sg.lo, sg.hi)) return { index: 0, spanPart_: { move: true } }
+            return null
+        }
         case "roi": {
             const rg = g as ROIGeometry
             // `handle` is the manifest hit size, not the painted grip (HANDLE_CSS). The hit
@@ -812,7 +826,7 @@ function yieldsToOtherAxis(manifest: Manifest, layer: HitLayer, x: number, y: nu
 
 // Masque's own tools (threshold lines, ROI boxes, the view) draw over a legend, and a legend's
 // entries are the legend, so a box Makie draws over the plots hides neither.
-const OVER_OCCLUDERS: ReadonlySet<Kind> = new Set(["threshold", "roi", "view", "control"])
+const OVER_OCCLUDERS: ReadonlySet<Kind> = new Set(["threshold", "span", "roi", "view", "control"])
 
 // Whether (x, y) on `layer`'s marks is inside a box Makie draws over the plots (an opaque
 // legend, `occluders`) that hides them. The picture shows the legend there, not the mark, so
@@ -998,7 +1012,7 @@ export function resolvePayload(hit: Hit, manifest: Manifest, px: number, py: num
 // an invisible drag handle, or a box being dragged all only make sense relative to the cursor.
 // Checked by layer.kind, not hit.geom's tag, because :threshold's geom is ["seg", …] — byte-
 // identical to :segments — so a geom-first dispatch would wrongly anchor a threshold hover.
-export const CURSOR_FOLLOWING_KINDS: ReadonlySet<Kind> = new Set(["axis", "threshold", "roi", "view"])
+export const CURSOR_FOLLOWING_KINDS: ReadonlySet<Kind> = new Set(["axis", "threshold", "span", "roi", "view"])
 
 export interface Anchor {
     x: number // horizontal center the tooltip box is placed over

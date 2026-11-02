@@ -602,6 +602,8 @@ try {
         lineY: line ? Number(line.getAttribute("y1")) : null,
         rect: rect ? ["x", "y", "width", "height"].map((a) => Number(rect.getAttribute(a))) : null,
         tip: sr.querySelector(".masque-tip")?.classList.contains("show") ? sr.querySelector(".masque-tip").textContent : null,
+        // A view's live readout sits in the figure's corner (#526).
+        readout: sr.querySelector(".masque-readout")?.classList.contains("show") ? sr.querySelector(".masque-readout").textContent : null,
         liveText: live?.textContent ?? "",
         inputs: window.__masqueKbdInputs[k],
         frame: host.dataset.masqueGestureFrame ? JSON.parse(host.dataset.masqueGestureFrame) : null,
@@ -707,6 +709,50 @@ try {
       await page.keyboard.press("Escape");
     }
 
+    // Span (#500): an x window, so Left/Right move it and Up/Down are swallowed; Alt moves the
+    // edge on the arrow's side out, Alt+Shift moves it back in. Each release writes the bond once.
+    {
+      const key = "span_axis", id = "span";
+      const edgesOf = (k) => page.evaluate((kk) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        return [...sr.querySelectorAll("line.masque-threshold-line")].map((l) => Number(l.getAttribute("x1")));
+      }, k);
+      let s = await tabToStop(key, id);
+      if (s.role !== "application") throw new Error(`${key}: stop role ${s.role}`);
+      if (!/Left or Right/.test(s.hint) || !/Alt/.test(s.hint)) throw new Error(`${key}: hint ${JSON.stringify(s.hint)}`);
+      const pxPerCss = s.pxPerCss, n0 = s.inputs, before = await textOf(`#out_${key}`);
+      let e = await edgesOf(key);
+      // An earlier driver may have left the band at an end or flat: page it back to the start.
+      await page.keyboard.press("Home");
+      const e0 = await edgesOf(key);
+      await page.keyboard.press("ArrowUp");
+      s = await dragState(key, id);
+      e = await edgesOf(key);
+      if (JSON.stringify(e) !== JSON.stringify(e0) || s.inputs !== n0 + 1) throw new Error(`${key}: ArrowUp moved the band or wrote the bond ${JSON.stringify({ e, e0, inputs: s.inputs - n0 })}`);
+      passed.push(`${key}/cross-axis-swallowed`);
+      await hold("ArrowRight", 4);
+      s = await dragState(key, id);
+      e = await edgesOf(key);
+      if (e.some((x, i) => Math.abs(x - e0[i] - 4 * pxPerCss) > 0.5)) throw new Error(`${key}: ArrowRight ×4 gave ${JSON.stringify(e)} from ${JSON.stringify(e0)}`);
+      if (s.inputs !== n0 + 2) throw new Error(`${key}: expected one bond write for the hold, got ${s.inputs - n0 - 1}`);
+      if (!/\[.*,.*\]/.test(s.tip ?? "")) throw new Error(`${key}: readout ${JSON.stringify(s.tip)}`);
+      const e1 = e;
+      await page.keyboard.press("Alt+ArrowRight");
+      e = await edgesOf(key);
+      if (Math.abs(e[1] - e1[1] - pxPerCss) > 0.5 || e[0] !== e1[0]) throw new Error(`${key}: Alt+ArrowRight gave ${JSON.stringify(e)} from ${JSON.stringify(e1)}`);
+      await page.keyboard.press("Alt+Shift+ArrowRight");
+      e = await edgesOf(key);
+      if (Math.abs(e[1] - e1[1]) > 0.5) throw new Error(`${key}: Alt+Shift+ArrowRight did not move the edge back: ${JSON.stringify(e)}`);
+      const after = await waitFor(async () => { const t = await textOf(`#out_${key}`); return { ok: t !== before, t }; }, `${key} bond`);
+      if (!/SpanEvent\(:span, lo = /.test(after.t)) throw new Error(`${key}: bond readout ${after.t.slice(0, 200)}`);
+      s = await waitForLiveRegion(key, /\d/);
+      if (!/\d/.test(s.liveText)) throw new Error(`${key}: live region did not announce the band: ${JSON.stringify(s.liveText)}`);
+      passed.push(`${key}/arrow-move+alt-resize+single-bind+announce`);
+      await page.keyboard.press("Escape");
+    }
+
     // View (pan): arrows and + preview through the gesture channel and settle once on keyup.
     // The bond never moves.
     {
@@ -728,7 +774,7 @@ try {
       }, `${key} preview frame`);
       await page.waitForTimeout(200);
       const held = await dragState(key, id);
-      if (!held.tip || !/x:\[/.test(held.tip)) throw new Error(`${key}: a preview frame hid the readout ${JSON.stringify({ tip: held.tip, frame: preview.d.frame })}`);
+      if (!held.readout || !/x:\[/.test(held.readout)) throw new Error(`${key}: a preview frame hid the readout ${JSON.stringify({ readout: held.readout, frame: preview.d.frame })}`);
       await page.keyboard.up("ArrowRight");
       const first = await settleAfter(s.frame?.n ?? 0, `${key} settle frame`);
       await page.keyboard.press("ArrowRight");
@@ -744,12 +790,25 @@ try {
       s = await dragState(key, id);
       if (s.inputs !== n0) throw new Error(`${key}: a view nudge wrote the bond`);
       if ((await textOf(`#out_${key}`)) !== before) throw new Error(`${key}: a view nudge changed #out_${key}`);
-      // Put the camera back for the drivers that run after this one.
-      await page.keyboard.press("-");
-      await page.keyboard.press("ArrowLeft");
-      await page.keyboard.press("ArrowLeft");
-      await page.waitForTimeout(1500);
       passed.push(`${key}/arrow-pan+zoom+settle-no-bind`);
+      // #524: `0` puts the view back at the limits the page mounted with, which also leaves
+      // the camera where the drivers that run after this one expect it.
+      await page.keyboard.press("0");
+      const reset = await waitFor(async () => {
+        const d = await dragState(key, id);
+        return { ok: d.frame && d.frame.n > zoomed.f.n && d.frame.reset === true && d.frame.settle, f: d.frame };
+      }, `${key} reset frame`);
+      const home = await page.evaluate((k) => {
+        const layers = JSON.parse(document.querySelector(`#coords_${k}`).textContent);
+        const t = JSON.parse(document.querySelector(`#axes_${k}`).textContent)[layers.find((l) => l.kind === "view").axis];
+        return [...t.xlims, ...t.ylims];
+      }, key);
+      const got = [reset.f.xmin, reset.f.xmax, reset.f.ymin, reset.f.ymax];
+      if (!got.every((v, i) => Math.abs(v - home[i]) <= 1e-6 * Math.max(1, Math.abs(home[i]), Math.abs(home[1] - home[0]), Math.abs(home[3] - home[2])))) {
+        throw new Error(`${key}: 0 reset to ${JSON.stringify(reset.f)}, not the mount limits ${JSON.stringify(home)}`);
+      }
+      if ((await dragState(key, id)).inputs !== n0) throw new Error(`${key}: the reset wrote the bond`);
+      passed.push(`${key}/zero-resets`);
       await page.keyboard.press("Escape");
     }
 
@@ -783,10 +842,21 @@ try {
       s = await dragState(key, id);
       if (s.inputs !== n0) throw new Error(`${key}: a view nudge wrote the bond`);
       if ((await textOf(`#out_${key}`)) !== before) throw new Error(`${key}: a view nudge changed #out_${key}`);
-      // Put the camera back for the drivers that run after this one.
-      for (const k of ["ArrowLeft", "Shift+ArrowLeft", "-", "-"]) await page.keyboard.press(k);
-      await page.waitForTimeout(1500);
       passed.push(`${key}/zoom+shift-pan+orbit-no-bind`);
+      // #524: `0` turns and zooms the view back to the camera the page mounted with.
+      await page.keyboard.press("0");
+      const reset = await waitFor(async () => {
+        const d = await dragState(key, id);
+        return { ok: d.frame && d.frame.n > orbit.f.n && d.frame.reset === true && d.frame.settle, f: d.frame };
+      }, `${key} reset frame`);
+      const g = await page.evaluate((k) => JSON.parse(document.querySelector(`#coords_${k}`).textContent).find((l) => l.kind === "view").geometry, key);
+      const near = (a, b, tol) => Math.abs(a - b) <= tol;
+      if (!near(reset.f.azimuth, g.azimuth, 1e-9) || !near(reset.f.elevation, g.elevation, 1e-9) ||
+        !reset.f.limits.every((v, i) => near(v, g.limits[i], 1e-6 * Math.max(1, w(g.limits, Math.floor(i / 2)))))) {
+        throw new Error(`${key}: 0 reset to ${JSON.stringify(reset.f)}, not the mount camera ${JSON.stringify({ azimuth: g.azimuth, elevation: g.elevation, limits: g.limits })}`);
+      }
+      if ((await dragState(key, id)).inputs !== n0) throw new Error(`${key}: the reset wrote the bond`);
+      passed.push(`${key}/zero-resets`);
       await page.keyboard.press("Escape");
     }
   }
