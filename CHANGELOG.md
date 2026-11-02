@@ -61,6 +61,9 @@ All notable changes to this project are documented here. The format is based on
   and a point's tooltip doesn't show over it (#526).
 
 ### Fixed
+- An inset axis with its own `ViewInteractable`, inside an axis that has one too, now pans
+  and zooms itself when the pointer is over it. Before, a drag or Ctrl+wheel over the inset
+  moved the outer plot instead (#559).
 - A figure shown narrower than it was drawn for, as in the docs on a phone or in a narrow
   Pluto window, keeps its hover and click targets the same size on screen. Before, every
   target shrank with the picture: on a phone a scatter dot's target was about half its size

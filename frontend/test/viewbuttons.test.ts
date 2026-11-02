@@ -293,6 +293,21 @@ describe("the corner buttons on a live widget", () => {
         expect(box!.classList.contains("show")).toBe(false)
     })
 
+    it("over an inset view, the inset's box shows, not its parent's (#559)", () => {
+        const m = manifestOf()
+        m.transforms.ax2 = tf([700, 50, 400, 300])
+        m.layers.push({ ...m.layers[1], id: "inset", axis: "ax2", geometry: { x: 700, y: 50, w: 400, h: 300, mode: "pan" } as never })
+        const { shadow, surface } = setup(m)
+        const parent = shadow.querySelector(`.masque-vb[data-view="view"]`) as HTMLElement
+        const inset = shadow.querySelector(`.masque-vb[data-view="inset"]`) as HTMLElement
+        pointer(surface, "pointermove", 450, 100)
+        expect(inset.classList.contains("show")).toBe(true)
+        expect(parent.classList.contains("show")).toBe(false)
+        pointer(surface, "pointermove", 150, 200)
+        expect(parent.classList.contains("show")).toBe(true)
+        expect(inset.classList.contains("show")).toBe(false)
+    })
+
     it("a touch outside the widget puts a touch-shown box away", () => {
         const { surface, box } = setup(manifestOf())
         pointer(surface, "pointerdown", 300, 200, "touch")

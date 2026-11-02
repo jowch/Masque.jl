@@ -610,6 +610,14 @@ kind_sweep_meta() = [
         "resizeAfterDisplay" => true,
     ),
     Dict(
+        # An inset axis with its own view inside its parent's (#559). Over the inset, the wheel
+        # and a drag move the inset's view; outside it, the parent's. The driver tells which
+        # moved by the corner readout's range: the inset spans 0–1, the parent 0–10.
+        "key" => "view_nested", "layerId" => "view", "layerKind" => "view",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "nested",
+    ),
+    Dict(
         "key" => "legend", "layerId" => "legend", "layerKind" => "rects",
         "selected" => nothing, "halo" => false, "selectedIndex" => 2, "clickIndex" => 2,
         "tip" => "pts", "mode" => "element",
@@ -1772,6 +1780,18 @@ function build_kind_sweep()
         masque(fig, ViewInteractable(ax), interactables(lower; id = :lower); auto = false)
     end
 
+    view_nested = let
+        fig = Figure(size = (480, 320))
+        ax = Axis(fig[1, 1]; title = "view with an inset view", limits = (0, 10, 0, 10))
+        scatter!(ax, [1, 3, 8], [8, 2, 1]; color = :gray, markersize = 14)
+        inset = Axis(
+            fig[1, 1]; width = Relative(0.42), height = Relative(0.42),
+            halign = 0.92, valign = 0.9, limits = (0, 1, 0, 1),
+        )
+        scatter!(inset, [0.2, 0.5, 0.8], [0.3, 0.7, 0.4]; color = :teal, markersize = 10)
+        masque(fig, ViewInteractable(ax; id = :view), ViewInteractable(inset; id = :inset); auto = false)
+    end
+
     legend = let
         xs = collect(0.0:0.5:3.0)
         fig = Figure(size = (480, 320))
@@ -2063,7 +2083,7 @@ function build_kind_sweep()
     return (;
         scatter, scatter_low, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, box_hidden, box_axes, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_resized, legend, series_legend,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_resized, view_nested, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

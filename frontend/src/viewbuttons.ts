@@ -8,7 +8,7 @@
 // settled request, like a released key, and never reaches the plot's own click handling.
 
 import { resetView } from "./bond"
-import { matrixLimits } from "./geometry"
+import { innermostView, matrixLimits } from "./geometry"
 import { hideTip } from "./hover"
 import { unmapPoint, wheelScale, zoomAt, ZOOM_NOTCH } from "./photo"
 import * as viewDrag from "./drag/view"
@@ -332,12 +332,13 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
         paint()
     }
 
+    // The box of the view the pointer would drag: the innermost one under it, so over an inset
+    // the inset's buttons show, not its parent's (#559).
     const at = (p: { x: number; y: number }): string | null => {
-        for (const b of boxes.values()) {
-            const v = b.vp
-            if (v && p.x >= v[0] && p.x <= v[0] + v[2] && p.y >= v[1] && p.y <= v[1] + v[3]) return b.id
-        }
-        return null
+        const l = innermostView(ctx.manifest_, p.x, p.y, "drag")
+        const id = l ? owner(l.id) : null
+        const v = id ? boxes.get(id)?.vp : null
+        return v && p.x >= v[0] && p.x <= v[0] + v[2] && p.y >= v[1] && p.y <= v[1] + v[3] ? id : null
     }
 
     // The box a view shows: its own, or for a twin (same viewport) the first view's.
