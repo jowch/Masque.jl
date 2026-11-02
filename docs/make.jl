@@ -123,5 +123,5 @@ end
 deploydocs(;
     repo = "github.com/jowch/Masque.jl",
     devbranch = "main",
-    push_preview = false,
+    push_preview = true,  # PROTOTYPE PR ONLY: preview the two-finger trial page. Do not merge.
 )
