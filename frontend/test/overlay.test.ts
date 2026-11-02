@@ -7748,3 +7748,72 @@ describe("a grid pick is inset or centred by its own size, not the grid's smalle
         expect(align(grid([1, 0, 1, 2, 0, 1], xedges))).toBe("mid") // the thin column itself
     })
 })
+
+// #559: an inset axis with its own view sits inside its parent's. The pointer over the inset
+// drives the inset's view, by wheel, by drag and by Shift+drag; outside it, the parent's.
+describe("nested views", () => {
+    const nested = (): Manifest => ({
+        width: 1200, height: 800, scaling: 2,
+        transforms: {
+            outer: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false },
+            inset: { xlims: [0, 1], ylims: [0, 1], xscale: "identity", yscale: "identity",
+                viewport: [500, 300, 300, 200], xreversed: false, yreversed: false },
+        },
+        // The parent is listed first, as Makie lists the axes it was given.
+        layers: [
+            { id: "vout", kind: "view", axis: "outer", events: ["drag"], payloads: [],
+                geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            { id: "vin", kind: "view", axis: "inset", events: ["drag"], payloads: [],
+                geometry: { x: 500, y: 300, w: 300, h: 200, mode: "pan" } },
+        ],
+    })
+    const wheel = (surface: HTMLElement, x: number, y: number) => {
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -120 })
+        Object.defineProperty(ev, "ctrlKey", { value: true })
+        Object.defineProperty(ev, "clientX", { value: x })
+        Object.defineProperty(ev, "clientY", { value: y })
+        surface.dispatchEvent(ev)
+    }
+    const drag = (surface: HTMLElement, x: number, y: number, shiftKey = false) => {
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: x, clientY: y, shiftKey, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: x + 20, clientY: y + 10, shiftKey, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: x + 20, clientY: y + 10, shiftKey, bubbles: true }))
+    }
+    const mounted = () => {
+        const { host, img, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+        mount(script, nested(), undefined, requestFrame)
+        // display scale 1200/600 = 2: client (300, 200) is image (600, 400), inside the inset
+        img.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        const ids = () => requestFrame.mock.calls.map((c) => ((c as unknown[])[0] as { id: string }).id)
+        return { surface, ids }
+    }
+
+    it("a wheel over the inset zooms the inset, and outside it the parent", async () => {
+        const a = mounted()
+        wheel(a.surface, 300, 200)
+        await Promise.resolve()
+        expect(a.ids()[0]).toBe("vin")
+        const b = mounted()
+        wheel(b.surface, 100, 100)
+        await Promise.resolve()
+        expect(b.ids()[0]).toBe("vout")
+    })
+
+    it("a drag over the inset pans the inset, and outside it the parent", async () => {
+        for (const shift of [false, true]) {
+            const a = mounted()
+            drag(a.surface, 300, 200, shift)
+            await Promise.resolve()
+            expect(a.ids().length).toBeGreaterThan(0)
+            expect(new Set(a.ids())).toEqual(new Set(["vin"]))
+            const b = mounted()
+            drag(b.surface, 100, 100, shift)
+            await Promise.resolve()
+            expect(new Set(b.ids())).toEqual(new Set(["vout"]))
+        }
+    })
+})

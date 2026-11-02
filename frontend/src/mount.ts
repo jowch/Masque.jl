@@ -24,7 +24,7 @@ import { createFade } from "./fade"
 import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, oneHome, MOTION_MS, NOTE_MS } from "./state"
 import type { HiGroups, HiSet, OverlayCtx } from "./state"
 import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
-import { axisFrame, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
+import { axisFrame, innermostView, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
 import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_HINT_MS, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
 
@@ -1313,22 +1313,17 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         let axis = ""
         let limits3: Limits3 | null = null // an Axis3 view's limits, on screen now
         let wheel: ViewGeometry["wheel"] = "modifier"
-        for (const layer of ctx.manifest_.layers) {
-            if (layer.kind !== "view" || !layer.events.includes("drag")) continue
+        // The innermost view under the pointer zooms: an inset's own, not its parent's (#559).
+        const layer = innermostView(ctx.manifest_, layout.x, layout.y, "drag", (l) => {
+            const g = l.geometry as ViewGeometry
+            return g.mode === "orbit" ? !!g.limits : !!ctx.manifest_.transforms[l.axis]
+        })
+        if (layer) {
             const g = layer.geometry as ViewGeometry
-            if (layout.x < g.x || layout.x > g.x + g.w || layout.y < g.y || layout.y > g.y + g.h) continue
-            if (g.mode === "orbit") {
-                if (!g.limits) continue
-                id = layer.id
-                limits3 = g.limits
-                wheel = g.wheel ?? "modifier"
-                break
-            }
-            if (!ctx.manifest_.transforms[layer.axis]) continue
             id = layer.id
-            axis = layer.axis
             wheel = g.wheel ?? "modifier"
-            break
+            if (g.mode === "orbit") limits3 = g.limits ?? null
+            else axis = layer.axis
         }
         if (!id) return
         // #526: a plain wheel scrolls the page unless the view asked for `wheel = :always`.
