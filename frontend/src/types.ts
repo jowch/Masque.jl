@@ -297,7 +297,7 @@ export interface HitLayer {
     points?: (number | string)[][]
     step?: "pre" | "post" | "center"
     // :lines on an Axis3: per element, the z of each sample in `points`. Such a line reads out
-    // its points but its pick stays the whole line.
+    // and picks its points, as a 2D line does (#518).
     zpoints?: (number | string)[][]
     // :lines on a zoomed Axis3: per element, what each vertex of the drawn path is: 2k for sample
     // k, 2k + 1 for where the edge from sample k is cut by the limits, -1 for a gap. null (or

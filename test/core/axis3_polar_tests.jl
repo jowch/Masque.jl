@@ -609,8 +609,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         t = masque(f, SegmentInteractable(ax, ln; tooltip = masque"$(x) $(y) $(z) (point $(i))"); auto = false)
         @test haskey(only(t.manifest["layers"]), "template")
         @test_throws ArgumentError masque(f, SegmentInteractable(ax, ln; tooltip = masque"$(w)"); auto = false)
-        # A pick still names the whole line on an Axis3; its points are for the readout.
+        # A pick names a point on an Axis3 too (#518).
         Lh = only(hitlayers(SegmentInteractable(ax, ln), (bk = Masque._resolve_backend(:cairo); Masque.context(bk, f, Masque._ppu(bk, f, 700), 700))))
-        @test Lh.zpoints !== nothing && !Masque._picks_points(Lh)
+        @test Lh.zpoints !== nothing && Masque._picks_points(Lh)
     end
 end
