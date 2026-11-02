@@ -406,6 +406,10 @@ end
     )
     @test resp["pxPerUnit"] == 1.0
     @test resp["width"] == 400 && resp["height"] == 300
+    # A mount density below 1 (a figure over twice max_width) is not raised mid-drag (#548)
+    wide = masque(fig, [ViewInteractable(ax), PointInteractable(ax, pts)]; backend = :webgl, auto = false, max_width = 150)
+    @test wide.px_per_unit == 0.75
+    @test wide.render_frame(Dict("id" => "view", "xmin" => 1.0, "xmax" => 9.0, "ymin" => 0.5, "ymax" => 4.5, "settle" => false))["pxPerUnit"] == 0.75
     @test resp["scene"] isa Dict{String, Any}
     @test json_ok(resp["scene"])
     @test !haskey(resp, "png")
