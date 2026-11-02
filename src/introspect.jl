@@ -255,7 +255,7 @@ function _shift_data_markers(ax, i::PointInteractable, mo)
         Point3f(d[1], d[2], ax isa Makie.Axis3 ? d[3] : x[3])
     end
     return PointInteractable(
-        i.ax, pts, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.billboard, i.select,
+        i.ax, pts, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.billboard, i.select, i.touch_radius,
     )
 end
 function _marker_offset_vec(mo, n)
@@ -272,10 +272,10 @@ function _warn_no_inverse(id)
     return nothing
 end
 _with_offset(i::PointInteractable, o) = PointInteractable(
-    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, o, i.stroke, i.billboard, i.select,
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, o, i.stroke, i.billboard, i.select, i.touch_radius,
 )
 _with_billboard(i::PointInteractable) = PointInteractable(
-    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke, true, i.select,
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke, true, i.select, i.touch_radius,
 )
 # On an Axis3, Makie adds a `markerspace = :data` scatter's `marker_offset` after the scene's
 # model, in the axis box's units, so where a marker lands in data depends on the current
@@ -290,7 +290,7 @@ function _check_billboard_offset(p, n)
     )
 end
 _with_marker_stroke(i::PointInteractable, s) = PointInteractable(
-    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, s, i.billboard, i.select,
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, s, i.billboard, i.select, i.touch_radius,
 )
 
 # A `markerspace = :data` scatter on an Axis3 draws camera-facing markers `markersize` wide in
@@ -816,11 +816,11 @@ function SegmentInteractable(ax, p::Makie.Stairs; id = :stairs, payloads = nothi
     return _with_linewidth(_with_samples(i, p.step[], [[_pt3d(v) for v in _converted(p)[1]]]), p)
 end
 _with_samples(i::SegmentInteractable, step, paths) = SegmentInteractable(
-    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, (step, paths), i.select, i.linewidth,
+    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, (step, paths), i.select, i.linewidth, i.touch_radius,
 )
 # The plot's drawn line width, carried for the overlay's line fade.
 _with_linewidth(i::SegmentInteractable, p) = SegmentInteractable(
-    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, i.samples, i.select, _line_width(p),
+    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, i.samples, i.select, _line_width(p), i.touch_radius,
 )
 
 # Each child line (or a ScatterLines child's line, when markers are on) is one element.
@@ -1303,7 +1303,7 @@ function _place(i::PointInteractable, f)
         [f.place(i.points[k], offs[k]) for k in eachindex(i.points)]
     end
     return PointInteractable(
-        i.ax, pts, i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.billboard, i.select,
+        i.ax, pts, i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.billboard, i.select, i.touch_radius,
     )
 end
 function _place(i::SegmentInteractable, f)

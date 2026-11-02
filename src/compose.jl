@@ -3,7 +3,7 @@
 # known: a plot does not know its axis, and its default id counts across the figure.
 
 """
-    interactables(ax, plot; id, select, kwargs...) -> Vector{AbstractInteractable}
+    interactables(ax, plot; id, select, touch_radius, kwargs...) -> Vector{AbstractInteractable}
 
 The interactables Masque builds for one `plot` on `ax`, the ones `masque(fig)` uses by
 default. `id` names the plot: a plot with one layer takes it as its layer id, and one that
@@ -23,6 +23,10 @@ applies to every layer the plot builds, so a `stem!` gives a `NamedTuple` of two
 [`GridSelection`](@ref) instead, a mask of the selected cells; surface cells don't take
 `:many` yet. The default, `:one`, holds one mark or `nothing`.
 
+`touch_radius` sets how far a finger reaches to the plot's points and lines, in CSS px, over
+`masque`'s `touch` radius: `interactables(ax, s; touch_radius = 8)` for a dense scatter. A
+plot's bars, polygons and cells take a touch inside them and keep no radius.
+
 This is also how a recipe gets layers of its own. Define a method for your plot type, and
 `masque(fig)` uses it instead of walking the plots your recipe draws:
 
@@ -36,7 +40,8 @@ end
 then `:myplot_2` for a second `myplot!`, and each other layer adds its own name to it
 (`:myplot_bars`). A method that takes `id` by name names its layers itself instead.
 """
-function interactables(ax, p::Makie.AbstractPlot; id = nothing, select = nothing, kwargs...)
+function interactables(ax, p::Makie.AbstractPlot; id = nothing, select = nothing, touch_radius = nothing, kwargs...)
+    touch_radius === nothing || return _with_touch(interactables(ax, p; id, select, kwargs...), touch_radius)
     select === nothing || return _with_select(interactables(ax, p; id, kwargs...), select)
     base = _plotbase(p)
     if base === nothing
@@ -105,7 +110,8 @@ end
 # which reports no default for the plot. Read the keywords the method declares and name the
 # fix instead. A `MethodError` raised inside the method's body is not this case and passes
 # through.
-function _plot_interactables(ax, p; id, select = nothing, kwargs...)
+function _plot_interactables(ax, p; id, select = nothing, touch_radius = nothing, kwargs...)
+    touch_radius === nothing || return _with_touch(_plot_interactables(ax, p; id, select, kwargs...), touch_radius)
     select === nothing || return _with_select(_plot_interactables(ax, p; id, kwargs...), select)
     _has_custom(ax, p) || return interactables(ax, p; id, kwargs...)
     declared = Base.kwarg_decl(which(interactables, Tuple{typeof(ax), typeof(p)}))
@@ -269,6 +275,15 @@ function _with_select(i::AbstractInteractable, select)
     _check_select(T, select)
     return T((f === :select ? select : getfield(i, f) for f in fieldnames(T))...)
 end
+# `touch_radius` for every layer a plot built that a finger reaches to: its points and lines.
+# Bars, polygons and cells take a touch inside them, so a recipe's other layers keep theirs.
+function _with_touch(built::AbstractVector, r)
+    r = _check_touch_radius(r)
+    return AbstractInteractable[hasfield(typeof(i), :touch_radius) ? _with_touch(i, r) : i for i in built]
+end
+_with_touch(i::AbstractInteractable, r) =
+    (T = typeof(i); T((f === :touch_radius ? r : getfield(i, f) for f in fieldnames(T))...))
+
 _buildable(p) = _plotbase(p) !== nothing ||
     any(A -> _has_custom_for(A, p), (Makie.Axis, Makie.Axis3, Makie.PolarAxis))
 # A recipe Masque has no default for, drawing a plot it does: `contour!` draws `lines!`.

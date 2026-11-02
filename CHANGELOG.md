@@ -8,9 +8,9 @@ All notable changes to this project are documented here. The format is based on
 
 ### Breaking
 - Scrolling over a plot with a `ViewInteractable` scrolls the page, as it does everywhere else
-  on the page. To zoom, hold Ctrl (Cmd on a Mac) while scrolling; in Chrome and Firefox a
-  trackpad pinch zooms too. A plain scroll over the plot shows a short hint in its corner
-  saying so. Before, any scroll over the plot zoomed it and the page stopped scrolling.
+  on the page. To zoom, hold Ctrl (Cmd on a Mac) while scrolling; a trackpad pinch zooms
+  too, now in Safari as well (#541). A plain scroll over the plot shows a short hint in its
+  corner saying so. Before, any scroll over the plot zoomed it and the page stopped scrolling.
   `ViewInteractable(ax; wheel = :always)` brings back the old behavior, and `wheel = :none`
   turns wheel zoom off. An axis whose scroll zoom is turned off in Makie, with
   `deregister_interaction!(ax, :scrollzoom)`, `deactivate_interaction!(ax, :scrollzoom)` or
@@ -32,6 +32,11 @@ All notable changes to this project are documented here. The format is based on
   and each edge has a grip. Its field is a `SpanEvent` with `lo` and `hi`. Points, lines, bars
   and shapes inside the band still answer hover and click; a heatmap or image inside it
   answers hover, and a press on it moves the band (#500).
+- On a touch screen a finger picks the nearest point or line within 16 pixels of it, instead
+  of only the mark under it, so a small marker or a thin line is easy to tap. Bars, polygons
+  and heatmap cells still take a tap inside them. `masque(fig; touch = (; radius = 8))` sets
+  the reach for the figure, `touch_radius` sets it for one plot or layer, and `touch = false`
+  turns it off. A mouse or a pen keeps its precision, also on a touchscreen laptop (#528).
 
 ### Changed
 - Default tooltips and readouts show a coordinate the way its axis labels it. On a
