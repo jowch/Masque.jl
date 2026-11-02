@@ -858,6 +858,35 @@ function yieldsToOtherAxis(manifest: Manifest, layer: HitLayer, x: number, y: nu
         l.axis !== layer.axis && l.events.includes(event) && inside(l.axis))
 }
 
+// Nested views (#559): an inset axis with its own view sits inside its parent's, so the
+// pointer over the inset is inside both. The smallest view rectangle that holds the point
+// takes the drag, the wheel and the corner buttons. The rule assumes nesting, where the
+// smaller view is the one drawn on top; of two views that only partly overlap, the smaller
+// wins whichever Makie drew last. Two the same size (twin axes sharing a viewport) go to the
+// first listed, as before. `ok` narrows which views count, so a view that can't take the
+// gesture leaves it to the next one out.
+export function innermostView(
+    manifest: Manifest, x: number, y: number, event = "drag", ok: (l: HitLayer) => boolean = () => true,
+): HitLayer | null {
+    let best: HitLayer | null = null
+    let bestArea = Infinity
+    for (const l of manifest.layers) {
+        if (l.kind !== "view" || !l.events.includes(event) || !ok(l)) continue
+        const g = l.geometry as ViewGeometry
+        if (x < g.x || x > g.x + g.w || y < g.y || y > g.y + g.h) continue
+        const a = g.w * g.h
+        if (a < bestArea) { best = l; bestArea = a }
+    }
+    return best
+}
+
+// A view yields the point to a smaller one inside it that holds the point too (#559).
+function yieldsToInnerView(manifest: Manifest, layer: HitLayer, x: number, y: number, event: string): boolean {
+    if (layer.kind !== "view") return false
+    const top = innermostView(manifest, x, y, event)
+    return top !== null && top !== layer
+}
+
 // Masque's own tools (threshold lines, ROI boxes, the view) draw over a legend, and a legend's
 // entries are the legend, so a box Makie draws over the plots hides neither.
 const OVER_OCCLUDERS: ReadonlySet<Kind> = new Set(["threshold", "span", "roi", "view", "control"])
@@ -877,6 +906,7 @@ export function hitTest(manifest: Manifest, px: number, py: number, event: strin
     for (const layer of manifest.layers) {
         if (!layer.events.includes(event)) continue
         if (yieldsToOtherAxis(manifest, layer, px, py, event)) continue
+        if (yieldsToInnerView(manifest, layer, px, py, event)) continue
         if (occludedAt(manifest, layer, px, py)) continue
         const h = hitLayer(layer, px, py, manifest.transforms[layer.axis], slop)
         if (h) return { layer, ...h }
@@ -1020,6 +1050,7 @@ export function hitTestAt(
         const f = layerFrame(manifest, photo, viewId, layer)
         if (f && !insideFrame(f, x, y)) continue
         if (yieldsToOtherAxis(manifest, layer, x, y, event)) continue
+        if (yieldsToInnerView(manifest, layer, x, y, event)) continue
         const p = f ? frameInverse(f, x, y) : { x, y }
         // In the marks' own space: a live photograph moves the legend's pixels with them.
         if (occludedAt(manifest, layer, p.x, p.y)) continue
