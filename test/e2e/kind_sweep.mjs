@@ -3115,6 +3115,19 @@ try {
         // Grab the line where the drag above released it, then release 20.45 px further on.
         const sx = frame.left + released[0] * frame.s, sy = frame.top + released[1] * frame.s;
         const ex = horiz ? sx : Math.round(sx + 20) + 0.45, ey = horiz ? Math.round(sy + 20) + 0.45 : sy;
+        // Count what the release sends (#567): an "input" event on the host is a value handed
+        // to Pluto, so a failure below says whether the gesture committed nothing or Pluto did.
+        await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          window.__releaseLog = { inputs: [], downs: 0, ups: 0 };
+          if (!host.__releaseCounting) {
+            host.__releaseCounting = true;
+            host.addEventListener("input", () => window.__releaseLog?.inputs.push(JSON.stringify(host.value).slice(0, 160)));
+            host.addEventListener("pointerdown", () => { if (window.__releaseLog) window.__releaseLog.downs++ }, true);
+            host.addEventListener("pointerup", () => { if (window.__releaseLog) window.__releaseLog.ups++ }, true);
+          }
+        }, key);
         await page.mouse.move(sx, sy);
         await page.mouse.down();
         await page.mouse.move((sx + ex) / 2, (sy + ey) / 2, { steps: 4 });
@@ -3140,6 +3153,18 @@ try {
           await new Promise((r) => setTimeout(r, 200));
         }
         if (t === prev || !Number.isFinite(got) || Math.abs(got - tipVal) > tipTol) {
+          const log = await page.evaluate(() => window.__releaseLog);
+          let late = t;
+          for (let i = 0; i < 100 && late === prev; i++) { await new Promise((r) => setTimeout(r, 200)); late = await textOf(`#out_${key}`); }
+          const out = t !== prev ? `changed to ${JSON.stringify(t)} (no wait)` : late === prev ? "still unchanged 20 s later" : `became ${JSON.stringify(late)} within 20 s more`;
+          // The host's value now: Pluto writes its server value back into the host, so a stale
+          // value here with the new one in `inputs` means it wrote an old one back (#567).
+          const hostValue = await page.evaluate((k) => {
+            const span = document.querySelector(`#coords_${k}`);
+            const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+            return JSON.stringify(host.value).slice(0, 160);
+          }, key);
+          console.error(`${key}/release-fractional: pointerdown ${log?.downs}, pointerup ${log?.ups}, inputs ${JSON.stringify(log?.inputs)}; #out_${key} ${out}; host value ${hostValue}`);
           throw new Error(`${key}/release-fractional: committed ${JSON.stringify(t)}, want the tooltip's ${JSON.stringify(tipText)}`);
         }
         passed.push(`${key}/release-fractional`);
