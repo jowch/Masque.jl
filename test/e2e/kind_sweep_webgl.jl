@@ -182,6 +182,17 @@ HTML(
         "<span id=\"axes_axis_polar\" style=\"display:none\">$(JSON3.write(sweep.axis_polar.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000186
+@bind ev_tick_units sweep.tick_units
+
+# ╔═╡ d1000000-0000-0000-0000-000000000187
+HTML(
+    "<span id=\"out_tick_units\">TICK_UNITS=$(sweep_field("tick_units", ev_tick_units))</span>" *
+        "<span id=\"bond_tick_units\" style=\"display:none\">$(repr(ev_tick_units))</span>" *
+        "<span id=\"coords_tick_units\" style=\"display:none\">$(JSON3.write(sweep.tick_units.manifest["layers"]))</span>" *
+        "<span id=\"axes_tick_units\" style=\"display:none\">$(JSON3.write(sweep.tick_units.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000036
 @bind ev_scatter_dark sweep.scatter_dark
 
@@ -363,10 +374,10 @@ HTML(
         "<span id=\"coords_surface3d\" style=\"display:none\">$(JSON3.write(sweep.surface3d.manifest["layers"]))</span>",
 )
 
-# ╔═╡ d1000000-0000-0000-0000-000000000186
+# ╔═╡ d1000000-0000-0000-0000-000000000200
 @bind ev_surface_polar sweep.surface_polar
 
-# ╔═╡ d1000000-0000-0000-0000-000000000187
+# ╔═╡ d1000000-0000-0000-0000-000000000201
 HTML(
     "<span id=\"out_surface_polar\">SURFACE_POLAR=$(sweep_field("surface_polar", ev_surface_polar))</span>" *
         "<span id=\"bond_surface_polar\" style=\"display:none\">$(repr(ev_surface_polar))</span>" *
@@ -627,6 +638,26 @@ HTML(
         "<span id=\"coords_roi_bounds\" style=\"display:none\">$(JSON3.write(sweep.roi_bounds.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000196
+@bind ev_threshold_default sweep.threshold_default
+
+# ╔═╡ d1000000-0000-0000-0000-000000000197
+HTML(
+    "<span id=\"out_threshold_default\">THRESHOLD_DEFAULT=$(sweep_field("threshold_default", ev_threshold_default))</span>" *
+        "<span id=\"bond_threshold_default\" style=\"display:none\">$(repr(ev_threshold_default))</span>" *
+        "<span id=\"coords_threshold_default\" style=\"display:none\">$(JSON3.write(sweep.threshold_default.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000198
+@bind ev_roi_default sweep.roi_default
+
+# ╔═╡ d1000000-0000-0000-0000-000000000199
+HTML(
+    "<span id=\"out_roi_default\">ROI_DEFAULT=$(sweep_field("roi_default", ev_roi_default))</span>" *
+        "<span id=\"bond_roi_default\" style=\"display:none\">$(repr(ev_roi_default))</span>" *
+        "<span id=\"coords_roi_default\" style=\"display:none\">$(JSON3.write(sweep.roi_default.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000064
 @bind ev_axis_cat sweep.axis_cat
 
@@ -790,6 +821,12 @@ HTML(
         "<span id=\"axes_onchange\" style=\"display:none\">$(JSON3.write(sweep.onchange.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000535
+# How many times the cell reading the controls' bond has run: a control commit must run it
+# once (#458). It has no inputs, so Pluto never runs it again. The count shows in a span named
+# `count_controls`: Pluto already gives the page an element with the variable's own name.
+runs_controls = Ref(0)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000170
 @bind ev_controls sweep.controls
 
@@ -799,7 +836,8 @@ HTML(
         "<span id=\"bond_controls\" style=\"display:none\">$(repr(ev_controls))</span>" *
         "<span id=\"coords_controls\" style=\"display:none\">$(JSON3.write(sweep.controls.manifest["layers"]))</span>" *
         "<span id=\"axes_controls\" style=\"display:none\">$(JSON3.write(sweep.controls.manifest["transforms"]))</span>" *
-        "<span id=\"ran_controls\" style=\"display:none\">$(time_ns())</span>",
+        "<span id=\"ran_controls\" style=\"display:none\">$(time_ns())</span>" *
+        "<span id=\"count_controls\" style=\"display:none\">$(runs_controls[] += 1)</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000129
@@ -966,6 +1004,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000025
 # ╠═d1000000-0000-0000-0000-000000000074
 # ╠═d1000000-0000-0000-0000-000000000075
+# ╠═d1000000-0000-0000-0000-000000000186
+# ╠═d1000000-0000-0000-0000-000000000187
 # ╠═d1000000-0000-0000-0000-000000000036
 # ╠═d1000000-0000-0000-0000-000000000037
 # ╠═d1000000-0000-0000-0000-000000000068
@@ -1002,8 +1042,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-00000000010a
 # ╠═d1000000-0000-0000-0000-000000000123
 # ╠═d1000000-0000-0000-0000-000000000124
-# ╠═d1000000-0000-0000-0000-000000000186
-# ╠═d1000000-0000-0000-0000-000000000187
+# ╠═d1000000-0000-0000-0000-000000000200
+# ╠═d1000000-0000-0000-0000-000000000201
 # ╠═d1000000-0000-0000-0000-000000000188
 # ╠═d1000000-0000-0000-0000-000000000189
 # ╠═d1000000-0000-0000-0000-000000000125
@@ -1052,6 +1092,10 @@ HTML(
 # ╟─d1000000-0000-0000-0000-000000000120
 # ╠═d1000000-0000-0000-0000-000000000121
 # ╟─d1000000-0000-0000-0000-000000000122
+# ╠═d1000000-0000-0000-0000-000000000196
+# ╟─d1000000-0000-0000-0000-000000000197
+# ╠═d1000000-0000-0000-0000-000000000198
+# ╟─d1000000-0000-0000-0000-000000000199
 # ╠═d1000000-0000-0000-0000-000000000064
 # ╠═d1000000-0000-0000-0000-000000000065
 # ╠═d1000000-0000-0000-0000-000000000032
@@ -1086,6 +1130,7 @@ HTML(
 # ╟─d1000000-0000-0000-0000-000000000195
 # ╠═d1000000-0000-0000-0000-000000000160
 # ╠═d1000000-0000-0000-0000-000000000161
+# ╠═d1000000-0000-0000-0000-000000000535
 # ╠═d1000000-0000-0000-0000-000000000170
 # ╠═d1000000-0000-0000-0000-000000000171
 # ╠═d1000000-0000-0000-0000-000000000129

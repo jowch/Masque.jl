@@ -114,7 +114,7 @@ describe(":surface highlight and tooltip", () => {
 })
 
 describe(":surface tooltip and restored selection", () => {
-    const ctx = (L: HitLayer) => ({ manifest_: { layers: [L] }, tipDigits_: 4 }) as unknown as OverlayCtx
+    const ctx = (L: HitLayer) => ({ manifest_: { layers: [L], transforms: {} }, tipDigits_: 4 }) as unknown as OverlayCtx
 
     it("shows the point's fields, with a payload's own fields winning a clash", () => {
         const L = layer(flat(), Array.from({ length: 9 }, (_, k) => ({ name: `p${k}`, z: -1 })))
