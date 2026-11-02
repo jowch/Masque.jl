@@ -84,7 +84,7 @@ overlaystyle `color` when one is set, else the mark's colour moved 45% toward bl
 plot area or white on a dark one, else (no `colors`) the chrome grey. Other plots in the axis,
 grid lines and text keep their look, except where a faded mark's cover lies over them; a legend's
 pick fades every series that legend names, lines included, and the picked line keeps its own
-colour (no wash). A whole line picked with no other line in scope to fade (a lone line on an
+colour (no wash). A whole line picked with no other line in scope to fade (a lone `stairs!` on an
 Axis3) keeps a pick halo along it instead. The picks are punched out in drawing order (each
 layer's `draw`, its plot's place in the backend's order), and a faded line drawn after a kept
 mark it meets (or any faded mark drawn after a kept line) has its cover put back over it, so a
@@ -203,7 +203,7 @@ bake it; hover/click or drag only.
 | Scatter (dark figure) | `:circles` | fade toward the dark background | tip, click `@bind`, persist, flat `#c8c8c8` edge stroke + dodge fill brightens the marker's interior (screenshot) on the dark figure too, still readable |
 | Arrows3D | `:segments` | ring | tip, click `@bind`, persist |
 | Axis3 scatter / meshscatter | `:circles` | fade, `r` from the projected mark | tip, click `@bind`, persist, hover highlight on the projected mark |
-| Axis3 lines | `:lines` | none (one element) | tip, readout `x`/`y`/`z` (#502), click `@bind` (whole line) |
+| Axis3 lines | `:lines` | point ring (`selected = [1]`) | tip, readout `x`/`y`/`z` (#502), click `@bind` picks the point, with `z` (#518) |
 | Axis3 wireframe | `:segments` (one per edge) | ring | tip, click `@bind`, persist, ring on the edge |
 | Axis3 overlapping pair | `:circles` over `:circles` | none | the plot drawn last answers where both claim the pixel (its layer sorts first), highlight takes its circle |
 | Text | `:rects` | fade | tip, click `@bind`, persist |

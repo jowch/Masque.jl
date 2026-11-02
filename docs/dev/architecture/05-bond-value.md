@@ -13,13 +13,13 @@ A layer's role decides its field:
   `nothing` until a click, then one event; a second click on the same element clears it. A
   default line (`:polyline` or `:lines` kind from a plot `masque(fig)` found by itself) is
   hover-only unless `bind` names it: neither the whole line nor a point on it is the obvious
-  pick. A bound `:lines` layer with `points` (any 2D line) picks the data point a hover reads
-  out: the wire adds `sample` (0-based) to `{layer, index}`, `index` still naming the line, and
-  the `ElementEvent`'s `index` is the 1-based sample, its payload the line's plus `line`, `x`,
-  `y`. The overlay rings the point (the selected-open ring around a circle of the line's hit
-  slack). `selected=` indices on such a layer are samples, for one line only. A line without
-  `points`, or an `Axis3` line (which has `zpoints`, for the readout only), still picks the
-  whole line: a point pick there changes what `pick.index` means, so it waits for a minor.
+  pick. A bound `:lines` layer with `points` picks the data point a hover reads out: the wire
+  adds `sample` (0-based) to `{layer, index}`, `index` still naming the line, and the
+  `ElementEvent`'s `index` is the 1-based sample, its payload the line's plus `line`, `x`, `y`
+  (and `z` from `zpoints` on an `Axis3`, since 0.5.0, #518). The overlay rings the point (the
+  selected-open ring around a circle of the line's hit slack). `selected=` indices on such a
+  layer are samples, for one line only. A line without `points` (a staircase on an `Axis3`)
+  still picks the whole line.
 - **Control**: a threshold (stamp `"threshold"`) or an ROI box (stamp `"bounds"`, with or
   without `selects`). Always holds its event, starting at the constructor's `value` or
   `bounds`.

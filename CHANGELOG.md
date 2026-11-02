@@ -21,6 +21,11 @@ All notable changes to this project are documented here. The format is based on
   your own `payloads` fields. Templates and the fields you set yourself are unchanged, and so
   is the `@bind` value. A set `tooltip_sigdigits` wins over the
   format's precision. See "Axis units" on the Tooltips page (#510).
+- **Breaking:** a click on a bound line on an `Axis3` picks the point you plotted nearest
+  the click, as on a 2D `Axis`, where it used to pick the whole line. `pick.index` is now
+  that point's position in your data, `pick.line` says which line it is on, and `pick.x`,
+  `pick.y` and `pick.z` hold it. `selected=` indices on such a line name points too. To
+  upgrade, code that read `pick.index` as the line now reads `pick.line` (#518).
 
 ## [0.4.5] - 2026-11-02
 
@@ -38,6 +43,7 @@ All notable changes to this project are documented here. The format is based on
   pointer, as a line on a 2D `Axis` does, and a tooltip template can name `z`. This covers
   `lines!`, `scatterlines!`'s line, `contour3d!` and a 3D `streamplot!`. A click still picks
   the whole line (#502).
+
 ## [0.4.4] - 2026-11-01
 
 ### Fixed
