@@ -1,7 +1,7 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, surfaceSelection } from "./selection"
 import { emptyMask, maskHit } from "./gridmask"
-import { applyMove, onLeave, hideTip, setMarkAccent, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip, replaceTip } from "./hover"
+import { applyMove, onLeave, hideTip, hideViewReadout, showViewReadout, syncFocusTip, replaceTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
 import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
@@ -250,6 +250,17 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-halo-ink, var(--ma
        font: var(--masque-tip-font-size, 11px)/1.4 var(--masque-tip-font, system-ui, -apple-system, sans-serif);
        max-width: calc(100% - 32px); transition: opacity ${MOTION_MS}ms ease-out; }
 .masque-note.show { opacity: 1; }
+/* A moving view's limits readout (#526): the note's box, in the same corner. Shown and hidden
+   at once, as the readout it replaces followed the pointer without a fade. An error note that
+   lands meanwhile sits above it. */
+.masque-readout { position: absolute; left: 8px; bottom: 8px; display: none; pointer-events: none; z-index: 11;
+       padding: 4px 8px; border-radius: var(--masque-tip-radius, 4px);
+       background: var(--masque-tip-bg-resolved); color: var(--masque-tip-color-resolved);
+       border: 1px solid var(--masque-tip-border-resolved);
+       font: var(--masque-tip-font-size, 11px)/1.4 var(--masque-tip-font, system-ui, -apple-system, sans-serif);
+       font-variant-numeric: tabular-nums; max-width: calc(100% - 32px); }
+.masque-readout.show { display: block; }
+.masque-readout.show ~ .masque-note { bottom: calc(18px + 1.4 * var(--masque-tip-font-size, 11px) + 10px); }
 .masque-tip-row { display: flex; gap: 8px; justify-content: space-between; }
 .masque-tip-key { color: var(--masque-tip-accent, #6b7280); }
 .masque-tip-val { font-variant-numeric: tabular-nums; }
@@ -489,27 +500,30 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     liveRegion.setAttribute("aria-live", "polite")
     liveRegion.setAttribute("aria-atomic", "true")
 
+    const readout = document.createElement("div")
+    readout.className = "masque-readout"
+    readout.setAttribute("aria-hidden", "true") // the keys announce their readout themselves
     const note = document.createElement("div")
     note.className = "masque-note"
     note.setAttribute("role", "status")
     let noteTimer: ReturnType<typeof setTimeout> | null = null
     // The same error again (a drag that keeps failing) keeps the note up without announcing
     // it again. The text goes once the note has faded, so a screen reader doesn't find it later.
-    const showNote = (text: string) => {
+    const showNote = (text: string, ms = NOTE_MS) => {
         if (note.textContent !== text) note.textContent = text
         note.classList.add("show")
         if (noteTimer !== null) clearTimeout(noteTimer)
         noteTimer = setTimeout(() => {
             note.classList.remove("show")
             noteTimer = setTimeout(() => { noteTimer = null; note.textContent = "" }, MOTION_MS)
-        }, NOTE_MS)
+        }, ms)
     }
 
     // The closed-mark selected look's canvases (fade.ts), one pair per axis, under every svg so
     // the hover fill dodges over them.
     const fadeRoot = document.createElement("div")
     fadeRoot.className = "masque-fades"
-    shadow.append(style, fadeRoot, fillSvg, edgeSvg, plainSvg, surface, tip, kbdHint, liveRegion, note)
+    shadow.append(style, fadeRoot, fillSvg, edgeSvg, plainSvg, surface, tip, kbdHint, liveRegion, readout, note)
     // Named Makie blocks, drawn as HTML over the empty boxes Julia left for them. A release
     // commits like any field; a slider moving under `onchange` redraws as it goes.
     const controls = buildControls(shadow, manifest, {
@@ -614,7 +628,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         },
     })
     const ctx: OverlayCtx = {
-        manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
+        manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, host_: host, base_: base, surface_: surface, tip_: tip, readout_: readout, hiGroup_: hiGroup, selGroup_: selGroup,
         hiFixed_: hiFixed, selFixed_: selFixed, linkGroup_: linkGroup, fade_: fade,
         thresholdLines_: thresholdLines, roiBoxes_: roiBoxes, chromeAt_: chromeAt,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
@@ -886,7 +900,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ctx.fade_.hover_(null, null, [])
         // A frame that lands mid-pan, mid-wheel, or mid-key would wipe the readout the gesture is
         // still showing. Pointer-up, the wheel idle timer, and the key's settle frame hide it.
-        if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) hideTip(ctx, state)
+        if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) {
+            hideTip(ctx, state)
+            hideViewReadout(ctx)
+        }
 
         // Re-key the LIVE selection against the new layer objects — do NOT re-derive it from
         // the mount manifest's `initial`, which is only the starting value (a frame's manifest
@@ -1233,21 +1250,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         focusTo(ctx, state, null)
     }
 
-    // The hint wears the tooltip, so it follows the figure's tooltip theme. It hides only
-    // itself: a hover or zoom readout that has replaced it keeps the tooltip.
-    const wheelHint = () => `${isApplePlatform() ? "Cmd" : "Ctrl"} + scroll to zoom`
-    const showWheelHint = (e: WheelEvent) => {
-        const text = wheelHint()
-        setTipText(ctx, state, text)
-        setMarkAccent(ctx, null)
-        setTipVisible(ctx, true)
-        const tp = tipOffset(ctx, e)
-        placeTip(ctx, state, tp.x, tp.y)
-        if (state.wheelHintTimer_ !== null) clearTimeout(state.wheelHintTimer_)
-        state.wheelHintTimer_ = setTimeout(() => {
-            state.wheelHintTimer_ = null
-            if (state.tipHtml_ === text) hideTip(ctx, state)
-        }, WHEEL_HINT_MS)
+    // A plain wheel over a `wheel = :modifier` view says how to zoom, in the note at the
+    // figure's corner, as maps do (#526). An `onchange` error the note is showing wins.
+    const wheelHint = `${isApplePlatform() ? "Cmd" : "Ctrl"} + scroll to zoom`
+    const showWheelHint = () => {
+        if (note.classList.contains("show") && note.textContent !== wheelHint) return
+        showNote(wheelHint, WHEEL_HINT_MS)
     }
 
     const onWheel = (e: WheelEvent) => {
@@ -1281,7 +1289,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // A trackpad pinch arrives as Ctrl+wheel in Chrome and Firefox, so it still zooms.
         if (wheel === "none") return
         if (wheel === "modifier" && !e.ctrlKey && !e.metaKey) {
-            showWheelHint(e)
+            showWheelHint()
             return
         }
         e.preventDefault()
@@ -1291,15 +1299,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             // their center; the idle timer settles the last ones at full resolution.
             const lim = viewDrag.zoom3(state, id, shown, wheelScale(e.deltaY, e.deltaMode))
             ctx.gesture_.request({ id, limits: lim, settle: false })
-            setTipText(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_))
-            setTipVisible(ctx, true)
-            const tp = tipOffset(ctx, e)
-            placeTip(ctx, state, tp.x, tp.y)
+            showViewReadout(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_))
             if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
             const wheelId = id
             state.wheelTimer_ = setTimeout(() => {
                 state.wheelTimer_ = null
-                hideTip(ctx, state)
+                hideViewReadout(ctx)
                 ctx.gesture_.settle({ id: wheelId, limits: viewDrag.view3Base(state, wheelId, shown), settle: true })
             }, WHEEL_IDLE_MS)
             return
@@ -1312,17 +1317,14 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const lim = matrixLimits(ctx.manifest_.transforms[axis], next)
         if (lim) {
             ctx.gesture_.request({ id, ...lim, settle: false, s: next.s, tx: next.tx, ty: next.ty })
-            setTipText(ctx, state, limitsTip(lim, ctx.tipDigits_))
-            setTipVisible(ctx, true)
-            const tp = tipOffset(ctx, e)
-            placeTip(ctx, state, tp.x, tp.y)
+            showViewReadout(ctx, state, limitsTip(lim, ctx.tipDigits_))
         }
         if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
         const wheelId = id
         const wheelAxis = axis
         state.wheelTimer_ = setTimeout(() => {
             state.wheelTimer_ = null
-            hideTip(ctx, state)
+            hideViewReadout(ctx)
             const layer = ctx.manifest_.layers.find((l) => l.id === wheelId)
             const shown = layer ? ctx.manifest_.transforms[layer.axis] : ctx.manifest_.transforms[wheelAxis]
             if (!shown) return
@@ -1380,8 +1382,6 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         if (state.announceTimer_ != null) clearTimeout(state.announceTimer_)
         if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
         state.wheelTimer_ = null
-        if (state.wheelHintTimer_ !== null) clearTimeout(state.wheelHintTimer_)
-        state.wheelHintTimer_ = null
         state.photo_ = IDENTITY
         paintPhoto(IDENTITY)
         channel.dispose() // abandon anything in flight — a late response must not touch a dead DOM

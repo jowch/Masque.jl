@@ -44,10 +44,11 @@ end
 
 Drag the plot to pan. To zoom around the pointer, hold Ctrl (Cmd on a
 Mac) while you scroll, or pinch on a trackpad. A plain scroll over the
-plot scrolls the page and shows a short hint saying how to zoom. The
-axis frame stays in place while the data moves inside it, and you can
-hover over and click the points wherever they move to. `pick` changes
-only when you click a point, and the view has no field of its own.
+plot scrolls the page and shows a short hint in the corner of the figure
+saying how to zoom. The axis frame stays in place while the data moves
+inside it, and you can hover over and click the points wherever they
+move to. `pick` changes only when you click a point, and the view has no
+field of its own.
 
 To zoom on a plain scroll instead, pass `wheel = :always`. The page then
 stops scrolling while the pointer is over the plot. `wheel = :none`

@@ -473,7 +473,7 @@ try {
   };
 
   // #526: on a default `wheel = :modifier` view a plain wheel scrolls the page, leaves the view
-  // alone, and shows the "Ctrl + scroll to zoom" hint in the tooltip. A real wheel (no
+  // alone, and shows the "Ctrl + scroll to zoom" hint in the corner note. A real wheel (no
   // modifier) at the view's center; scrolls up instead when the page is near its bottom.
   const plainWheelScrolls = async (key, g, what) => {
     if ((g.wheel ?? "modifier") !== "modifier") throw new Error(`${key}: expected the default wheel = modifier, got ${JSON.stringify(g.wheel)}`);
@@ -487,28 +487,52 @@ try {
       const se = document.scrollingElement;
       return { x: b.left + ix * s, y: b.top + iy * s, top: se.scrollTop, room: se.scrollHeight - se.clientHeight - se.scrollTop, photo: host.dataset.masquePhoto || "" };
     }, [key, g.x + g.w / 2, g.y + g.h / 2]);
+    await page.evaluate(() => {
+      window.__masqueWheelSeen = [];
+      if (!window.__masqueWheelSpy) {
+        window.__masqueWheelSpy = true;
+        // Bubble phase on window: runs after the target's own handlers, so it sees whether any
+        // of them took the wheel.
+        window.addEventListener("wheel", (e) => {
+          const t = e.composedPath()[0];
+          window.__masqueWheelSeen.push({ prevented: e.defaultPrevented, target: `${t?.tagName ?? "?"}.${t?.className?.baseVal ?? t?.className ?? ""}` });
+        }, { passive: true });
+      }
+    });
     await page.mouse.move(at.x, at.y);
-    // A short scroll, so the pointer stays over the plot: once the plot slides out from under
-    // it, the pointer has left and the hint goes with the rest of the tooltip.
+    // A short scroll, so the pointer stays over the plot.
     const dy = at.room > 300 ? 40 : -40;
     await page.mouse.wheel(0, dy);
-    await new Promise((r) => setTimeout(r, 150));
+    // Playwright doesn't wait for the scroll, and a busy WebGL page can take a while to apply it.
+    // The hint can lapse first, so it is read on every poll.
+    let hint = "";
+    for (let i = 0; i < 30; i++) {
+      const now = await page.evaluate(([k]) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const note = sr.querySelector(".masque-note");
+        return { top: document.scrollingElement.scrollTop, hint: note?.classList.contains("show") ? note.textContent : "" };
+      }, [key]);
+      if (now.hint) hint = now.hint;
+      if (now.top !== at.top && hint) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
     const after = await page.evaluate(([k]) => {
       const span = document.querySelector(`#coords_${k}`);
       const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-      const tip = sr.querySelector(".masque-tip");
-      return { top: document.scrollingElement.scrollTop, photo: host.dataset.masquePhoto || "", tip: tip?.textContent ?? "", shown: !!tip?.classList.contains("show") };
+      return { seen: window.__masqueWheelSeen, top: document.scrollingElement.scrollTop, photo: host.dataset.masquePhoto || "" };
     }, [key]);
-    if (Math.sign(after.top - at.top) !== Math.sign(dy)) throw new Error(`${key}-wheel: a plain wheel over the ${what} view did not scroll the page (${at.top} -> ${after.top})`);
+    if (Math.sign(after.top - at.top) !== Math.sign(dy)) throw new Error(`${key}-wheel: a plain wheel over the ${what} view did not scroll the page (${at.top} -> ${after.top}): ${JSON.stringify({ at, after })}`);
     if (after.photo !== at.photo) throw new Error(`${key}-wheel: a plain wheel zoomed the ${what} view (${JSON.stringify(after.photo)})`);
-    if (!after.shown || !/^(Ctrl|Cmd) \+ scroll to zoom$/.test(after.tip)) throw new Error(`${key}-wheel: no zoom hint after a plain wheel: ${JSON.stringify({ at, after })}`);
+    if (!/^(Ctrl|Cmd) \+ scroll to zoom$/.test(hint)) throw new Error(`${key}-wheel: no zoom hint in the corner note after a plain wheel: ${JSON.stringify({ at, after, hint })}`);
     await page.mouse.move(1, 1);
     await dispatchAt(key, 1, 1, "pointermove");
-    // Let the hint lapse so later checks start from a hidden tooltip.
+    // Let the hint lapse so later checks start from a hidden note.
     await new Promise((r) => setTimeout(r, 1700));
     passed.push(`${key}/plain-wheel-scrolls`);
-    console.error(`OK  ${key} — a plain wheel scrolled the page by ${after.top - at.top} px and showed "${after.tip}"`);
+    console.error(`OK  ${key} — a plain wheel scrolled the page by ${after.top - at.top} px and showed "${hint}"`);
   };
 
   const dispatchAt = async (key, x, y, type, mod = {}) => page.evaluate(async ([k, ix, iy, typ, md, haloCapture]) => {

@@ -168,6 +168,9 @@ export interface OverlayCtx {
     base_: HTMLElement
     surface_: HTMLElement
     tip_: HTMLElement
+    // The live limits readout of a moving view (pan, zoom, orbit, any input), at the figure's
+    // bottom-left corner instead of following the pointer, so it is never under a finger.
+    readout_: HTMLElement
     hiGroup_: HiSet
     selGroup_: HiSet
     // Legend, colorbar, and axis rings. Siblings of the photograph clip, so a live matrix
@@ -269,8 +272,6 @@ export interface OverlayState {
     photoAnchor_: { x: number; y: number } | null
     photoViewId_: string | null
     wheelTimer_: ReturnType<typeof setTimeout> | null
-    // Hides the "Ctrl + scroll to zoom" hint a plain wheel over a `wheel = :modifier` view shows.
-    wheelHintTimer_: ReturnType<typeof setTimeout> | null
     // A keyboard pan or orbit (dragkeys.ts) is between its first keydown and its keyup settle.
     // A frame that lands meanwhile keeps the readout, as it does for a pointer pan or a wheel.
     keyView_: boolean
@@ -321,7 +322,6 @@ export function createOverlayState(): OverlayState {
         photoAnchor_: null,
         photoViewId_: null,
         wheelTimer_: null,
-        wheelHintTimer_: null,
         keyView_: false,
         view3_: new Map(),
         view3Last_: null,

@@ -1208,9 +1208,15 @@ try {
       }));
       // Read in the same turn as the wheel: the readout hides 150 ms after the last notch, and
       // on a loaded software-GL page two animation frames can take longer than that.
-      const t = sr.querySelector(".masque-tip");
+      // The readout sits in the figure's bottom-left corner (#526), and no mark tooltip shows.
+      const t = sr.querySelector(".masque-readout");
       const cs = getComputedStyle(t);
-      const during = { show: t.classList.contains("show"), text: t.innerText, bg: cs.backgroundColor, color: cs.color };
+      const tb = t.getBoundingClientRect(), hb = sr.host.getBoundingClientRect();
+      const during = {
+        show: t.classList.contains("show"), text: t.innerText, bg: cs.backgroundColor, color: cs.color,
+        left: tb.left - hb.left, bottom: hb.bottom - tb.bottom,
+        tip: sr.querySelector(".masque-tip").classList.contains("show"),
+      };
       await new Promise((res) => setTimeout(res, 600));   // past the wheel's idle settle
       return { during, after: t.classList.contains("show") };
     }, ["view3d", view3.x + view3.w / 2, view3.y + view3.h / 2, deltaY]);
@@ -1220,6 +1226,10 @@ try {
     if (r.during.bg !== lightTip.bg || r.during.color !== lightTip.color) {
       throw new Error(`view3d/zoom-readout: readout theme ${r.during.bg}/${r.during.color} differs from the hover tooltip's ${lightTip.bg}/${lightTip.color}`);
     }
+    if (!(Math.abs(r.during.left - 8) <= 2 && Math.abs(r.during.bottom - 8) <= 2)) {
+      throw new Error(`view3d/zoom-readout: the readout is not in the figure's bottom-left corner: ${JSON.stringify(r.during)}`);
+    }
+    if (r.during.tip) throw new Error("view3d/zoom-readout: a mark tooltip shows while the view zooms");
     if (r.after) throw new Error("view3d/zoom-readout: the readout is still showing after the zoom settled");
     await wheel3(300);
     passed.push("view3d/zoom-readout");

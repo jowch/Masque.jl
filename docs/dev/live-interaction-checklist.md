@@ -121,10 +121,14 @@ to the figure's edge. A
 resolvable per-element `colors` (today `scatter!`'s `color=`) adds a 3px tooltip accent border
 in that colour (`--masque-mark-border`); the text stays neutral.
 
-The wheel hint (#526): a plain wheel over a `wheel = :modifier` view shows "Ctrl + scroll to
-zoom" ("Cmd" on Apple platforms) in the ordinary tooltip at the pointer, with no accent, the same
-box a drag readout uses, and hides it 1.5 s after the last plain wheel. It adds no chrome of its
-own; a hover or zoom readout that replaces it keeps the tooltip.
+View chrome (#526): a moving view's live limits readout (`x:[…] y:[…]`, and `z:[…]` on an
+`Axis3`) sits in `.masque-readout` at the figure's bottom-left corner, for every input (mouse
+drag, wheel, the view keys), instead of following the pointer, so it is never under a finger.
+It is the tooltip's box and theme, shown and hidden at once, and a mark's tooltip hides while
+the view moves. A plain wheel over a `wheel = :modifier` view shows "Ctrl + scroll to zoom"
+("Cmd" on Apple platforms) in `.masque-note`, the tooltip-themed note in the same corner that
+also carries an `onchange` error, for 1.5 s after the last plain wheel; it never covers an
+error the note is showing. A note that lands while the readout shows sits just above it.
 
 ROI chrome: 4 corner handles (7 CSS px, white fill, 1px chrome stroke, ~1.5 CSS px corner
 radius); a corner resizes two axes. The sides have no grip, but the manifest `handle` on each

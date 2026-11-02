@@ -458,15 +458,17 @@ describe("drag-layer tab stops", () => {
         mount(script, withFields(m), undefined, requestFrame)
         const shadow = (host.lastElementChild as HTMLElement).shadowRoot!
         const stop = stopOf(shadow, "view")
-        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        // The view's readout sits in the figure's corner (#526).
+        const readout = shadow.querySelector(".masque-readout") as HTMLElement
         stop.focus()
         press(stop, "ArrowRight")
         await new Promise((r) => setTimeout(r, 10))
         expect(requestFrame).toHaveBeenCalled()
-        expect(tip.classList.contains("show")).toBe(true)
+        expect(readout.classList.contains("show")).toBe(true)
+        expect(readout.textContent).toContain("x:[")
         release(stop, "ArrowRight")
         await new Promise((r) => setTimeout(r, 10))
-        expect(tip.classList.contains("show")).toBe(false)
+        expect(readout.classList.contains("show")).toBe(false)
     })
 
     it("cleanup removes the stops' listeners", () => {
