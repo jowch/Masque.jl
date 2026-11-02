@@ -20,7 +20,7 @@ radius under the pointer.
 | Select several marks (`select = :many`, see [Select several marks](@ref)) | yes | yes ⁴ | yes |
 | Drag a box to select marks (with `select = :many`) | yes ⁵ | yes ⁵ | yes |
 | Link selections across plots ([`linked`](@ref)) | yes | yes | yes |
-| Hover a line to read the nearest point you plotted | yes | no | yes |
+| Hover a line to read the nearest point you plotted | yes | yes ⁷ | yes |
 | Hover a surface to read its height | no ⁶ | yes | no |
 | Read `(x, y)` ([`AxisInteractable`](@ref)) | yes ¹ | no | yes ³ |
 | Drag a threshold ([`ThresholdInteractable`](@ref)) | yes ¹ | no | no |
@@ -46,19 +46,23 @@ turns the view, so hold Alt (Option on a Mac) to draw the box.
 
 ⁶ Draw the matrix with `heatmap!` to read its values on a 2D `Axis`.
 
+⁷ The tooltip shows `x`, `y` and `z`, but a click picks the whole
+line, not the point.
+
 A "no" in the last five rows, a scale outside that list (such as
 `Makie.pseudolog10` or `Makie.Symlog10`), or a categorical axis where ²
 requires a numeric one raises an `ArgumentError` when `masque` runs,
 instead of giving a wrong coordinate. The other "no" cells don't raise:
-a line on an `Axis3` still responds as one whole line, and a `surface!`
-is skipped with a warning. Orbiting an `Axis3` has no scale requirement.
+a `surface!` is skipped with a warning. Orbiting an `Axis3` has no
+scale requirement.
 `ViewInteractable` also raises an error when given a `Colorbar`.
 
 Legends, colorbars, and the sliders, toggles and menus of
 [Sliders, toggles and menus](@ref) belong to the figure, not to an
 axis, so they work next to any `Axis`, `Axis3`, or `PolarAxis`. A
 [`ColorbarInteractable`](@ref) reads values on `identity`, `log10`, and
-`log` colorbars.
+`log` colorbars, and a [`ThresholdInteractable`](@ref) drags a cutoff
+along them.
 
 `LScene` is not supported: on both backends, `masque` raises an error
 for a figure that contains one, so nothing in that figure responds, not
@@ -124,7 +128,9 @@ sized in data units (`markerspace = :data`) responds over each marker's
 drawn shape: a square over its square, a circle over its circle. To
 cover heatmap cells exactly, draw `marker = Rect` with `markersize = 1`;
 the `:rect` symbol draws a smaller square. Its layer has kind `:polygons`; pass `radius` to
-`interactables(plot; …)` to hit circles of that many pixels instead.
+`interactables(plot; …)` to hit circles of that many pixels instead. On an `Axis3`, the
+markers turn to face the camera, so each one responds over a circle the size of the marker.
+One drawn with a `marker_offset` is skipped with a warning.
 
 A recipe not in the table, such as `rainclouds!`, still gets each
 visible part the table knows, under that part's layer id: `rainclouds!`

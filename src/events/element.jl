@@ -36,14 +36,16 @@ function _element_event(id::Symbol, index, payloads)
 end
 
 # A line's pick is one of its data points, the one nearest the click. Lines on a 2D axis ship
-# their data points (`points`); a line on an `Axis3` doesn't, so its pick stays the whole line.
-_picks_points(L::HitLayer) = L.kind === :lines && L.points !== nothing
+# their data points (`points`). A line on an `Axis3` ships them too (with `zpoints`), for the
+# hover readout, but its pick stays the whole line: a point pick there changes what
+# `pick.index` means, which waits for a minor release.
+_picks_points(L::HitLayer) = L.kind === :lines && L.points !== nothing && L.zpoints === nothing
 
 # `ev` is the picked line; `s` the 1-based data point on it. `index` becomes the point, so
 # `xs[pick]` reads it, and the payload adds `line` (which line of a `series!`), `x` and `y`.
 # `data` is the line's samples at full precision from the Julia side, when the layer has an
 # owner there; without one the manifest's Float32 points stand in.
-function _line_point(ev::ElementEvent, d::AbstractDict, s::Int, data = nothing)
+function _line_point(ev::ElementEvent, d::AbstractDict, s::Int, data = nothing, zdata = nothing)
     id, k = getfield(ev, :layer), getfield(ev, :index)
     pts = get(d, "points", nothing)
     pts === nothing && throw(ArgumentError("bond: layer :$id sent a point, but its lines have no data points"))
@@ -53,7 +55,14 @@ function _line_point(ev::ElementEvent, d::AbstractDict, s::Int, data = nothing)
         ArgumentError("bond: layer :$id point $s out of range for line $k's $n data points" * (n > 0 ? " (valid: 1:$n)" : "")),
     )
     q = data !== nothing && length(data) == length(p) ? data : p
-    return ElementEvent(id, s, _point_payload(getfield(ev, :payload), k, _coord(q[2s - 1]), _coord(q[2s])))
+    zs = get(d, "zpoints", nothing)
+    z = if zs === nothing
+        nothing
+    else
+        zq = zdata !== nothing && length(zdata) == n ? zdata : zs[k]
+        _coord(zq[s])
+    end
+    return ElementEvent(id, s, _point_payload(getfield(ev, :payload), k, _coord(q[2s - 1]), _coord(q[2s]), z))
 end
 # Without an owner, a line's points come from the manifest as Float32. Widening by value turns
 # 0.4f0 into 0.4000000059604645; the shortest decimal that reads back as the same Float32 is
@@ -62,14 +71,16 @@ _coord(v::Float32) = isfinite(v) ? parse(Float64, Base.Ryu.writeshortest(v)) : F
 _coord(v::AbstractFloat) = Float64(v)
 _coord(v) = v
 # The line's own payload keys stay, except its `index`, which named the line and is now `line`.
-function _point_payload(pl::NamedTuple, line, x, y)
-    return merge((; line, x, y), Base.structdiff(pl, NamedTuple{(:index,)}))
+# On an Axis3 the point also has its `z`.
+_xyz(line, x, y, z) = z === nothing ? (; line, x, y) : (; line, x, y, z)
+function _point_payload(pl::NamedTuple, line, x, y, z = nothing)
+    return merge(_xyz(line, x, y, z), Base.structdiff(pl, NamedTuple{(:index,)}))
 end
-function _point_payload(pl::AbstractDict, line, x, y)
-    out = Dict{Any, Any}(:line => line, :x => x, :y => y)
+function _point_payload(pl::AbstractDict, line, x, y, z = nothing)
+    out = Dict{Any, Any}(pairs(_xyz(line, x, y, z)))
     for (k, v) in pl
         string(k) == "index" || (out[k] = v)
     end
     return out
 end
-_point_payload(pl, line, x, y) = (; line, x, y, value = pl)
+_point_payload(pl, line, x, y, z = nothing) = merge(_xyz(line, x, y, z), (; value = pl))

@@ -254,6 +254,9 @@ export interface LayerStyle {
 
 export type TemplateSegment = string | { f: string; spec?: string }
 
+// A :lines readout: [0-based sample index, x, y], and z on an Axis3.
+export type Readout = [number, number | string, number | string] | [number, number | string, number | string, number | string]
+
 export interface HitLayer {
     id: string
     kind: Kind
@@ -286,12 +289,20 @@ export interface HitLayer {
     // shared palette + one 0-based palette index per element (colormapped/categorical data).
     // Absent → no accent (unresolvable or not attempted for this plot kind).
     colors?: string | { palette: string[]; index: number[] }
-    // :lines on a 2D axis: per element, the data samples [x0, y0, x1, y1, …] that a hover
-    // readout snaps to. Vertex k of the drawn path is sample k, except for a staircase (`step`),
-    // whose drawn path adds a corner between samples. A coordinate on a categorical or date axis
-    // is its label or date text. Absent → no readout (Axis3, or a layer built by hand).
+    // :lines: per element, the data samples [x0, y0, x1, y1, …] that a hover readout snaps to.
+    // Vertex k of the drawn path is sample k, except for a staircase (`step`), whose drawn path
+    // adds a corner between samples, and a path cut by an Axis3's limits (`drawn`). A coordinate
+    // on a categorical or date axis is its label or date text. Absent → no readout (a layer
+    // built by hand).
     points?: (number | string)[][]
     step?: "pre" | "post" | "center"
+    // :lines on an Axis3: per element, the z of each sample in `points`. Such a line reads out
+    // its points but its pick stays the whole line.
+    zpoints?: (number | string)[][]
+    // :lines on a zoomed Axis3: per element, what each vertex of the drawn path is: 2k for sample
+    // k, 2k + 1 for where the edge from sample k is cut by the limits, -1 for a gap. null (or
+    // absent) for a path drawn whole.
+    drawn?: (number[] | null)[]
     // :circles and :rects: 0-based element indices, top first, to hit-test in, so the element
     // drawn on top wins an overlap (points and text on an Axis3, ordered by depth where the
     // backend sorts or depth-tests them). An element left out is not drawn. Absent → the last
@@ -358,7 +369,7 @@ export interface Hit {
     index: number // -1 for axis (continuous)
     geom_?: unknown[] // shape descriptor for highlight drawing
     grid_?: [number, number, number?] // [i, j, value]; value absent only when neither values nor sample was sent. A :surface point: [source i, source j, z]
-    pt_?: [number, number | string, number | string] // :lines readout: [0-based sample index, x, y] nearest the cursor
+    pt_?: Readout // :lines readout: the sample nearest the cursor
     sample_?: number // a picked point on a :lines layer: 0-based sample on line `index`, drawn as a ring
     region_?: number // a grid cell's region id (regions.ts), when it is in one: the hit stands for the whole region
     axis_?: string // transform id, for continuous inversion

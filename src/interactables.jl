@@ -85,8 +85,8 @@ struct HitLayer
     label::Union{Nothing, String}
     colors::Any
     links::Union{Nothing, Vector{Vector{Symbol}}}
-    # :lines on a 2D axis: per element, the data samples `[x1, y1, x2, y2, …]` a hover readout
-    # snaps to, and the staircase `step` mode when the drawn path adds corners between them.
+    # :lines: per element, the data samples `[x1, y1, x2, y2, …]` a hover readout snaps to,
+    # and the staircase `step` mode when the drawn path adds corners between them.
     points::Union{Nothing, Vector}
     step::Union{Nothing, Symbol}
     # :circles/:rects: 0-based element indices, top first, that the overlay hit-tests in; an
@@ -94,7 +94,16 @@ struct HitLayer
     order::Union{Nothing, Vector{Int}}
     # :circles: per element, the drawn outline as an ellipse, `(sxx, sxy, syy)` (image px²).
     ellipses::Union{Nothing, Vector}
+    # :lines on an Axis3: per element, the `z` of each sample in `points`.
+    zpoints::Union{Nothing, Vector}
+    # :lines on a zoomed Axis3, whose limits cut the drawn path: per element, what each vertex
+    # of the drawn geometry is, `2k` for sample `k` (0-based), `2k + 1` for a point where the
+    # edge from sample `k` is cut, `-1` for a gap. `nothing` for a path drawn whole, whose
+    # vertex `k` is sample `k`.
+    drawn::Union{Nothing, Vector}
 end
+HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses) =
+    HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses, nothing, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order) =
     HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step) =
@@ -451,10 +460,12 @@ use their own bbox in the same way, a `GeometryBasics` `Circle`/`Rect` marker dr
 per-element vector of markers) falls back to `markersize / 2` as a conservative bound. The
 marker's outline is added where it is drawn: half of `strokewidth` on CairoMakie, which
 centers the outline on the marker's edge, and all of it on WebGL, which paints it outside. This
-requires `markerspace = :pixel` (the default); pass `radius=` explicitly for any other
-markerspace, or it errors. `interactables(ax, p)` and `masque(fig)` build a `markerspace =
-:data` scatter as a [`PolygonInteractable`](@ref) instead, one polygon per marker's drawn
-shape, unless `radius` is passed. The points constructor above takes the same radius when exactly one
+requires `markerspace = :pixel` (the default) on a 2D axis; pass `radius=` explicitly for
+any other markerspace, or it errors. On an `Axis3`, a `markerspace = :data` scatter faces the
+camera, and its hit circle is the projected outline of a sphere of the marker's drawn radius,
+as for `meshscatter!`. On a 2D axis, `interactables(ax, p)` and `masque(fig)` build a
+`markerspace = :data` scatter as a [`PolygonInteractable`](@ref) instead, one polygon per
+marker's drawn shape, unless `radius` is passed. The points constructor above takes the same radius when exactly one
 `Scatter` on `ax` has the same positions (including a `scatterlines!`/`stem!` child scatter);
 it does not resolve `colors`. The overlay adds its own hit-test slack on top, so the smaller
 radius doesn't make small markers harder to click. The scatter constructor also resolves
@@ -495,10 +506,13 @@ struct PointInteractable <: AbstractInteractable
     # A scatter's `strokewidth` in px. How much of it lies outside the marker depends on the
     # backend (`InteractionContext.marker_stroke`), so it is added to `radius` in `hitlayers`.
     stroke::Float64
+    # `radius3d` is in world units, past the scene's model: a `markerspace = :data` scatter on
+    # an Axis3, whose camera-facing markers keep their size when the limits change.
+    billboard::Bool
     select::Symbol
 end
-PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke) =
-    PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke, :one)
+PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke, billboard::Bool = false) =
+    PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke, billboard, :one)
 function PointInteractable(
         ax, points; id = :points, payloads = nothing,
         radius = nothing, radius3d = nothing, tooltip = nothing, label = nothing, colors = nothing,
@@ -524,7 +538,7 @@ function PointInteractable(
     # including the `9` the MeshScatter constructor still forwards when it has no pixel radius.
     r, s = radius === nothing ? _point_radius(ax, pts) : (radius, 0.0)
     r = _check_radius(r, length(pts))
-    return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors, Makie.Vec2f(0, 0), s, select)
+    return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors, Makie.Vec2f(0, 0), s, false, select)
 end
 function _check_radius(r, n)
     r isa AbstractVector || return Float64(r)
@@ -565,6 +579,12 @@ function _px_outline3d(ctx, ax, p, e, q)
     end
     return max(half, sqrt((a + d) / 2 + hypot((a - d) / 2, b))), (a, b, d)
 end
+# A world-space half-extent as data-space half-extents along each axis: over the scale the
+# scene's model (which fits the limits into the Axis3 box) gives that axis.
+function _world_extent_to_data(ax, w)
+    M = Makie.transformationmatrix(ax.scene)[]
+    return Makie.Vec3f((w[c] / sqrt(sum(abs2, M[r, c] for r in 1:3)) for c in 1:3)...)
+end
 function hitlayers(i::PointInteractable, ctx)
     g = Real[]
     # A sphere's outline is an ellipse wherever the axes stretch it, and its hit circle (the
@@ -574,7 +594,8 @@ function hitlayers(i::PointInteractable, ctx)
     for (k, p) in enumerate(i.points)
         q = _proj(ctx, i.ax, p, box)
         r = if i.radius3d !== nothing
-            r3, (a, b, d) = _px_outline3d(ctx, i.ax, p, i.radius3d[k], q)
+            e = i.billboard ? _world_extent_to_data(i.ax, i.radius3d[k]) : i.radius3d[k]
+            r3, (a, b, d) = _px_outline3d(ctx, i.ax, p, e, q)
             append!(ell, (_q(a), _q(b), _q(d)))
             r3
         else
@@ -586,9 +607,11 @@ function hitlayers(i::PointInteractable, ctx)
     end
     # With no `order` the overlay puts the last point listed on top, as CairoMakie paints a
     # `scatter!`. On an Axis3, WebGL depth-tests markers and CairoMakie paints a `meshscatter!`
-    # (the points with `radius3d`) far to near, so there the nearest point is on top.
+    # (the points with `radius3d`) far to near, so there the nearest point is on top. A
+    # `markerspace = :data` scatter (`billboard`) is still a scatter: CairoMakie paints it in
+    # list order.
     order = nothing
-    if i.ax isa Makie.Axis3 && (ctx.depth_test || i.radius3d !== nothing)
+    if i.ax isa Makie.Axis3 && (ctx.depth_test || (i.radius3d !== nothing && !i.billboard))
         depth = _project_depth(ctx, i.ax, i.points)[3]
         ks = [k for k in eachindex(i.points) if isfinite(g[3k - 2]) && isfinite(g[3k - 1]) && isfinite(depth[k])]
         order = _top_first(ks, depth)
@@ -781,8 +804,10 @@ function _edge_px(ctx, ax, box, a, b)
     return t, at(t[1]), at(t[2])
 end
 _push_px!(g, q) = append!(g, (_q(q[1]), _q(q[2])))
-# One connected path (`:lines`): runs of visible edges, NaN-separated.
-function _clipped_path_px(ctx, ax, vs, box)
+# One connected path (`:lines`): runs of visible edges, NaN-separated. With `codes`, also
+# records what each vertex pushed is (see `HitLayer.drawn`): `2(k - 1)` for vertex `k` itself,
+# `2(k - 1) + 1` for a cut on the edge from vertex `k`, `-1` for a gap.
+function _clipped_path_px(ctx, ax, vs, box, codes = nothing)
     _needs_clip(box, vs) || return _flat_px(ctx, ax, vs, box)
     g = Real[]
     open = false   # g ends on the previous edge's far end, so the next edge continues from it
@@ -794,10 +819,15 @@ function _clipped_path_px(ctx, ax, vs, box)
         end
         (t0, t1), a, b = e
         if !(open && t0 == 0)
-            isempty(g) || isnan(g[end]) || append!(g, (NaN32, NaN32))
+            if !(isempty(g) || isnan(g[end]))
+                append!(g, (NaN32, NaN32))
+                codes === nothing || push!(codes, -1)
+            end
             _push_px!(g, a)
+            codes === nothing || push!(codes, t0 == 0 ? 2(k - 1) : 2(k - 1) + 1)
         end
         _push_px!(g, b)
+        codes === nothing || push!(codes, t1 == 1 ? 2k : 2(k - 1) + 1)
         open = t1 == 1
     end
     return g
@@ -829,6 +859,9 @@ function _flat_data(ax, vs, ::Type{T} = Float32) where {T}
     u = _unconvert_payloads(ax, Any[(; x = v[1], y = v[2]) for v in vs])
     return Any[c for pl in u for c in (pl.x, pl.y)]
 end
+# One line's sample `z`s, the third coordinate on an Axis3. Makie draws no category or date
+# axis on an Axis3, so they stay numbers.
+_flat_z(ax, vs, ::Type{T} = Float32) where {T} = T[v[3] for v in vs]
 _converts_dim(ax) = any((:dim1_conversion, :dim2_conversion)) do d
     hasproperty(ax, d) || return false
     c = getproperty(ax, d)[]
@@ -843,15 +876,11 @@ function hitlayers(i::SegmentInteractable, ctx)
             [vs]
         end
         box = _clipbox(i.ax)
-        geom = [_clipped_path_px(ctx, i.ax, path, box) for path in raw]
         aid = axis_id(ctx, i.ax)
-        # The readout's samples. Axis3 has no 2D sample to show the cursor's position on a path.
-        points, step = if ctx.transforms[aid].is3d
-            nothing, nothing
-        else
-            [_flat_data(i.ax, path) for path in _sample_paths(i, raw)], _step(i)
-        end
-        return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, step)]
+        ctx.transforms[aid].is3d && return _lines3d_layers(i, ctx, raw, box, aid)
+        geom = [_clipped_path_px(ctx, i.ax, path, box) for path in raw]
+        points = [_flat_data(i.ax, path) for path in _sample_paths(i, raw)]
+        return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, _step(i))]
     end
     vs = i.resolve === nothing ? i.vertices : [_pt3(v) for v in i.resolve(i.ax)]
     box = _clipbox(i.ax)
@@ -864,6 +893,33 @@ function hitlayers(i::SegmentInteractable, ctx)
     return [HitLayer(i.id, :segments, _clipped_pairs_px(ctx, i.ax, pairs, box), i.payloads, aid, events(i), i.label)]
 end
 
+# Lines on an Axis3. A pixel there is a ray, so the readout can't invert the cursor: each
+# sample's `x`, `y` and `z` ship, and the readout is the drawn vertex nearest the cursor along
+# the path, as on a 2D axis. Where the axis limits cut a path, `drawn` says which sample each
+# drawn vertex is. A staircase, or samples that aren't the path's vertices, ship no samples, so
+# the line reads out as a whole.
+function _lines3d_layers(i::SegmentInteractable, ctx, raw, box, aid)
+    samples = _sample_paths(i, raw)
+    ok = _step(i) === nothing && length(samples) == length(raw) && all(length.(samples) .== length.(raw))
+    drawn = Any[]
+    geom = map(raw) do path
+        ok && _needs_clip(box, path) || (push!(drawn, nothing); return _clipped_path_px(ctx, i.ax, path, box))
+        codes = Int[]
+        g = _clipped_path_px(ctx, i.ax, path, box, codes)
+        push!(drawn, codes)
+        return g
+    end
+    ok || return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label)]
+    points = [_flat_data(i.ax, path) for path in samples]
+    zpoints = [_flat_z(i.ax, path) for path in samples]
+    return [
+        HitLayer(
+            i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, nothing, nothing, nothing,
+            zpoints, all(isnothing, drawn) ? nothing : drawn,
+        ),
+    ]
+end
+
 # Each line's data samples, as plotted. A line built without samples reads them off its path.
 _sample_paths(i::SegmentInteractable, raw = nothing) = i.samples !== nothing ? i.samples[2] :
     raw !== nothing ? raw : i.paths !== nothing ? i.paths :
@@ -873,6 +929,9 @@ _step(i::SegmentInteractable) = i.samples === nothing ? nothing : i.samples[1]
 # owner isn't a line of data points.
 _line_data(i::SegmentInteractable, k) = i.unit === :line ? _flat_data(i.ax, _sample_paths(i)[k], Float64) : nothing
 _line_data(i, k) = nothing
+# Line `k`'s sample `z`s at full precision, on an Axis3; `nothing` elsewhere.
+_line_zdata(i::SegmentInteractable, k) = i.unit === :line && i.ax isa Makie.Axis3 ? _flat_z(i.ax, _sample_paths(i)[k], Float64) : nothing
+_line_zdata(i, k) = nothing
 
 # ============================ RectInteractable =============================
 """
@@ -2081,21 +2140,23 @@ end
 
 # ============================ ThresholdInteractable ========================
 """
-    ThresholdInteractable(ax; orientation=:horizontal, value=nothing, id=:threshold, update_while_dragging=true)
+    ThresholdInteractable(ax; orientation, value=nothing, id=:threshold, update_while_dragging=true)
 
 A draggable horizontal or vertical line: drag for a live client-side readout, and the pixel
 position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up. Produces one
 `:threshold` [`HitLayer`](@ref).
 
 # Arguments
-- `ax` — a `Makie.Axis`.
+- `ax` — a `Makie.Axis`, or a `Makie.Colorbar` to drag a cutoff along its color scale.
 - `orientation` — `:horizontal` (constant-y line, dragged vertically) or `:vertical`
   (constant-x line, dragged horizontally). Any other value raises `ArgumentError`. Default
-  `:horizontal`.
+  `:horizontal` on an `Axis`. On a `Colorbar` the line runs across the bar, so it follows the
+  colorbar: `:horizontal` on a vertical colorbar, `:vertical` on a horizontal one; leave it out.
 - `value` — the line's initial data-space position (a y-value for `:horizontal`, x-value for
-  `:vertical`). Default: the middle of the axis's limits along the dragged dimension, as they
-  are when `masque` runs. On a `log10` or `log` scale that is the middle on screen (the
-  geometric mean of the limits); on a categorical axis, the middle category in view.
+  `:vertical`; on a `Colorbar`, a value on its scale, inside its limits). Default: the middle
+  of the axis's limits along the dragged dimension, as they are when `masque` runs. On a
+  `log10` or `log` scale that is the middle on screen (the geometric mean of the limits); on a
+  categorical axis, the middle category in view; on a `Colorbar`, the middle of its scale.
 - `id` — the layer id; becomes `InteractionEvent.layer` on commit. Default `:threshold`.
 - `update_while_dragging` — with `onchange` on [`masque`](@ref), redraw the figure while the
   line moves, not only when it is let go. Default `true`, like Makie's `Slider`. The `@bind`
@@ -2104,14 +2165,16 @@ position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up.
 Payload on commit (client-side): the scalar data coordinate.
 
 Its field in the `@bind` value starts as a [`ThresholdEvent`](@ref) at `value` (with its
-`category` on a categorical axis, when `value` is a category's position).
+`category` on a categorical axis, when `value` is a category's position). On a `Colorbar` the
+value is in the colorbar's units, the same ones a [`ColorbarInteractable`](@ref) click reads.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
 a data value — inversion is undefined), a `PolarAxis` (a straight line is neither a constant r nor
-a constant θ), a `Colorbar` (use [`ColorbarInteractable`](@ref) to read a value off it, or put
-the threshold on an `Axis`, such as a histogram of the same values), or
-the dragged axis's scale isn't client-invertible (`:horizontal` needs the y-scale, `:vertical`
-the x-scale; supported: `identity`, `log10`, `log`).
+a constant θ), or a `Legend`; if the dragged scale isn't client-invertible (`:horizontal` needs
+the y-scale, `:vertical` the x-scale, a `Colorbar` its own scale; supported: `identity`,
+`log10`, `log`); or, on a `Colorbar`, if `orientation` runs along the bar instead of across it.
+On a `Colorbar`, a `value` outside the colorbar's limits raises `ArgumentError` here. If an
+`onchange` later moves the limits past the line, the line waits at the end of the bar.
 
 # Examples
 ```julia
@@ -2119,6 +2182,10 @@ ThresholdInteractable(ax; orientation = :horizontal, value = 5.0)
 
 # starts halfway up the axis
 ThresholdInteractable(ax)
+
+# a cutoff on the colorbar of a heatmap `hm`
+cb = Colorbar(fig[1, 2], hm)
+ThresholdInteractable(cb; value = 0.5)
 ```
 """
 struct ThresholdInteractable <: AbstractInteractable
@@ -2128,18 +2195,36 @@ struct ThresholdInteractable <: AbstractInteractable
 end
 # The 0.3.0 positional form, before `update_while_dragging`.
 ThresholdInteractable(ax, orientation::Symbol, value::Real, id::Symbol) = ThresholdInteractable(ax, orientation, value, id, true)
-function ThresholdInteractable(ax; orientation = :horizontal, value = nothing, id = :threshold, update_while_dragging::Bool = true)
+function ThresholdInteractable(ax; orientation = _threshold_orientation(ax), value = nothing, id = :threshold, update_while_dragging::Bool = true)
     orientation in (:horizontal, :vertical) ||
         throw(ArgumentError("ThresholdInteractable: orientation must be :horizontal or :vertical, got $(orientation)"))
-    return ThresholdInteractable(ax, orientation, _threshold_value(value), id, update_while_dragging)
+    v = _threshold_value(value)
+    ax isa Makie.Colorbar && v !== nothing && _check_on_bar(ax, v)
+    return ThresholdInteractable(ax, orientation, v, id, update_while_dragging)
 end
+# Only the value the author writes is held to the colorbar's limits, as they are when it is
+# written. A value the browser sends back can sit a rounding error past the end of the bar, and
+# an `onchange` can move the limits under the line; a redraw then draws the line at the end of
+# the bar instead (`_colorbar_pos`).
+function _check_on_bar(cb, v)
+    lims = cb.limits[]
+    lims === nothing && return nothing
+    lo, hi = minmax(Float64(lims[1]), Float64(lims[2]))
+    lo <= v <= hi || throw(
+        ArgumentError(
+            "ThresholdInteractable: value = $(v) is outside the colorbar's limits ($(lo), $(hi)), " *
+                "so the line would sit off the bar. Pick a value inside them."
+        )
+    )
+    return nothing
+end
+# Across the bar on a colorbar; a horizontal line everywhere else.
+_threshold_orientation(ax) = ax isa Makie.Colorbar && !ax.vertical[] ? :vertical : :horizontal
 events(::ThresholdInteractable) = (:drag,)
 function validate(i::ThresholdInteractable, ctx::InteractionContext)
     i.ax isa Makie.Legend && return "ThresholdInteractable: ax is a Legend, not an Axis — a legend has no data-space scalar to drag."
-    i.ax isa Makie.Colorbar && return "ThresholdInteractable: ax is a Colorbar, not an Axis — a threshold " *
-        "can't be dragged on a colorbar yet. To read a value off the colorbar, use " *
-        "ColorbarInteractable(cb); to drag a cutoff, put the threshold on an Axis, such as a histogram of the same values."
     t = ctx.transforms[axis_id(ctx, i.ax)]
+    i.ax isa Makie.Colorbar && return _validate_colorbar_threshold(i, t)
     t.is3d && return "ThresholdInteractable: drag inverts a pixel to a data scalar via the axis " *
         "transform, which is undefined on an Axis3 (a screen pixel is a ray, not a data value)."
     t.ispolar && return "ThresholdInteractable: a threshold is not supported on PolarAxis (it drags a " *
@@ -2149,10 +2234,35 @@ function validate(i::ThresholdInteractable, ctx::InteractionContext)
         "invertible $(i.orientation === :horizontal ? "y" : "x")-scale ($(sc) is not; supported: identity/log10/log)."
     return nothing
 end
+function _validate_colorbar_threshold(i, t)
+    vertical = t.valueaxis === :y
+    across = vertical ? :horizontal : :vertical
+    i.orientation === across || return "ThresholdInteractable: a $(vertical ? "vertical" : "horizontal") " *
+        "colorbar takes a $(across) line, across the bar; got orientation = :$(i.orientation). " *
+        "Leave orientation out on a Colorbar and it follows the bar."
+    sc = vertical ? t.yscale : t.xscale
+    sc in _JS_INVERTIBLE || return "ThresholdInteractable: the colorbar's scale $(sc) is not " *
+        "invertible client-side; supported: identity/log10/log."
+    return nothing
+end
+# The pixel along a colorbar's value axis where `v` sits, the way geometry.ts `projectAxis` puts
+# it, held to the bar.
+function _colorbar_pos(t, v)
+    vx, vy, vw, vh = t.viewport
+    vertical = t.valueaxis === :y
+    lims = vertical ? t.ylims : t.xlims
+    f = (vertical ? t.yscale : t.xscale) === :identity ? identity : log10
+    frac = clamp((f(v) - f(lims[1])) / (f(lims[2]) - f(lims[1])), 0.0, 1.0)
+    return vertical ? vy + (1 - frac) * vh : vx + frac * vw
+end
 function hitlayers(i::ThresholdInteractable, ctx)
     t = ctx.transforms[axis_id(ctx, i.ax)]
     vx, vy, vw, vh = t.viewport
-    if i.orientation === :horizontal
+    if i.ax isa Makie.Colorbar
+        pos = _colorbar_pos(t, i.value)
+        span = i.orientation === :horizontal ? Float32[vx, vx + vw] : Float32[vy, vy + vh]
+        orient = i.orientation === :horizontal ? "h" : "v"
+    elseif i.orientation === :horizontal
         pos = _proj(ctx, i.ax, (t.xlims[1], i.value))[2]   # constant data-y → its pixel-y
         span = Float32[vx, vx + vw]; orient = "h"
     else

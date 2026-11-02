@@ -250,8 +250,10 @@ leave that block with nothing to hover, even when the figure also holds
 a normal `Axis`.
 
 **Fix:** put interactive 3D in an `Axis3`, which both backends
-support. To show an `LScene` without interaction, display the figure
-itself instead of `masque(fig)`.
+support. A 3D call such as `surface(z)` or `scatter(x, y, z)` draws in
+an `LScene` unless you pass `axis = (; type = Axis3)`. To show an
+`LScene` without interaction, display the figure itself instead of
+`masque(fig)`.
 
 ### `selected=` on a layer that cannot start selected
 
@@ -355,6 +357,24 @@ page offline, use `backend = :cairo`. For what works outside Pluto, see
 **Fix:** remove it, because a click already keeps its highlight. To
 carry a selection through a rebuild, see
 [Keep a selection when the figure rebuilds](@ref).
+
+### A plot added after `masque` doesn't show
+
+**Cause:** you can add a plot to the figure after `masque`, further down the same
+cell or in another cell, but it isn't recommended: the widget keeps
+showing the figure as it was when `masque` ran, so the new plot is
+missing, and so is a later `update!` of a plot. This holds on both
+backends, although a WGLMakie figure shown on its own takes new plots
+in place. A widget that redraws, because the reader pans, zooms or
+rotates it or because it has `onchange`, draws the new plot, or the
+change, at its next redraw, but a new plot may show no tooltip and take
+no clicks.
+
+**Fix:** make every plot in the cell that creates the figure. Changing
+that cell then runs the `masque` cell again, and the widget shows the
+new plot. To draw something that follows the reader's picks, such as a
+line through the selected points, create the plot before `masque` and
+change it in `onchange`, as [Update the figure](@ref) shows.
 
 ### Hovering doesn't change the `@bind` value
 

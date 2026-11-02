@@ -86,6 +86,26 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == string(id))
         @test (b2.xmin, b2.xmax, b2.ymin, b2.ymax) == (1.0, 2.0, 1.0, 2.0)
     end
 
+    @testset "on a colorbar, the middle of its scale" begin
+        fig = Figure(size = (600, 400))
+        ax = Axis(fig[1, 1])
+        hm = heatmap!(ax, [Float64(i + 3j) for i in 1:4, j in 1:3])
+        cb = Colorbar(fig[1, 2], hm)
+        lo, hi = cb.limits[] === nothing ? extrema(hm[3][]) : cb.limits[]
+        @test Masque.initial_bond(masque(fig, (cut = ThresholdInteractable(cb),); auto = false)).cut.value ≈ (lo + hi) / 2
+        # A log colorbar on its side: the middle on screen.
+        figl = Figure(size = (600, 400))
+        axl = Axis(figl[1, 1])
+        hml = heatmap!(axl, [10.0^(i + 4j - 5) for i in 1:4, j in 1:3]; colorscale = log10)
+        cbl = Colorbar(figl[2, 1], hml; vertical = false)
+        th = ThresholdInteractable(cbl)
+        @test th.orientation === :vertical && th.value === nothing
+        wl = masque(figl, (cut = th,); auto = false)
+        _, _, ctxl = ctx_for(figl)
+        t = ctxl.transforms[Masque.axis_id(ctxl, cbl)]
+        @test Masque.initial_bond(wl).cut.value ≈ sqrt(t.xlims[1] * t.xlims[2])
+    end
+
     @testset "build_manifest sets the start too" begin
         (; ax, ctx) = default_fixture()
         t = only(values(ctx.transforms))
@@ -101,7 +121,8 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == string(id))
         @test_throws "undefined on an Axis3" masque(fig, (b = ROIInteractable(ax3),); auto = false)
         fc = Figure()
         axc = Axis(fc[1, 1]); hm = heatmap!(axc, rand(3, 3)); cb = Colorbar(fc[1, 2], hm)
-        @test_throws "ax is a Colorbar" masque(fc, (t = ThresholdInteractable(cb),); auto = false)
+        @test_throws "ax is a Colorbar" masque(fc, (b = ROIInteractable(cb),); auto = false)
+        @test_throws "across the bar" masque(fc, (t = ThresholdInteractable(cb; orientation = :vertical),); auto = false)
         fk = Figure(); axk = Axis(fk[1, 1]; dim1_conversion = Makie.CategoricalConversion())
         scatter!(axk, ["a", "b"], [1.0, 2.0])
         @test_throws "bounds need continuous axes" masque(fk, (b = ROIInteractable(axk),); auto = false)

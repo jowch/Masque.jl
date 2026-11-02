@@ -70,10 +70,11 @@ The default grid tooltip with payloads is the auto table of the cell's payload f
 numbers as the default `(i,j)` tooltip and `GridCellEvent`; the overlay adds 1 to the 0-based
 wire indices for the tooltip only, and the `@bind` payload keeps the wire indices.
 
-A 2D `:lines` layer also synthesises `$(x)`, `$(y)` and `$(i)` at hover: the data sample nearest
+A `:lines` layer also synthesises `$(x)`, `$(y)` and `$(i)` at hover: the data sample nearest
 the cursor along the drawn path, read from the layer's `points` ([§3](03-interactables.md)),
-and that sample's 1-based index in its line. They replace payload fields of the same name at
-hover. A click on a bound line commits the same sample ([§5](05-bond-value.md)).
+and that sample's 1-based index in its line. On an `Axis3` it adds `$(z)` from `zpoints`.
+Payload fields of the same name win. A click on a bound 2D line commits the same sample
+([§5](05-bond-value.md)); on an `Axis3` it picks the whole line.
 
 d3-format spec *structure* (the type character and arrangement of flags) is validated in Julia
 against d3's canonical grammar; the *meaning* of precision, trim, and sign modifiers is only

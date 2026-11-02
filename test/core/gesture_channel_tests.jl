@@ -334,6 +334,11 @@ end
         g = only(lay(m, "lines")["geometry"])
         @test length(g) == 6 && all(isfinite, g)
         @test g ≈ vcat(a, mid, b) atol = 1
+        # What each drawn vertex is, for the readout (#502): a cut on the edge from sample 0,
+        # sample 1 itself, a cut on the edge from sample 1. Before the zoom, nothing is cut.
+        @test lay(m, "lines")["drawn"] == [[1, 2, 3]]
+        @test lay(m, "lines")["zpoints"] == [Float32[0, 0.5, 1]]
+        @test !haskey(lay(w.manifest, "lines"), "drawn")
         # A per-edge path ships one pair per edge, so element k is still edge k.
         e = lay(m, "edges")
         @test e["kind"] == "segments"

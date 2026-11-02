@@ -226,6 +226,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test occursin("scoping guard", err.msg)  # framing: Masque scoping, not a backend capability limit
         @test occursin("LScene", err.msg)
         @test occursin("Axis3", err.msg)          # names the supported 3D block
+        @test occursin("axis = (; type = Axis3)", err.msg)  # and how a plain 3D call gets one
         @test !occursin("WGLMakie", err.msg)      # no longer recommends another backend
         # A mixed figure is refused too, not silently narrowed to its Axis.
         fm = Figure(); Axis(fm[1, 1]); LScene(fm[1, 2])
