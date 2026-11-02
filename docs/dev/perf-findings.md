@@ -210,7 +210,15 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `many` | each `select = :many` layer (#335) | 13 B (`payload_envelope.jl` §K) |
 | `draw` | each layer whose plot `masque` knows (#462) | 6–8 B (key 5 B + a small integer); `payload_envelope.jl` at `d31f6e1` moved only the 1 000-point scatter manifest, by 6 B, and the two `:many` scatters by 0.1 KB |
 | `groups`, `group` | once per `linked(...)` group, and a tag on each member layer (#346) | under 0.1 KB by position; with `key`, `rows` adds one small integer per mark (`payload_envelope.jl` §M) |
+| `xfmt`, `yfmt`, `zfmt` | each axis transform whose ticks have a format string, `AngularTicks` or `MultiplesTicks`, and both dimensions of a `PolarAxis` (#510) | ~15–60 B per formatted dimension; absent on an axis with automatic ticks |
+| `coords` | each layer of Masque's own default payloads (points, text, arrows) (#510) | 13 B |
 | `regions` | each grid layer given `regions = R` (#359) | `[id, n, …]` runs over the row-major cells, one pair per region edge crossed along a row (`payload_envelope.jl` §L) |
+
+Re-running `payload_envelope.jl` and `stress.jl` for the tick-format tooltips (#510, 2026-11-02)
+moved only the 1 000-point scatter manifest, by 8 B (its `coords` flag), and the Axis3
+meshscatter by under 0.1 KB. No fixture sets a tick format, so no `xfmt` is sent. Every stress
+manifest and PNG size is unchanged at the precision above; the `coords` check costs ~11 ms on a
+200 000-point scatter, inside that row's render spread.
 
 Re-running `payload_envelope.jl` for the composite bind value (#335, 2026-10-10) moved no
 manifest in the tables above by more than 0.1 KB; `fields` and `initial` replace the old
