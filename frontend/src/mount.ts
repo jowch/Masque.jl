@@ -1,6 +1,7 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, surfaceSelection } from "./selection"
 import { emptyMask, maskHit } from "./gridmask"
+import { touchDown, touchMove, touchUp, touchCancel, keepOnLeave, unpinOnScroll, onTouchMove, onContextMenu, disposeTouch } from "./touch"
 import { applyMove, onLeave, hideTip, hideViewReadout, showViewReadout, syncFocusTip, replaceTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
 import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onDoubleClick, onPointerMove } from "./bond"
@@ -61,7 +62,7 @@ const HI_STYLE = {
 
 const STYLE = `
 :host { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
-.surface { position: absolute; inset: 0; cursor: crosshair; pointer-events: auto; }
+.surface { position: absolute; inset: 0; cursor: crosshair; pointer-events: auto; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .surface.passthrough { pointer-events: none; }
 .surface.hot { cursor: pointer; }
 .surface.grab { cursor: grab; }
@@ -1242,7 +1243,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     window.addEventListener("resize", syncOverlayToBase)
     // Capture: the scroll that moves the figure can be any ancestor's, not just the window's.
-    const onScroll = () => replaceTip(ctx, state)
+    const onScroll = () => { if (!unpinOnScroll(ctx, state)) replaceTip(ctx, state) }
     window.addEventListener("scroll", onScroll, { capture: true, passive: true })
     let overlayFrames = 0
     const overlayTick = () => {
@@ -1251,28 +1252,32 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(overlayTick)
 
-    const down = (e: PointerEvent) => onDown(ctx, state, e)
-    const move = (e: PointerEvent) => { lastMove = e; onPointerMove(ctx, state, e) }
+    const down = (e: PointerEvent) => { onDown(ctx, state, e); touchDown(ctx, state, e) }
+    const move = (e: PointerEvent) => { lastMove = e; touchMove(state, e); onPointerMove(ctx, state, e) }
     const releaseChrome = (kind: string | undefined) => {
         if ((kind === "roi" || kind === "threshold" || kind === "span") && !state.drag_) flushPendingChrome()
     }
     const up = (e: PointerEvent) => {
         const kind = state.drag_?.kind
         onUp(ctx, state, e)
+        // A tap's tooltip stays up; an onchange frame re-shows it from here.
+        if (touchUp(ctx, state, e)) lastMove = e
         releaseChrome(kind)
         dragStops?.sync_()
     }
     const cancel = (e: PointerEvent) => {
         const kind = state.drag_?.kind
         onCancel(ctx, state, e)
+        touchCancel(state, e)
         releaseChrome(kind)
     }
-    const leave = () => {
+    const leave = (e: PointerEvent) => {
         // onLeave nulls an uncaptured drag. Capture the kind first or the deferred
         // ROI/threshold frame stays pending with the old nodes still on screen.
         const kind = state.drag_?.kind
-        lastMove = null
-        onLeave(ctx, state)
+        const keep = keepOnLeave(state, e)
+        if (!keep) lastMove = null
+        onLeave(ctx, state, keep)
         releaseChrome(kind)
     }
     const lostCapture = () => {
@@ -1282,6 +1287,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     const click = (e: MouseEvent) => onClick(ctx, state, e)
     const dblclick = (e: MouseEvent) => onDoubleClick(ctx, state, e)
+    const touchmove = (e: TouchEvent) => onTouchMove(state, e)
+    const contextmenu = (e: MouseEvent) => onContextMenu(state, e)
     const keydown = (e: KeyboardEvent) => {
         // A key shows where keys go (pointer-focus). Not a modifier held for Cmd/Ctrl-click, and
         // not a Cmd/Ctrl/Alt chord: undo after a click (#386) or a browser shortcut is not
@@ -1388,6 +1395,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     surface.addEventListener("lostpointercapture", lostCapture)
     surface.addEventListener("click", click)
     surface.addEventListener("dblclick", dblclick)
+    surface.addEventListener("touchmove", touchmove, { passive: false })
+    surface.addEventListener("contextmenu", contextmenu)
     surface.addEventListener("keydown", keydown)
     surface.addEventListener("focusout", focusout)
     // After the surface in the shadow root, so Tab reaches the plot first, then each drag layer.
@@ -1414,6 +1423,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         surface.removeEventListener("lostpointercapture", lostCapture)
         surface.removeEventListener("click", click)
         surface.removeEventListener("dblclick", dblclick)
+        surface.removeEventListener("touchmove", touchmove)
+        surface.removeEventListener("contextmenu", contextmenu)
+        disposeTouch(state)
         surface.removeEventListener("keydown", keydown)
         surface.removeEventListener("focusout", focusout)
         dragStops?.cleanup_()

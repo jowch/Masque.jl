@@ -163,6 +163,17 @@ reach past the figure onto the page, and it moves below the mark or
 inward only at the edge of the browser window. Axis readouts, boxes, and other interactions
 without a single mark show their tooltip at the pointer.
 
+## On a touch screen
+
+Tap a mark to see its tooltip. The tap also picks the mark, as a click
+does. The tooltip stays up after you lift your finger, until you tap
+somewhere else, press Escape, or scroll the plot away. A tap on an axis
+readout or a colorbar shows the value at that spot.
+
+To follow a readout or a line with your finger, press and hold for a
+moment, then slide. While you hold, the page doesn't scroll and the
+tooltip follows your finger.
+
 ## Dark figures
 
 A dark figure gets a dark tooltip, even on a light page, because the
