@@ -99,13 +99,21 @@ A point inside an element still wins over another element's outline. `:circles` 
 centers the outline on the marker's edge, and all of it on WebGL, which paints it outside).
 `:circles` and the other kinds' manifests are untouched by this field.
 
-`points` (optional, `:lines` on a 2D axis only) is one flat `[x1, y1, x2, y2, …]` per element:
+`points` (optional, `:lines`) is one flat `[x1, y1, x2, y2, …]` per element:
 the line's own data samples, which the hover readout snaps to ([§10](10-tooltips.md)). The
 geometry is rounded to image pixels and a stairs path adds corners between samples, so the
 samples cannot be recovered from it. Numbers ship as Float32. On a date or categorical axis a
 coordinate ships as the text a scatter's default payload holds. `step` (`"pre"`, `"post"` or
 `"center"`, from a `stairs` plot) says which sample each drawn corner belongs to. Placement
 (`translate!`, …) moves the path but not the samples.
+
+On an `Axis3` a pixel is a ray, so the readout cannot invert the cursor: a `:lines` layer there
+also ships `zpoints`, one flat `[z1, z2, …]` per element (#502). Drawn vertex `k` is sample `k`,
+as on 2D, until a zoom's limits cut the path ([§12](12-gesture-channel.md)): the cut adds
+vertices where the path leaves the box. Then `drawn` (one entry per element, `null` for a
+path drawn whole) says what each drawn vertex is: `2k` for sample `k`, `2k + 1` for a cut on
+the edge from sample `k`, `-1` for a gap. A line with a `step`, or whose samples aren't its
+path's vertices, ships no samples on an `Axis3`.
 
 Where elements of one `:circles`, `:rects` or `:polygons` layer overlap, the one drawn on top
 answers (#331, #340). With no `order`, that is the last one listed, since both backends paint a

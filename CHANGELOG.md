@@ -11,6 +11,12 @@ All notable changes to this project are documented here. The format is based on
   colorbar's scale, `identity`, `log10` or `log`. The line follows the bar, horizontal on a
   vertical colorbar and vertical on a horizontal one, and hovering or clicking the rest of the
   bar still reads its value (#499).
+- Hovering a line on an `Axis3` shows `x`, `y` and `z` of the point you plotted nearest the
+  pointer, as a line on a 2D `Axis` does, and a tooltip template can name `z`. This covers
+  `lines!`, `scatterlines!`'s line, `contour3d!` and a 3D `streamplot!`. A click still picks
+  the whole line (#502).
+
+## [0.4.4] - 2026-11-01
 
 ### Fixed
 - `masque` takes what `scatter(x, y)` or `scatter(fig[1, 1], …)` returns, as the figure it
@@ -19,7 +25,18 @@ All notable changes to this project are documented here. The format is based on
 - A `ThresholdInteractable` or `ROIInteractable` on a `Colorbar` is refused with a message
   that names `ColorbarInteractable`, instead of a Makie field error (#498).
 - After `masque(fig; backend = :webgl)`, plots can be added to the figure again. Before,
-  `lines!` and the like failed with "Screen Session uninitialized" (#508).
+  `lines!` and the like failed with "Screen Session uninitialized". Adding a plot after
+  `masque` isn't recommended, though: the widget may not show it. See "A plot added after
+  `masque` doesn't show" in
+  [Troubleshooting](https://jowch.github.io/Masque.jl/stable/troubleshooting/) (#508).
+- A `scatter!` sized in data units (`markerspace = :data`) on an `Axis3` responds to hover
+  and clicks. Before, it was skipped with a warning. One with a `marker_offset` is still
+  skipped, with a warning that says why (#511).
+- When a plot on an `Axis3` or a `PolarAxis` is skipped, the warning links to the Supported
+  plots and axes page. Before, it pointed to a maintainer document (#511).
+- The error for a figure with an `LScene` says how to get an `Axis3` instead:
+  `surface(z)`, `scatter(x, y, z)` and other 3D calls draw in an `LScene` unless given
+  `axis = (; type = Axis3)` (#521).
 
 ## [0.4.3] - 2026-10-31
 
@@ -754,7 +771,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/jowch/Masque.jl/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/jowch/Masque.jl/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/jowch/Masque.jl/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/jowch/Masque.jl/compare/v0.4.0...v0.4.1

@@ -85,8 +85,8 @@ struct HitLayer
     label::Union{Nothing, String}
     colors::Any
     links::Union{Nothing, Vector{Vector{Symbol}}}
-    # :lines on a 2D axis: per element, the data samples `[x1, y1, x2, y2, …]` a hover readout
-    # snaps to, and the staircase `step` mode when the drawn path adds corners between them.
+    # :lines: per element, the data samples `[x1, y1, x2, y2, …]` a hover readout snaps to,
+    # and the staircase `step` mode when the drawn path adds corners between them.
     points::Union{Nothing, Vector}
     step::Union{Nothing, Symbol}
     # :circles/:rects: 0-based element indices, top first, that the overlay hit-tests in; an
@@ -94,7 +94,16 @@ struct HitLayer
     order::Union{Nothing, Vector{Int}}
     # :circles: per element, the drawn outline as an ellipse, `(sxx, sxy, syy)` (image px²).
     ellipses::Union{Nothing, Vector}
+    # :lines on an Axis3: per element, the `z` of each sample in `points`.
+    zpoints::Union{Nothing, Vector}
+    # :lines on a zoomed Axis3, whose limits cut the drawn path: per element, what each vertex
+    # of the drawn geometry is, `2k` for sample `k` (0-based), `2k + 1` for a point where the
+    # edge from sample `k` is cut, `-1` for a gap. `nothing` for a path drawn whole, whose
+    # vertex `k` is sample `k`.
+    drawn::Union{Nothing, Vector}
 end
+HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses) =
+    HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses, nothing, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order) =
     HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step) =
@@ -451,10 +460,12 @@ use their own bbox in the same way, a `GeometryBasics` `Circle`/`Rect` marker dr
 per-element vector of markers) falls back to `markersize / 2` as a conservative bound. The
 marker's outline is added where it is drawn: half of `strokewidth` on CairoMakie, which
 centers the outline on the marker's edge, and all of it on WebGL, which paints it outside. This
-requires `markerspace = :pixel` (the default); pass `radius=` explicitly for any other
-markerspace, or it errors. `interactables(ax, p)` and `masque(fig)` build a `markerspace =
-:data` scatter as a [`PolygonInteractable`](@ref) instead, one polygon per marker's drawn
-shape, unless `radius` is passed. The points constructor above takes the same radius when exactly one
+requires `markerspace = :pixel` (the default) on a 2D axis; pass `radius=` explicitly for
+any other markerspace, or it errors. On an `Axis3`, a `markerspace = :data` scatter faces the
+camera, and its hit circle is the projected outline of a sphere of the marker's drawn radius,
+as for `meshscatter!`. On a 2D axis, `interactables(ax, p)` and `masque(fig)` build a
+`markerspace = :data` scatter as a [`PolygonInteractable`](@ref) instead, one polygon per
+marker's drawn shape, unless `radius` is passed. The points constructor above takes the same radius when exactly one
 `Scatter` on `ax` has the same positions (including a `scatterlines!`/`stem!` child scatter);
 it does not resolve `colors`. The overlay adds its own hit-test slack on top, so the smaller
 radius doesn't make small markers harder to click. The scatter constructor also resolves
@@ -495,10 +506,13 @@ struct PointInteractable <: AbstractInteractable
     # A scatter's `strokewidth` in px. How much of it lies outside the marker depends on the
     # backend (`InteractionContext.marker_stroke`), so it is added to `radius` in `hitlayers`.
     stroke::Float64
+    # `radius3d` is in world units, past the scene's model: a `markerspace = :data` scatter on
+    # an Axis3, whose camera-facing markers keep their size when the limits change.
+    billboard::Bool
     select::Symbol
 end
-PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke) =
-    PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke, :one)
+PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke, billboard::Bool = false) =
+    PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke, billboard, :one)
 function PointInteractable(
         ax, points; id = :points, payloads = nothing,
         radius = nothing, radius3d = nothing, tooltip = nothing, label = nothing, colors = nothing,
@@ -524,7 +538,7 @@ function PointInteractable(
     # including the `9` the MeshScatter constructor still forwards when it has no pixel radius.
     r, s = radius === nothing ? _point_radius(ax, pts) : (radius, 0.0)
     r = _check_radius(r, length(pts))
-    return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors, Makie.Vec2f(0, 0), s, select)
+    return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors, Makie.Vec2f(0, 0), s, false, select)
 end
 function _check_radius(r, n)
     r isa AbstractVector || return Float64(r)
@@ -565,6 +579,12 @@ function _px_outline3d(ctx, ax, p, e, q)
     end
     return max(half, sqrt((a + d) / 2 + hypot((a - d) / 2, b))), (a, b, d)
 end
+# A world-space half-extent as data-space half-extents along each axis: over the scale the
+# scene's model (which fits the limits into the Axis3 box) gives that axis.
+function _world_extent_to_data(ax, w)
+    M = Makie.transformationmatrix(ax.scene)[]
+    return Makie.Vec3f((w[c] / sqrt(sum(abs2, M[r, c] for r in 1:3)) for c in 1:3)...)
+end
 function hitlayers(i::PointInteractable, ctx)
     g = Real[]
     # A sphere's outline is an ellipse wherever the axes stretch it, and its hit circle (the
@@ -574,7 +594,8 @@ function hitlayers(i::PointInteractable, ctx)
     for (k, p) in enumerate(i.points)
         q = _proj(ctx, i.ax, p, box)
         r = if i.radius3d !== nothing
-            r3, (a, b, d) = _px_outline3d(ctx, i.ax, p, i.radius3d[k], q)
+            e = i.billboard ? _world_extent_to_data(i.ax, i.radius3d[k]) : i.radius3d[k]
+            r3, (a, b, d) = _px_outline3d(ctx, i.ax, p, e, q)
             append!(ell, (_q(a), _q(b), _q(d)))
             r3
         else
@@ -586,9 +607,11 @@ function hitlayers(i::PointInteractable, ctx)
     end
     # With no `order` the overlay puts the last point listed on top, as CairoMakie paints a
     # `scatter!`. On an Axis3, WebGL depth-tests markers and CairoMakie paints a `meshscatter!`
-    # (the points with `radius3d`) far to near, so there the nearest point is on top.
+    # (the points with `radius3d`) far to near, so there the nearest point is on top. A
+    # `markerspace = :data` scatter (`billboard`) is still a scatter: CairoMakie paints it in
+    # list order.
     order = nothing
-    if i.ax isa Makie.Axis3 && (ctx.depth_test || i.radius3d !== nothing)
+    if i.ax isa Makie.Axis3 && (ctx.depth_test || (i.radius3d !== nothing && !i.billboard))
         depth = _project_depth(ctx, i.ax, i.points)[3]
         ks = [k for k in eachindex(i.points) if isfinite(g[3k - 2]) && isfinite(g[3k - 1]) && isfinite(depth[k])]
         order = _top_first(ks, depth)
@@ -781,8 +804,10 @@ function _edge_px(ctx, ax, box, a, b)
     return t, at(t[1]), at(t[2])
 end
 _push_px!(g, q) = append!(g, (_q(q[1]), _q(q[2])))
-# One connected path (`:lines`): runs of visible edges, NaN-separated.
-function _clipped_path_px(ctx, ax, vs, box)
+# One connected path (`:lines`): runs of visible edges, NaN-separated. With `codes`, also
+# records what each vertex pushed is (see `HitLayer.drawn`): `2(k - 1)` for vertex `k` itself,
+# `2(k - 1) + 1` for a cut on the edge from vertex `k`, `-1` for a gap.
+function _clipped_path_px(ctx, ax, vs, box, codes = nothing)
     _needs_clip(box, vs) || return _flat_px(ctx, ax, vs, box)
     g = Real[]
     open = false   # g ends on the previous edge's far end, so the next edge continues from it
@@ -794,10 +819,15 @@ function _clipped_path_px(ctx, ax, vs, box)
         end
         (t0, t1), a, b = e
         if !(open && t0 == 0)
-            isempty(g) || isnan(g[end]) || append!(g, (NaN32, NaN32))
+            if !(isempty(g) || isnan(g[end]))
+                append!(g, (NaN32, NaN32))
+                codes === nothing || push!(codes, -1)
+            end
             _push_px!(g, a)
+            codes === nothing || push!(codes, t0 == 0 ? 2(k - 1) : 2(k - 1) + 1)
         end
         _push_px!(g, b)
+        codes === nothing || push!(codes, t1 == 1 ? 2k : 2(k - 1) + 1)
         open = t1 == 1
     end
     return g
@@ -829,6 +859,9 @@ function _flat_data(ax, vs, ::Type{T} = Float32) where {T}
     u = _unconvert_payloads(ax, Any[(; x = v[1], y = v[2]) for v in vs])
     return Any[c for pl in u for c in (pl.x, pl.y)]
 end
+# One line's sample `z`s, the third coordinate on an Axis3. Makie draws no category or date
+# axis on an Axis3, so they stay numbers.
+_flat_z(ax, vs, ::Type{T} = Float32) where {T} = T[v[3] for v in vs]
 _converts_dim(ax) = any((:dim1_conversion, :dim2_conversion)) do d
     hasproperty(ax, d) || return false
     c = getproperty(ax, d)[]
@@ -843,15 +876,11 @@ function hitlayers(i::SegmentInteractable, ctx)
             [vs]
         end
         box = _clipbox(i.ax)
-        geom = [_clipped_path_px(ctx, i.ax, path, box) for path in raw]
         aid = axis_id(ctx, i.ax)
-        # The readout's samples. Axis3 has no 2D sample to show the cursor's position on a path.
-        points, step = if ctx.transforms[aid].is3d
-            nothing, nothing
-        else
-            [_flat_data(i.ax, path) for path in _sample_paths(i, raw)], _step(i)
-        end
-        return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, step)]
+        ctx.transforms[aid].is3d && return _lines3d_layers(i, ctx, raw, box, aid)
+        geom = [_clipped_path_px(ctx, i.ax, path, box) for path in raw]
+        points = [_flat_data(i.ax, path) for path in _sample_paths(i, raw)]
+        return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, _step(i))]
     end
     vs = i.resolve === nothing ? i.vertices : [_pt3(v) for v in i.resolve(i.ax)]
     box = _clipbox(i.ax)
@@ -864,6 +893,33 @@ function hitlayers(i::SegmentInteractable, ctx)
     return [HitLayer(i.id, :segments, _clipped_pairs_px(ctx, i.ax, pairs, box), i.payloads, aid, events(i), i.label)]
 end
 
+# Lines on an Axis3. A pixel there is a ray, so the readout can't invert the cursor: each
+# sample's `x`, `y` and `z` ship, and the readout is the drawn vertex nearest the cursor along
+# the path, as on a 2D axis. Where the axis limits cut a path, `drawn` says which sample each
+# drawn vertex is. A staircase, or samples that aren't the path's vertices, ship no samples, so
+# the line reads out as a whole.
+function _lines3d_layers(i::SegmentInteractable, ctx, raw, box, aid)
+    samples = _sample_paths(i, raw)
+    ok = _step(i) === nothing && length(samples) == length(raw) && all(length.(samples) .== length.(raw))
+    drawn = Any[]
+    geom = map(raw) do path
+        ok && _needs_clip(box, path) || (push!(drawn, nothing); return _clipped_path_px(ctx, i.ax, path, box))
+        codes = Int[]
+        g = _clipped_path_px(ctx, i.ax, path, box, codes)
+        push!(drawn, codes)
+        return g
+    end
+    ok || return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label)]
+    points = [_flat_data(i.ax, path) for path in samples]
+    zpoints = [_flat_z(i.ax, path) for path in samples]
+    return [
+        HitLayer(
+            i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, nothing, nothing, nothing,
+            zpoints, all(isnothing, drawn) ? nothing : drawn,
+        ),
+    ]
+end
+
 # Each line's data samples, as plotted. A line built without samples reads them off its path.
 _sample_paths(i::SegmentInteractable, raw = nothing) = i.samples !== nothing ? i.samples[2] :
     raw !== nothing ? raw : i.paths !== nothing ? i.paths :
@@ -873,6 +929,9 @@ _step(i::SegmentInteractable) = i.samples === nothing ? nothing : i.samples[1]
 # owner isn't a line of data points.
 _line_data(i::SegmentInteractable, k) = i.unit === :line ? _flat_data(i.ax, _sample_paths(i)[k], Float64) : nothing
 _line_data(i, k) = nothing
+# Line `k`'s sample `z`s at full precision, on an Axis3; `nothing` elsewhere.
+_line_zdata(i::SegmentInteractable, k) = i.unit === :line && i.ax isa Makie.Axis3 ? _flat_z(i.ax, _sample_paths(i)[k], Float64) : nothing
+_line_zdata(i, k) = nothing
 
 # ============================ RectInteractable =============================
 """

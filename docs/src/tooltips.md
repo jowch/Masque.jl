@@ -53,7 +53,7 @@ What the default tooltip shows depends on what you hover:
 | a mark with `payloads` | the payload's fields, then the mark's own fields, such as a point's `x` and `y`; see [What each mark returns](@ref) |
 | a scatter point without `payloads` | its `index`, `x` and `y` |
 | a line from `lines!`, `stairs!`, `series!` or `scatterlines!` on an `Axis` | its payload, then `x` and `y` of the point you plotted nearest the pointer |
-| a line on an `Axis3` | only its payload |
+| a line on an `Axis3` | its payload, then `x`, `y` and `z` of the point you plotted nearest the pointer |
 | a legend entry | nothing, because its label is already next to the swatch; to add a tooltip, pass a template, as [Legend](@ref) shows |
 | a [`SliceInteractable`](@ref) | the series values at the pointer |
 

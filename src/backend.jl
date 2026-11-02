@@ -131,7 +131,8 @@ function _reject_unsupported_axes(fig)
         ArgumentError(
             "Masque supports `Makie.Axis`, `Makie.Axis3`, and `Makie.PolarAxis`; found unsupported " *
                 "$(join(unsupported, ", ")). This is Masque's own scoping guard, not a backend limit: " *
-                "`LScene` is not supported on any backend. For interactive 3D, use `Axis3`.",
+                "`LScene` is not supported on any backend. For interactive 3D, use `Axis3`: a 3D call such as " *
+                "`surface(z)` or `scatter(x, y, z)` draws in an `LScene` unless it is given `axis = (; type = Axis3)`.",
         ),
     )
 end

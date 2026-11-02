@@ -186,10 +186,20 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
-        # `lines!` on Axis3: one element, so nothing is baked selected and hover takes it.
+        # `scatter!` in `markerspace = :data` on Axis3 (#511): camera-facing markers sized in
+        # world units, each hit circle the projected outline of a sphere of the marker's radius.
+        "key" => "scatter3d_data", "layerId" => "scatter", "layerKind" => "circles",
+        "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
+    ),
+    Dict(
+        # `lines!` on Axis3: one element, so nothing is baked selected and hover takes it. A
+        # hover reads out the nearest plotted point's x, y and z (#502); a click still picks
+        # the whole line.
         "key" => "lines3d", "layerId" => "lines", "layerKind" => "lines",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
+        "readout" => Dict("vertex" => 2, "text" => ["x2", "y4", "z3"]),
     ),
     Dict(
         # `meshscatter!` on Axis3: each sphere's hit circle comes from its data-space size.
@@ -1051,6 +1061,18 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:scatter => [2]))
     end
 
+    scatter3d_data = let
+        fig = Figure(size = (480, 320))
+        # Limits and points chosen so no marker touches the axis frame's black lines, which
+        # polish_verify's drawn-mark probes would read as the marker's edge.
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "scatter3d-data", limits = (0, 4, 0, 5, 0, 4))
+        scatter!(
+            ax, Makie.Point3f[(2, 1.5, 2.5), (1, 3, 2), (3, 3.5, 3.5)];
+            color = :gray, markerspace = :data, markersize = 0.15,
+        )
+        masque(fig; selected = Dict(:scatter => [2]))
+    end
+
     lines3d = let
         fig = Figure(size = (480, 320))
         ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "lines3d")
@@ -1756,7 +1778,7 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_colorbar, threshold_colorbar_h, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, legend, series_legend,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_colorbar, threshold_colorbar_h, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
