@@ -32,10 +32,12 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
     Payloads, when present, are one per shipped point, row-major like `xy`
   - `:axis` — `nothing` (whole-axis readout, `AxisInteractable`) or flat `Real[x, y, w, h]`
     (the colorbar's pixel bbox, `ColorbarInteractable`); not element-indexed
-  - `:threshold` / `:span` / `:roi` / `:view` — a small `Dict` (orientation/position, the
-    orientation and both edges' positions, drag bbox + hit half-size `handle` — the overlay
-    paints the grip at a fixed 7 CSS px — or viewport + camera, respectively); not
-    element-indexed
+  - `:threshold` / `:roi` / `:view` — a small `Dict` (orientation/position, drag bbox + hit
+    half-size `handle` — the overlay paints the grip at a fixed 7 CSS px — or viewport +
+    camera, respectively); not element-indexed
+  - `:span` — a `Dict` of `"orientation"` (`"h"`/`"v"`), the two edges' pixel positions
+    `"lo"`/`"hi"` along the drag (held inside the axis or bar), the across extent `"span"`,
+    and `"settleOnly"`; not element-indexed
   - `:slice` — a `Dict` of data-space series to sample at the cursor (`SliceInteractable`);
     not a hit target. The overlay hair is drawn only when this layer's `crosshair` is true,
     and only the arm named by `orientation`
@@ -2228,11 +2230,11 @@ function validate(i::ThresholdInteractable, ctx::InteractionContext)
         "invertible $(i.orientation === :horizontal ? "y" : "x")-scale ($(sc) is not; supported: identity/log10/log)."
     return nothing
 end
-function _validate_colorbar_line(who, orientation, t)
+function _validate_colorbar_line(who, orientation, t; edges = false)
     vertical = t.valueaxis === :y
     across = vertical ? :horizontal : :vertical
     orientation === across || return "$(who): a $(vertical ? "vertical" : "horizontal") " *
-        "colorbar takes a $(across) line, across the bar; got orientation = :$(orientation). " *
+        "colorbar takes $(edges ? "$(across) edges" : "a $(across) line"), across the bar; got orientation = :$(orientation). " *
         "Leave orientation out on a Colorbar and it follows the bar."
     sc = vertical ? t.yscale : t.xscale
     sc in _JS_INVERTIBLE || return "$(who): the colorbar's scale $(sc) is not " *
@@ -2279,8 +2281,9 @@ do, and each edge carries a small grip. On release both edges invert to data val
 
 # Arguments
 - `ax` — a `Makie.Axis`, or a `Makie.Colorbar` to pick a band of its colors.
-- `span` — the band's starting `(lo, hi)` in data space, with `lo < hi` (`ArgumentError`
-  otherwise). On a `Colorbar`, both inside its limits. Accepts a [`SpanEvent`](@ref).
+- `span` — the band's starting `(lo, hi)` in data space, with `lo ≤ hi` (`ArgumentError`
+  otherwise). On a `Colorbar`, both inside its limits. Accepts a [`SpanEvent`](@ref), so a
+  band dragged flat comes back flat.
 - `orientation` — `:vertical` (the edges are constant-x lines, so the band is an x interval)
   or `:horizontal` (constant-y edges, a y interval). Any other value raises `ArgumentError`.
   Default `:vertical` on an `Axis`. On a `Colorbar` the edges run across the bar, so leave it
@@ -2296,8 +2299,9 @@ the other edge, so `lo ≤ hi` holds while dragging.
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3`, a `PolarAxis` or a
 `Legend`; if the dragged scale isn't client-invertible (supported: `identity`, `log10`, `log`);
 if the dragged dimension is categorical; or, on a `Colorbar`, if `orientation` runs along the
-bar instead of across it. If an `onchange` later moves a colorbar's limits past an edge, that
-edge waits at the end of the bar.
+bar instead of across it. An edge outside the axis limits (or, after an `onchange`, outside a
+colorbar's) is drawn at the end of the plot area and waits there until you drag it; the field
+keeps `span` until then.
 
 # Examples
 ```julia
@@ -2316,7 +2320,7 @@ function SpanInteractable(ax; span, orientation = _span_orientation(ax), id = :s
     orientation in (:horizontal, :vertical) ||
         throw(ArgumentError("SpanInteractable: orientation must be :horizontal or :vertical, got $(orientation)"))
     lo, hi = _span_values(span)
-    lo < hi || throw(ArgumentError("SpanInteractable: need lo < hi, got span = $((lo, hi))"))
+    lo <= hi || throw(ArgumentError("SpanInteractable: need lo ≤ hi, got span = $((lo, hi))"))
     if ax isa Makie.Colorbar
         _check_on_bar(ax, lo, "SpanInteractable", "span")
         _check_on_bar(ax, hi, "SpanInteractable", "span")
@@ -2329,7 +2333,7 @@ events(::SpanInteractable) = (:drag,)
 function validate(i::SpanInteractable, ctx::InteractionContext)
     i.ax isa Makie.Legend && return "SpanInteractable: ax is a Legend, not an Axis — a legend has no data-space interval to drag."
     t = ctx.transforms[axis_id(ctx, i.ax)]
-    i.ax isa Makie.Colorbar && return _validate_colorbar_line("SpanInteractable", i.orientation, t)
+    i.ax isa Makie.Colorbar && return _validate_colorbar_line("SpanInteractable", i.orientation, t; edges = true)
     t.is3d && return "SpanInteractable: drag inverts a pixel to a data value via the axis " *
         "transform, which is undefined on an Axis3 (a screen pixel is a ray, not a data value)."
     t.ispolar && return "SpanInteractable: a span is not supported on PolarAxis (its edges are " *
@@ -2349,12 +2353,12 @@ function hitlayers(i::SpanInteractable, ctx)
     h = i.orientation === :horizontal
     if i.ax isa Makie.Colorbar
         lo, hi = _colorbar_pos(t, i.lo), _colorbar_pos(t, i.hi)
-    elseif h
-        lo = _proj(ctx, i.ax, (t.xlims[1], i.lo))[2]
-        hi = _proj(ctx, i.ax, (t.xlims[1], i.hi))[2]
     else
-        lo = _proj(ctx, i.ax, (i.lo, t.ylims[1]))[1]
-        hi = _proj(ctx, i.ax, (i.hi, t.ylims[1]))[1]
+        # Held to the plot area, as a colorbar edge is held to the bar: an edge past the limits
+        # waits at the end, so the fades never leave the axis.
+        e0, e1 = h ? (vy, vy + vh) : (vx, vx + vw)
+        at(v) = clamp(h ? _proj(ctx, i.ax, (t.xlims[1], v))[2] : _proj(ctx, i.ax, (v, t.ylims[1]))[1], e0, e1)
+        lo, hi = at(i.lo), at(i.hi)
     end
     span = h ? Float32[vx, vx + vw] : Float32[vy, vy + vh]
     geom = Dict{String, Any}("orientation" => h ? "h" : "v", "lo" => Float32(lo), "hi" => Float32(hi), "span" => span)

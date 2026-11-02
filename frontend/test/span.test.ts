@@ -158,6 +158,97 @@ describe("span drag", () => {
     })
 })
 
+// x reversed: x = 10 at image x 0 and x = 0 at 1200. The window [3, 6] has lo at 840, hi at 480.
+const axRev: AxisTransform = { ...ax1, xreversed: true }
+const xSpanRev = (lo = 840, hi = 480): Manifest => ({
+    width: 1200, height: 800, scaling: 2, transforms: { ax1: axRev },
+    layers: [{ id: "span", kind: "span", axis: "ax1", events: ["drag"], payloads: [],
+        geometry: { orientation: "v", lo, hi, span: [0, 800] } }],
+})
+
+describe("span on a reversed axis", () => {
+    it("an edge drag reads the value through the reversal, and lo still stops at hi", () => {
+        const { surface, inputs } = setup(xSpanRev())
+        // lo edge at image 840 = client 420; drag right to client 480 (image 960, x = 2).
+        drag(surface, [420, 200], [480, 200])
+        expect(last(inputs).payload.lo).toBeCloseTo(2)
+        expect(last(inputs).payload.hi).toBeCloseTo(6)
+        // Dragged left past hi (image 480), lo stops there.
+        drag(surface, [480, 200], [100, 200])
+        expect(last(inputs).payload.lo).toBeCloseTo(6)
+        expect(last(inputs).payload.hi).toBeCloseTo(6)
+    })
+    it("Home and End take the band to the lowest and highest values", () => {
+        const { shadow, inputs } = setup(xSpanRev())
+        const el = shadow.querySelector('.drag-stop[data-layer="span"]') as HTMLElement
+        el.focus()
+        const key = (k: string) => {
+            el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }))
+            el.dispatchEvent(new KeyboardEvent("keyup", { key: k, bubbles: true }))
+        }
+        key("Home")
+        expect(last(inputs).payload.lo).toBeCloseTo(0)
+        expect(last(inputs).payload.hi).toBeCloseTo(3)
+        key("End")
+        expect(last(inputs).payload.lo).toBeCloseTo(7)
+        expect(last(inputs).payload.hi).toBeCloseTo(10)
+    })
+})
+
+describe("a flat band (lo == hi)", () => {
+    const flat = (at: number, t: AxisTransform = ax1): Manifest => ({
+        width: 1200, height: 800, scaling: 2, transforms: { ax1: t },
+        layers: [{ id: "span", kind: "span", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: { orientation: "v", lo: at, hi: at, span: [0, 800] } }],
+    })
+    it("opens toward either side under the mouse", () => {
+        const right = setup(flat(600))
+        drag(right.surface, [300, 200], [360, 200]) // image 600 → 720
+        expect(last(right.inputs).payload.lo).toBeCloseTo(5)
+        expect(last(right.inputs).payload.hi).toBeCloseTo(6)
+        const left = setup(flat(600))
+        drag(left.surface, [300, 200], [240, 200]) // image 600 → 480
+        expect(last(left.inputs).payload.lo).toBeCloseTo(4)
+        expect(last(left.inputs).payload.hi).toBeCloseTo(5)
+    })
+    it("flat at the low end of the axis, it can still be opened", () => {
+        const { surface, inputs } = setup(flat(0))
+        drag(surface, [1, 200], [60, 200]) // image 0 → 120
+        expect(last(inputs).payload.lo).toBeCloseTo(0)
+        expect(last(inputs).payload.hi).toBeCloseTo(1)
+    })
+    it("on a reversed axis it opens the same way", () => {
+        const { surface, inputs } = setup(flat(600, axRev))
+        drag(surface, [300, 200], [360, 200]) // image 720 is x = 4 on the reversed axis
+        expect(last(inputs).payload.lo).toBeCloseTo(4)
+        expect(last(inputs).payload.hi).toBeCloseTo(5)
+    })
+    it("Alt+arrow grows the edge on that side; Alt+Shift+arrow does nothing", () => {
+        const { shadow, inputs } = setup(flat(600))
+        const el = shadow.querySelector('.drag-stop[data-layer="span"]') as HTMLElement
+        el.focus()
+        const key = (k: string, opts: KeyboardEventInit) => {
+            el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...opts }))
+            el.dispatchEvent(new KeyboardEvent("keyup", { key: k, bubbles: true }))
+        }
+        const n = inputs.length
+        key("ArrowLeft", { altKey: true, shiftKey: true }) // nothing to shrink
+        expect(inputs.length).toBe(n)
+        key("ArrowRight", { altKey: true })
+        expect(last(inputs).payload.lo).toBeCloseTo(5)
+        expect(last(inputs).payload.hi).toBeCloseTo(5 + 2 / 120)
+    })
+})
+
+describe("a press that does not move the band", () => {
+    it("leaves the field as it was", () => {
+        const { surface, inputs } = setup(xSpan())
+        const n = inputs.length
+        drag(surface, [270, 200], [270, 200])
+        expect(inputs.length).toBe(n)
+    })
+})
+
 describe("span hover", () => {
     it("an edge takes the resize cursor and thickens; the inside keeps a mark's hover", async () => {
         const frame = () => new Promise((r) => setTimeout(r, 40)) // onMove coalesces moves per frame

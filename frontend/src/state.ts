@@ -137,7 +137,7 @@ export type Drag =
     | { kind: "threshold"; id_: string; line_: SVGLineElement; tg_: ThresholdGeometry; t_: AxisTransform; pointerId_: number }
     // `at_` is the press along the drag, `lo0_`/`hi0_` the edges then: a move shifts both by
     // the pointer's travel from the press.
-    | { kind: "span"; id_: string; band_: SpanBand; mode_: "lo" | "hi" | "move"; at_: number; lo0_: number; hi0_: number; pointerId_: number }
+    | { kind: "span"; id_: string; band_: SpanBand; mode_: "lo" | "hi" | "move"; at_: number; lo0_: number; hi0_: number; pointerId_: number; moved_?: boolean }
     | {
         kind: "roi"; id_: string; box_: ROIBox
         mode_: { corner: number } | { edge: "n" | "s" | "w" | "e" } | { move: true }

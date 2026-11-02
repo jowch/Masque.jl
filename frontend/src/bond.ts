@@ -368,7 +368,8 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     if (d.kind === "threshold") {
         ctx.commit_({ [d.id_]: thresholdDrag.end(d, content(dragAxis(ctx, d))) })
     } else if (d.kind === "span") {
-        ctx.commit_({ [d.id_]: spanDrag.envelope(d) })
+        // A press that never moved the band leaves the field as it was.
+        if (d.moved_) ctx.commit_({ [d.id_]: spanDrag.envelope(d) })
     } else if (d.kind === "view") {
         // §12.3: a view gesture commits nothing — no bond write, no "input" event.
         // Settle is gated on whether a request actually went out during this drag

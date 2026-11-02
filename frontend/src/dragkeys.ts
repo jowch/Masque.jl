@@ -212,6 +212,8 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             if (e.altKey && (e.key.startsWith("Arrow") || e.key.startsWith("Page"))) {
                 // The arrow names the edge on that side; Shift moves it in instead of out.
                 const far = dp > 0 ? b : a
+                // A flat band cannot shrink; to grow it, spanDrag.move picks the edge on that side.
+                if (a === b && e.shiftKey) return true
                 const edge = far === g.lo ? "lo" : "hi"
                 d = spanDrag.begin(id, band, { edge }, 0, -1) as typeof d
                 text = spanDrag.move(d, at(far + (e.shiftKey ? -dp : dp)), ctx.tipDigits_)

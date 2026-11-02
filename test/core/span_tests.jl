@@ -8,7 +8,7 @@ _span_wire(id, lo, hi) = Dict{String, Any}("layer" => id, "index" => 0, "payload
 @testset "SpanInteractable (#500)" begin
     @testset "an x or y window on an axis" begin
         (; ax, ctx) = default_fixture()
-        sp = SpanInteractable(ax; span = (2.0, 5.0))
+        sp = SpanInteractable(ax; span = (1.5, 2.5))   # inside the x limits (about 0.9 to 3.1)
         @test sp.orientation === :vertical && sp.id === :span
         @test events(sp) == (:drag,)
         @test validate(sp, ctx) === nothing
@@ -16,8 +16,8 @@ _span_wire(id, lo, hi) = Dict{String, Any}("layer" => id, "index" => 0, "payload
         @test L.kind === :span
         t = ctx.transforms[L.axis]
         @test L.geometry["orientation"] == "v"
-        @test L.geometry["lo"] ≈ data_to_image_px(ctx, ax, (2.0, t.ylims[1]))[1]
-        @test L.geometry["hi"] ≈ data_to_image_px(ctx, ax, (5.0, t.ylims[1]))[1]
+        @test L.geometry["lo"] ≈ data_to_image_px(ctx, ax, (1.5, t.ylims[1]))[1]
+        @test L.geometry["hi"] ≈ data_to_image_px(ctx, ax, (2.5, t.ylims[1]))[1]
         @test L.geometry["span"] ≈ [t.viewport[2], t.viewport[2] + t.viewport[4]]
         @test !haskey(L.geometry, "settleOnly")
         Lh = only(hitlayers(SpanInteractable(ax; span = (1.0, 3.0), orientation = :horizontal), ctx))
@@ -28,13 +28,47 @@ _span_wire(id, lo, hi) = Dict{String, Any}("layer" => id, "index" => 0, "payload
         @test only(hitlayers(SpanInteractable(ax; span = (1, 2), update_while_dragging = false), ctx)).geometry["settleOnly"] === true
 
         # The band is checked where it is written.
-        @test_throws "need lo < hi" SpanInteractable(ax; span = (5.0, 2.0))
-        @test_throws "need lo < hi" SpanInteractable(ax; span = (2.0, 2.0))
+        @test_throws "need lo ≤ hi" SpanInteractable(ax; span = (5.0, 2.0))
+        # A band dragged flat comes back as span= (review #544).
+        flat = SpanInteractable(ax; span = SpanEvent(:span, 2.0, 2.0))
+        @test flat.lo == flat.hi == 2.0
+        Lf = only(hitlayers(flat, ctx))
+        @test Lf.geometry["lo"] == Lf.geometry["hi"]
+        @test_throws "span must hold two numbers" SpanInteractable(ax; span = ("a", "b"))
         @test_throws "orientation must be" SpanInteractable(ax; span = (1, 2), orientation = :diagonal)
         @test_throws "span must be (lo, hi)" SpanInteractable(ax; span = 3.0)
         @test_throws "span must be (lo, hi)" SpanInteractable(ax; span = (1, 2, 3))
         @test SpanInteractable(ax; span = [1, 2]).hi == 2.0
         @test SpanInteractable(ax; span = SpanEvent(:old, 1.5, 4.0)).lo == 1.5
+    end
+
+    @testset "an edge past the axis limits waits at the end of the plot area" begin
+        fig = Figure(size = (500, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 1))
+        scatter!(ax, [1.0, 9.0], [0.5, 0.5])
+        _, _, ctx = ctx_for(fig)
+        t = ctx.transforms[Masque.axis_id(ctx, ax)]
+        vx, vy, vw, vh = t.viewport
+        L = only(hitlayers(SpanInteractable(ax; span = (-5.0, 3.0)), ctx))
+        @test L.geometry["lo"] ≈ vx
+        @test L.geometry["hi"] ≈ data_to_image_px(ctx, ax, (3.0, 0.0))[1]
+        Lh = only(hitlayers(SpanInteractable(ax; span = (0.5, 7.0), orientation = :horizontal), ctx))
+        @test Lh.geometry["hi"] ≈ vy   # past the top
+        # The field keeps what was written until the band is dragged.
+        w = masque(fig, SpanInteractable(ax; span = (-5.0, 3.0)))
+        @test w.manifest["initial"]["span"]["payload"] == Dict("lo" => -5.0, "hi" => 3.0)
+    end
+
+    @testset "a band on a log10 axis" begin
+        fig = Figure(size = (500, 300)); ax = Axis(fig[1, 1]; xscale = log10, limits = (1, 1000, 0, 1))
+        scatter!(ax, [1.0, 10.0, 100.0, 1000.0], fill(0.5, 4))
+        _, _, ctx = ctx_for(fig)
+        sp = SpanInteractable(ax; span = (10.0, 100.0))
+        @test validate(sp, ctx) === nothing
+        L = only(hitlayers(sp, ctx)); t = ctx.transforms[L.axis]
+        vx, _, vw, _ = t.viewport
+        # A decade is a third of the axis.
+        @test L.geometry["lo"] ≈ vx + vw / 3 atol = 1
+        @test L.geometry["hi"] ≈ vx + 2vw / 3 atol = 1
     end
 
     @testset "refusals: Axis3, PolarAxis, a scale the browser can't invert, categories, a Legend" begin
@@ -80,7 +114,7 @@ _span_wire(id, lo, hi) = Dict{String, Any}("layer" => id, "index" => 0, "payload
         @test Lh.geometry["orientation"] == "v" && Lh.geometry["lo"] < Lh.geometry["hi"]
         # Along the bar, or off it, is refused with what to do instead.
         msg = validate(SpanInteractable(cb; span = (3, 6), orientation = :vertical), ctx)
-        @test occursin("SpanInteractable: a vertical colorbar takes a horizontal line", msg)
+        @test occursin("SpanInteractable: a vertical colorbar takes horizontal edges", msg)
         err = (@test_throws ArgumentError SpanInteractable(cb; span = (3.0, 99.0))).value
         @test occursin("SpanInteractable: span = 99.0 is outside the colorbar's limits", err.msg)
         # The browser's value is not held to the bar: a redraw puts an edge at its end instead.

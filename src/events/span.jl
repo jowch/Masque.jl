@@ -1,7 +1,7 @@
 """
     SpanEvent(layer, lo, hi)
 
-Where a [`SpanInteractable`](@ref)'s band sits, the value of its field: `lo < hi` in data
+Where a [`SpanInteractable`](@ref)'s band sits, the value of its field: `lo ≤ hi` in data
 space (equal when an edge was dragged onto the other). Pass back as `span=` to restore the band.
 """
 struct SpanEvent <: InteractionEvent
@@ -30,5 +30,8 @@ _span_values(s::SpanEvent) = (s.lo, s.hi)
 function _span_values(s)
     (s isa Union{Tuple, AbstractVector} && length(s) == 2) ||
         throw(ArgumentError("SpanInteractable: span must be (lo, hi) or a SpanEvent, got $(repr(s))"))
-    return Float64(s[1]), Float64(s[2])
+    a, b = s[1], s[2]
+    (a isa Real && b isa Real) ||
+        throw(ArgumentError("SpanInteractable: span must hold two numbers, got $(repr(s))"))
+    return Float64(a), Float64(b)
 end

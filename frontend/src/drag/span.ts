@@ -147,9 +147,13 @@ export function move(d: Extract<Drag, { kind: "span" }>, p: { x: number; y: numb
         // An edge stops at the other one, so lo never passes hi.
         const dir = direction(g, band.t_)
         const v = clamp(along)
+        // A band that starts flat has no inside and one spot for both edges: the edge that can
+        // move toward the pointer takes it, so the band opens either way.
+        if (d.lo0_ === d.hi0_ && g.lo === g.hi && v !== g.lo) d.mode_ = (v - g.lo) * dir > 0 ? "hi" : "lo"
         if (d.mode_ === "lo") g.lo = dir > 0 ? Math.min(v, g.hi) : Math.max(v, g.hi)
         else g.hi = dir > 0 ? Math.max(v, g.lo) : Math.min(v, g.lo)
     }
+    if (g.lo !== d.lo0_ || g.hi !== d.hi0_) d.moved_ = true
     setSpan(band)
     const s = spanValues(band)
     return `[${fmt(s.lo, digits)}, ${fmt(s.hi, digits)}]`

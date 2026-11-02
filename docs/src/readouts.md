@@ -255,7 +255,10 @@ window = SpanInteractable(ax; span = (2.0, 5.0))
 an edge you drag stops at the other edge. The edges are vertical lines
 across the axis, so the band picks out a range of `x`. Pass
 `orientation = :horizontal` for a range of `y`. Hovering or clicking a
-point inside the band still works as it does elsewhere.
+point, line, bar or shape inside the band still works as it does
+elsewhere. A heatmap or image fills the band, so hovering it still shows
+its value, but pressing on it moves the band. An edge outside the axis
+limits is drawn at the end of the axis until you drag it.
 
 On a colorbar, the band picks out a range of the colorbar's values,
 and `span` must lie inside its limits:
