@@ -254,7 +254,9 @@ end
 # converted dimension (categories, dates, units) give nothing. `label` renames the table key
 # (`θ`, `r` on a PolarAxis) and is sent even when the number is plain.
 function _coord_format(ticks, format; scale = identity, conv = nothing, label = nothing)
-    f = (scale === identity && conv === nothing) ? _tick_format(ticks, format) : nothing
+    # A plot such as `boxplot!` sets `NoDimConversion` on its axes: plain numbers, as with none.
+    plain = conv === nothing || conv isa Makie.NoDimConversion
+    f = (scale === identity && plain) ? _tick_format(ticks, format) : nothing
     label === nothing && return f
     f = something(f, Dict{String, Any}())
     f["label"] = label

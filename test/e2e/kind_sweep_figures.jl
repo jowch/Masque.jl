@@ -150,11 +150,11 @@ kind_sweep_meta() = [
         "anchorKey" => "polar", "anchorIndex" => 1, "theta" => π / 2, "r" => 2.0, "rmax" => 2.5,
     ),
     Dict(
-        # Default tooltips follow the axis's tick format (#510): one auto widget, five axes.
+        # Default tooltips follow the axis's tick format (#510): one auto widget, seven axes.
         # Each scatter's first point is hovered; the driver picks the expectation by the axis's
-        # transform (polar, a `"{:.1f} mV"` format, a function format left plain). The first bar
-        # and the first hist bin are hovered too: their fields follow the axis each is measured
-        # along (#543).
+        # transform (polar, a `"{:.1f} mV"` format, a function format left plain). A bar, a hist
+        # bin, a horizontal box and a vspan are hovered too: their fields follow the axis each
+        # is measured along (#543).
         "key" => "tick_units", "layerId" => "", "layerKind" => "circles",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "tick_units",
@@ -956,7 +956,7 @@ function build_kind_sweep()
     end
 
     tick_units = let
-        fig = Figure(size = (720, 480))
+        fig = Figure(size = (720, 700))
         ax_mv = Axis(fig[1, 1]; title = "mV", ytickformat = "{:.1f} mV", limits = (0, 3, 0, 5))
         scatter!(ax_mv, [1.0, 2.0], [3.4721, 1.5]; color = :gray, markersize = 22)
         ax_fn = Axis(fig[1, 2]; title = "function", ytickformat = vs -> string.(vs) .* "!", limits = (0, 3, 0, 5))
@@ -968,6 +968,11 @@ function build_kind_sweep()
         barplot!(ax_bar, [1, 2], [3.4721, 1.5]; color = :gray)
         ax_hist = Axis(fig[2, 2]; title = "hist", xtickformat = "{:.1f} s", ytickformat = "{:.0f} n")
         hist!(ax_hist, [0.2, 0.4, 0.6, 1.5]; bins = [0.0, 1.0, 2.0], color = :gray)
+        # A horizontal box plot (its axes carry `NoDimConversion`) and a vspan read along x.
+        ax_box = Axis(fig[3, 1]; xtickformat = "{:.1f} kg")
+        boxplot!(ax_box, fill(1, 5), [1.0, 2.0, 3.0, 4.0, 5.0]; orientation = :horizontal, color = :gray)
+        ax_vs = Axis(fig[3, 2]; xtickformat = "{:.1f} s", limits = (0, 3, 0, 1))
+        vspan!(ax_vs, [1.0], [2.0]; color = (:gray, 0.5))
         masque(fig)
     end
 

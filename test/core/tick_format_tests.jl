@@ -138,6 +138,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         g = repeat([1, 2], 10)
         @test coords(only(IP._construct_unplaced(ax, boxplot!(ax, g, randn(20)), :box))) == on(:y, :q1, :median, :q3)
         @test coords(only(IP._construct_unplaced(ax, boxplot!(ax, g, randn(20); orientation = :horizontal), :box))) == on(:x, :q1, :median, :q3)
+        # A boxplot sets `NoDimConversion` on its axes; their formats still reach the browser.
+        figb = Figure(); axb = Axis(figb[1, 1]; xtickformat = "{:.1f} kg")
+        boxplot!(axb, fill(1, 5), [1.0, 2.0, 3.0, 4.0, 5.0]; orientation = :horizontal)
+        @test axb.dim1_conversion[] isa Makie.NoDimConversion
+        tb = masque(figb).manifest["transforms"]
+        @test only(values(tb))["xfmt"] == Dict("suffix" => " kg", "spec" => ".1f")
         notched = only(IP._construct_unplaced(ax, boxplot!(ax, repeat([1, 2], 100), Float64.(1:200); show_notch = true), :box))
         @test notched isa PolygonInteractable
         @test coords(notched) == on(:y, :q1, :median, :q3)
