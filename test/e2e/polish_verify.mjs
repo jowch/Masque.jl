@@ -1442,10 +1442,18 @@ try {
       await touch("touchEnd", [], t0 + 16 * 9);
       let y1 = y0;
       await until(async () => Math.abs((y1 = await page.evaluate(() => window.scrollY)) - y0) >= 20);
-      // Put the plot back where the hold check expects it.
-      await page.evaluate((d) => window.scrollBy(0, d), y0 - y1);
+      // A quick swipe flings: wait for the page to stop, then put the plot back where the
+      // hold check expects it.
+      for (let last = NaN, n = 0; n < 40; n++) {
+        await new Promise((r) => setTimeout(r, 150));
+        const y = await page.evaluate(() => window.scrollY);
+        if (y === last) break;
+        last = y;
+      }
+      const moved = y1 - y0;
+      await page.evaluate((y) => window.scrollTo(window.scrollX, y), y0);
       await new Promise((r) => setTimeout(r, 200));
-      return y1 - y0;
+      return moved;
     };
     const moved = await swipe();
     if (Math.abs(moved) < 20) {
@@ -1461,10 +1469,11 @@ try {
       throw new Error(`touch/swipe-scrolls: a plain swipe moved the page ${moved}px, so the hold check proves nothing (under the finger: ${under}; a swipe in the page margin moved it ${m1 - m0}px; touchmove ${prev})`);
     }
     passed.push("touch/swipe-scrolls");
-    const y0 = await page.evaluate(() => window.scrollY);
     const t0 = Date.now();
     await touch("touchStart", [[a0.x, a0.y]], t0);
     await new Promise((r) => setTimeout(r, 500));
+    // Read after the finger is down: the press stops what is left of the swipe's fling.
+    const y0 = await page.evaluate(() => window.scrollY);
     for (let i = 1; i <= 8; i++) {
       await touch("touchMove", [[a0.x + (a1.x - a0.x) * i / 8, a0.y + 30 * i / 8]], t0 + 500 + 30 * i);
       await new Promise((r) => setTimeout(r, 30));
@@ -1474,7 +1483,7 @@ try {
     await touch("touchEnd", []);
     await new Promise((r) => setTimeout(r, 250));
     const end = await tipOf("axis");
-    if (!mid.show || mid.text === r0.text) throw new Error(`touch/hold-scrub: readout did not follow (${r0.text} -> ${mid.text})`);
+    if (!mid.show || mid.text === r0.text) throw new Error(`touch/hold-scrub: readout did not follow (${r0.text} -> ${mid.text}, show ${mid.show})`);
     if (Math.abs(y1 - y0) > 1) throw new Error(`touch/hold-scrub: page scrolled ${y1 - y0}px during the scrub`);
     if (!end.show) throw new Error("touch/hold-scrub: readout gone after lift");
     passed.push("touch/hold-scrub");
