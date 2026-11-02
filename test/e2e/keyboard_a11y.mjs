@@ -42,10 +42,6 @@ try {
   page = await context.newPage();
   // The fade's picks in a widget's shadow root (#394), every axis together; see fade.ts.
   await page.addInitScript(() => {
-    // Diagnostic: count websocket frames sent/received, to tell a value never sent from one Pluto never answered.
-    window.__wsSent = 0; window.__wsRecv = 0;
-    const send = WebSocket.prototype.send;
-    WebSocket.prototype.send = function (...a) { window.__wsSent++; if (!this.__masqueCounted) { this.__masqueCounted = true; this.addEventListener("message", () => { window.__wsRecv++ }); } return send.apply(this, a); };
     window.fadeOf = (sr) => {
       const out = { picked: [], kept: [], lone: [], outlines: [] };
       for (const w of sr?.querySelectorAll(".masque-fade") ?? []) {
@@ -236,6 +232,7 @@ try {
     return t;
   };
 
+  let firstValue = true;
   for (const key of ["scatter", "barplot", "poly"]) {
     const layers = await layersOf(key);
     const layer = layers[0];
@@ -306,23 +303,15 @@ try {
     const delta = target - landed;
     const stepKey = delta >= 0 ? "ArrowRight" : "ArrowLeft";
     for (let i = 0; i < Math.abs(delta); i++) await page.keyboard.press(stepKey);
-    await countInputs(key);
-    const ws0 = await page.evaluate(() => [window.__wsSent, window.__wsRecv]);
-    const t0 = Date.now();
     await page.keyboard.press("Enter");
+    // The session's first value is the slow one: on CI it came back after 1.3 s (:cairo) and
+    // 6.1 s (:webgl), every later one in about 0.1 s (#566). It is sent at once and does
+    // arrive, so it gets 15 s; the rest keep 4 s.
+    const budget = firstValue ? 150 : 40;
+    firstValue = false;
     let after = before;
-    for (let i = 0; i < 40 && after === before; i++) { await page.waitForTimeout(100); after = await textOf(`#out_${key}`); }
-    console.log(`TIMING ${key} enter->out ${Date.now() - t0} ms`);
-    if (after === before) {
-      const n0 = await inputCount(key);
-      const ws1 = await page.evaluate(() => [window.__wsSent, window.__wsRecv]);
-      const ping0 = Date.now(); await fetch(`${base}/ping`); const pingMs = Date.now() - ping0;
-      const hv = await page.evaluate(([k, src]) => JSON.stringify((0, eval)(src)(k).value ?? null).slice(0, 300), [key, hostOf.toString()]).catch((e) => String(e));
-      for (let i = 0; i < 300 && after === before; i++) { await page.waitForTimeout(100); after = await textOf(`#out_${key}`); }
-      const ws2 = await page.evaluate(() => [window.__wsSent, window.__wsRecv]);
-      console.log(`LATE ${key}: ws sent/recv before=${ws0} at4s=${ws1} end=${ws2} ping=${pingMs}ms inputs=${n0} arrived=${after !== before} after ${Date.now() - t0} ms; out=${after.slice(0, 120)} hostval=${hv}`);
-    }
-    if (after === before) throw new Error(`${key}: Enter never updated #out_${key} (wire index ${target}, was ${beforeWire})`);
+    for (let i = 0; i < budget && after === before; i++) { await page.waitForTimeout(100); after = await textOf(`#out_${key}`); }
+    if (after === before) throw new Error(`${key}: Enter never updated #out_${key} in ${budget / 10} s (wire index ${target}, was ${beforeWire})`);
     const idRe = new RegExp(`:${layer.id}|${layer.id}`, "i");
     if (!idRe.test(after)) throw new Error(`${key}: Enter bond value missing layer id: ${after.slice(0, 200)}`);
     if (!new RegExp(`:${layer.id},\\s*${target + 1}\\b`).test(after)) {
@@ -379,11 +368,9 @@ try {
     const before = await textOf(`#out_${key}`);
     let want = 2;
     if (new RegExp(`:series,\\s*2,\\s*line = 1\\b`).test(before)) { await page.keyboard.press("Shift+ArrowRight"); want = 3; }
-    const t0 = Date.now();
     await page.keyboard.press("Enter");
     let after = before;
     for (let i = 0; i < 40 && after === before; i++) { await page.waitForTimeout(100); after = await textOf(`#out_${key}`); }
-    console.log(`TIMING ${key} enter->out ${Date.now() - t0} ms`);
     if (!new RegExp(`:series,\\s*${want},\\s*line = 1\\b`).test(after)) {
       throw new Error(`${key}: Shift+Arrow then Enter expected point ${want} of line 1: ${after.slice(0, 200)}`);
     }
