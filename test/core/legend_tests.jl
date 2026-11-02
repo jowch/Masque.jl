@@ -529,6 +529,30 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test haskey(built(; before = true, color = :white, z = 1)[4], "occluders")
         @test !haskey(built(; color = :white, z = -1)[4], "occluders")
 
+        # The rule per backend and axis kind (`true` = the WebGL rule), as each draws it (#547).
+        over(axis; before = false, z = 0, raise = 0, gl = false) = begin
+            fig = Figure(size = (500, 400))
+            mk() = Box(fig[1, 1]; width = 120, height = 120, color = :white, tellwidth = false, tellheight = false, z)
+            b = before ? mk() : nothing
+            ax = axis(fig[1, 1])
+            sc = axis === Axis3 ? scatter!(ax, [0.0], [0.0], [0.0]) : scatter!(ax, [0.0], [0.0])
+            raise == 0 || translate!(sc, 0, 0, raise)
+            b = before ? b : mk()
+            Masque._box_over_plots(fig, b, ax, gl)
+        end
+        for gl in (false, true), axis in (Axis, PolarAxis)
+            # a plot raised above the Box shows over it
+            @test !over(axis; raise = 5, gl) && !over(axis; raise = 5, z = 1, gl)
+            @test over(axis; raise = 5, z = 5, gl) && over(axis; raise = 5, z = 6, gl)
+            @test !over(axis; z = -1, gl)
+        end
+        # WebGL draws a PolarAxis's background over a Box made before it, whatever its `z`
+        @test over(PolarAxis; before = true, z = 1) && !over(PolarAxis; before = true, z = 1, gl = true)
+        # over an Axis3 the WebGL depth test covers the plots for `z` 0 and up, in either order
+        @test !over(Axis3; before = true) && over(Axis3; before = true, gl = true)
+        @test over(Axis3) && over(Axis3; gl = true)
+        @test !over(Axis3; z = -50) && !over(Axis3; z = -50, gl = true)
+
         # a Box beside the axes covers none of them
         fig = Figure(size = (600, 400)); ax = Axis(fig[1, 1])
         scatter!(ax, 1:10, 1:10)

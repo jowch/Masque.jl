@@ -751,6 +751,39 @@ try {
     passed.push(`${key}/no-hover-through-box`);
   }
 
+  // A `Box` over each kind of axis (#547): the backends draw it differently, so on each one a
+  // mark is hidden on screen exactly when it sits under a shipped occluder, and every other
+  // mark takes the pointer. Two centre marks hide on each backend (Cairo: after, polar; WebGL:
+  // after, 3D), so the check sees both outcomes.
+  {
+    const key = "box_axes";
+    const boxes = await page.evaluate((k) => JSON.parse(document.querySelector(`#occluders_${k}`).innerText), key);
+    const layers = (await layersOf(key)).filter((l) => /^p[1-6]$/.test(l.id)).sort((a, b) => a.id.localeCompare(b.id));
+    if (layers.length !== 6) throw new Error(`${key}: want six mark layers, got ${JSON.stringify(layers.map((l) => l.id))}`);
+    const ringOf = (h) => [h.hi.fill, h.hi.edge, h.hi.plain].some((c) => c && !/masque-leave/.test(c.className ?? ""));
+    const away = async () => { await hoverAt(key, 2, 2); await page.waitForTimeout(600); };
+    await away();
+    const rest = await screenOf(key);
+    const orange = ([x, y]) => { const [r, g, b] = rest.mean(x, y, 2); return r > 200 && g > 100 && g < 200 && b < 80; };
+    const under = ([x, y]) => boxes.some(([bx, by, bw, bh]) => x > bx && x < bx + bw && y > by && y < by + bh);
+    const hidden = [];
+    for (const l of layers) {
+      for (let k = 0; 3 * k < l.geometry.length; k++) {
+        const at = [l.geometry[3 * k], l.geometry[3 * k + 1]];
+        const occluded = under(at), shown = orange(at);
+        if (occluded === shown) throw new Error(`${key}: ${l.id}:${k} at ${at.map(Math.round)} is ${shown ? "drawn" : "hidden"} on screen but ${occluded ? "under" : "outside"} the occluders ${JSON.stringify(boxes)}`);
+        await away();
+        const h = await hoverAt(key, ...at);
+        if ((h.show && ringOf(h)) === occluded) throw new Error(`${key}/hover: ${l.id}:${k} ${occluded ? "takes the pointer through its box" : "shows but takes no pointer"} (tip ${JSON.stringify(h.text)})`);
+        if (occluded) hidden.push(`${l.id}:${k}`);
+      }
+    }
+    const want = backend === "webgl" ? ["p1:0", "p5:0"] : ["p1:0", "p4:0"];
+    if (JSON.stringify(hidden) !== JSON.stringify(want)) throw new Error(`${key}: hidden marks ${JSON.stringify(hidden)}, want ${JSON.stringify(want)}`);
+    await away();
+    passed.push(`${key}/hidden-exactly-under-occluders`);
+  }
+
   // A plot drawn with `visible = false` (#484): picking legend entry "a" fades line c and leaves
   // the hidden line b's path alone, so the gridlines under it stay whole; hovering b's path
   // shows nothing.

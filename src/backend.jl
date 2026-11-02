@@ -444,12 +444,10 @@ end
 # too small to point at, so the box stays square.
 function _box_occluder(box, scaling, out_h)
     box.visible[] || return nothing
-    a = try
-        Makie.alpha(Makie.to_color(box.color[]))
-    catch
-        return nothing   # a pattern or other non-colour fill: leave the marks under it alone
-    end
-    a >= 0.5 || return nothing
+    c = Makie.to_color(box.color[])
+    # a pattern or other non-colour fill: leave the marks under it alone
+    c isa Makie.Colorant || return nothing
+    Makie.alpha(c) >= 0.5 || return nothing
     bb = box.layoutobservables.computedbbox[]
     half = box.strokevisible[] ? box.strokewidth[] / 2 : 0.0
     x0, y0 = bb.origin[1] - half, bb.origin[2] - half
@@ -458,9 +456,30 @@ function _box_occluder(box, scaling, out_h)
     return [x0 * scaling, out_h - (y0 + h) * scaling, w * scaling, h * scaling]
 end
 
+# Whether Makie draws Box `box` over every plot of axis `ax`, as each backend renders it (#547).
+# Probed on both backends over an Axis, Axis3 and PolarAxis, with the Box made before and after
+# the axis, Box `z` from -200 to 6, and plots raised with `translate!`. `gl` is the WebGL
+# backend (`ctx.depth_test`).
+# - CairoMakie sorts every plot by its 2D z (`Makie.zvalue2d`), ties in the order the blocks
+#   were made: the Box covers the plots when its `z` is above the highest of theirs, or level
+#   with it and the Box was made after the axis. An Axis3's plots count as z 0.
+# - WebGL does the same over an Axis, and over a PolarAxis made before the Box. A PolarAxis
+#   made after the Box draws its background over it whatever its `z`, so the Box hides nothing.
+#   Over an Axis3 the depth test decides: a Box with `z` 0 or more covers the plots whatever
+#   the order; below 0 it depends on the marks' depth (-20 covers, -50 doesn't), so it counts
+#   as not covering, which keeps every mark that might show under the pointer.
+function _box_over_plots(fig, box, ax, gl::Bool)
+    gl && ax isa Makie.Axis3 && return box.z[] >= 0
+    after = _made_after(fig, box, ax)
+    gl && ax isa Makie.PolarAxis && !after && return false
+    z = box.z[]
+    pz = ax isa Makie.Axis3 ? 0.0f0 : maximum(Makie.zvalue2d, ax.scene.plots; init = 0.0f0)
+    return z > pz || (z == pz && after)
+end
+
 # Whether block `top` was made after block `under`: each block's scene hangs off the figure's
-# scene in the order the blocks were made, and Makie draws plots level in `z` in that order.
-function _drawn_after(fig, top, under)
+# scene in the order the blocks were made.
+function _made_after(fig, top, under)
     kids = fig.scene.children
     i = findfirst(s -> s === top.blockscene, kids)
     j = findfirst(s -> s === under.blockscene, kids)

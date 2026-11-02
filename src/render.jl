@@ -622,10 +622,7 @@ function build_manifest(
             blk isa Makie.Box || continue
             box = _box_occluder(blk, ctx.scaling, ctx.height)
             box === nothing && continue
-            # Makie draws a Box over an axis's plots when its `z` is above theirs (0), or level
-            # with it and the Box was made after the axis; otherwise the plots show on top (#547).
-            z = blk.z[]
-            over(ax) = z > 0 || (z == 0 && _drawn_after(fig, blk, ax))
+            over(ax) = _box_over_plots(fig, blk, ax, ctx.depth_test)
             any(((ax, v),) -> meets(box, v) && over(ax), axes) && push!(occluders, box)
         end
     end
