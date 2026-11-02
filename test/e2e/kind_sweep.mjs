@@ -685,12 +685,14 @@ try {
   const expectBase = backend === "webgl" ? "canvas" : "img";
   // An off-screen WebGL plot hands its GPU context back and shows a snapshot img (the context
   // pool in wgl-shim.ts), so whether a plot holds a canvas depends on where the last step
-  // scrolled. Each case brings its plot on screen and waits for its context, as a reader
-  // scrolling to it would, before the canvas check below.
+  // scrolled. A case whose plot holds no canvas yet brings it on screen and waits for its
+  // context, as a reader scrolling to it would, before the canvas check below. A plot that
+  // already holds one is left where it is: scrolling it moves other plots' contexts around.
   const bringLive = async (key) => {
     const live = await page.evaluate(async (k) => {
       const span = document.querySelector(`#coords_${k}`);
       const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      if (host.querySelector("img, canvas")?.tagName === "CANVAS") return true;
       host.scrollIntoView({ block: "center", inline: "nearest" });
       for (let i = 0; i < 75; i++) {
         if (host.querySelector("img, canvas")?.tagName === "CANVAS") return true;
