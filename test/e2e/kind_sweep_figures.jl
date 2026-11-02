@@ -150,6 +150,14 @@ kind_sweep_meta() = [
         "anchorKey" => "polar", "anchorIndex" => 1, "theta" => π / 2, "r" => 2.0, "rmax" => 2.5,
     ),
     Dict(
+        # Default tooltips follow the axis's tick format (#510): one auto widget, three axes.
+        # Each scatter's first point is hovered; the driver picks the expectation by the axis's
+        # transform (polar, a `"{:.1f} mV"` format, a function format left plain).
+        "key" => "tick_units", "layerId" => "", "layerKind" => "circles",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "tick_units",
+    ),
+    Dict(
         "key" => "scatter_dark", "layerId" => "scatter_dark", "layerKind" => "circles",
         "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
         "tip" => "beta", "hoverIndex" => 0, "hoverTip" => "alpha", "mode" => "element",
@@ -193,11 +201,12 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
-        # `lines!` on Axis3: one element, so nothing is baked selected and hover takes it. A
-        # hover reads out the nearest plotted point's x, y and z (#502); a click still picks
-        # the whole line.
+        # `lines!` on Axis3: a hover reads out the nearest plotted point's x, y and z (#502),
+        # and a click picks that point, as on a 2D axis (#518): `selected = [1]` rings the
+        # first point, and the click lands on the third.
         "key" => "lines3d", "layerId" => "lines", "layerKind" => "lines",
-        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "selected" => "point", "circle" => false, "selectedIndex" => 0, "selectedSample" => 0,
+        "clickIndex" => 0, "clickSample" => 2, "clickZ" => "3.0",
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
         "readout" => Dict("vertex" => 2, "text" => ["x2", "y4", "z3"]),
     ),
@@ -237,6 +246,24 @@ kind_sweep_meta() = [
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 13,
         "tip" => "i4j3", "hoverIndex" => 12, "hoverTip" => "i3j3", "mode" => "element",
         "orbitSuspends" => true,
+    ),
+    Dict(
+        # `surface!` on a PolarAxis, Makie's polar heatmap (#514): the same `:surface` layer as
+        # on Axis3, projected through the polar transform. Point k is (a, b) = (k % 9, k ÷ 9) of
+        # the 9 × 4 θ × r grid; 11 is θ = π/2, r = 1 and 22 is θ = π, r = 1.5 (Julia's (3, 2) and
+        # (5, 3)). θ = 0 and θ = 2π are the same ray, so the cases stay off it.
+        "key" => "surface_polar", "layerId" => "surface", "layerKind" => "surface",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 22,
+        "tip" => "i5j3", "hoverIndex" => 11, "hoverTip" => "i3j2", "mode" => "element",
+    ),
+    Dict(
+        # A polar surface on a sector axis turned and mirrored (`thetalimits`, `direction = -1`,
+        # `theta_0`) with an inner radius (`rlimits`), so every polar field moves the points.
+        # The data runs past the limits, where the axis hides it (polish_verify checks that part
+        # stays silent). 7 × 7 θ × r grid: 22 is Julia's (2, 4), θ = π/6, r = 2; 30 is (3, 5).
+        "key" => "surface_sector", "layerId" => "surface", "layerKind" => "surface",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 30,
+        "tip" => "i3j5", "hoverIndex" => 22, "hoverTip" => "i2j4", "mode" => "element",
     ),
     Dict(
         # `text!` on Axis3 (#292): "front" sits between "back" and the camera, so their boxes
@@ -405,6 +432,27 @@ kind_sweep_meta() = [
         "owner" => Dict(
             "layer" => "scatter", "otherClicks" => true,
             "initial" => "roi = BoundsEvent\\(:roi, xmin = 3\\.0, xmax = 6\\.0, ymin = 3\\.0, ymax = 6\\.0\\)",
+        ),
+    ),
+    Dict(
+        # The same line with no `value`: it starts halfway up the 0–10 axis (#513).
+        "key" => "threshold_default", "layerId" => "threshold", "layerKind" => "threshold",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+        "owner" => Dict(
+            "layer" => "scatter", "otherClicks" => true,
+            "initial" => "threshold = ThresholdEvent\\(:threshold, value = 5\\.0",
+        ),
+    ),
+    Dict(
+        # The same box with no `bounds`: the middle half of the 0–10 axes (#513). The scatter's
+        # first point, at (1, 1), is outside it.
+        "key" => "roi_default", "layerId" => "roi", "layerKind" => "roi",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "owner",
+        "owner" => Dict(
+            "layer" => "scatter", "otherClicks" => true,
+            "initial" => "roi = BoundsEvent\\(:roi, xmin = 2\\.5, xmax = 7\\.5, ymin = 2\\.5, ymax = 7\\.5\\)",
         ),
     ),
     Dict(
@@ -905,6 +953,17 @@ function build_kind_sweep()
         masque(fig, AxisInteractable(ax; id = :axis); auto = false)
     end
 
+    tick_units = let
+        fig = Figure(size = (720, 260))
+        ax_mv = Axis(fig[1, 1]; title = "mV", ytickformat = "{:.1f} mV", limits = (0, 3, 0, 5))
+        scatter!(ax_mv, [1.0, 2.0], [3.4721, 1.5]; color = :gray, markersize = 22)
+        ax_fn = Axis(fig[1, 2]; title = "function", ytickformat = vs -> string.(vs) .* "!", limits = (0, 3, 0, 5))
+        scatter!(ax_fn, [1.0, 2.0], [3.4721, 1.5]; color = :gray, markersize = 22)
+        ax_p = PolarAxis(fig[1, 3])
+        scatter!(ax_p, [π / 2, π], [2.0, 1.0]; color = :gray, markersize = 22)
+        masque(fig)
+    end
+
     scatter_dark = let
         pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 1.2)]
         fig = Figure(size = (480, 260); backgroundcolor = :gray12)
@@ -1078,7 +1137,7 @@ function build_kind_sweep()
         ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "lines3d")
         ln = lines!(ax, Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3), (4, 4, 2)]; color = :gray, linewidth = 4)
         # Bound, so the Axis3 line takes clicks; a default line is hover-only (#335).
-        masque(fig; bind = (ln,))
+        masque(fig; bind = (ln,), selected = Dict(:lines => [1]))
     end
 
     meshscatter3d = let
@@ -1109,6 +1168,29 @@ function build_kind_sweep()
         surface!(ax, xs, xs, zs; colormap = [:steelblue, :lightblue], shading = NoShading)
         wireframe!(ax, xs, xs, zs; color = :black, linewidth = 0.5)
         masque(fig, ViewInteractable(ax))
+    end
+
+    # A polar heatmap drawn with `surface!` (#514), coarse so each point's cell is large enough
+    # to hover on its own. Values are RNG-free (CI's sweep runs Julia 1.10).
+    surface_polar = let
+        fig = Figure(size = (480, 320))
+        ax = PolarAxis(fig[1, 1]; title = "surface_polar")
+        th = range(0, 2π; length = 9)
+        rs = [0.5, 1.0, 1.5, 2.0]
+        surface!(ax, th, rs, [cos(2t) * r for t in th, r in rs]; shading = NoShading)
+        masque(fig)
+    end
+
+    surface_sector = let
+        fig = Figure(size = (480, 320))
+        ax = PolarAxis(
+            fig[1, 1]; title = "surface_sector", thetalimits = (0, π / 2), direction = -1,
+            theta_0 = π / 4, rlimits = (1, 3),
+        )
+        th = range(0, π; length = 7)
+        rs = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5]
+        surface!(ax, th, rs, [t + r for t in th, r in rs]; shading = NoShading)
+        masque(fig)
     end
 
     # A small scatter marker in front of a large sphere, drawn after it (#242, #301).
@@ -1323,6 +1405,21 @@ function build_kind_sweep()
         ax = Axis(fig[1, 1]; title = "roi bounds", limits = (0, 10, 0, 10))
         scatter!(ax, [1.0, 8.0], [1.0, 8.0]; markersize = 14, color = :gray)
         masque(fig, ROIInteractable(ax; bounds = (3.0, 6.0, 3.0, 6.0), id = :roi))
+    end
+
+    # A threshold and a box with no start: they start in the middle of the limits (#513).
+    threshold_default = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "threshold, no value", limits = (0, 10, 0, 10))
+        scatter!(ax, [2.0, 8.0], [2.0, 8.0]; markersize = 10, color = :gray)
+        masque(fig, ThresholdInteractable(ax; orientation = :horizontal, id = :threshold))
+    end
+
+    roi_default = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "roi, no bounds", limits = (0, 10, 0, 10))
+        scatter!(ax, [1.0, 8.0], [1.0, 8.0]; markersize = 14, color = :gray)
+        masque(fig, ROIInteractable(ax; id = :roi))
     end
 
     threshold_colorbar = let
@@ -1777,8 +1874,8 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_colorbar, threshold_colorbar_h, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, legend, series_legend,
+        polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

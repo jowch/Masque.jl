@@ -147,9 +147,9 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 |---|---|---|---|
 | [`AxisInteractable`](@ref) | `(ax; id=:axis)` | [`AxisEvent`](@ref): `x`, `y` | [Read coordinates](@ref) |
 | [`ColorbarInteractable`](@ref) | `(cb; id=:colorbar)` | [`ColorbarEvent`](@ref): `value` | [Read coordinates](@ref) |
-| [`ThresholdInteractable`](@ref) | `(ax; orientation=:horizontal, value, id=:threshold)` | [`ThresholdEvent`](@ref): `value`, starting at `value` | [Read coordinates](@ref) |
+| [`ThresholdInteractable`](@ref) | `(ax; orientation=:horizontal, value=nothing, id=:threshold)` | [`ThresholdEvent`](@ref): `value`, starting at `value`, or mid-axis without one | [Read coordinates](@ref) |
 | [`LegendInteractable`](@ref) | `(leg; targets=nothing, tooltip=nothing, id=:legend)` | [`LegendEvent`](@ref): `label`, `group`, `targets` | [Legend](@ref) |
-| [`ROIInteractable`](@ref) | `(ax; bounds, selects=nothing, id=:roi)` | [`BoundsEvent`](@ref), starting at `bounds`; with `selects`, the target's field holds the marks or cells inside | [Brush a region](@ref) |
+| [`ROIInteractable`](@ref) | `(ax; bounds=nothing, selects=nothing, id=:roi)` | [`BoundsEvent`](@ref), starting at `bounds`, or the middle half of the axis without them; with `selects`, the target's field holds the marks or cells inside | [Brush a region](@ref) |
 | [`ViewInteractable`](@ref) | `(ax; id=:view)` | no field | [Pan, zoom and orbit](@ref) |
 | [`SliceInteractable`](@ref) | `(plots)`, `(ax, plots)`, or `(ax; series, orientation=:vertical, crosshair=true, covers, tooltip)` | no field; hover only | [Slice across series](@ref) |
 

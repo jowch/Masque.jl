@@ -52,6 +52,10 @@ export interface SurfaceGeometry {
     y: number[]     // data y: length nj or ni*nj
     z: number[]     // ni*nj
     value?: number[] // ni*nj, the colour matrix when it is separate from z
+    // PolarAxis only: the shown region, image px. [cx, cy, rin, rout] is the annulus around the
+    // polar origin; a sector adds [phi0, span], the counterclockwise screen angle of its first
+    // edge and its signed width. The axis masks the rest, so it is not hit.
+    clip?: number[]
 }
 
 export interface ThresholdGeometry {
@@ -237,6 +241,22 @@ export interface AxisTransform {
     ispolar?: boolean // lims are the viewport's Cartesian window; `polar` turns that point into (θ, r)
     polar?: PolarFrame | null // PolarAxis only; mirrors Julia's PolarFrame (src/backend.jl)
     fill?: string // the empty plot area's colour, when it is not the figure's `background`
+    // How a tooltip prints a coordinate on each dimension, read from the axis's tick settings
+    // (Julia `_coord_format`, src/backend.jl). Absent: the plain number.
+    xfmt?: CoordFormat
+    yfmt?: CoordFormat
+    zfmt?: CoordFormat
+}
+
+// One axis dimension's display format (#510). Display only: the `@bind` value keeps the raw number.
+export interface CoordFormat {
+    scale?: number   // multiply before printing: 180/π for degrees, 100 for %, 1/π for π units
+    prefix?: string  // "$"
+    suffix?: string  // " mV", "°", "π", "%"
+    group?: boolean  // thousands separators
+    exp?: boolean    // scientific notation
+    spec?: string    // d3-format spec from the precision a Makie format string states
+    label?: string   // the table key in place of x/y/z: "θ" or "r" on a PolarAxis
 }
 
 // The resolved Makie.Polar fields of one PolarAxis. invertAxis maps a pixel to the Cartesian
@@ -273,6 +293,7 @@ export interface HitLayer {
     linewidth?: number // :segments/:polyline/:lines: the drawn line width, image px (absent → Makie's default, 1.5 logical px); fade.ts covers a line with it
     template?: TemplateSegment[] // masque"..." parsed once per layer; $() fields fill from payloads[]
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table
+    coords?: string[]            // the payload fields Masque filled in ("x", "y", "z"): they print in the axis's CoordFormat
     brush?: "elements" | "grid" // a `selects` box's target: its field holds what the box holds
     many?: true // a `select = :many` field: it holds { items: [...] }, and a click toggles one in or out
     group?: string // the `linked(...)` group this layer is a member of: its clicks edit the group's field
@@ -300,7 +321,7 @@ export interface HitLayer {
     points?: (number | string)[][]
     step?: "pre" | "post" | "center"
     // :lines on an Axis3: per element, the z of each sample in `points`. Such a line reads out
-    // its points but its pick stays the whole line.
+    // and picks its points, as a 2D line does (#518).
     zpoints?: (number | string)[][]
     // :lines on a zoomed Axis3: per element, what each vertex of the drawn path is: 2k for sample
     // k, 2k + 1 for where the edge from sample k is cut by the limits, -1 for a gap. null (or

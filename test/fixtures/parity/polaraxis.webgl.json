@@ -2,6 +2,10 @@
     "height": 900,
     "layers": [
         {
+            "coords": [
+                "x",
+                "y"
+            ],
             "kind": "circles",
             "id": "scatter",
             "geometry": [
@@ -234,9 +238,17 @@
                 "theta_as_x": true,
                 "theta_0": 0
             },
+            "xfmt": {
+                "scale": 57.29577951308232,
+                "label": "θ",
+                "suffix": "°"
+            },
             "is3d": false,
             "xreversed": false,
             "ycats": null,
+            "yfmt": {
+                "label": "r"
+            },
             "xcats": null,
             "yreversed": false,
             "yscale": "identity",

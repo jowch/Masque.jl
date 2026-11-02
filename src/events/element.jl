@@ -6,8 +6,9 @@ One element of a point, bar, polygon, segment, polyline, or list-of-rects layer.
 `df[pick, :]`, `xs[pick]`.
 
 A line's pick is the data point nearest the click: `index` is that point, and the payload adds
-`line` (which line, for a plot of several like `series!`), `x` and `y`. A line on an `Axis3`
-has no points to pick, so its pick is the whole line and `index` is which line.
+`line` (which line, for a plot of several like `series!`), `x` and `y`, plus `z` on an `Axis3`.
+A `stairs!` on an `Axis3` has no points to pick, so its pick is the whole line and `index` is
+which line.
 """
 struct ElementEvent <: InteractionEvent
     layer::Symbol
@@ -35,11 +36,10 @@ function _element_event(id::Symbol, index, payloads)
     return ElementEvent(id, idx, payloads[idx])
 end
 
-# A line's pick is one of its data points, the one nearest the click. Lines on a 2D axis ship
-# their data points (`points`). A line on an `Axis3` ships them too (with `zpoints`), for the
-# hover readout, but its pick stays the whole line: a point pick there changes what
-# `pick.index` means, which waits for a minor release.
-_picks_points(L::HitLayer) = L.kind === :lines && L.points !== nothing && L.zpoints === nothing
+# A line's pick is one of its data points, the one nearest the click. A line ships its data
+# points (`points`, with `zpoints` on an `Axis3`) unless it has none to read, such as a
+# staircase on an Axis3; that line is picked whole.
+_picks_points(L::HitLayer) = L.kind === :lines && L.points !== nothing
 
 # `ev` is the picked line; `s` the 1-based data point on it. `index` becomes the point, so
 # `xs[pick]` reads it, and the payload adds `line` (which line of a `series!`), `x` and `y`.

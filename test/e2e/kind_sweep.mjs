@@ -727,6 +727,25 @@ try {
   };
 
   const expectBase = backend === "webgl" ? "canvas" : "img";
+  // An off-screen WebGL plot hands its GPU context back and shows a snapshot img (the context
+  // pool in wgl-shim.ts), so whether a plot holds a canvas depends on where the last step
+  // scrolled. A case whose plot holds no canvas yet brings it on screen and waits for its
+  // context, as a reader scrolling to it would, before the canvas check below. A plot that
+  // already holds one is left where it is: scrolling it moves other plots' contexts around.
+  const bringLive = async (key) => {
+    const live = await page.evaluate(async (k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      if (host.querySelector("img, canvas")?.tagName === "CANVAS") return true;
+      host.scrollIntoView({ block: "center", inline: "nearest" });
+      for (let i = 0; i < 75; i++) {
+        if (host.querySelector("img, canvas")?.tagName === "CANVAS") return true;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      return false;
+    }, key);
+    if (!live) console.error(`${key}: no WebGL context 15 s after scrolling the plot on screen`);
+  };
 
   // Set below when the loop reaches "scatter" — the hover-on-selected-noop check after the loop
   // needs the INDEX actually clicked (not just spec.clickIndex), since the collision-avoidance
@@ -738,6 +757,7 @@ try {
     const wantDark = key === "scatter_dark"; // the only dark-figure case in kind_sweep_figures.jl
     const sh = await shadowOf(key);
     if (!sh?.ok) throw new Error(`${key}: overlay surface missing`);
+    if (backend === "webgl") await bringLive(key);
     // #99: installed once per widget, before anything below can draw a hover — the no-pulse
     // window (below) opens at the tooltip-establishing hover, not here, but the recorder has to
     // already be watching by then to catch that add.
@@ -997,6 +1017,32 @@ try {
       await expectLevel(spec.controlStart, "mount");
       passed.push(`${key}/start-values`);
 
+      // Each control commit runs the cell reading the bond once (#458: a native `input` event
+      // escaping the shadow root sent the bond a second time). `once` waits for Pluto to go
+      // idle, then long enough for a late second run, and counts the runs since `r`. Only the
+      // actions that fire a native `input` can catch #458 (slider, toggle, interval, menu pick,
+      // grid key, text box, checkbox); a menu option click or a button fires none, so those
+      // checks guard against a double commit from some other cause.
+      // The 2.5 s wait is a fixed bound: a second run arriving later is blamed on the next
+      // action, and the last check (`checkbox-space`) would miss it.
+      const runs = async () => Number(await textOf(`#count_${key}`));
+      const settle = async () => {
+        for (let i = 0; ; i++) {
+          if (!(await page.evaluate(() => document.querySelectorAll("pluto-cell.running, pluto-cell.queued").length))) break;
+          if (i >= 600) throw new Error(`${key}: Pluto still busy after 60 s`);
+          await new Promise((res) => setTimeout(res, 100));
+        }
+        await new Promise((res) => setTimeout(res, 2500));
+        return runs();
+      };
+      const once = async (what, before) => {
+        const n = await settle();
+        if (n !== before + 1) throw new Error(`${key}/one-run-${what}: the cell reading the bond ran ${n - before} times, want 1`);
+        passed.push(`${key}/one-run-${what}`);
+        return n;
+      };
+      let r = await settle();
+
       // Keyboard: two steps right on the focused slider.
       await ctl("level").focus();
       await page.keyboard.press("ArrowRight");
@@ -1004,6 +1050,8 @@ try {
       v = await bondReaches(/level = 5,/, v, "keyboard");
       await expectLevel(5, "keyboard");
       passed.push(`${key}/slider-keyboard`);
+      // Two key presses, two commits; Pluto may run them as one, so only count from here.
+      r = await settle();
 
       // Pointer: drag the knob to the right end. The line follows while the knob moves.
       const sb = await ctl("level").boundingBox();
@@ -1014,6 +1062,7 @@ try {
       await page.mouse.up();
       v = await bondHas(/level = 10,/, v, "drag");
       await expectLevel(10, "drag");
+      r = await once("slider-drag", r);
       passed.push(`${key}/slider-drag`);
 
       // The toggle hides the line, and its knob slides to Makie's off end (#427).
@@ -1042,6 +1091,7 @@ try {
       }
       await ctl("show").click();
       v = await bondHas(/show = false,/, v, "toggle");
+      r = await once("toggle", r);
       await expectLevel(null, "toggle");
       await knobAt(geo("show").knobOff, "toggle-knob-off");
       passed.push(`${key}/toggle`);
@@ -1050,6 +1100,7 @@ try {
       await ctl("span", "input >> nth=1").focus();
       await page.keyboard.press("ArrowRight");
       v = await bondHas(/span = \(2, 5\),/, v, "interval");
+      r = await once("interval-key", r);
       // Pointer: drag the low knob (index 1 of 0..4) to the bar's start. The high input sits
       // over the whole box, so this proves each knob takes its own drag.
       const ib = await ctl("span", "input >> nth=0").boundingBox();
@@ -1060,6 +1111,7 @@ try {
       await page.mouse.move(ib.x + 1, iy, { steps: 6 });
       await page.mouse.up();
       v = await bondHas(/span = \(1, 5\),/, v, "interval-low-drag");
+      r = await once("interval-drag", r);
       passed.push(`${key}/interval-low-knob-drag`);
       // The checkbox swaps the menu's options in `onchange`: the menu follows, with nothing chosen.
       await ctl("fine").click();
@@ -1072,6 +1124,9 @@ try {
       const opts = await page.locator(`[data-masque-control="pick"] [role=option]`).allTextContents();
       if (opts.join(",") !== "x,y,z") throw new Error(`${key}/menu-follows: options ${JSON.stringify(opts)}, want x,y,z`);
       passed.push(`${key}/menu-follows-onchange`);
+      // Not counted: `onchange` swaps the menu's options, and the menu then commits its own
+      // cleared pick, so this click runs the cell twice. The plain checkbox below is counted.
+      r = await settle();
       // The menu drawn as Makie draws it (#429): a press opens its list of cells under the box,
       // each `cell` high, in Makie's odd and hover colours.
       {
@@ -1101,12 +1156,14 @@ try {
         await page.keyboard.press("ArrowDown");
         await page.keyboard.press("Enter");
         v = await bondHas(/level = 10, show = false, span = \(1, 5\), fine = true, pick = "z"/, v, "menu");
+        r = await once("menu-pick", r);
         if (await list.isVisible()) throw new Error(`${key}/menu-search: list still open after Enter`);
         passed.push(`${key}/menu-search`);
         // A click on an option picks it.
         await ctl("pick", "input").click();
         await cells.nth(1).click();
         v = await bondHas(/pick = "y"/, v, "menu-click");
+        r = await once("menu-click", r);
         if ((await ctl("pick", "input").inputValue()) !== "y") throw new Error(`${key}/menu-click: box shows ${await ctl("pick", "input").inputValue()}, want y`);
       }
       passed.push(`${key}/interval-checkbox-menu`);
@@ -1150,6 +1207,7 @@ try {
         });
         if (ringed.length !== 1 || ringed[0] !== "grid-0") throw new Error(`${key}/grid: focus ring on ${JSON.stringify(ringed)}, want only grid-0`);
         v = await bondHas(/grid = \(3,\)/, v, "grid");
+        r = await once("grid-key", r);
         if ((await lab.textContent()) !== "3 dB") throw new Error(`${key}/grid: value label ${await lab.textContent()}, want 3 dB`);
         passed.push(`${key}/slider-grid`);
       }
@@ -1159,8 +1217,10 @@ try {
         if ((await b.textContent()) !== "Go") throw new Error(`${key}/button: label ${await b.textContent()}, want Go`);
         await b.click();
         v = await bondHas(/go = 1\b/, v, "button");
+        r = await once("button", r);
         await b.click();
         v = await bondHas(/go = 2\b/, v, "button");
+        r = await once("button-again", r);
         passed.push(`${key}/button`);
       }
       // The text box checks the text as the reader types and stores it on Enter.
@@ -1176,10 +1236,12 @@ try {
         await page.keyboard.press("Enter");
         await page.waitForTimeout(1500);
         if (!/word = nothing/.test(await textOf(`#bond_${key}`))) throw new Error(`${key}/textbox: invalid text was stored`);
+        r = await settle();
         await page.keyboard.press("Backspace");
         await page.keyboard.type("c");
         await page.keyboard.press("Enter");
         v = await bondHas(/word = "abc"/, v, "textbox");
+        r = await once("textbox", r);
         passed.push(`${key}/textbox`);
       }
       // A checkbox drawn as Makie draws it (#428): its square is `size` across in the middle of
@@ -1200,11 +1262,13 @@ try {
         if (await markShown()) throw new Error(`${key}/checkbox-drawn: mark shows before the box is ticked`);
         await ctl("sure").click();
         v = await bondHas(/sure = true/, v, "checkbox-drawn");
+        r = await once("checkbox", r);
         if ((await rect.getAttribute("fill")) !== g.color) throw new Error(`${key}/checkbox-drawn: fill ${await rect.getAttribute("fill")}, want ${g.color}`);
         await page.mouse.move(0, 0);
         if (!(await markShown())) throw new Error(`${key}/checkbox-drawn: mark hidden on a ticked box`);
         await page.keyboard.press("Space");
         v = await bondHas(/sure = false/, v, "checkbox-space");
+        r = await once("checkbox-space", r);
         passed.push(`${key}/checkbox-drawn`);
       }
       console.error(`OK  ${key} — ${v.slice(0, 120)}`);
@@ -2736,9 +2800,10 @@ try {
       if (!t?.ispolar || !t.polar) throw new Error(`${key}: expected a polar transform, got ${JSON.stringify(t)}`);
       const anchor = (await layersOf(spec.anchorKey)).find((l) => l.kind === "circles");
       const pt = { x: anchor.geometry[3 * spec.anchorIndex], y: anchor.geometry[3 * spec.anchorIndex + 1] };
+      // The readout names θ and r and reads θ in the axis's degrees (#510): `θ=90.00°, r=2.000`.
       const read = (text) => {
-        const m = /x=(-?[\d.e+-]+), y=(-?[\d.e+-]+)/.exec(text ?? "");
-        return m ? { x: Number(m[1]), y: Number(m[2]) } : null;
+        const m = /θ=(-?[\d.e+-]+)°, r=(-?[\d.e+-]+)/.exec(text ?? "");
+        return m ? { x: Number(m[1]) * Math.PI / 180, y: Number(m[2]) } : null;
       };
       const near = (v, want, tol) => v !== null && Math.abs(v - want) <= tol;
       // The anchor is rounded to whole image px, and Chromium truncates a synthetic click's
@@ -2776,6 +2841,38 @@ try {
       if (!matches(after)) throw new Error(`${key}/click: expected AxisEvent at θ≈${spec.theta}, r≈${spec.r}, got ${JSON.stringify(after).slice(0, 200)}`);
       passed.push(`${key}/click-theta-r`);
       console.error(`OK  ${key}/click — ${after.slice(0, 100)} (tolerance r ±${tolR.toFixed(3)}, θ ±${tolT.toFixed(3)})`);
+      continue;
+    }
+
+    if (spec.mode === "tick_units") {
+      // #510: each scatter's first point reads the way its axis labels it. The expectation is
+      // picked by the axis's transform: a `"{:.1f} mV"` format, a function format (plain), or a
+      // PolarAxis (θ in degrees, r).
+      const axes = await transformsOf(key);
+      const circles = layers.filter((l) => l.kind === "circles");
+      if (circles.length !== 3) throw new Error(`${key}: expected 3 scatter layers, got ${circles.length}`);
+      const seen = new Set();
+      for (const L of circles) {
+        const t = axes[L.axis];
+        if (!L.coords) throw new Error(`${key}/${L.id}: a scatter's default payloads should be flagged coords`);
+        const which = t.ispolar ? "polar" : t.yfmt?.suffix === " mV" ? "mV" : "function";
+        // The card's text is its rows run together: "index 1 x 1 y 3.5 mV".
+        const want = { polar: [/(^| )θ 90°( |$)/, /\br 2\b/], mV: [/\bx 1\b/, /\by 3\.5 mV\b/], function: [/\bx 1\b/, /\by 3\.472\b/] }[which];
+        const never = { polar: [/\bx \d/, /\by \d/, /1\.571/], mV: [/3\.472/], function: [/mV/, /!/] }[which];
+        let tip = null;
+        for (let a = 0; a < 6; a++) {
+          tip = await dispatchAt(key, L.geometry[0], L.geometry[1], "pointermove");
+          if (tip?.show && want.every((w) => w.test(tip.text))) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        for (const w of want) if (!w.test(tip?.text ?? "")) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip?.text)} should match ${w}`);
+        for (const w of never) if (w.test(tip.text)) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip.text)} should not match ${w}`);
+        seen.add(which);
+        passed.push(`${key}/${which}`);
+        console.error(`OK  ${key}/${which} — ${tip.text}`);
+      }
+      if (seen.size !== 3) throw new Error(`${key}: expected the polar, mV and function axes, saw ${[...seen]}`);
+      await dispatchAt(key, 1, 1, "pointermove");
       continue;
     }
 
@@ -3822,6 +3919,10 @@ try {
       if (clickSample !== null && !new RegExp(`\\bline = ${clickIdx + 1}\\b`).test(after)) {
         throw new Error(`${key}-click: expected the point on line ${clickIdx + 1}: ${after.slice(0, 220)}`);
       }
+      // An Axis3 line's point carries its z (#518).
+      if (spec.clickZ != null && !new RegExp(`\\bz = ${spec.clickZ}\\b`).test(after)) {
+        throw new Error(`${key}-click: expected z = ${spec.clickZ} in the bond: ${after.slice(0, 220)}`);
+      }
     }
     if (spec.layerId === "legend" && !/LegendEvent\(/.test(after)) {
       throw new Error(`${key}-click: expected LegendEvent: ${after.slice(0, 220)}`);
@@ -3860,10 +3961,8 @@ try {
       // A closed mark's pick is drawn by the fade and keeps its hover fill and halo (#394); any
       // other pick, a picked point on a line included, is the hovered mark itself (the line's
       // hover dot sits on the sample just picked), which draws no hover chrome once selected.
-      // An Axis3 line (#502) is picked whole but reads out a point, so the hover dot at that
-      // point stays over the picked line, as the line hover recipe draws it.
       const fadePick = echo.picked.includes(`${layer.id}:${clickIdx}`);
-      const wantHi = fadePick ? 2 : layer.kind === "lines" && layer.zpoints ? 1 : 0;
+      const wantHi = fadePick ? 2 : 0;
       if (echo.hi !== wantHi) throw new Error(`${key}/click-echo: g.hi=${echo.hi} over the echo, expected ${wantHi}`);
       const expectSel = closedHover ? 2 : 1;
       if (echo.sel !== expectSel) {
