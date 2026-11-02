@@ -1985,6 +1985,12 @@ resolution. Because nothing commits, `ax`'s camera stays wherever the gesture le
 cell re-runs (a fresh `Figure`/`Axis` resets it); to persist a view across re-renders, bind it
 explicitly with the `Ref` + `@bind` pattern (§12.8).
 
+**Reset.** A double-click on an empty part of the plot, or `0` while the view has keyboard
+focus, puts the view back where it started: the limits as the author wrote them (automatic
+limits come back automatic) and, on an `Axis3`, the azimuth and elevation. Axes tied to `ax`
+by `linkaxes!`, `linkxaxes!` or `linkyaxes!` go back with it. Re-running only the `masque`
+cell keeps that starting point, even though the axis still shows the moved view.
+
 `masque` raises `ArgumentError` at build time if `ax` is a `PolarAxis` (a polar pan or zoom
 moves r and θ limits, not Cartesian ones), a `Colorbar`'s value axis (no pan/orbit view applies), a categorical
 2D axis (pan needs numeric limits to shift), or (2D only) either scale isn't client-invertible
@@ -2086,6 +2092,8 @@ function hitlayers(i::ViewInteractable, ctx)
         "w" => Float32(vw), "h" => Float32(vh),
         "mode" => t.is3d ? "orbit" : "pan",
     )
+    # Away from where it started (#524): a reset has somewhere to go. Left out at home.
+    _view_moved(i.ax) && (geom["moved"] = true)
     if !t.is3d && i.ax isa Makie.Axis
         geom["clip"], geom["fill"] = _pan_window(ctx, i.ax)
         links = _pan_links(ctx, i.ax)

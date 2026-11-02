@@ -215,6 +215,9 @@ export interface ViewGeometry {
     limits?: Limits3
     panx?: [number, number, number]
     pany?: [number, number, number]
+    // The view, or an axis linked to it, is away from where it started (#524), so a reset has
+    // somewhere to go. Left out when it is at home.
+    moved?: boolean
 }
 
 export type Limits3 = [number, number, number, number, number, number]

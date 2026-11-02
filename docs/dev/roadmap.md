@@ -52,7 +52,6 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 
 ### Interaction and selection
 - *idea* — a legend click toggles series visibility (a bond round trip and re-render).
-- *idea* — double-click resets the view to the figure's limits or camera.
 - *idea* — Escape aborts a drag and restores its start.
 - *idea* — links across layers and across figures; across widgets this needs a registry.
 - #499 — drag a threshold on a `Colorbar`.

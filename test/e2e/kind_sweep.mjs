@@ -444,6 +444,50 @@ try {
   // layer dict every other kind gets by from `layersOf`.
   const transformsOf = (key) => page.evaluate((k) => JSON.parse(document.querySelector(`#axes_${k}`).textContent), key);
 
+  // #524: a real double-click on an empty part of a view's plot (`g`, the view layer's
+  // geometry), through Chromium's own input path, then the reset frame's stamp. The spot is the
+  // first of a few around the viewport where hover finds no mark.
+  const resetByDoubleClick = async (key, g) => {
+    const readStamp = async () => {
+      const raw = await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        return host?.dataset.masqueGestureFrame ?? "";
+      }, key);
+      return raw ? JSON.parse(raw) : null;
+    };
+    const before = await readStamp();
+    let spot = null;
+    for (const [fx, fy] of [[0.08, 0.08], [0.92, 0.08], [0.08, 0.92], [0.92, 0.92], [0.5, 0.08], [0.08, 0.5], [0.5, 0.5]]) {
+      const x = g.x + fx * g.w, y = g.y + fy * g.h;
+      if (!(await dispatchAt(key, x, y, "pointermove")).show) { spot = { x, y }; break; }
+    }
+    if (!spot) throw new Error(`${key}-reset: no empty spot in the view to double-click`);
+    const at = await page.evaluate(([k, ix, iy]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      return { x: b.left + ix * s, y: b.top + iy * s };
+    }, [key, spot.x, spot.y]);
+    await page.mouse.dblclick(at.x, at.y);
+    const tries = backend === "webgl" ? 50 : 25;
+    const delayMs = backend === "webgl" ? 300 : 200;
+    for (let i = 0; i < tries; i++) {
+      await new Promise((r) => setTimeout(r, delayMs));
+      const st = await readStamp();
+      if (st && st.n > (before?.n ?? 0) && st.reset === true && st.settle === true) {
+        await page.mouse.move(1, 1);
+        return st;
+      }
+    }
+    throw new Error(`${key}-reset: no reset frame landed after a double-click at ${JSON.stringify(spot)} (last ${JSON.stringify(await readStamp())})`);
+  };
+  // Within a millionth of the span: the limits a reset lands at are the mount's own.
+  const sameLims = (a, b) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= 1e-6 * Math.max(1, Math.abs(b[i]), Math.abs(b[i ^ 1] - b[i])));
+
   // A real mouse click at image px (x, y), through Chromium's own input path rather than a
   // synthetic event, so the browser's focus handling runs as it would for a user (#380). The
   // plot is scrolled into view first; the click itself must not scroll the page or draw the
@@ -2023,6 +2067,18 @@ try {
       if (!(wx(z2.limits) < 0.95 * wx(z1.limits))) throw new Error(`${key}: the second panel's zoom did not start from the first's (${wx(z1.limits)} -> ${wx(z2.limits)})`);
       if (!(wx(z3.limits) < 0.95 * wx(z2.limits))) throw new Error(`${key}: zooming the first panel again dropped the second panel's zoom (${wx(z1.limits)}, ${wx(z2.limits)}, ${wx(z3.limits)})`);
       passed.push(`${key}/alternating-zoom`);
+      // #524: resetting the dragged panel turns and zooms both back (`limits = true`), so the
+      // follower's points answer where the page mounted them again.
+      const rs = await resetByDoubleClick(key, g);
+      if (Math.abs(rs.azimuth - g.azimuth) > 1e-9 || Math.abs(rs.elevation - g.elevation) > 1e-9 || !sameLims(rs.limits ?? [], g.limits)) {
+        throw new Error(`${key}-reset: the dragged panel came back at ${JSON.stringify(rs)}, not ${JSON.stringify({ azimuth: g.azimuth, elevation: g.elevation, limits: g.limits })}`);
+      }
+      for (const p of old) {
+        const r = await dispatchAt(key, p.x, p.y, "pointermove");
+        if (!r.show) throw new Error(`${key}-reset: the follower's point at its mount spot ${JSON.stringify(p)} does not answer after the reset`);
+      }
+      await dispatchAt(key, 1, 1, "pointermove");
+      passed.push(`${key}/reset-dblclick`);
       console.error(`OK  ${key} — orbit az ${g.azimuth.toFixed(2)} -> ${st.azimuth.toFixed(2)}, follower redrawn, its point answers at ${JSON.stringify(far)}; zoom widths ${[z1, z2, z3].map((z) => wx(z.limits).toFixed(3)).join(" > ")}`);
       continue;
     }
@@ -2108,7 +2164,14 @@ try {
       passed.push(`${key}/drag-orbit`);
       const after = await textOf(`#out_${key}`);
       if (after !== before) throw new Error(`${key}: a view gesture must not commit (${before} -> ${after})`);
-      console.error(`OK  ${key} — wheel zoom ${JSON.stringify(zs.limits)}, clipped corner, pan, orbit`);
+      // #524: a double-click on empty plot area turns the camera back and zooms back out.
+      const g3 = layer.geometry;
+      const rs = await resetByDoubleClick(key, g3);
+      if (Math.abs(rs.azimuth - g3.azimuth) > 1e-9 || Math.abs(rs.elevation - g3.elevation) > 1e-9 || !sameLims(rs.limits ?? [], g3.limits)) {
+        throw new Error(`${key}-reset: the view came back at ${JSON.stringify(rs)}, not its mount camera ${JSON.stringify({ azimuth: g3.azimuth, elevation: g3.elevation, limits: g3.limits })}`);
+      }
+      passed.push(`${key}/reset-dblclick`);
+      console.error(`OK  ${key} — wheel zoom ${JSON.stringify(zs.limits)}, clipped corner, pan, orbit, reset`);
       continue;
     }
 
@@ -2401,6 +2464,23 @@ try {
         }
         passed.push(`${key}/wheel-zoom`);
         console.error(`OK  ${key}/wheel — photo cleared, zoomed gesture frame ${zoomStamp}`);
+      }
+      // #524: a double-click on empty plot area puts the pan view, and each axis linked to it,
+      // back at the limits the page mounted with.
+      if (key === "view" || key === "view_linked") {
+        const tr = await transformsOf(key);
+        const home = (axis) => [...tr[axis].xlims, ...tr[axis].ylims];
+        const st = await resetByDoubleClick(key, layer.geometry);
+        if (!sameLims([st.xmin, st.xmax, st.ymin, st.ymax], home(layer.axis))) {
+          throw new Error(`${key}-reset: the view came back at ${JSON.stringify(st)}, not its mount limits ${JSON.stringify(home(layer.axis))}`);
+        }
+        for (const l of links) {
+          if (!sameLims(st[`linked:${l.axis}`] ?? [], home(l.axis))) {
+            throw new Error(`${key}-reset: linked axis ${l.axis} came back at ${JSON.stringify(st[`linked:${l.axis}`])}, not ${JSON.stringify(home(l.axis))}`);
+          }
+        }
+        passed.push(`${key}/reset-dblclick`);
+        console.error(`OK  ${key}/reset — double-click back at the mount limits${links.length ? `, ${links.length} linked axis too` : ""}`);
       }
       continue;
     }

@@ -3,7 +3,7 @@ import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, surfa
 import { emptyMask, maskHit } from "./gridmask"
 import { applyMove, onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip, replaceTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
-import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
+import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onDoubleClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import { buildDragStops } from "./dragkeys"
 import { fieldSelection, recordPicks } from "./history"
@@ -591,13 +591,18 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     let photoFrames = 0
     const adoptedMatrices = new Map<number, PhotoMatrix>()
     const builtAt = new WeakMap<Record<string, unknown>, number>()
+    // A pan, zoom or orbit request moves its view at once (#524); the frame confirms it.
+    const noteMoved = (input: Record<string, unknown>) => {
+        if (typeof input.id === "string" && input.reset !== true && input.onchange !== true) state.viewMoved_.add(input.id)
+    }
     const channel: GestureChannel = {
-        request(input) { builtAt.set(input, photoFrames); route(input.onchange === true).request(input) },
+        request(input) { builtAt.set(input, photoFrames); noteMoved(input); route(input.onchange === true).request(input) },
         settle(input, slot) {
             const ch = route(slot === "onchange")
             // A built-when-sent input is relative to the frame on screen when it is sent.
             if (typeof input === "function") return ch.settle(() => { const o = input(); builtAt.set(o, photoFrames); return o }, slot)
             builtAt.set(input, photoFrames)
+            noteMoved(input)
             return ch.settle(input, slot)
         },
         dispose() { rawChannel.dispose(); replayChannel?.dispose() },
@@ -654,6 +659,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     const state = createOverlayState()
     viewDrag.seedView3Homes(state, manifest.layers)
+    noteViewsMoved(manifest, false)
     // Each field starts highlighted at its `initial` value: a `selected=` pick, or what a box
     // over marks or cells holds at its starting bounds.
     const restoreSelection = (v: Record<string, unknown>) => {
@@ -935,7 +941,13 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             state.sel_.set(f, sel.items_ ? { ...sel, hits_: nextSel, items_: keptPicks(newManifest, sel.items_) } : { ...sel, hits_: nextSel })
         }
         renderSelection(ctx, state)
-        adoptPhoto(input)
+        noteViewsMoved(newManifest, input.settle === true)
+        // A reset's frame is the starting view, drawn whole: no preview matrix is left over it.
+        if (input.reset === true) {
+            state.photo_ = IDENTITY
+            state.photoAnchor_ = null
+            paintPhoto(IDENTITY)
+        } else adoptPhoto(input)
         dragStops?.sync_()
         if (focused && !state.drag_) {
             const k = ctx.focusable_.findIndex((f) => f.layer_.id === focused.id && f.index_ === focused.index)
@@ -949,7 +961,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const viewLayer = newManifest.layers.find((l) => l.id === input.id)
         const geom = viewLayer?.geometry as ViewGeometry | undefined
         // An Axis3 frame's limits decode as a typed array, which JSON writes as an object.
-        const camera: Record<string, number | number[]> = "azimuth" in input || "limits" in input
+        const camera: Record<string, number | number[]> = geom?.mode === "orbit" || "azimuth" in input || "limits" in input
             ? { azimuth: geom?.azimuth ?? NaN, elevation: geom?.elevation ?? NaN, ...(geom?.limits ? { limits: Array.from(geom.limits) } : {}) }
             : (() => {
                 const t = viewLayer ? newManifest.transforms[viewLayer.axis] : undefined
@@ -963,8 +975,19 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             })()
         gestureFrameCount += 1
         ;(host as unknown as { dataset: DOMStringMap }).dataset.masqueGestureFrame = JSON.stringify({
-            n: gestureFrameCount, settle: input.settle === true, ...(input.onchange ? { onchange: true } : {}), ...camera,
+            n: gestureFrameCount, settle: input.settle === true, ...(input.onchange ? { onchange: true } : {}),
+            ...(input.reset ? { reset: true } : {}), ...camera,
         })
+    }
+
+    // Which views are away from where they started, from a manifest's `moved` (#524). A frame
+    // can trail a request still in flight, so only a settle frame takes a view out.
+    function noteViewsMoved(man: Manifest, settled: boolean): void {
+        for (const l of man.layers) {
+            if (l.kind !== "view") continue
+            if ((l.geometry as ViewGeometry).moved) state.viewMoved_.add(l.id)
+            else if (settled) state.viewMoved_.delete(l.id)
+        }
     }
 
     // A plot \`onchange\` gave a different number of marks loses its picks (Julia names them).
@@ -1216,6 +1239,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         releaseChrome(kind)
     }
     const click = (e: MouseEvent) => onClick(ctx, state, e)
+    const dblclick = (e: MouseEvent) => onDoubleClick(ctx, state, e)
     const keydown = (e: KeyboardEvent) => {
         // A key shows where keys go (pointer-focus). Not a modifier held for Cmd/Ctrl-click, and
         // not a Cmd/Ctrl/Alt chord: undo after a click (#386) or a browser shortcut is not
@@ -1312,6 +1336,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     surface.addEventListener("pointerleave", leave)
     surface.addEventListener("lostpointercapture", lostCapture)
     surface.addEventListener("click", click)
+    surface.addEventListener("dblclick", dblclick)
     surface.addEventListener("keydown", keydown)
     surface.addEventListener("focusout", focusout)
     // After the surface in the shadow root, so Tab reaches the plot first, then each drag layer.
@@ -1337,6 +1362,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         surface.removeEventListener("pointerleave", leave)
         surface.removeEventListener("lostpointercapture", lostCapture)
         surface.removeEventListener("click", click)
+        surface.removeEventListener("dblclick", dblclick)
         surface.removeEventListener("keydown", keydown)
         surface.removeEventListener("focusout", focusout)
         dragStops?.cleanup_()

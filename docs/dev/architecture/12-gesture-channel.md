@@ -222,6 +222,15 @@ invalidates the closure, re-runs it, or signals that its answers are stale: fram
 computed against data the notebook no longer holds. This follows from being outside the graph and
 has no framework fix.
 
+**Reset (#524) is one more request, not a new channel.** A double-click on empty plot area, the
+`0` key on a view's stop, and the corner reset button (#525) send `{id, reset: true}` as a settle,
+so it supersedes a queued settle like any release. Julia keeps the home: the axis's `limits`
+attribute as written and, on an `Axis3`, its angles, recorded per axis object the first time a
+view is planned on it (`src/viewhome.jl`). The browser cannot hold it: a pan overwrites
+`ax.limits[]`, so a re-run `masque` cell mounts at the dragged view, and only Julia saw the
+author's `nothing`. A frame's view geometry carries `moved = true` while the view, or an axis a
+reset puts back with it, is away from home; the browser sends a reset only then.
+
 ## 12.7 Nothing carried on this channel is notebook state
 
 `with_js_link` bypasses Pluto's state management by design: nothing it returns is recorded in the
