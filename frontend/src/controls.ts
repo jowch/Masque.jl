@@ -192,12 +192,19 @@ export const CONTROLS_STYLE = `
 type Rect = [number, number, number, number]
 
 // How far a control's hit area at `r` may reach past each edge before it meets another
-// control's or an axis's: half the gap on that side, image px, so two neighbours split it.
-// Infinity where nothing is in the way. A neighbour counts on a side when it lies past that
-// edge and overlaps `r` across it; one that overlaps `r` itself, or only meets a corner, doesn't.
-export function reachCaps(r: Rect, others: Rect[]): { t: number; b: number; l: number; r: number } {
+// control's or an axis's: half the gap on that side, image px, so two neighbours split it. The
+// figure's own edge (`size`, its width and height) caps it at the whole distance, since nothing
+// past it shares the gap: a finger off the picture is on the page. A neighbour counts on a side
+// when it lies past that edge and overlaps `r` across it. Two cases are left alone on purpose:
+// a neighbour that overlaps `r` itself (a toggle laid over an axis) doesn't cap it, so the
+// control takes the plot's touches right around it, as a finger that close most likely means
+// the control; and one that only meets a corner doesn't either, so two toggles offset
+// diagonally can share a corner of their reach.
+export function reachCaps(r: Rect, others: Rect[], size?: [number, number]): { t: number; b: number; l: number; r: number } {
     const [x, y, w, h] = r
-    const caps = { t: Infinity, b: Infinity, l: Infinity, r: Infinity }
+    const caps = size
+        ? { t: Math.max(0, y), b: Math.max(0, size[1] - y - h), l: Math.max(0, x), r: Math.max(0, size[0] - x - w) }
+        : { t: Infinity, b: Infinity, l: Infinity, r: Infinity }
     for (const [ox, oy, ow, oh] of others) {
         const across = ox < x + w && ox + ow > x
         const along = oy < y + h && oy + oh > y
@@ -948,7 +955,7 @@ function reach(m: Manifest, els: Map<string, ControlEl>): void {
     leaves.forEach(([box, g], i) => {
         if (!REACHES.has(g.control)) return
         const r = rects[i]
-        const caps = reachCaps(r, [...rects.filter((_, j) => j !== i), ...axes])
+        const caps = reachCaps(r, [...rects.filter((_, j) => j !== i), ...axes], [m.width, m.height])
         const set = (name: string, v: number, along: number, unit: string) => {
             if (Number.isFinite(v) && along > 0) box.style.setProperty(name, `${(100 * v) / along}${unit}`)
             else box.style.removeProperty(name)

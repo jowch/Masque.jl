@@ -1279,6 +1279,8 @@ try {
             // It never reaches into another control's area, or the axis.
             for (const other of ids) if (other !== id && a.out[other].top !== a.out[id].top && overlap(hit, a.out[other].hit)) throw new Error(`${key}/touch-reach: ${id} ${JSON.stringify(hit)} overlaps ${other} ${JSON.stringify(a.out[other].hit)}`);
             if (overlap(hit, axisBox)) throw new Error(`${key}/touch-reach: ${id} ${JSON.stringify(hit)} reaches into the axis ${JSON.stringify(axisBox)}`);
+            // Nor off the picture onto the page.
+            if (hit[0] < a.img[0] - 0.5 || hit[1] < a.img[1] - 0.5 || hit[2] > a.img[2] + 0.5 || hit[3] > a.img[3] + 0.5) throw new Error(`${key}/touch-reach: ${id} ${JSON.stringify(hit)} reaches past the picture ${JSON.stringify(a.img)}`);
           }
           if (grown < 4) throw new Error(`${key}/touch-reach: only ${grown} controls grew their hit area: ${JSON.stringify(a.out)}`);
           // Nothing drawn moved: the figure's pixels are the same with touch on.

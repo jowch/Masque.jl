@@ -7275,13 +7275,15 @@ describe("block controls (#345)", () => {
         expect(v("deg", "--ct")).toBe(`${(100 * 50) / 20}cqh`)
         expect(v("deg", "--cb")).toBe(`${(100 * 10) / 20}cqh`)
         expect(v("deg", "--cr")).toBe(`${(100 * 50) / 400}cqw`)
-        expect(v("deg", "--cl")).toBe("")
+        // Left, nothing but the figure's edge 100 px away: the whole distance, not half.
+        expect(v("deg", "--cl")).toBe(`${(100 * 100) / 400}cqw`)
         expect(v("span", "--ct")).toBe(`${(100 * 10) / 20}cqh`)
-        expect(v("span", "--cb")).toBe("")
+        // Below, the figure's bottom edge 40 px away.
+        expect(v("span", "--cb")).toBe(`${(100 * 40) / 20}cqh`)
         // The toggle sits between the slider and the menu; nothing above or below it.
         expect(v("show", "--cl")).toBe(`${(100 * 50) / 60}cqw`)
         expect(v("show", "--cr")).toBe(`${(100 * 20) / 60}cqw`)
-        expect(v("show", "--ct")).toBe("")
+        expect(v("show", "--ct")).toBe(`${(100 * 700) / 30}cqh`)
         // A menu is a neighbour but doesn't reach itself.
         expect(v("pick", "--cl")).toBe("")
         // A checkbox reaches from its square, 10 px in from its box: 60 px from the menu.
@@ -7291,6 +7293,8 @@ describe("block controls (#345)", () => {
         // Only where some input is coarse, and nothing drawn grows.
         expect(CONTROLS_STYLE).toContain("@media (any-pointer: coarse)")
         expect(reachCaps([0, 0, 10, 10], [[0, 30, 10, 10], [20, 0, 10, 10], [20, 30, 10, 10], [2, 2, 4, 4]])).toEqual({ t: Infinity, b: 10, l: Infinity, r: 5 })
+        // A control at the figure's edge reaches no further than the picture.
+        expect(reachCaps([0, 5, 10, 10], [], [100, 20])).toEqual({ t: 5, b: 5, l: 0, r: 90 })
     })
 
     it("a slider grid's rows split the gap between them, and a new frame moves the room with the boxes (#531)", async () => {
