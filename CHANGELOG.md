@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-11-02
+
 ### Added
 - `ThresholdInteractable(ax)` and `ROIInteractable(ax)` work without a `value` or `bounds`.
   The line starts halfway along the axis, and the box over the middle half of it, as the
@@ -776,7 +778,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/jowch/Masque.jl/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/jowch/Masque.jl/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/jowch/Masque.jl/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/jowch/Masque.jl/compare/v0.4.1...v0.4.2
