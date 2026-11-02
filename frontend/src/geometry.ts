@@ -422,7 +422,10 @@ export function nearestCircle(
 }
 
 // `slop` scales every hit slack (see slopScale); 1 hits at the design size.
-export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransform, slop = 1): Omit<Hit, "layer"> | null {
+// `grab`, for a finger (#530): the least reach of a threshold line or band edge (`line_`, each
+// side) and the least half-size of an ROI grip's hit square (`box_`), in image px. The drawn
+// chrome doesn't change.
+export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransform, slop = 1, grab?: Grab): Omit<Hit, "layer"> | null {
     const g = layer.geometry
     switch (layer.kind) {
         case "circles": {
@@ -569,7 +572,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             const y0 = tg.orientation === "h" ? tg.pos : lo
             const x1 = tg.orientation === "h" ? hi : tg.pos
             const y1 = tg.orientation === "h" ? tg.pos : hi
-            if (distToSegment(px, py, x0, y0, x1, y1) <= SEG_TOL * slop) return { index: 0, geom_: ["seg", x0, y0, x1, y1] }
+            if (distToSegment(px, py, x0, y0, x1, y1) <= Math.max(SEG_TOL * slop, grab?.line_ ?? 0)) return { index: 0, geom_: ["seg", x0, y0, x1, y1] }
             return null
         }
         case "span": {
@@ -579,7 +582,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             const h = sg.orientation === "h"
             const along = h ? py : px, across = h ? px : py
             const [s0, s1] = sg.span
-            const tol = SEG_TOL * slop
+            const tol = Math.max(SEG_TOL * slop, grab?.line_ ?? 0)
             if (across < s0 - tol || across > s1 + tol) return null
             const dlo = Math.abs(along - sg.lo), dhi = Math.abs(along - sg.hi)
             if (Math.min(dlo, dhi) <= tol) return { index: 0, spanPart_: { edge: dlo <= dhi ? "lo" : "hi" } }
@@ -594,7 +597,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             // only this midpoint square (no grip).
             // Corners are checked before edges before the body so a small ROI's overlapping
             // corner/edge hit boxes resolve to the (two-axis) corner, not an edge.
-            const halfHit = Math.max(2 * rg.handle, 6) * slop
+            const halfHit = Math.max(Math.max(2 * rg.handle, 6) * slop, grab?.box_ ?? 0)
             const corners: [number, number][] = [[rg.x, rg.y], [rg.x + rg.w, rg.y], [rg.x + rg.w, rg.y + rg.h], [rg.x, rg.y + rg.h]]
             for (let k = 0; k < 4; k++) {
                 if (Math.abs(px - corners[k][0]) <= halfHit && Math.abs(py - corners[k][1]) <= halfHit) return { index: 0, roiPart_: { corner: k } }
@@ -1048,6 +1051,19 @@ export const TOUCH_RADIUS = 16
 // polygons, cells), or by its own rule (axes, threshold lines, ROI boxes, views).
 const TOUCH_KINDS: ReadonlySet<Kind> = new Set(["circles", "lines", "polyline", "segments"])
 
+// A finger's hit area on a drag handle (#530): a threshold line or a band edge reaches the touch
+// radius each side, and an ROI grip is at least a GRAB_BOX_CSS square, centred on the grip.
+export const GRAB_BOX_CSS = 44
+
+export interface Grab {
+    line_: number
+    box_: number
+}
+
+// The widget's finger radius, CSS px.
+export const touchRadius = (manifest: Manifest): number =>
+    manifest.touch && typeof manifest.touch.radius === "number" ? manifest.touch.radius : TOUCH_RADIUS
+
 // A touch's hit test: image px per CSS px, so a reach in CSS px is the same on every screen.
 export interface TouchReach {
     pxPerCss_: number
@@ -1122,9 +1138,9 @@ const boundedAxis = (layer: HitLayer): boolean =>
 
 // A finger's hit on a layer that isn't a point or a line: inside the shape only, so a bar's
 // or a polygon's outline reach (`tol`, the mouse's) doesn't stretch under a finger.
-function touchAreaHit(layer: HitLayer, px: number, py: number, t?: AxisTransform, slop = 1): Omit<Hit, "layer"> | null {
+function touchAreaHit(layer: HitLayer, px: number, py: number, t?: AxisTransform, slop = 1, grab?: Grab): Omit<Hit, "layer"> | null {
     if ((layer.kind === "rects" || layer.kind === "polygons") && layer.tol) return hitLayer({ ...layer, tol: 0 }, px, py, t)
-    return hitLayer(layer, px, py, t, slop)
+    return hitLayer(layer, px, py, t, slop, grab)
 }
 
 // `(x, y)` is a layout point on the untransformed base. While a photograph is live, each
@@ -1142,7 +1158,7 @@ export function hitTestAt(
     touch: TouchReach | null = null,
 ): Hit | null {
     const finger = touch !== null && manifest.touch !== false && touch.pxPerCss_ > 0
-    const radius = manifest.touch ? manifest.touch.radius : TOUCH_RADIUS
+    const radius = touchRadius(manifest)
     let near: Hit | null = null, nearD = Infinity
     for (const layer of manifest.layers) {
         if (!layer.events.includes(event)) continue
@@ -1167,7 +1183,9 @@ export function hitTestAt(
             if (n && n.dist < nearD) { near = { layer, ...n.hit }; nearD = n.dist }
             continue
         }
-        const h = touchAreaHit(layer, p.x, p.y, t, slop)
+        // A handle's grab area is CSS px on screen too.
+        const k = (touch as TouchReach).pxPerCss_ / (f && f.sx > 0 ? f.sx : 1)
+        const h = touchAreaHit(layer, p.x, p.y, t, slop, { line_: radius * k, box_: GRAB_BOX_CSS / 2 * k })
         if (!h) continue
         // A readout that follows the cursor anywhere in its axis (an `AxisInteractable` with no
         // bbox, a threshold band, a span, an ROI, a view) is what a miss falls back to, not a

@@ -129,7 +129,9 @@ It is the tooltip's box and theme, shown and hidden at once, and a mark's toolti
 the view moves. A plain wheel over a `wheel = :modifier` view shows "Ctrl + scroll to zoom"
 ("Cmd" on Apple platforms) in `.masque-note`, the tooltip-themed note in the same corner that
 also carries an `onchange` error, for 1.5 s after the last plain wheel; it never covers an
-error the note is showing (#537's touch hint is the same kind of note). The two stack in a
+error the note is showing. On touch, a one-finger drag that starts on a view scrolls the page
+and shows "Use two fingers to move the plot" in the same note, by the same rule (#537); two
+fingers pan and pinch-zoom (or, on an `Axis3`, orbit and zoom) through the same readout. The two stack in a
 column, the note above, so a readout that wraps never sits under it. The bottom-left corner
 belongs to the note and the readout: the view buttons (#525) never use it.
 

@@ -30,14 +30,14 @@ function tryCapture(surface: HTMLElement, pointerId: number): void {
     }
 }
 
-function shownViewTransform(ctx: OverlayCtx, id: string, fallback: AxisTransform): AxisTransform {
+export function shownViewTransform(ctx: OverlayCtx, id: string, fallback: AxisTransform): AxisTransform {
     const layer = ctx.manifest_.layers.find((l) => l.id === id)
     return layer ? ctx.manifest_.transforms[layer.axis] ?? fallback : fallback
 }
 
 // Returns whether a live wheel-idle timer was cleared. That timer is the only
 // settle:true a notch has, so the caller owes a settle of the current photo.
-function clearWheelTimer(state: OverlayState): boolean {
+export function clearWheelTimer(state: OverlayState): boolean {
     if (state.wheelTimer_ === null) return false
     clearTimeout(state.wheelTimer_)
     state.wheelTimer_ = null
@@ -283,7 +283,9 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             return
         }
     }
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_, slop)
+    // A finger grabs a handle by its larger grab area (#530).
+    const finger = touchReach(ctx.base_, ctx.manifest_, e.pointerType)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_, slop, finger)
     // A marquee: a drag on a plot with no view, or Alt-drag on any plot, where a field holds
     // several picks. A threshold line or an ROI box under the press still takes the drag.
     if (!hit || (hit.layer.kind === "view" && e.altKey)) {
@@ -336,6 +338,8 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             state.drag_ = roiDrag.begin(hit.layer.id, box, { corner: k }, opp[0], opp[1], e.pointerId)
         }
     } else if (hit.layer.kind === "view") {
+        // One finger scrolls the page past a view; two move it (touchviews.ts, #537).
+        if (finger && ctx.manifest_.touchViews !== "onefinger") return
         const g = hit.layer.geometry as ViewGeometry
         if (g.mode === "pan" && photoHeldByOther(state, hit.layer.id)) { e.preventDefault(); return }
         state.drag_ = viewDrag.begin(hit.layer.id, g, ctx.manifest_.transforms[hit.layer.axis], layout.x, layout.y, e.pointerId)

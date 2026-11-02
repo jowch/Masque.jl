@@ -50,6 +50,12 @@ data moves inside it, and you can hover over and click the points
 wherever they move to. `pick` changes only when you click a point, and
 the view has no field of its own.
 
+On a touch screen, one finger scrolls the page past the plot, and the
+corner says to use two fingers. Drag with two fingers to pan, and pinch
+to zoom around them. A tap still picks a point. To pan with one finger
+instead, pass `touch = (; views = :onefinger)` to [`masque`](@ref); a
+finger on the plot then no longer scrolls the page.
+
 To zoom on a plain scroll instead, pass `wheel = :always`. The page then
 stops scrolling while the pointer is over the plot. `wheel = :none`
 turns wheel zoom off, and `+` / `-` still zoom from the keyboard. If you
@@ -149,7 +155,8 @@ end
 
 Ctrl+scroll (Cmd+scroll on a Mac) to zoom in or out around the middle of
 the axis box, and Shift+drag to pan. `wheel` works as it does on a 2D
-axis. The box keeps its size while the data grows or slides inside it,
+axis. On a touch screen, drag with two fingers to turn the view and
+pinch to zoom; one finger scrolls the page. The box keeps its size while the data grows or slides inside it,
 and marks that leave the box are hidden and no longer respond to hover
 or clicks. A line that crosses the edge of the box still responds along
 the part you can see. A sphere from `meshscatter` stops responding once

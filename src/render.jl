@@ -485,7 +485,7 @@ function build_manifest(
         interactables, ctx::InteractionContext;
         selected = nothing, tip_style = nothing, tip_digits = nothing, background = nothing,
         overlay_style = nothing, owners_out = nothing, suspend_surfaces = false, with_initial = true,
-        touch = nothing,
+        touch = nothing, touch_views = nothing,
     )
     plan = interactables
     # A threshold or box with no start takes it from the limits. `masque` sets it once at mount;
@@ -605,6 +605,7 @@ function build_manifest(
     tip_digits === nothing || (m["tipDigits"] = tip_digits)
     # Sent only when the user set it; the overlay's default radius is 16 CSS px (#528).
     touch === nothing || (m["touch"] = touch)
+    touch_views === nothing || (m["touchViews"] = touch_views)
     background === nothing || (m["background"] = _css_color(background))
     # An axis whose empty plot area is not the figure's colour ships that colour as `fill`: the
     # selected look fades unpicked marks toward it (#394).
@@ -816,8 +817,13 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   does; bars, polygons and heatmap cells take a touch inside them. `touch = (; radius = 8)`
   sets the radius (default 16), `(; radius = 0)` picks only what the finger lands on, and
   `touch = false` gives a finger the mouse's rule. A layer's own `touch_radius` (see
-  [`interactables`](@ref)) wins over it. A mouse or a pen is never affected, so a touchscreen
-  laptop keeps the mouse's precision. Default `true`.
+  [`interactables`](@ref)) wins over it. A finger takes a threshold line or a band edge within
+  the same radius, and an ROI grip anywhere in a 44 CSS px square around it; elsewhere on the
+  plot it scrolls the page. On a [`ViewInteractable`](@ref), one finger scrolls the page and
+  two fingers pan, pinch-zoom or (on an `Axis3`) orbit the view; `touch = (; views = :onefinger)`
+  makes one finger pan or orbit it again, as in Masque 0.4, and then a finger on the plot
+  doesn't scroll the page. A mouse or a pen is never affected, so a touchscreen laptop keeps
+  the mouse's precision. Default `true`.
 - `tooltip_sigdigits` — significant figures for a tooltip number that has no format spec.
   Unset, it is 4, so `0.30000000000000004` shows as `0.3` and `2.71828` as `2.718`;
   integers, and the whole-number part of a value at or above `10^tooltip_sigdigits`, show in
@@ -879,7 +885,7 @@ _as_figure(x) = throw(
 _touch_dict(t::Bool) = t ? nothing : false
 function _touch_dict(t::NamedTuple)
     for k in keys(t)
-        k === :radius || throw(ArgumentError("masque: `touch` takes the key `radius`, got `$k`"))
+        k in (:radius, :views) || throw(ArgumentError("masque: `touch` takes the keys `radius` and `views`, got `$k`"))
     end
     haskey(t, :radius) || return nothing
     r = t.radius
@@ -888,6 +894,18 @@ function _touch_dict(t::NamedTuple)
     return Dict{String, Any}("radius" => Float64(r))
 end
 _touch_dict(t) = throw(ArgumentError("masque: `touch` must be `true`, `false`, or a NamedTuple such as `(; radius = 16)`; got $(repr(t))"))
+
+# `masque(...; touch = (; views))` as the manifest's `touchViews`: `nothing` for the default,
+# two fingers move a view and one scrolls the page (#537), or "onefinger" for 0.4's one-finger
+# pan and orbit.
+_touch_views(::Any) = nothing
+function _touch_views(t::NamedTuple)
+    haskey(t, :views) || return nothing
+    v = t.views
+    v === :twofinger && return nothing
+    v === :onefinger && return "onefinger"
+    throw(ArgumentError("masque: `touch.views` must be `:twofinger` or `:onefinger`; got $(repr(v))"))
+end
 
 _check_onchange(f) = f === nothing || f isa Function || throw(
     ArgumentError("masque: `onchange` must be a function of the widget's state, `state -> …`, got $(typeof(f))"),
@@ -899,6 +917,7 @@ function _masque(
         tooltipstyle = nothing, tooltip_sigdigits = nothing, overlaystyle = nothing, touch = true,
     )
     tip_digits = _check_sigdigits(tooltip_sigdigits)
+    touch_views = _touch_views(touch)
     touch = _touch_dict(touch)
     _check_onchange(onchange)
     interactables = _with_onchange(interactables, onchange)
@@ -922,7 +941,7 @@ function _masque(
         owners_out = Ref(Dict{String, LayerOwner}())
         build() = build_manifest(
             interactables, ctx; selected, tip_style, tip_digits,
-            background = fig.scene.backgroundcolor[], overlay_style, owners_out, touch,
+            background = fig.scene.backgroundcolor[], overlay_style, owners_out, touch, touch_views,
         )
         manifest = build()
         if onchange !== nothing

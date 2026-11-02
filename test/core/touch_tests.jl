@@ -75,3 +75,19 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test only(m["layers"])["touch"] == 4.0
     end
 end
+
+# One finger scrolls the page past a view, two move it (#537); `touch = (; views)` picks.
+@testset "Touch views (#537)" begin
+    fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
+    v = ViewInteractable(ax)
+    @test !haskey(masque(fig, v).manifest, "touchViews")
+    @test !haskey(masque(fig, v; touch = (; views = :twofinger)).manifest, "touchViews")
+    m = masque(fig, v; touch = (; views = :onefinger)).manifest
+    @test m["touchViews"] == "onefinger"
+    @test !haskey(m, "touch") # the radius stays the default
+    m = masque(fig, v; touch = (; radius = 8, views = :onefinger)).manifest
+    @test m["touch"] == Dict("radius" => 8.0) && m["touchViews"] == "onefinger"
+    @test !haskey(masque(fig, v; touch = false).manifest, "touchViews")
+    @test_throws ArgumentError masque(fig, v; touch = (; views = :one))
+    @test_throws ArgumentError masque(fig, v; touch = (; views = "onefinger"))
+end

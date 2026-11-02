@@ -29,8 +29,10 @@ export function wheelScale(deltaY: number, deltaMode: number): number {
     return Math.exp(-lines * 0.001)
 }
 
+export const clampScale = (s: number): number => Math.min(S_MAX, Math.max(S_MIN, s))
+
 export function zoomAt(m: PhotoMatrix, local: { x: number; y: number }, k: number): PhotoMatrix {
-    const ns = Math.min(S_MAX, Math.max(S_MIN, m.s * k))
+    const ns = clampScale(m.s * k)
     return {
         s: ns,
         tx: m.tx + (m.s - ns) * local.x,

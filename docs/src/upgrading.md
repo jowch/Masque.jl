@@ -19,6 +19,15 @@ pinch zooms too. To zoom on a plain scroll as 0.4 did, pass
 | `ViewInteractable(ax)`: scroll zooms | `ViewInteractable(ax)`: Ctrl+scroll zooms, scroll moves the page; `ViewInteractable(ax; wheel = :always)`: scroll zooms |
 | scroll zoom turned off in Makie, the wheel zooms anyway | the wheel does not zoom; pass `wheel = :modifier` or `:always` to zoom |
 
+On a touch screen, one finger on the plot scrolls the page too, where
+in 0.4 it panned or turned the view. Drag with two fingers to pan or
+turn it, and pinch to zoom. To pan with one finger as 0.4 did, pass
+`touch = (; views = :onefinger)` to `masque`:
+
+| 0.4 | 0.5 |
+|---|---|
+| one finger pans or turns the view, the page can't scroll past it | one finger scrolls the page; two fingers pan or turn, a pinch zooms; `masque(fig, pan; touch = (; views = :onefinger))`: one finger pans |
+
 Scroll zoom counts as turned off in Makie after
 `deregister_interaction!(ax, :scrollzoom)` or
 `deactivate_interaction!(ax, :scrollzoom)`, or with both `xzoomlock`

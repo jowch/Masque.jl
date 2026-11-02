@@ -1374,6 +1374,161 @@ try {
     passed.push("view3d/zoom-readout");
   }
 
+  // Touch on drag plots (#530, #537), through CDP touch emulation so the browser itself decides
+  // what scrolls. One finger on a view scrolls the page and shows the two-finger hint; two
+  // fingers pinch-zoom a pan view (limits readout in the corner, settled on lift) and orbit an
+  // Axis3; a finger takes a threshold line and an ROI grip by their finger-sized grab areas and
+  // the page holds still, while a finger elsewhere on that plot scrolls it. `at` stamps each
+  // event with the finger's own time, or a busy WebGL page reads a quick swipe as a hold.
+  {
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+    const touch = (type, pts, at) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts.map(([x, y], i) => ({ x, y, id: i + 1 })), ...(at ? { timestamp: at / 1000 } : {}) });
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const until = async (f, ms = 3000) => { const end = Date.now() + ms; let v; while (!(v = await f()) && Date.now() < end) await wait(100); return v; };
+    const ui = (key, center = false) => page.evaluate(([k, center]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      if (center) host.scrollIntoView({ block: "center", behavior: "instant" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const note = sr.querySelector(".masque-note"), ro = sr.querySelector(".masque-readout");
+      return {
+        left: b.left, top: b.top, s: b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width,
+        note: note.classList.contains("show") ? note.innerText : "", readout: ro.classList.contains("show") ? ro.innerText : "",
+        photo: host.dataset.masquePhoto ?? "", touchAction: sr.querySelector(".surface").style.touchAction,
+        out: document.querySelector(`#out_${k}`)?.innerText ?? "", scrollY: window.scrollY,
+      };
+    }, [key, center]);
+    const resetView = (key) => page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const s = sr.querySelector(".surface");
+      s.focus();
+      s.dispatchEvent(new KeyboardEvent("keydown", { key: "0", bubbles: true, cancelable: true }));
+    }, key);
+    // A one-finger swipe up from (x, y); returns how far the page moved, then puts it back.
+    const swipe = async (x, y, dy = 120) => {
+      const y0 = await page.evaluate(() => window.scrollY);
+      const t0 = Date.now();
+      await touch("touchStart", [[x, y]], t0);
+      for (let i = 1; i <= 8; i++) await touch("touchMove", [[x, y - dy * i / 8]], t0 + 16 * i);
+      await touch("touchEnd", [], t0 + 16 * 9);
+      let y1 = y0;
+      await until(async () => Math.abs((y1 = await page.evaluate(() => window.scrollY)) - y0) >= 20);
+      for (let last = NaN, n = 0; n < 40; n++) { await wait(150); const yy = await page.evaluate(() => window.scrollY); if (yy === last) break; last = yy; }
+      await page.evaluate((yy) => window.scrollTo(window.scrollX, yy), y0);
+      await wait(200);
+      return y1 - y0;
+    };
+    // One finger pressing at (x, y) and dragging by (dx, dy), slowly enough to be a drag.
+    const fingerDrag = async (x, y, dx, dy) => {
+      const t0 = Date.now();
+      await touch("touchStart", [[x, y]], t0);
+      for (let i = 1; i <= 8; i++) { await touch("touchMove", [[x + dx * i / 8, y + dy * i / 8]], t0 + 40 * i); await wait(40); }
+      await touch("touchEnd", [], t0 + 40 * 9);
+    };
+    await page.mouse.move(1, 1);
+
+    // A pan view: one finger scrolls the page and shows the hint, the view stays put.
+    {
+      let u = await ui("view", true);
+      await wait(300);
+      u = await ui("view");
+      if (u.touchAction !== "pan-x pan-y") throw new Error(`touch/view-touch-action: ${u.touchAction}`);
+      const g = (await layersOf("view")).find((l) => l.id === "view").geometry;
+      const cx = u.left + (g.x + g.w / 2) * u.s, cy = u.top + (g.y + g.h / 2) * u.s;
+      const moved = await swipe(cx, cy);
+      if (Math.abs(moved) < 20) throw new Error(`touch/view-one-finger-scrolls: the page moved ${moved}px`);
+      const after = await ui("view");
+      if (after.photo) throw new Error(`touch/view-one-finger-scrolls: one finger moved the view (${after.photo})`);
+      passed.push("touch/view-one-finger-scrolls");
+      const hinted = await until(async () => /two fingers/i.test((await ui("view")).note), 1000) || /two fingers/i.test(after.note);
+      if (!hinted) throw new Error(`touch/view-hint: no "Use two fingers" note (note: ${JSON.stringify(after.note)})`);
+      passed.push("touch/view-hint");
+
+      // Two fingers spread apart: the view zooms in about their midpoint, the readout sits in the
+      // corner while they move, and lifting settles it.
+      u = await ui("view");
+      const t0 = Date.now();
+      await touch("touchStart", [[cx - 40, cy]], t0);
+      await touch("touchStart", [[cx - 40, cy], [cx + 40, cy]], t0 + 20);
+      for (let i = 1; i <= 8; i++) { await touch("touchMove", [[cx - 40 - 40 * i / 8, cy], [cx + 40 + 40 * i / 8, cy]], t0 + 20 + 40 * i); await wait(40); }
+      const mid = await ui("view");
+      await touch("touchEnd", [], t0 + 400);
+      if (Math.abs(mid.scrollY - u.scrollY) > 1) throw new Error(`touch/view-pinch: the page scrolled ${mid.scrollY - u.scrollY}px during a pinch`);
+      const m = /x:\[\s*([-\d.]+),\s*([-\d.]+)\]/.exec(mid.readout);
+      if (!m) throw new Error(`touch/view-pinch: no limits readout during the pinch (${JSON.stringify(mid.readout)}, note ${JSON.stringify(mid.note)})`);
+      const span = Number(m[2]) - Number(m[1]);
+      if (!(span > 2 && span < 6)) throw new Error(`touch/view-pinch: a 2x spread should show about half of the x range (8), got ${mid.readout}`);
+      if (!(await until(async () => !(await ui("view")).readout))) throw new Error("touch/view-pinch: the readout is still up after the fingers lifted");
+      passed.push("touch/view-pinch-zooms", "touch/view-pinch-readout");
+      await resetView("view");
+      await wait(800);
+    }
+
+    // An Axis3: two fingers moving together turn it.
+    {
+      await ui("view3d", true);
+      await wait(300);
+      const u = await ui("view3d");
+      const g = (await layersOf("view3d")).find((l) => l.id === "view").geometry;
+      const cx = u.left + (g.x + g.w / 2) * u.s, cy = u.top + (g.y + g.h / 2) * u.s;
+      const t0 = Date.now();
+      await touch("touchStart", [[cx - 30, cy]], t0);
+      await touch("touchStart", [[cx - 30, cy], [cx + 30, cy]], t0 + 20);
+      for (let i = 1; i <= 8; i++) { await touch("touchMove", [[cx - 30 + 60 * i / 8, cy], [cx + 30 + 60 * i / 8, cy]], t0 + 20 + 40 * i); await wait(40); }
+      const mid = await ui("view3d");
+      await touch("touchEnd", [], t0 + 400);
+      if (!/az=/.test(mid.readout)) throw new Error(`touch/view3d-two-finger-orbit: no az/el readout (${JSON.stringify(mid.readout)})`);
+      if (Math.abs(mid.scrollY - u.scrollY) > 1) throw new Error("touch/view3d-two-finger-orbit: the page scrolled");
+      if (!(await until(async () => !(await ui("view3d")).readout))) throw new Error("touch/view3d-two-finger-orbit: the readout is still up after lift");
+      passed.push("touch/view3d-two-finger-orbit");
+      await resetView("view3d");
+      await wait(800);
+    }
+
+    // A threshold line: a finger 12 CSS px off it (past a mouse's reach) drags it, and the page
+    // holds still; a finger far from it scrolls the page.
+    {
+      await ui("threshold", true);
+      await wait(300);
+      const u = await ui("threshold");
+      if (u.touchAction !== "pan-x pan-y") throw new Error(`touch/threshold-touch-action: ${u.touchAction}`);
+      const g = (await layersOf("threshold")).find((l) => l.id === "threshold").geometry;
+      const lx = u.left + (g.span[0] + g.span[1]) / 2 * u.s, ly = u.top + g.pos * u.s;
+      await fingerDrag(lx, ly + 12, 0, 30);
+      const after = await until(async () => { const a = await ui("threshold"); return a.out !== u.out ? a : null; }, 6000);
+      if (!after) throw new Error(`touch/threshold-grab: the line didn't move (${u.out})`);
+      if (Math.abs(after.scrollY - u.scrollY) > 1) throw new Error(`touch/threshold-grab: the page scrolled ${after.scrollY - u.scrollY}px under the finger`);
+      passed.push("touch/threshold-grab");
+      await fingerDrag(lx, ly + 42, 0, -30); // put it back for later drivers
+      await wait(600);
+      const far = await swipe(lx, ly - 50);
+      if (Math.abs(far) < 20) throw new Error(`touch/threshold-elsewhere-scrolls: the page moved ${far}px`);
+      passed.push("touch/threshold-elsewhere-scrolls");
+    }
+
+    // An ROI corner: a finger 19 CSS px outside the box, past a mouse's grip square, resizes it.
+    {
+      await ui("roi_bounds", true);
+      await wait(300);
+      const u = await ui("roi_bounds");
+      const g = (await layersOf("roi_bounds")).find((l) => l.id === "roi").geometry;
+      const x = u.left + g.x * u.s - 19, y = u.top + g.y * u.s;
+      await fingerDrag(x, y, -20, 0);
+      const after = await until(async () => { const a = await ui("roi_bounds"); return a.out !== u.out ? a : null; }, 6000);
+      if (!after) throw new Error(`touch/roi-grip-grab: the box didn't change (${u.out})`);
+      if (Math.abs(after.scrollY - u.scrollY) > 1) throw new Error("touch/roi-grip-grab: the page scrolled under the finger");
+      passed.push("touch/roi-grip-grab");
+      await fingerDrag(x - 20, y, 20, 0);
+      await wait(600);
+    }
+    await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+    await cdp.detach();
+  }
+
   // The axis readout's cursor-following tooltip: the caret apex sits on the pointer, both in
   // open space and where the box clamps at the right edge (the caret then moves along the box).
   // The box may extend past the figure and clamps at the window's edge instead, so the

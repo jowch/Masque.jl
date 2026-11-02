@@ -386,6 +386,9 @@ export interface Manifest {
     // `masque(...; touch)`: a finger picks the nearest mark within `radius` CSS px (geometry.ts's
     // touch rule); `false` gives a finger the mouse's rule. Absent → radius TOUCH_RADIUS.
     touch?: { radius: number } | false
+    // `masque(...; touch = (; views = :onefinger))`: one finger pans or orbits a view, as in 0.4.
+    // Absent → one finger scrolls the page and two fingers move the view (#537).
+    touchViews?: "onefinger"
     background?: string // the figure's background colour (CSS string) — drives the tooltip's light/dark theme
     // Image-px boxes [x, y, w, h] Makie draws over the axes' plots (an opaque legend or `Box`). A data
     // mark's highlight and fade leave them out, as the picture hides the marks under them (#437),

@@ -984,16 +984,16 @@ describe("pointer capture, cancel, and coalesced drag release", () => {
         expect(fired).toBe(true)
     })
 
-    it("sets touch-action:none only on surfaces with a drag-capable layer", () => {
+    it("a surface with a drag layer lets a finger scroll the page but not zoom it (#530)", () => {
         const hover = setup()
         mount(hover.script, manifest) // click/hover circles layer, no drag layer
         const hoverSurface = shadowOf(hover.host).querySelector(".surface") as HTMLElement
-        expect(hoverSurface.style.touchAction).not.toBe("none") // page scroll must still work here
+        expect(hoverSurface.style.touchAction).toBe("") // the browser's own
 
         const drag = setup()
         mount(drag.script, thresholdManifest())
         const dragSurface = shadowOf(drag.host).querySelector(".surface") as HTMLElement
-        expect(dragSurface.style.touchAction).toBe("none")
+        expect(dragSurface.style.touchAction).toBe("pan-x pan-y")
     })
 
     it("a second pointer's move/up cannot hijack a drag it didn't start", () => {
