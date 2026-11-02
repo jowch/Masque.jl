@@ -554,6 +554,39 @@ HTML(
         "<span id=\"axes_threshold_cat\" style=\"display:none\">$(JSON3.write(sweep.threshold_cat.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000190
+@bind ev_threshold_colorbar sweep.threshold_colorbar
+
+# ╔═╡ d1000000-0000-0000-0000-000000000191
+HTML(
+    "<span id=\"out_threshold_colorbar\">THRESHOLD_COLORBAR=$(sweep_field("threshold_colorbar", ev_threshold_colorbar))</span>" *
+        "<span id=\"bond_threshold_colorbar\" style=\"display:none\">$(repr(ev_threshold_colorbar))</span>" *
+        "<span id=\"coords_threshold_colorbar\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar.manifest["layers"]))</span>" *
+        "<span id=\"axes_threshold_colorbar\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar.manifest["transforms"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000192
+@bind ev_threshold_colorbar_h sweep.threshold_colorbar_h
+
+# ╔═╡ d1000000-0000-0000-0000-000000000193
+HTML(
+    "<span id=\"out_threshold_colorbar_h\">THRESHOLD_COLORBAR_H=$(sweep_field("threshold_colorbar_h", ev_threshold_colorbar_h))</span>" *
+        "<span id=\"bond_threshold_colorbar_h\" style=\"display:none\">$(repr(ev_threshold_colorbar_h))</span>" *
+        "<span id=\"coords_threshold_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar_h.manifest["layers"]))</span>" *
+        "<span id=\"axes_threshold_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar_h.manifest["transforms"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000194
+@bind ev_onchange_colorbar sweep.onchange_colorbar
+
+# ╔═╡ d1000000-0000-0000-0000-000000000195
+HTML(
+    "<span id=\"out_onchange_colorbar\">ONCHANGE_COLORBAR=$(sweep_field("onchange_colorbar", ev_onchange_colorbar))</span>" *
+        "<span id=\"bond_onchange_colorbar\" style=\"display:none\">$(repr(ev_onchange_colorbar))</span>" *
+        "<span id=\"coords_onchange_colorbar\" style=\"display:none\">$(JSON3.write(sweep.onchange_colorbar.manifest["layers"]))</span>" *
+        "<span id=\"axes_onchange_colorbar\" style=\"display:none\">$(JSON3.write(sweep.onchange_colorbar.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000119
 @bind ev_colorbar_owner sweep.colorbar_owner
 
@@ -572,6 +605,26 @@ HTML(
     "<span id=\"out_roi_bounds\">ROI_BOUNDS=$(sweep_field("roi_bounds", ev_roi_bounds))</span>" *
         "<span id=\"bond_roi_bounds\" style=\"display:none\">$(repr(ev_roi_bounds))</span>" *
         "<span id=\"coords_roi_bounds\" style=\"display:none\">$(JSON3.write(sweep.roi_bounds.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000196
+@bind ev_threshold_default sweep.threshold_default
+
+# ╔═╡ d1000000-0000-0000-0000-000000000197
+HTML(
+    "<span id=\"out_threshold_default\">THRESHOLD_DEFAULT=$(sweep_field("threshold_default", ev_threshold_default))</span>" *
+        "<span id=\"bond_threshold_default\" style=\"display:none\">$(repr(ev_threshold_default))</span>" *
+        "<span id=\"coords_threshold_default\" style=\"display:none\">$(JSON3.write(sweep.threshold_default.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000198
+@bind ev_roi_default sweep.roi_default
+
+# ╔═╡ d1000000-0000-0000-0000-000000000199
+HTML(
+    "<span id=\"out_roi_default\">ROI_DEFAULT=$(sweep_field("roi_default", ev_roi_default))</span>" *
+        "<span id=\"bond_roi_default\" style=\"display:none\">$(repr(ev_roi_default))</span>" *
+        "<span id=\"coords_roi_default\" style=\"display:none\">$(JSON3.write(sweep.roi_default.manifest["layers"]))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000064
@@ -994,10 +1047,18 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000031
 # ╠═d1000000-0000-0000-0000-000000000062
 # ╠═d1000000-0000-0000-0000-000000000063
+# ╠═d1000000-0000-0000-0000-000000000190
+# ╟─d1000000-0000-0000-0000-000000000191
+# ╠═d1000000-0000-0000-0000-000000000192
+# ╟─d1000000-0000-0000-0000-000000000193
 # ╠═d1000000-0000-0000-0000-000000000119
 # ╟─d1000000-0000-0000-0000-000000000120
 # ╠═d1000000-0000-0000-0000-000000000121
 # ╟─d1000000-0000-0000-0000-000000000122
+# ╠═d1000000-0000-0000-0000-000000000196
+# ╟─d1000000-0000-0000-0000-000000000197
+# ╠═d1000000-0000-0000-0000-000000000198
+# ╟─d1000000-0000-0000-0000-000000000199
 # ╠═d1000000-0000-0000-0000-000000000064
 # ╠═d1000000-0000-0000-0000-000000000065
 # ╠═d1000000-0000-0000-0000-000000000032
@@ -1028,6 +1089,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000044
 # ╠═d1000000-0000-0000-0000-000000000127
 # ╠═d1000000-0000-0000-0000-000000000128
+# ╠═d1000000-0000-0000-0000-000000000194
+# ╟─d1000000-0000-0000-0000-000000000195
 # ╠═d1000000-0000-0000-0000-000000000160
 # ╠═d1000000-0000-0000-0000-000000000161
 # ╠═d1000000-0000-0000-0000-000000000535

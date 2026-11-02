@@ -36,7 +36,9 @@ An [`ROIInteractable`](@ref) adds the box, and `selects` names the plot
 whose points it collects. To give each point its row of data, pass the
 scatter to [`interactables`](@ref) with `payloads`, and pass both to the
 same `masque` call, as the figure cell above does. `bounds` is where the
-box starts, as `(xmin, xmax, ymin, ymax)` in data coordinates.
+box starts, as `(xmin, xmax, ymin, ymax)` in data coordinates. Leave it
+out, and the box starts in the middle of the axis, half its width and
+half its height.
 
 `bind = s` makes `picks` the scatter's field: the points inside the box,
 as one [`ElementEvent`](@ref) per point, holding that point's payload

@@ -2140,19 +2140,23 @@ end
 
 # ============================ ThresholdInteractable ========================
 """
-    ThresholdInteractable(ax; orientation=:horizontal, value, id=:threshold, update_while_dragging=true)
+    ThresholdInteractable(ax; orientation, value=nothing, id=:threshold, update_while_dragging=true)
 
 A draggable horizontal or vertical line: drag for a live client-side readout, and the pixel
 position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up. Produces one
 `:threshold` [`HitLayer`](@ref).
 
 # Arguments
-- `ax` — a `Makie.Axis`.
+- `ax` — a `Makie.Axis`, or a `Makie.Colorbar` to drag a cutoff along its color scale.
 - `orientation` — `:horizontal` (constant-y line, dragged vertically) or `:vertical`
   (constant-x line, dragged horizontally). Any other value raises `ArgumentError`. Default
-  `:horizontal`.
+  `:horizontal` on an `Axis`. On a `Colorbar` the line runs across the bar, so it follows the
+  colorbar: `:horizontal` on a vertical colorbar, `:vertical` on a horizontal one; leave it out.
 - `value` — the line's initial data-space position (a y-value for `:horizontal`, x-value for
-  `:vertical`). Required, no default.
+  `:vertical`; on a `Colorbar`, a value on its scale, inside its limits). Default: the middle
+  of the axis's limits along the dragged dimension, as they are when `masque` runs. On a
+  `log10` or `log` scale that is the middle on screen (the geometric mean of the limits); on a
+  categorical axis, the middle category in view; on a `Colorbar`, the middle of its scale.
 - `id` — the layer id; becomes `InteractionEvent.layer` on commit. Default `:threshold`.
 - `update_while_dragging` — with `onchange` on [`masque`](@ref), redraw the figure while the
   line moves, not only when it is let go. Default `true`, like Makie's `Slider`. The `@bind`
@@ -2161,38 +2165,66 @@ position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up.
 Payload on commit (client-side): the scalar data coordinate.
 
 Its field in the `@bind` value starts as a [`ThresholdEvent`](@ref) at `value` (with its
-`category` on a categorical axis, when `value` is a category's position).
+`category` on a categorical axis, when `value` is a category's position). On a `Colorbar` the
+value is in the colorbar's units, the same ones a [`ColorbarInteractable`](@ref) click reads.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
 a data value — inversion is undefined), a `PolarAxis` (a straight line is neither a constant r nor
-a constant θ), a `Colorbar` (use [`ColorbarInteractable`](@ref) to read a value off it, or put
-the threshold on an `Axis`, such as a histogram of the same values), or
-the dragged axis's scale isn't client-invertible (`:horizontal` needs the y-scale, `:vertical`
-the x-scale; supported: `identity`, `log10`, `log`).
+a constant θ), or a `Legend`; if the dragged scale isn't client-invertible (`:horizontal` needs
+the y-scale, `:vertical` the x-scale, a `Colorbar` its own scale; supported: `identity`,
+`log10`, `log`); or, on a `Colorbar`, if `orientation` runs along the bar instead of across it.
+On a `Colorbar`, a `value` outside the colorbar's limits raises `ArgumentError` here. If an
+`onchange` later moves the limits past the line, the line waits at the end of the bar.
 
 # Examples
 ```julia
 ThresholdInteractable(ax; orientation = :horizontal, value = 5.0)
+
+# starts halfway up the axis
+ThresholdInteractable(ax)
+
+# a cutoff on the colorbar of a heatmap `hm`
+cb = Colorbar(fig[1, 2], hm)
+ThresholdInteractable(cb; value = 0.5)
 ```
 """
 struct ThresholdInteractable <: AbstractInteractable
-    ax; orientation::Symbol; value::Float64; id::Symbol
+    # value: `nothing` until `masque` sets it from the axis limits (`_pin_start`).
+    ax; orientation::Symbol; value::Union{Nothing, Float64}; id::Symbol
     update_while_dragging::Bool
 end
 # The 0.3.0 positional form, before `update_while_dragging`.
 ThresholdInteractable(ax, orientation::Symbol, value::Real, id::Symbol) = ThresholdInteractable(ax, orientation, value, id, true)
-function ThresholdInteractable(ax; orientation = :horizontal, value, id = :threshold, update_while_dragging::Bool = true)
+function ThresholdInteractable(ax; orientation = _threshold_orientation(ax), value = nothing, id = :threshold, update_while_dragging::Bool = true)
     orientation in (:horizontal, :vertical) ||
         throw(ArgumentError("ThresholdInteractable: orientation must be :horizontal or :vertical, got $(orientation)"))
-    return ThresholdInteractable(ax, orientation, _threshold_value(value), id, update_while_dragging)
+    v = _threshold_value(value)
+    ax isa Makie.Colorbar && v !== nothing && _check_on_bar(ax, v)
+    return ThresholdInteractable(ax, orientation, v, id, update_while_dragging)
 end
+# Only the value the author writes is held to the colorbar's limits, as they are when it is
+# written. A value the browser sends back can sit a rounding error past the end of the bar, and
+# an `onchange` can move the limits under the line; a redraw then draws the line at the end of
+# the bar instead (`_colorbar_pos`).
+function _check_on_bar(cb, v)
+    lims = cb.limits[]
+    lims === nothing && return nothing
+    lo, hi = minmax(Float64(lims[1]), Float64(lims[2]))
+    lo <= v <= hi || throw(
+        ArgumentError(
+            "ThresholdInteractable: value = $(v) is outside the colorbar's limits ($(lo), $(hi)), " *
+                "so the line would sit off the bar. Pick a value inside them."
+        )
+    )
+    return nothing
+end
+# Across the bar on a colorbar; a horizontal line everywhere else.
+_threshold_orientation(ax) = ax isa Makie.Colorbar && !ax.vertical[] ? :vertical : :horizontal
 events(::ThresholdInteractable) = (:drag,)
 function validate(i::ThresholdInteractable, ctx::InteractionContext)
     i.ax isa Makie.Legend && return "ThresholdInteractable: ax is a Legend, not an Axis — a legend has no data-space scalar to drag."
-    i.ax isa Makie.Colorbar && return "ThresholdInteractable: ax is a Colorbar, not an Axis — a threshold " *
-        "can't be dragged on a colorbar yet. To read a value off the colorbar, use " *
-        "ColorbarInteractable(cb); to drag a cutoff, put the threshold on an Axis, such as a histogram of the same values."
     t = ctx.transforms[axis_id(ctx, i.ax)]
+    i.ax isa Makie.Colorbar && return _validate_colorbar_threshold(i, t)
     t.is3d && return "ThresholdInteractable: drag inverts a pixel to a data scalar via the axis " *
         "transform, which is undefined on an Axis3 (a screen pixel is a ray, not a data value)."
     t.ispolar && return "ThresholdInteractable: a threshold is not supported on PolarAxis (it drags a " *
@@ -2202,10 +2234,35 @@ function validate(i::ThresholdInteractable, ctx::InteractionContext)
         "invertible $(i.orientation === :horizontal ? "y" : "x")-scale ($(sc) is not; supported: identity/log10/log)."
     return nothing
 end
+function _validate_colorbar_threshold(i, t)
+    vertical = t.valueaxis === :y
+    across = vertical ? :horizontal : :vertical
+    i.orientation === across || return "ThresholdInteractable: a $(vertical ? "vertical" : "horizontal") " *
+        "colorbar takes a $(across) line, across the bar; got orientation = :$(i.orientation). " *
+        "Leave orientation out on a Colorbar and it follows the bar."
+    sc = vertical ? t.yscale : t.xscale
+    sc in _JS_INVERTIBLE || return "ThresholdInteractable: the colorbar's scale $(sc) is not " *
+        "invertible client-side; supported: identity/log10/log."
+    return nothing
+end
+# The pixel along a colorbar's value axis where `v` sits, the way geometry.ts `projectAxis` puts
+# it, held to the bar.
+function _colorbar_pos(t, v)
+    vx, vy, vw, vh = t.viewport
+    vertical = t.valueaxis === :y
+    lims = vertical ? t.ylims : t.xlims
+    f = (vertical ? t.yscale : t.xscale) === :identity ? identity : log10
+    frac = clamp((f(v) - f(lims[1])) / (f(lims[2]) - f(lims[1])), 0.0, 1.0)
+    return vertical ? vy + (1 - frac) * vh : vx + frac * vw
+end
 function hitlayers(i::ThresholdInteractable, ctx)
     t = ctx.transforms[axis_id(ctx, i.ax)]
     vx, vy, vw, vh = t.viewport
-    if i.orientation === :horizontal
+    if i.ax isa Makie.Colorbar
+        pos = _colorbar_pos(t, i.value)
+        span = i.orientation === :horizontal ? Float32[vx, vx + vw] : Float32[vy, vy + vh]
+        orient = i.orientation === :horizontal ? "h" : "v"
+    elseif i.orientation === :horizontal
         pos = _proj(ctx, i.ax, (t.xlims[1], i.value))[2]   # constant data-y → its pixel-y
         span = Float32[vx, vx + vw]; orient = "h"
     else
@@ -2219,7 +2276,7 @@ end
 
 # ============================ ROIInteractable ==============================
 """
-    ROIInteractable(ax; bounds, id=:roi, selects=nothing, update_while_dragging=true)
+    ROIInteractable(ax; bounds=nothing, id=:roi, selects=nothing, update_while_dragging=true)
 
 A draggable and resizable rectangle: drag the interior to move it, a corner to resize both
 edges, or the middle of a side (no drawn grip there) to resize just that one edge; on mouse-up
@@ -2232,6 +2289,8 @@ compatible layer, reporting the contained elements. Produces one `:roi` [`HitLay
 - `ax` — a `Makie.Axis`.
 - `bounds` — initial `(xmin, xmax, ymin, ymax)` in data space. Requires `xmin < xmax` and
   `ymin < ymax` (`ArgumentError` otherwise); length must be 4 (`ArgumentError` otherwise).
+  Default: a box half the size of the axis's limits, centred in them, as they are when
+  `masque` runs. On a `log10` or `log` scale it is centred and sized on screen.
 - `id` — the layer id; becomes `InteractionEvent.layer` on commit. Default `:roi`.
 - `selects` — the layer to brush: a `:circles` or `:grid` layer's `id`, or the plot itself
   (`selects = sc`), whatever id that plot's layer ends up with. On mouse-up, elements whose
@@ -2260,6 +2319,9 @@ need numeric limits), or either scale isn't client-invertible (supported: `ident
 ```julia
 ROIInteractable(ax; bounds = (0.0, 1.0, 0.0, 1.0))
 
+# starts as a box over the middle of the axis
+ROIInteractable(ax)
+
 # brush the points of a scatter plot `sc`
 ROIInteractable(ax; bounds = (0.0, 1.0, 0.0, 1.0), selects = sc)
 
@@ -2270,11 +2332,13 @@ ROIInteractable(ax; bounds = (0.0, 1.0, 0.0, 1.0), selects = :scatter)
 struct ROIInteractable <: AbstractSelector
     # bounds: (xmin,xmax,ymin,ymax) data space. A plot `selects` becomes a `_PlotTarget` in
     # `_assemble`, then the one compatible layer id in `build_manifest`.
-    ax; bounds::NTuple{4, Float64}; id::Symbol; selects::Union{Nothing, Symbol, Makie.AbstractPlot, _PlotTarget}
+    # bounds: `nothing` until `masque` sets them from the axis limits (`_pin_start`).
+    ax; bounds::Union{Nothing, NTuple{4, Float64}}; id::Symbol; selects::Union{Nothing, Symbol, Makie.AbstractPlot, _PlotTarget}
     update_while_dragging::Bool
 end
 ROIInteractable(ax, bounds::NTuple{4, Real}, id::Symbol, selects) = ROIInteractable(ax, bounds, id, selects, true)
-function ROIInteractable(ax; bounds, id = :roi, selects = nothing, update_while_dragging::Bool = true)
+function ROIInteractable(ax; bounds = nothing, id = :roi, selects = nothing, update_while_dragging::Bool = true)
+    bounds === nothing && return ROIInteractable(ax, nothing, id, selects, update_while_dragging)
     xmin, xmax, ymin, ymax = _roi_bounds(bounds)
     (xmin < xmax && ymin < ymax) ||
         throw(ArgumentError("ROIInteractable: need xmin < xmax and ymin < ymax, got $(bounds)"))
@@ -2311,6 +2375,81 @@ function hitlayers(i::ROIInteractable, ctx)
     i.update_while_dragging || (geom["settleOnly"] = true)
     return [HitLayer(i.id, :roi, geom, Any[], axis_id(ctx, i.ax), events(i))]
 end
+
+# ============================ starts from the axis limits ==================
+# A threshold or box made without a `value` or `bounds` starts in the middle of its axis as
+# `masque` finds it (#513). `masque` sets the start once, at mount, so a pan or an `onchange`
+# frame that moves the limits leaves the line where it was, as it does a line given a `value`.
+
+# The point a fraction `f` of the way along `lims` on screen: on a log scale, in log space.
+function _along(lims, scale::Symbol, f)
+    a, b = lims
+    scale in (:log10, :log) && return exp10(log10(a) + f * (log10(b) - log10(a)))
+    return a + f * (b - a)
+end
+
+_pin_start(i, ctx) = i
+function _pin_start(i::ThresholdInteractable, ctx)
+    i.value === nothing || return i
+    t = _start_transform(i, ctx)
+    t === nothing && return i
+    h = i.orientation === :horizontal
+    cats = h ? t.ycats : t.xcats
+    lims = h ? t.ylims : t.xlims
+    v = cats === nothing || isempty(cats) ? _along(lims, h ? t.yscale : t.xscale, 0.5) :
+        Float64(_middle_category(lims, length(cats)))
+    return ThresholdInteractable(i.ax, i.orientation, v, i.id, i.update_while_dragging)
+end
+# A release on a categorical axis snaps to a category, so the start sits on one too: the
+# middle of the categories in view (the lower one of two), which is all of them unless the
+# axis is zoomed. With none in view, the one nearest the middle.
+function _middle_category(lims, n)
+    lo, hi = minmax(lims...)
+    a, b = max(1, ceil(Int, lo)), min(n, floor(Int, hi))
+    a <= b && return (a + b) ÷ 2
+    return clamp(round(Int, (lo + hi) / 2), 1, n)
+end
+function _pin_start(i::ROIInteractable, ctx)
+    i.bounds === nothing || return i
+    t = _start_transform(i, ctx)
+    t === nothing && return i
+    b = (
+        _along(t.xlims, t.xscale, 0.25), _along(t.xlims, t.xscale, 0.75),
+        _along(t.ylims, t.yscale, 0.25), _along(t.ylims, t.yscale, 0.75),
+    )
+    return ROIInteractable(i.ax, b, i.id, i.selects, i.update_while_dragging)
+end
+# The axis transform a start is read from, or `nothing` where `validate` refuses the axis.
+function _start_transform(i, ctx)
+    id = get(ctx.ids, i.ax, nothing)
+    id === nothing && return nothing
+    t = get(ctx.transforms, id, nothing)
+    (t === nothing || t.is3d || t.ispolar) && return nothing
+    return t
+end
+
+# The plan with every unset start set from `ctx`; a new plan, so the caller's vector stays as
+# it was.
+function _pin_starts(p, ctx)
+    any(_unpinned, p) || return p
+    ints = AbstractInteractable[_pin_start(i, ctx) for i in p]
+    p isa _Plan || return ints
+    return _Plan(ints, p.binding, p.onchange, p.rebuild, p.mount, p.hidden, p.draw)
+end
+_unpinned(i::ThresholdInteractable) = i.value === nothing
+_unpinned(i::ROIInteractable) = i.bounds === nothing
+_unpinned(_) = false
+
+# A rebuilt plan's unset starts, set to where `old`, the plan it replaces, had them.
+function _carry_starts(ints, old)
+    any(_unpinned, ints) || return ints
+    was = Dict{Symbol, Any}(i.id => i for i in old if i isa Union{ThresholdInteractable, ROIInteractable} && !_unpinned(i))
+    return AbstractInteractable[
+        _unpinned(i) && get(was, i.id, nothing) isa typeof(i) ? _with_start(i, was[i.id]) : i for i in ints
+    ]
+end
+_with_start(i::ThresholdInteractable, w) = ThresholdInteractable(i.ax, i.orientation, w.value, i.id, i.update_while_dragging)
+_with_start(i::ROIInteractable, w) = ROIInteractable(i.ax, w.bounds, i.id, i.selects, i.update_while_dragging)
 
 # ============================ custom: RegionInteractable (Tier A) =========
 """
