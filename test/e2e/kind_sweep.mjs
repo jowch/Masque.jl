@@ -955,11 +955,17 @@ try {
 
       // Each control commit runs the cell reading the bond once (#458: a native `input` event
       // escaping the shadow root sent the bond a second time). `once` waits for Pluto to go
-      // idle, then long enough for a late second run, and counts the runs since `r`.
+      // idle, then long enough for a late second run, and counts the runs since `r`. Only the
+      // actions that fire a native `input` can catch #458 (slider, toggle, interval, menu pick,
+      // grid key, text box, checkbox); a menu option click or a button fires none, so those
+      // checks guard against a double commit from some other cause.
+      // The 2.5 s wait is a fixed bound: a second run arriving later is blamed on the next
+      // action, and the last check (`checkbox-space`) would miss it.
       const runs = async () => Number(await textOf(`#count_${key}`));
       const settle = async () => {
-        for (let i = 0; i < 600; i++) {
+        for (let i = 0; ; i++) {
           if (!(await page.evaluate(() => document.querySelectorAll("pluto-cell.running, pluto-cell.queued").length))) break;
+          if (i >= 600) throw new Error(`${key}: Pluto still busy after 60 s`);
           await new Promise((res) => setTimeout(res, 100));
         }
         await new Promise((res) => setTimeout(res, 2500));
