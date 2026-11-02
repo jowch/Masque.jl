@@ -1,0 +1,4 @@
+image = "tooltips_stars.png"
+
+[outputs]
+c0e1a001-0001-4000-8000-000000000007 = "click a star"

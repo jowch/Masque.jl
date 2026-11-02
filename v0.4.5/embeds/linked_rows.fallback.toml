@@ -1,0 +1,4 @@
+image = "linked_rows.png"
+
+[outputs]
+c0a10003-0001-4000-8000-000000000004 = "click a point"

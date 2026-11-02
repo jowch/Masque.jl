@@ -1,0 +1,4 @@
+image = "custom_regions.png"
+
+[outputs]
+a1b2c3d4-0001-4000-8000-000000000004 = "click a region"
