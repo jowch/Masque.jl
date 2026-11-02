@@ -1126,8 +1126,45 @@ try {
         await new Promise((r) => setTimeout(r, 200));
       }
 
+      // #541: a Safari trackpad pinch (gesturestart / gesturechange / gestureend with a
+      // cumulative `scale`). Chromium never fires these, so they are dispatched here; each step
+      // goes through the real frame round trip and the idle settle.
+      const pinch = (kk, x, y) => page.evaluate(([k2, px, py]) => {
+        const span = document.querySelector(`#coords_${k2}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const surface = sr.querySelector(".surface");
+        const prevented = [];
+        for (const [type, scale] of [["gesturestart", 1], ["gesturechange", 1.3], ["gesturechange", 1.6], ["gestureend", 1.6]]) {
+          const ev = new Event(type, { bubbles: true, cancelable: true });
+          Object.defineProperty(ev, "scale", { value: scale });
+          Object.defineProperty(ev, "clientX", { value: px });
+          Object.defineProperty(ev, "clientY", { value: py });
+          surface.dispatchEvent(ev);
+          prevented.push(ev.defaultPrevented);
+        }
+        const ro = sr.querySelector(".masque-readout");
+        return { prevented, photo: host.dataset.masquePhoto || "", readout: ro.classList.contains("show") ? ro.textContent : "" };
+      }, [kk, x, y]);
+      c = await centerOf(gAlways);
+      const pz = await pinch(key, c.x, c.y);
+      if (!pz.prevented.every(Boolean)) throw new Error(`${key}: a Safari pinch over a zooming view was left to the page: ${JSON.stringify(pz)}`);
+      const scaleOf = (ph) => Number(ph.split(",")[0]);
+      if (!(Math.abs(scaleOf(pz.photo) - 1.6) < 1e-6)) throw new Error(`${key}: a Safari pinch to 1.6 did not scale the view by 1.6: ${JSON.stringify(pz)}`);
+      if (!/x:\[/.test(pz.readout)) throw new Error(`${key}: no corner readout while a Safari pinch zoomed: ${JSON.stringify(pz)}`);
+      for (let i = 0; ; i++) {
+        const st = await state(key);
+        if (!st.photo && !st.readout) break;
+        if (i > 100) throw new Error(`${key}: the Safari pinch zoom never settled: ${JSON.stringify(st)}`);
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      passed.push(`${key}/safari-pinch-zooms`);
+
       // :none — Ctrl+wheel is not taken, and a real plain wheel scrolls the page with no hint.
       c = await centerOf(gNone);
+      const pn = await pinch(key, c.x, c.y);
+      if (pn.prevented.some(Boolean) || pn.photo) throw new Error(`${key}: a Safari pinch was taken by a wheel = :none view: ${JSON.stringify(pn)}`);
+      passed.push(`${key}/none-safari-pinch-left-to-page`);
       const ctrl = await page.evaluate(([kk, x, y]) => {
         const span = document.querySelector(`#coords_${kk}`);
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -1147,6 +1184,91 @@ try {
       passed.push(`${key}/none-wheel-left-to-page`);
       await page.mouse.move(1, 1);
       console.error(`OK  ${key} — :always zoomed on a plain wheel; Makie-off view left Ctrl+wheel and scroll to the page`);
+      continue;
+    }
+
+    // Nested views (#559): an inset axis with its own view inside its parent's. Over the inset,
+    // Ctrl+wheel and a drag move the inset's view; outside it, the parent's. Which one moved is
+    // read off the corner readout: the inset spans 0–1 and the parent 0–10.
+    if (spec.mode === "nested") {
+      const gOut = layers.find((l) => l.id === "view")?.geometry;
+      const gIn = layers.find((l) => l.id === "inset")?.geometry;
+      if (!gOut || !gIn) throw new Error(`${key}: expected views "view" and "inset", got ${layers.map((l) => l.id)}`);
+      if (!(gIn.x > gOut.x && gIn.x + gIn.w < gOut.x + gOut.w && gIn.y > gOut.y && gIn.y + gIn.h < gOut.y + gOut.h)) {
+        throw new Error(`${key}: the inset view ${JSON.stringify(gIn)} is not inside the parent's ${JSON.stringify(gOut)}`);
+      }
+      // Client px of an image px, with the plot on screen.
+      const clientAt = (ix, iy) => page.evaluate(([kk, x, y]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        return { x: b.left + x * s, y: b.top + y * s };
+      }, [key, ix, iy]);
+      const readout = () => page.evaluate((kk) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const ro = sr.querySelector(".masque-readout");
+        return { photo: host.dataset.masquePhoto || "", text: ro.classList.contains("show") ? ro.textContent : "" };
+      }, key);
+      // The x range the readout shows, polled for up to 3 s.
+      const xRange = async (what) => {
+        for (let i = 0; i < 30; i++) {
+          const r = await readout();
+          const m = /x:\[\s*(-?[\d.e+-]+)\s*[,–]\s*(-?[\d.e+-]+)/.exec(r.text.replace(/\u2212/g, "-"));
+          if (m) return Number(m[2]) - Number(m[1]);
+          await new Promise((res) => setTimeout(res, 100));
+        }
+        throw new Error(`${key}: no limits readout after ${what}`);
+      };
+      const settled = async () => {
+        for (let i = 0; ; i++) {
+          const r = await readout();
+          if (!r.photo && !r.text) return;
+          if (i > 100) throw new Error(`${key}: the view never settled: ${JSON.stringify(r)}`);
+          await new Promise((res) => setTimeout(res, 200));
+        }
+      };
+      const ctrlWheel = (c) => page.evaluate(([kk, x, y]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: x, clientY: y, deltaY: -120, ctrlKey: true });
+        sr.querySelector(".surface").dispatchEvent(ev);
+        return ev.defaultPrevented;
+      }, [key, c.x, c.y]);
+      const inner = await clientAt(gIn.x + gIn.w / 2, gIn.y + gIn.h / 2);
+      // Left of the inset, inside the parent.
+      const outer = await clientAt(gOut.x + (gIn.x - gOut.x) / 2, gIn.y + gIn.h / 2);
+      const isInset = (w) => w > 0 && w < 1.5, isParent = (w) => w > 2 && w < 12;
+
+      if (!(await ctrlWheel(inner))) throw new Error(`${key}: Ctrl+wheel over the inset was not taken`);
+      let w = await xRange("Ctrl+wheel over the inset");
+      if (!isInset(w)) throw new Error(`${key}: Ctrl+wheel over the inset zoomed a view spanning ${w} in x, not the inset's (0–1)`);
+      passed.push(`${key}/wheel-over-inset-zooms-inset`);
+      await settled();
+
+      if (!(await ctrlWheel(outer))) throw new Error(`${key}: Ctrl+wheel over the parent was not taken`);
+      w = await xRange("Ctrl+wheel over the parent");
+      if (!isParent(w)) throw new Error(`${key}: Ctrl+wheel beside the inset zoomed a view spanning ${w} in x, not the parent's (0–10)`);
+      passed.push(`${key}/wheel-beside-inset-zooms-parent`);
+      await settled();
+
+      for (const [c, want, name] of [[inner, isInset, "inset"], [outer, isParent, "parent"]]) {
+        await page.mouse.move(c.x, c.y);
+        await page.mouse.down();
+        await page.mouse.move(c.x + 15, c.y + 8, { steps: 4 });
+        w = await xRange(`a drag over the ${name}`);
+        await page.mouse.up();
+        if (!want(w)) throw new Error(`${key}: a drag over the ${name} moved a view spanning ${w} in x`);
+        passed.push(`${key}/drag-over-${name}-pans-${name}`);
+        await settled();
+      }
+      await page.mouse.move(1, 1);
+      console.error(`OK  ${key} — the wheel and a drag over the inset moved the inset's view; beside it, the parent's`);
       continue;
     }
 
@@ -4442,8 +4564,13 @@ try {
         host.scrollIntoView({ block: "center", inline: "nearest" });
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         const b = host.querySelector("img, canvas").getBoundingClientRect();
-        return { left: b.left, top: b.top, s: b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
+        const vbw = sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        return { left: b.left, top: b.top, s: b.width / vbw, vbw };
       }, key);
+      // Steps are a fixed share of the picture's width, so the orbit turns the same angle at any
+      // px_per_unit (orbitAngles divides the drag by the axis width in image px): 4 image px
+      // at the 960-px picture of a 480-wide figure at px_per_unit 2.
+      const unit = box.vbw / 960;
       const pointer = (type, ix, iy) => page.evaluate(([k, t, cx, cy]) => {
         const span = document.querySelector(`#coords_${k}`);
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -4459,7 +4586,7 @@ try {
       await pointer("pointerdown", clickPt.x, clickPt.y);
       let mid = null;
       for (let step = 1; step <= tries && !mid; step++) {
-        await pointer("pointermove", clickPt.x + 4 * step, clickPt.y);
+        await pointer("pointermove", clickPt.x + 4 * unit * step, clickPt.y);
         await new Promise((r) => setTimeout(r, delayMs));
         const st = await readStamp();
         const parsed = st ? JSON.parse(st) : null;
@@ -4475,7 +4602,7 @@ try {
         throw new Error(`${key}/orbit-suspend: the selected point still draws ${during.sel} shape(s) mid-drag`);
       }
       passed.push(`${key}/orbit-suspend`);
-      await pointer("pointerup", clickPt.x + 4 * tries, clickPt.y);
+      await pointer("pointerup", clickPt.x + 4 * unit * tries, clickPt.y);
       let settled = null;
       for (let i = 0; i < tries && !settled; i++) {
         await new Promise((r) => setTimeout(r, delayMs));

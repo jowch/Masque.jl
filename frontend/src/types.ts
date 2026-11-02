@@ -220,10 +220,10 @@ export interface ViewGeometry {
     fill?: string
     // pan only: axes tied to this one by Makie's `linkaxes!` (#363), whose data slides too.
     links?: ViewLink[]
-    // What a wheel over the axis does (#526). "modifier": Ctrl/Cmd+wheel (and a trackpad pinch,
-    // which Chrome and Firefox send as Ctrl+wheel) zooms, a plain wheel scrolls the page and
-    // shows a hint. "always": any wheel zooms. "none": the wheel never zooms. Absent means
-    // "modifier", the Julia default.
+    // What a wheel over the axis does (#526). "modifier": Ctrl/Cmd+wheel zooms, and so does a
+    // trackpad pinch (Ctrl+wheel in Chrome and Firefox, gesture events in Safari, #541); a plain
+    // wheel scrolls the page and shows a hint. "always": any wheel or pinch zooms. "none":
+    // neither zooms. Absent means "modifier", the Julia default.
     wheel?: "modifier" | "always" | "none"
     azimuth?: number    // radians; orbit only (current Axis3 camera)
     elevation?: number  // radians; orbit only
@@ -387,7 +387,7 @@ export interface Manifest {
     // touch rule); `false` gives a finger the mouse's rule. Absent → radius TOUCH_RADIUS.
     touch?: { radius: number } | false
     background?: string // the figure's background colour (CSS string) — drives the tooltip's light/dark theme
-    // Image-px boxes [x, y, w, h] Makie draws over the axes' plots (an opaque legend). A data
+    // Image-px boxes [x, y, w, h] Makie draws over the axes' plots (an opaque legend or `Box`). A data
     // mark's highlight and fade leave them out, as the picture hides the marks under them (#437),
     // and so does its hit test: the pointer there reaches only the legend and Masque's tools (#472).
     occluders?: Array<[number, number, number, number]>

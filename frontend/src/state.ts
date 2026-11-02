@@ -297,6 +297,9 @@ export interface OverlayState {
     photoAnchor_: { x: number; y: number } | null
     photoViewId_: string | null
     wheelTimer_: ReturnType<typeof setTimeout> | null
+    // The view a wheel gesture zooms, kept while `wheelTimer_` is live: a zoom that drifts
+    // across an inset's edge stays on the view it started on (#559).
+    wheelViewId_: string | null
     // A keyboard pan or orbit (dragkeys.ts) is between its first keydown and its keyup settle.
     // A frame that lands meanwhile keeps the readout, as it does for a pointer pan or a wheel.
     keyView_: boolean
@@ -354,6 +357,7 @@ export function createOverlayState(): OverlayState {
         photoAnchor_: null,
         photoViewId_: null,
         wheelTimer_: null,
+        wheelViewId_: null,
         keyView_: false,
         view3_: new Map(),
         view3Last_: null,

@@ -1,7 +1,7 @@
 import { invertAxis, matrixLimits, panLimits3, projectAxis } from "./geometry"
 import { hideTip, hideViewReadout, showViewReadout, placeTip, setMarkAccent, setTipText, setTipVisible } from "./hover"
 import { scheduleAnnounce } from "./keyboard"
-import { resetView, settleCurrentPan } from "./bond"
+import { photoHeldByOther, resetView, settleCurrentPan } from "./bond"
 import { fmtCoord } from "./template"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
@@ -326,6 +326,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                 pending = () => { state.keyView_ = false; ctx.gesture_.settle({ ...input, settle: true }) }
                 return true
             }
+            if (photoHeldByOther(state, id)) return true
             const d = viewDrag.begin(id, g, t, g.x + g.w / 2, g.y + g.h / 2, -1) as Extract<Drag, { kind: "view" }>
             // A live wheel-idle timer was that notch's only settle. The keyup settle below
             // covers the current photo, so the timer can go.
