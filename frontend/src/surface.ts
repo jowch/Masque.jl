@@ -1,14 +1,41 @@
 // :surface hit-testing (docs/dev/architecture/03-interactables.md, SurfaceInteractable). Julia
 // ships the projected points of a 3D surface and its quads sorted front to back; the first quad
-// under the pointer is the visible one, and its corner nearest the pointer is the answer. The
+// under the pointer is the visible one, and its corner nearest the pointer is the answer. On a
+// PolarAxis (a polar heatmap) the same layer is flat, and only the region the axis shows answers. The
 // highlight is that point's dual cell: the polygon through the midpoints of its grid edges and
 // the centres of its quads, drawn with the closed-mark recipe.
 import type { Hit, HitLayer, SurfaceGeometry } from "./types"
+
+// A point this close outside a PolarAxis's shown region still counts as shown: grid points
+// often sit exactly on the limits, and the shipped pixels are rounded.
+const CLIP_TOL = 1 // image px
+const TAU = 2 * Math.PI
+
+// Whether (px, py) is in the region a PolarAxis shows (`clip`), with `tol` px of slack. A layer
+// without `clip` shows everything.
+function shown(g: SurfaceGeometry, px: number, py: number, tol: number): boolean {
+    const c = g.clip
+    if (!c) return true
+    const dx = px - c[0], dy = c[1] - py, d = Math.hypot(dx, dy)
+    if (d < c[2] - tol || d > c[3] + tol) return false
+    if (c.length < 6 || d === 0) return true
+    const [phi0, span] = [c[4], c[5]]
+    const turn = span >= 0 ? Math.atan2(dy, dx) - phi0 : phi0 - Math.atan2(dy, dx)
+    const rel = ((turn % TAU) + TAU) % TAU
+    const slack = tol / d
+    return rel <= Math.abs(span) + slack || rel >= TAU - slack
+}
 
 // [x, y] of shipped point k, or null when it is not drawn.
 function vertex(g: SurfaceGeometry, k: number): [number, number] | null {
     const x = g.xy[2 * k], y = g.xy[2 * k + 1]
     return Number.isFinite(x) && Number.isFinite(y) ? [x, y] : null
+}
+
+// `vertex`, and also null when a PolarAxis masks the point.
+function shownVertex(g: SurfaceGeometry, k: number): [number, number] | null {
+    const v = vertex(g, k)
+    return v && shown(g, v[0], v[1], CLIP_TOL) ? v : null
 }
 
 // Strictly inside or on the edge of triangle (a, b, c), either winding.
@@ -26,7 +53,7 @@ function inTriangle(px: number, py: number, ax: number, ay: number, bx: number, 
 export function dualCell(g: SurfaceGeometry, k: number): number[] {
     const ni = g.ni, nj = g.nj
     const a = k % ni, b = (k - a) / ni
-    const p = vertex(g, k)
+    const p = shownVertex(g, k)
     if (!p) return []
     const at = (aa: number, bb: number): [number, number] | null =>
         aa < 0 || bb < 0 || aa >= ni || bb >= nj ? null : vertex(g, aa + bb * ni)
@@ -68,7 +95,7 @@ export function surfacePointHit(layer: HitLayer, k: number): Omit<Hit, "layer"> 
 // The quad under (px, py) nearest the camera, answered by its corner nearest the pointer.
 export function hitSurface(layer: HitLayer, px: number, py: number): Omit<Hit, "layer"> | null {
     const g = layer.geometry as SurfaceGeometry
-    if (g.suspended || !g.xy || !g.order) return null
+    if (g.suspended || !g.xy || !g.order || !shown(g, px, py, 0)) return null
     const ni = g.ni, w = ni - 1, xy = g.xy
     for (const q of g.order) {
         const a = q % w, b = (q - a) / w
@@ -79,11 +106,15 @@ export function hitSurface(layer: HitLayer, px: number, py: number): Omit<Hit, "
         if (py < Math.min(y0, y1, y2, y3) || py > Math.max(y0, y1, y2, y3)) continue
         // Corners in ring order k0, k1, k3, k2, split on the k0–k3 diagonal.
         if (!inTriangle(px, py, x0, y0, x1, y1, x3, y3) && !inTriangle(px, py, x0, y0, x3, y3, x2, y2)) continue
-        let best = k0, bd = Infinity
+        // The nearest corner that is drawn: on a PolarAxis, a quad across the shown region's
+        // edge has corners the axis hides.
+        let best = -1, bd = Infinity
         for (const k of [k0, k1, k2, k3]) {
+            if (!shownVertex(g, k)) continue
             const d = (xy[2 * k] - px) ** 2 + (xy[2 * k + 1] - py) ** 2
             if (d < bd) { bd = d; best = k }
         }
+        if (best < 0) continue
         return surfacePointHit(layer, best)
     }
     return null
@@ -107,5 +138,5 @@ export function surfaceFields(layer: HitLayer, k: number): Record<string, number
 // The point's projected position, which the tooltip sits above.
 export function surfaceVertex(layer: HitLayer, k: number): [number, number] | null {
     const g = layer.geometry as SurfaceGeometry
-    return g.suspended || !g.xy ? null : vertex(g, k)
+    return g.suspended || !g.xy ? null : shownVertex(g, k)
 }

@@ -62,8 +62,8 @@ controls, and how to turn several panels together with `linkcameras!`.
 
 ## Limitations
 
-- A surface responds only on an `Axis3`. On a 2D `Axis`, draw the same
-  matrix with `heatmap` to read its values; see [Heatmaps and images](@ref).
+- A surface responds only on an `Axis3` or a `PolarAxis`. On a 2D
+  `Axis`, draw the same matrix with `heatmap` to read its values; see [Heatmaps and images](@ref).
 - A sphere from `meshscatter` stops responding once its center leaves
   the axis box. Zoom out, or turn the view, to bring it back; see
   [Orbit an `Axis3`](@ref).
