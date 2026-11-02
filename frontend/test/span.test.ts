@@ -74,6 +74,11 @@ describe("span hit-test", () => {
         expect(hitLayer(layer, 500, -6, ax1)).toBeNull() // the inside does not
         expect(g.span).toEqual([0, 800])
     })
+    it("an edge's reach grows with slop, so it keeps its size on a narrow screen (#527)", () => {
+        expect(hitLayer(layer, 372, 400, ax1)?.spanPart_).toEqual({ move: true }) // 12 px > SEG_TOL 8
+        expect(hitLayer(layer, 372, 400, ax1, 2)?.spanPart_).toEqual({ edge: "lo" }) // ≤ 16
+        expect(hitLayer(layer, 360, -12, ax1, 2)?.spanPart_).toEqual({ edge: "lo" })
+    })
     it("two edges close together give the nearer one", () => {
         const near = { ...layer, geometry: { ...g, lo: 500, hi: 506 } }
         expect(hitLayer(near, 499, 400, ax1)?.spanPart_).toEqual({ edge: "lo" })

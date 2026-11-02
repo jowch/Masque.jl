@@ -2005,6 +2005,48 @@ describe("tooltips (mount/showTip)", () => {
         expect(stamp.xmax).toBe(9)
     })
 
+    it("a frame for a resized figure resizes the overlay and the host (#546)", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [{ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } }],
+        }
+        const host = document.createElement("div")
+        host.style.maxWidth = "600px"
+        const canvas = document.createElement("canvas") as HTMLCanvasElement & {
+            masqueReplaceScene?: (scene: unknown, px?: number, w?: number, h?: number) => void
+        }
+        canvas.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        canvas.masqueReplaceScene = vi.fn()
+        const script = document.createElement("script")
+        host.append(canvas, script)
+        document.body.append(host)
+        const grown: Manifest = { ...m, width: 1200, height: 1200,
+            transforms: { ax1: { ...m.transforms.ax1, viewport: [0, 0, 1200, 600] } } }
+        const requestFrame = vi.fn(async () => ({ scene: { tag: "frame" }, pxPerUnit: 2, width: 600, height: 600, displayWidth: 600, manifest: grown }))
+        mount(script, m, undefined, requestFrame)
+        const svgs = [...shadowOf(host).querySelectorAll("svg.masque-fill, svg.masque-edge, svg.masque-plain")]
+        expect(svgs.map((s) => s.getAttribute("viewBox"))).toEqual(Array(3).fill("0 0 1200 800"))
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(svgs.map((s) => s.getAttribute("viewBox"))).toEqual(Array(3).fill("0 0 1200 1200"))
+        expect(host.style.maxWidth).toBe("600px")
+        // A figure grown wider follows it up to max_width, which Julia has already applied.
+        requestFrame.mockImplementation(async () => ({ scene: { tag: "wide" }, pxPerUnit: 2, width: 900, height: 600, displayWidth: 700,
+            manifest: { ...grown, width: 1800 } }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 300, clientY: 200, bubbles: true }))
+        for (let i = 0; i < 6; i++) await Promise.resolve()
+        expect(svgs.map((s) => s.getAttribute("viewBox"))).toEqual(Array(3).fill("0 0 1800 1200"))
+        expect(host.style.maxWidth).toBe("700px")
+    })
+
     it("gesture channel: a canvas frame that lands before the replacer still swaps the manifest", async () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2,

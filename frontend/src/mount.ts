@@ -900,6 +900,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             pendingChrome = null
             replaceDraggedChrome(newManifest)
         }
+        // The figure was resized after display (#546): the picture has the new size, so the
+        // overlay takes it too. Its scale stays image px per figure unit; only the box grows.
+        if (newManifest.width !== ctx.manifest_.width || newManifest.height !== ctx.manifest_.height) {
+            for (const s of overlaySvgs) s.setAttribute("viewBox", `0 0 ${newManifest.width} ${newManifest.height}`)
+        }
+        if (typeof r.displayWidth === "number" && r.displayWidth > 0) host.style.maxWidth = `${r.displayWidth}px`
         ctx.manifest_ = newManifest
         paintOccluders(newManifest)
         controls.update_(newManifest, onchangeFrame && input.state && typeof input.state === "object" ? input.state as Record<string, unknown> : null)

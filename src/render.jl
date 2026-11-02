@@ -578,6 +578,9 @@ function build_manifest(
     permute!(layer_owners, perm)
     m = Dict{String, Any}(
         "width" => ctx.width, "height" => ctx.height, "scaling" => ctx.scaling,
+        # The CSS width the figure is drawn for: hit slack keeps its on-screen size when the
+        # figure is shown narrower (frontend `slopScale`, #527).
+        "cssWidth" => round(Int, ctx.width * ctx.display_scale),
         "layers" => layers,
         "transforms" => Dict(string(id) => _transform_dict(t) for (id, t) in ctx.transforms),
     )
@@ -605,16 +608,26 @@ function build_manifest(
             fill == m["background"] || (t["fill"] = fill)
         end
     end
-    # The boxes Makie draws over the axes' plots (an opaque legend over an axis): the overlay
-    # draws no data mark's highlight or fade inside them (#437), and a data mark takes no
-    # pointer there (#472).
-    plots = [ctx.transforms[id].viewport for (blk, id) in ctx.ids if blk isa _SUPPORTED_AXES]
+    # The boxes Makie draws over the axes' plots (an opaque legend or `Box` over an axis): the
+    # overlay draws no data mark's highlight or fade inside them (#437), and a data mark takes
+    # no pointer there (#472, #547).
+    axes = [(blk, ctx.transforms[id].viewport) for (blk, id) in ctx.ids if blk isa _SUPPORTED_AXES]
     meets((x, y, w, h), (vx, vy, vw, vh)) = x < vx + vw && vx < x + w && y < vy + vh && vy < y + h
     occluders = Vector{Float64}[]
     for (blk, _) in ctx.ids
         blk isa Makie.Legend || continue
         box = _legend_occluder(blk, ctx.scaling, ctx.height)
-        box === nothing || any(v -> meets(box, v), plots) && push!(occluders, box)
+        box === nothing || any(a -> meets(box, a[2]), axes) && push!(occluders, box)
+    end
+    fig = isempty(axes) ? nothing : first(axes)[1].parent
+    if fig isa Makie.Figure
+        for blk in fig.content
+            blk isa Makie.Box || continue
+            box = _box_occluder(blk, ctx.scaling, ctx.height)
+            box === nothing && continue
+            over(ax) = _box_over_plots(fig, blk, ax, ctx.depth_test)
+            any(((ax, v),) -> meets(box, v) && over(ax), axes) && push!(occluders, box)
+        end
     end
     isempty(occluders) || (m["occluders"] = sort!(occluders))
     if owners_out !== nothing
@@ -786,9 +799,9 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   `CairoMakie` / `WGLMakie` is loaded, `:cairo` if both. Raises `ArgumentError` if neither is
   loaded, if the named backend's package is not loaded, or for an unknown name.
 - `max_width` — the widest the plot shows on the page, in CSS px (Pluto's column). Default `700`.
-- `px_per_unit` — image pixels per figure unit, on either backend. Default `nothing`: on
-  `:cairo`, `2 * min(figure width, max_width) / figure width`, so the PNG is twice the width it
-  shows at; on `:webgl`, `2`. A larger number gives a sharper, heavier picture. Neither this
+- `px_per_unit` — image pixels per figure unit, on either backend. Default `nothing`:
+  `2 * min(figure width, max_width) / figure width`, so the picture is twice the width it
+  shows at. A larger number gives a sharper, heavier picture. Neither this
   nor `max_width` follows `CairoMakie.activate!` or `WGLMakie.activate!`.
 - `tooltip_sigdigits` — significant figures for a tooltip number that has no format spec.
   Unset, it is 4, so `0.30000000000000004` shows as `0.3` and `2.71828` as `2.718`;
@@ -1324,13 +1337,15 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
 end
 
 function _render_gesture_frame(input, backend, fig, interactables, ppu, max_width; owners_out = nothing)
-    # Frame resolution drops to 1x for every in-drag frame and restores to the mount ppu on
-    # release ("settle", the frontend's terminal request) — the MANIFEST always stays in the
-    # mount ppu's coordinate space below, so image-px geometry (viewBox, hit regions) never
-    # moves out from under the overlay; only the PNG's own pixel density changes (the <img>
-    # is width:100% CSS-scaled — see frontend-delivery.md — so that's decoupled from its
-    # intrinsic size).
-    render_ppu = get(input, "settle", false) === true ? ppu : 1.0
+    # Frame resolution drops to 1x (or the mount ppu, if lower) for every in-drag frame and
+    # restores to the mount ppu on release ("settle", the frontend's terminal request) — the
+    # MANIFEST always stays in the mount ppu's coordinate space below, so image-px geometry
+    # (viewBox, hit regions) never moves out from under the overlay; only the PNG's own pixel
+    # density changes (the <img> is width:100% CSS-scaled — see frontend-delivery.md — so
+    # that's decoupled from its intrinsic size). A figure `resize!`d after display changes the
+    # manifest's width and height, at the same scale, and the frontend resizes the overlay to
+    # match (#546).
+    render_ppu = get(input, "settle", false) === true ? ppu : min(ppu, 1.0)
     bg0 = fig.scene.backgroundcolor[]
     try
         # Same forcing masque() does around its own render — that guard is restored in ITS
@@ -1345,6 +1360,8 @@ function _render_gesture_frame(input, backend, fig, interactables, ppu, max_widt
         result = _with_blocks_hidden(() -> render(backend, fig, render_ppu), interactables)
         frame = _gesture_frame(result)
         frame["manifest"] = manifest
+        # The figure can be resized after display (#546); the widget follows it, as at mount.
+        frame["displayWidth"] = round(Int, min(size(fig.scene)[1], max_width))
         return frame
     finally
         fig.scene.backgroundcolor[] = bg0

@@ -371,13 +371,17 @@ export interface Manifest {
     width: number
     height: number
     scaling: number
+    // The CSS width the figure is drawn for (`min(scene width, max_width)`). Hit slack is image
+    // px at this width; shown narrower, geometry.ts's slopScale grows it to keep its on-screen
+    // size (#527). Absent: slack stays in image px.
+    cssWidth?: number
     layers: HitLayer[]
     transforms: Record<string, AxisTransform>
     tipStyle?: Record<string, string> // figure-level --masque-tip-* custom properties
     overlayStyle?: Record<string, string> // figure-level overlay chrome custom properties (overlaystyle)
     tipDigits?: number // tooltip_sigdigits; absent means the frontend default (4)
     background?: string // the figure's background colour (CSS string) — drives the tooltip's light/dark theme
-    // Image-px boxes [x, y, w, h] Makie draws over the axes' plots (an opaque legend). A data
+    // Image-px boxes [x, y, w, h] Makie draws over the axes' plots (an opaque legend or `Box`). A data
     // mark's highlight and fade leave them out, as the picture hides the marks under them (#437),
     // and so does its hit test: the pointer there reaches only the legend and Masque's tools (#472).
     occluders?: Array<[number, number, number, number]>

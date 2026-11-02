@@ -757,6 +757,17 @@ try {
     // The bond never moves.
     {
       const key = "view", id = "view";
+      if (backend === "webgl") {
+        // Start from a plot whose GPU context the pool has released, as after a long scroll:
+        // the first press must wake it and still show the frame it asked for.
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await waitFor(() => page.evaluate(() => {
+          const span = document.querySelector("#coords_view");
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          const plot = [...(window.__MasqueWGL?.contextPool?.plots ?? [])].find((pl) => host.contains(pl.host) || pl.host.contains(host));
+          return { ok: plot && plot.phase !== "live", phase: plot?.phase };
+        }), `${key} context released`);
+      }
       let s = await tabToStop(key, id);
       const n0 = s.inputs, before = await textOf(`#out_${key}`);
       // Earlier drivers may have panned this view, so measure one press against the window a

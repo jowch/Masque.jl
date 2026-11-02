@@ -60,6 +60,14 @@ kind_sweep_meta() = [
         "hoverFields" => ["labelalpha", "x1", "y1"],
     ),
     Dict(
+        # `scatter` at half its density: `max_width = 240` puts the 480-wide figure at
+        # `px_per_unit` 1 on both backends (#548), where the rest of the sweep runs near 2.
+        "key" => "scatter_low", "layerId" => "scatter", "layerKind" => "circles",
+        "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "beta", "hoverIndex" => 0, "hoverTip" => "alpha", "mode" => "element",
+        "hoverFields" => ["labelalpha", "x1", "y1"],
+    ),
+    Dict(
         # A bound line picks a data point (#335): `selected = [1]` rings its first point, and the
         # click lands on its third.
         "key" => "lines", "layerId" => "lines", "layerKind" => "lines",
@@ -243,6 +251,14 @@ kind_sweep_meta() = [
         # a ViewInteractable too: `orbitSuspends` checks that an in-drag frame hides the selected
         # point's highlight and the release frame brings it back.
         "key" => "surface3d", "layerId" => "surface", "layerKind" => "surface",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 13,
+        "tip" => "i4j3", "hoverIndex" => 12, "hoverTip" => "i3j3", "mode" => "element",
+        "orbitSuspends" => true,
+    ),
+    Dict(
+        # `surface3d` at `px_per_unit` 1 (`max_width = 240`, #548): hover, click, and an orbit
+        # whose release frame brings the selection back at the lower density.
+        "key" => "surface3d_low", "layerId" => "surface", "layerKind" => "surface",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 13,
         "tip" => "i4j3", "hoverIndex" => 12, "hoverTip" => "i3j3", "mode" => "element",
         "orbitSuspends" => true,
@@ -577,6 +593,15 @@ kind_sweep_meta() = [
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "wheel",
     ),
     Dict(
+        # The figure is `resize!`d in a later cell, after it is shown (#546). The pan's frame
+        # draws it at the new size, and the overlay must follow: the driver hovers the lower
+        # axis's points where the resized figure draws them and finds each ring on its mark.
+        "key" => "view_resized", "layerId" => "view", "layerKind" => "view",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+        "resizeAfterDisplay" => true,
+    ),
+    Dict(
         "key" => "legend", "layerId" => "legend", "layerKind" => "rects",
         "selected" => nothing, "halo" => false, "selectedIndex" => 2, "clickIndex" => 2,
         "tip" => "pts", "mode" => "element",
@@ -822,6 +847,18 @@ function build_kind_sweep()
             fig,
             interactables(sc; payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")]);
             selected = Dict(:scatter => [2]),
+        )
+    end
+
+    scatter_low = let
+        pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 1.2)]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "scatter_low")
+        sc = scatter!(ax, first.(pts), last.(pts); color = :gray, markersize = 22)
+        masque(
+            fig,
+            interactables(sc; payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")]);
+            selected = Dict(:scatter => [2]), max_width = 240,
         )
     end
 
@@ -1081,6 +1118,47 @@ function build_kind_sweep()
         )
     end
 
+    # A `Box` over marks (#547): Makie draws the opaque top-left box over hid 0 and hid 1, and
+    # the top-right one (made before the axis, but `z = 1`) over hid 5, so the pointer there
+    # finds the box, not the points. The bottom-left box was made before the axis and the
+    # bottom-right one has `z = -1`, so the plot draws over both: hid 2 and hid 3 show and take
+    # the pointer, and two occluders ship. hid 4 is in the open. Not in kind_sweep_meta();
+    # polish_verify.mjs checks it.
+    box_hidden = let
+        fig = Figure(size = (480, 260))
+        boxed(h, v; kw...) = Box(fig[1, 1]; width = 70, height = 50, halign = h, valign = v, color = :white, tellwidth = false, tellheight = false, kw...)
+        boxed(0.03, 0.03)
+        boxed(0.97, 0.97; z = 1)
+        ax = Axis(fig[1, 1]; title = "box-hidden", limits = (0, 10, 0, 10))
+        hid = scatter!(ax, [0.8, 1.6, 1.0, 9.0, 5.0, 9.0], [9.0, 8.3, 1.2, 1.2, 5.0, 8.8]; color = :orange, markersize = 18)
+        boxed(0.02, 0.98; width = 110, height = 70)
+        boxed(0.97, 0.03; z = -1)
+        masque(fig, interactables(hid; id = :hid); auto = false)
+    end
+
+    # A `Box` over each kind of axis (#547), where the backends draw it differently. Each panel
+    # has a white Box over the mark at its centre and a mark in the open. The Box hides the
+    # centre mark on both backends in panel 1 (made after the axis), on neither in panels 2
+    # (made before), 3 (the plot raised to z 5) and 6 (an Axis3 with the Box at z -50), on
+    # Cairo only in panel 4 (a PolarAxis made after a z 1 Box) and on WebGL only in panel 5 (an
+    # Axis3 made after a z 0 Box). Not in kind_sweep_meta(); polish_verify.mjs checks that a mark
+    # hides on screen exactly where an occluder ships, and takes the pointer everywhere else.
+    box_axes = let
+        fig = Figure(size = (690, 440))
+        boxed(pos; kw...) = Box(pos; width = 56, height = 44, color = :white, tellwidth = false, tellheight = false, kw...)
+        pts2 = ([0.0, 0.8], [0.0, 0.8])
+        pts3 = ([0.0, 1.0, -1.0], [0.0, 1.0, -1.0], [0.0, 1.0, -1.0])
+        mark(ax, pts...; kw...) = scatter!(ax, pts...; color = :orange, markersize = 18, kw...)
+        lim = (-1, 1, -1, 1)
+        ax1 = Axis(fig[1, 1]; title = "after", limits = lim); p1 = mark(ax1, pts2...); boxed(fig[1, 1])
+        boxed(fig[1, 2]); ax2 = Axis(fig[1, 2]; title = "before", limits = lim); p2 = mark(ax2, pts2...)
+        ax3 = Axis(fig[1, 3]; title = "raised", limits = lim); p3 = mark(ax3, pts2...); translate!(p3, 0, 0, 5); boxed(fig[1, 3])
+        boxed(fig[2, 1]; z = 1); ax4 = PolarAxis(fig[2, 1]; title = "polar"); p4 = mark(ax4, [0.0, 1.6], [0.0, 0.9]); rlims!(ax4, 0, 1)
+        boxed(fig[2, 2]); ax5 = Axis3(fig[2, 2]; title = "3D"); p5 = mark(ax5, pts3...)
+        ax6 = Axis3(fig[2, 3]; title = "3D z -50"); p6 = mark(ax6, pts3...); boxed(fig[2, 3]; z = -50)
+        masque(fig, (interactables(p; id = Symbol(:p, i)) for (i, p) in enumerate((p1, p2, p3, p4, p5, p6)))...; auto = false)
+    end
+
     # A plot drawn with `visible = false` (#484): picking a legend entry fades the shown lines and
     # leaves the hidden line's path alone, so the gridlines under it stay whole. The legend
     # sits beside the axis, off every line. Not in kind_sweep_meta(); polish_verify.mjs checks it.
@@ -1198,6 +1276,16 @@ function build_kind_sweep()
         surface!(ax, xs, xs, zs; colormap = [:steelblue, :lightblue], shading = NoShading)
         wireframe!(ax, xs, xs, zs; color = :black, linewidth = 0.5)
         masque(fig, ViewInteractable(ax))
+    end
+
+    surface3d_low = let
+        fig = Figure(size = (480, 320))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "surface3d_low")
+        xs = [0.0, 1.0, 2.0, 3.0, 4.0]
+        zs = [4.0 - ((x - 2)^2 + (y - 2)^2) / 2 for x in xs, y in xs]
+        surface!(ax, xs, xs, zs; colormap = [:steelblue, :lightblue], shading = NoShading)
+        wireframe!(ax, xs, xs, zs; color = :black, linewidth = 0.5)
+        masque(fig, ViewInteractable(ax); max_width = 240)
     end
 
     # A polar heatmap drawn with `surface!` (#514), coarse so each point's cell is large enough
@@ -1653,6 +1741,16 @@ function build_kind_sweep()
         )
     end
 
+    view_resized = let
+        fig = Figure(size = (480, 300))
+        ax = Axis(fig[1, 1]; title = "view, resized after display")
+        scatter!(ax, 11:13, [1, 2.46, 4.17]; color = :gray, markersize = 14)
+        ax2 = Axis(fig[2, 1])
+        lower = scatter!(ax2, 21:23, [1, 2.46, 4.17]; color = :gray, markersize = 14)
+        VIEW_RESIZED[] = (fig, ax2)
+        masque(fig, ViewInteractable(ax), interactables(lower; id = :lower); auto = false)
+    end
+
     legend = let
         xs = collect(0.0:0.5:3.0)
         fig = Figure(size = (480, 320))
@@ -1942,11 +2040,30 @@ function build_kind_sweep()
     end
 
     return (;
-        scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, legend, series_legend,
+        scatter, scatter_low, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
+        polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, box_hidden, box_axes, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_resized, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
+end
+
+# `view_resized`'s figure and lower axis, for the cell that resizes it after display (#546).
+const VIEW_RESIZED = Ref{Any}(nothing)
+
+# Resize `view_resized`'s figure, wider and taller, after it is shown. Gives the image px where
+# the resized figure draws the lower axis's points, at the widget's scale `k` (top-left origin,
+# y down), and the new width.
+function resize_view_resized!(k; to = (640, 420))
+    fig, ax2 = VIEW_RESIZED[]
+    resize!(fig, to...)
+    Masque._finalize!(fig)   # lay the figure out at its new size, as a frame will
+    H = to[2]
+    o = ax2.scene.viewport[].origin
+    marks = map(zip(21:23, [1, 2.46, 4.17])) do (x, y)
+        p = Makie.project(ax2.scene, Makie.Point2f(x, y)) .+ o
+        (k * p[1], k * (H - p[2]))
+    end
+    return (; marks, width = to[1])   # the CSS width the widget may grow to (under max_width)
 end
 
 # The text a notebook prints for one sweep widget's `@bind` value `ev`: the field the case is

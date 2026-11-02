@@ -323,11 +323,19 @@ end
     @test Masque._resolve_backend(nothing) isa _WGLExt.WebGLBackend   # the one loaded
     w = masque(fig)
     @test w isa _WGLExt.WebGLWidget && w.px_per_unit == 2.0 && w.display_css == 600
-    @test w.manifest["scaling"] == 2.0
+    @test w.manifest["scaling"] == 2.0 && w.manifest["cssWidth"] == 600
     err = (@test_throws ArgumentError masque(fig; backend = :cairo)).value
     @test occursin("using CairoMakie", err.msg)
+    # max_width sets the density too, as on Cairo (#548)
     w = masque(fig; backend = :webgl, max_width = 300)
-    @test w.display_css == 300 && w.px_per_unit == 2.0    # WebGL's density ignores max_width
+    @test w.display_css == 300 && w.px_per_unit == 2 * 300 / 600
+    @test w.manifest["scaling"] == w.px_per_unit && w.manifest["width"] == 600
+    @test w.manifest["cssWidth"] == 300                   # hit slack's design width (#527)
+    wide = Figure(; size = (1600, 450)); scatter!(Axis(wide[1, 1]), 1:3, 1:3)
+    w = masque(wide)
+    @test w.display_css == 700 && w.px_per_unit == 2 * 700 / 1600 && w.manifest["width"] == 1400
+    w = masque(fig; px_per_unit = 3, max_width = 300)
+    @test w.px_per_unit == 3.0 && w.display_css == 300   # px_per_unit still wins
     w = masque(fig; px_per_unit = 3)
     @test w.px_per_unit == 3.0 && w.manifest["scaling"] == 3.0 && w.manifest["width"] == 1800
 
@@ -399,6 +407,10 @@ end
     )
     @test resp["pxPerUnit"] == 1.0
     @test resp["width"] == 400 && resp["height"] == 300
+    # A mount density below 1 (a figure over twice max_width) is not raised mid-drag (#548)
+    wide = masque(fig, [ViewInteractable(ax), PointInteractable(ax, pts)]; backend = :webgl, auto = false, max_width = 150)
+    @test wide.px_per_unit == 0.75
+    @test wide.render_frame(Dict("id" => "view", "xmin" => 1.0, "xmax" => 9.0, "ymin" => 0.5, "ymax" => 4.5, "settle" => false))["pxPerUnit"] == 0.75
     @test resp["scene"] isa Dict{String, Any}
     @test json_ok(resp["scene"])
     @test !haskey(resp, "png")
