@@ -60,6 +60,14 @@ kind_sweep_meta() = [
         "hoverFields" => ["labelalpha", "x1", "y1"],
     ),
     Dict(
+        # `scatter` at half its density: `max_width = 240` puts the 480-wide figure at
+        # `px_per_unit` 1 on both backends (#548), where the rest of the sweep runs near 2.
+        "key" => "scatter_low", "layerId" => "scatter", "layerKind" => "circles",
+        "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "beta", "hoverIndex" => 0, "hoverTip" => "alpha", "mode" => "element",
+        "hoverFields" => ["labelalpha", "x1", "y1"],
+    ),
+    Dict(
         # A bound line picks a data point (#335): `selected = [1]` rings its first point, and the
         # click lands on its third.
         "key" => "lines", "layerId" => "lines", "layerKind" => "lines",
@@ -243,6 +251,14 @@ kind_sweep_meta() = [
         # a ViewInteractable too: `orbitSuspends` checks that an in-drag frame hides the selected
         # point's highlight and the release frame brings it back.
         "key" => "surface3d", "layerId" => "surface", "layerKind" => "surface",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 13,
+        "tip" => "i4j3", "hoverIndex" => 12, "hoverTip" => "i3j3", "mode" => "element",
+        "orbitSuspends" => true,
+    ),
+    Dict(
+        # `surface3d` at `px_per_unit` 1 (`max_width = 240`, #548): hover, click, and an orbit
+        # whose release frame brings the selection back at the lower density.
+        "key" => "surface3d_low", "layerId" => "surface", "layerKind" => "surface",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 13,
         "tip" => "i4j3", "hoverIndex" => 12, "hoverTip" => "i3j3", "mode" => "element",
         "orbitSuspends" => true,
@@ -834,6 +850,18 @@ function build_kind_sweep()
         )
     end
 
+    scatter_low = let
+        pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 1.2)]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "scatter_low")
+        sc = scatter!(ax, first.(pts), last.(pts); color = :gray, markersize = 22)
+        masque(
+            fig,
+            interactables(sc; payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")]);
+            selected = Dict(:scatter => [2]), max_width = 240,
+        )
+    end
+
     lines = let
         verts = [(0.0, 0.0), (1.0, 1.5), (2.0, 0.4), (3.0, 1.8)]
         fig = Figure(size = (480, 260))
@@ -1248,6 +1276,16 @@ function build_kind_sweep()
         surface!(ax, xs, xs, zs; colormap = [:steelblue, :lightblue], shading = NoShading)
         wireframe!(ax, xs, xs, zs; color = :black, linewidth = 0.5)
         masque(fig, ViewInteractable(ax))
+    end
+
+    surface3d_low = let
+        fig = Figure(size = (480, 320))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "surface3d_low")
+        xs = [0.0, 1.0, 2.0, 3.0, 4.0]
+        zs = [4.0 - ((x - 2)^2 + (y - 2)^2) / 2 for x in xs, y in xs]
+        surface!(ax, xs, xs, zs; colormap = [:steelblue, :lightblue], shading = NoShading)
+        wireframe!(ax, xs, xs, zs; color = :black, linewidth = 0.5)
+        masque(fig, ViewInteractable(ax); max_width = 240)
     end
 
     # A polar heatmap drawn with `surface!` (#514), coarse so each point's cell is large enough
@@ -2002,9 +2040,9 @@ function build_kind_sweep()
     end
 
     return (;
-        scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
+        scatter, scatter_low, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, box_hidden, box_axes, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_resized, legend, series_legend,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_resized, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

@@ -4442,8 +4442,13 @@ try {
         host.scrollIntoView({ block: "center", inline: "nearest" });
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         const b = host.querySelector("img, canvas").getBoundingClientRect();
-        return { left: b.left, top: b.top, s: b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
+        const vbw = sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        return { left: b.left, top: b.top, s: b.width / vbw, vbw };
       }, key);
+      // Steps are a fixed share of the picture's width, so the orbit turns the same angle at any
+      // px_per_unit (orbitAngles divides the drag by the axis width in image px): 4 image px
+      // at the 960-px picture of a 480-wide figure at px_per_unit 2.
+      const unit = box.vbw / 960;
       const pointer = (type, ix, iy) => page.evaluate(([k, t, cx, cy]) => {
         const span = document.querySelector(`#coords_${k}`);
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -4459,7 +4464,7 @@ try {
       await pointer("pointerdown", clickPt.x, clickPt.y);
       let mid = null;
       for (let step = 1; step <= tries && !mid; step++) {
-        await pointer("pointermove", clickPt.x + 4 * step, clickPt.y);
+        await pointer("pointermove", clickPt.x + 4 * unit * step, clickPt.y);
         await new Promise((r) => setTimeout(r, delayMs));
         const st = await readStamp();
         const parsed = st ? JSON.parse(st) : null;
@@ -4475,7 +4480,7 @@ try {
         throw new Error(`${key}/orbit-suspend: the selected point still draws ${during.sel} shape(s) mid-drag`);
       }
       passed.push(`${key}/orbit-suspend`);
-      await pointer("pointerup", clickPt.x + 4 * tries, clickPt.y);
+      await pointer("pointerup", clickPt.x + 4 * unit * tries, clickPt.y);
       let settled = null;
       for (let i = 0; i < tries && !settled; i++) {
         await new Promise((r) => setTimeout(r, delayMs));
