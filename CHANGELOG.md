@@ -51,6 +51,11 @@ All notable changes to this project are documented here. The format is based on
   that point's position in your data, `pick.line` says which line it is on, and `pick.x`,
   `pick.y` and `pick.z` hold it. `selected=` indices on such a line name points too. To
   upgrade, code that read `pick.index` as the line now reads `pick.line` (#518).
+- A `:webgl` figure wider than `max_width`, or any `:webgl` figure with a small
+  `max_width`, now draws its canvas at about twice the width it shows at, as `:cairo` does.
+  Before, the canvas was always twice the figure's own width, so a 1600-wide figure drew
+  3200 pixels across to show at 700. Figures no wider than `max_width` are unchanged, and
+  `px_per_unit` still sets the density when you pass it (#548).
 - While you pan, zoom or turn a view, its readout (the axis limits, or an `Axis3`'s angles
   while it turns) shows in the bottom-left corner of the figure instead of beside the pointer,
   and a point's tooltip doesn't show over it (#526).
@@ -66,6 +71,11 @@ All notable changes to this project are documented here. The format is based on
 - With WebGLMakie, on a page with many plots, the first pan or zoom of a view after scrolling
   back to it redraws the plot while the key or the mouse button is down. Before, that redraw
   was dropped, and the plot showed the old picture shifted until the gesture ended.
+
+### Fixed
+- An opaque `Box` drawn over an axis hides the marks under it from the pointer too, as a
+  legend does: hovering or clicking the box no longer shows a tooltip or ring for a mark you
+  can't see (#547).
 
 ## [0.4.5] - 2026-11-02
 
