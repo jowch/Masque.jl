@@ -15,6 +15,8 @@ import { limitsTip } from "./drag/view"
 import * as viewDrag from "./drag/view"
 import { createGestureChannel } from "./gesture"
 import { buildControls, CONTROLS_STYLE } from "./controls"
+import { buildViewButtons, VIEW_BUTTONS_STYLE } from "./viewbuttons"
+import type { ViewButtons } from "./viewbuttons"
 import { DEFAULT_SIGDIGITS } from "./template"
 import type { GestureChannel } from "./gesture"
 import type { FrameResponse, RenderFrame } from "./gesture"
@@ -321,7 +323,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const shadowHost = document.createElement("div")
     const shadow = shadowHost.attachShadow({ mode: "open" })
     const style = document.createElement("style")
-    style.textContent = STYLE + CONTROLS_STYLE
+    style.textContent = STYLE + CONTROLS_STYLE + VIEW_BUTTONS_STYLE
 
     // Three coordinate-identical top-level <svg>s. The fill svg carries color-dodge (Firefox
     // only honours mix-blend-mode on a top-level svg). The edge svg paints the flat chrome
@@ -576,7 +578,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // Where the pointer last moved over the plot, so an \`onchange\` frame can redraw its hover.
     let lastMove: PointerEvent | null = null
     const onchangeSettle = (): Record<string, unknown> => ({ onchange: true, state: currentState(), settle: true })
-    const rawChannel = createGestureChannel(requestFrame ?? null, applyFrame, () => { clearPhoto() })
+    // The corner view buttons (#525), built once the ctx exists, on a live channel only.
+    let viewButtons: ViewButtons | null = null
+    const rawChannel = createGestureChannel(requestFrame ?? null, applyFrame, () => { clearPhoto(); viewButtons?.dead_() })
     // A docs player answers `onchange` from frames it harvested at build time, where a live
     // kernel would (docs/pluto_html_export.jl). View gestures still have no kernel there.
     const replay = (window as unknown as { masqueReplayFrame?: RenderFrame }).masqueReplayFrame
@@ -596,16 +600,18 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         if (typeof input.id === "string" && input.reset !== true && input.onchange !== true) state.viewMoved_.add(input.id)
     }
     const channel: GestureChannel = {
-        request(input) { builtAt.set(input, photoFrames); noteMoved(input); route(input.onchange === true).request(input) },
+        request(input) { builtAt.set(input, photoFrames); noteMoved(input); viewButtons?.sync_(); route(input.onchange === true).request(input) },
         settle(input, slot) {
             const ch = route(slot === "onchange")
             // A built-when-sent input is relative to the frame on screen when it is sent.
             if (typeof input === "function") return ch.settle(() => { const o = input(); builtAt.set(o, photoFrames); return o }, slot)
             builtAt.set(input, photoFrames)
             noteMoved(input)
+            viewButtons?.sync_()
             return ch.settle(input, slot)
         },
         dispose() { rawChannel.dispose(); replayChannel?.dispose() },
+        alive: () => rawChannel.alive(),
     }
 
     const fade = createFade({
@@ -949,6 +955,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             paintPhoto(IDENTITY)
         } else adoptPhoto(input)
         dragStops?.sync_()
+        viewButtons?.layout_()
         if (focused && !state.drag_) {
             const k = ctx.focusable_.findIndex((f) => f.layer_.id === focused.id && f.index_ === focused.index)
             if (k >= 0) focusTo(ctx, state, k)
@@ -1050,6 +1057,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ctx.fade_.refresh_()
         state.surfaceSized_ = false
         replaceTip(ctx, state)
+        viewButtons?.layout_()
     }
     // The axis frame (spines, ticks, labels) stays on the untransformed base. A copy of the
     // same pixels, clipped to the pan view's viewport, carries the matrix, so only the data
@@ -1209,8 +1217,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(overlayTick)
 
-    const down = (e: PointerEvent) => onDown(ctx, state, e)
-    const move = (e: PointerEvent) => { lastMove = e; onPointerMove(ctx, state, e) }
+    // Where a pointer is over the figure, for the corner view buttons (#525).
+    const atButtons = (e: PointerEvent) => viewButtons?.pointer_(layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY), e.pointerType === "touch")
+    const down = (e: PointerEvent) => { if (e.pointerType === "touch") atButtons(e); onDown(ctx, state, e) }
+    const move = (e: PointerEvent) => { lastMove = e; if (e.pointerType !== "touch") atButtons(e); onPointerMove(ctx, state, e) }
     const releaseChrome = (kind: string | undefined) => {
         if ((kind === "roi" || kind === "threshold") && !state.drag_) flushPendingChrome()
     }
@@ -1225,7 +1235,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         onCancel(ctx, state, e)
         releaseChrome(kind)
     }
-    const leave = () => {
+    const leave = (e: PointerEvent) => {
+        if (e.pointerType !== "touch" && !viewButtons?.owns_(e.relatedTarget)) viewButtons?.pointer_(null, false)
         // onLeave nulls an uncaptured drag. Capture the kind first or the deferred
         // ROI/threshold frame stays pending with the old nodes still on screen.
         const kind = state.drag_?.kind
@@ -1341,6 +1352,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     surface.addEventListener("focusout", focusout)
     // After the surface in the shadow root, so Tab reaches the plot first, then each drag layer.
     dragStops = buildDragStops(ctx, state, shadow)
+    if (channel.alive()) viewButtons = buildViewButtons(ctx, state, shadow, () => {
+        const w = ctx.base_.getBoundingClientRect().width
+        return w > 0 ? ctx.manifest_.width / w : ctx.manifest_.scaling || 1
+    })
 
     // Drawn into g.sel, not g.hi: it must survive hovers (onMove clears g.hi on every miss)
     // and support multiple selected indices (drawHi keeps only the last).
@@ -1354,6 +1369,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         cleaned = true
         loadToken += 1
         controls.remove_()
+        viewButtons?.remove_()
         surface.removeEventListener("pointerdown", down)
         surface.removeEventListener("wheel", onWheel)
         surface.removeEventListener("pointermove", move)

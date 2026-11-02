@@ -4616,8 +4616,9 @@ describe("photographic pan / wheel zoom", () => {
         // ax3 has no transform: its canvases cover the whole image, unclipped
         expect(canvasT("ax3")).toBe("")
         expect(fade("ax3").style.clipPath).toBe("")
-        // every axis's g.sel paints below every axis's g.link, and that below every g.hi
-        for (const svg of shadow.querySelectorAll("svg")) {
+        // every axis's g.sel paints below every axis's g.link, and that below every g.hi, in
+        // each overlay svg (not a corner button's icon, #525)
+        for (const svg of shadow.querySelectorAll("svg.masque-fill, svg.masque-edge, svg.masque-plain")) {
             const order = [...svg.querySelectorAll("g.masque-photo > g.sel, g.masque-photo > g.link, g.masque-photo > g.hi")].map((el) => el.getAttribute("class"))
             expect(order).toEqual(["sel", "sel", "sel", "link", "link", "link", "hi", "hi", "hi"])
         }

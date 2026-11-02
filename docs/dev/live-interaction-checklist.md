@@ -127,6 +127,28 @@ edge midpoint (8 logical px × scaling, at least 6 image px) still resizes that 
 matching resize cursor. The ROI outline is 1px chrome unless an explicit `hoverstyle` stroke sets
 its own width and colour.
 
+View buttons (#525, look signed off 2026-11-02): each axis with a `ViewInteractable` gets zoom
+in, zoom out and reset in one joined box inside a corner of its viewport (`div.masque-vb`). The
+box takes the tooltip's background, border and shadow, radius `--masque-tip-radius` (4 px), with
+1 px dividers in the border colour; light or dark follows the figure background, like the
+tooltip. Buttons are 24 CSS px square with 14 px icons, stroke 1.75 in a 24-unit box, in the
+tooltip text colour; 44 px buttons with 24 px icons under `any-pointer: coarse`. Top to bottom:
+zoom in (+), zoom out (−), reset (a counter-clockwise arrow), and reset joins only once the view
+has moved. The box sits 8 px in from the corner, the same as `.masque-note`, preferring top
+right, then top left, then bottom right: the first one nothing covers, else the least covered.
+A legend or other box in `occluders` covers a corner, and so does any other axis or colorbar
+viewport overlapping this one, except one that holds this axis whole (an inset covers its
+parent's corner, not the other way round). Bottom left is never used: it holds the
+`.masque-note` stack. The stack may take at most half the axis's height; a shorter axis gets the
+same buttons in a row, at most half its width; on a coarse pointer 44 px is tried before 24 px;
+an axis too small for either gets none. Twin axes on one viewport share one box, driving the
+first view there (the one the wheel drives). On an `Axis3` the corner is the layout cell's, not
+the drawn cube's. Shown while the pointer is over the axis, while the view's keyboard stop has
+focus, and after a touch on the axis (`controls = :hover`); always (`:always`); never (`:none`);
+never once the gesture channel is dead (a static export). The box fades in and out over the
+tooltip's 80–120 ms, and reset fades in the same way when it joins; no pulse, no slide. A press
+never reaches the plot: no pick, no clear, no pan.
+
 These decisions are settled: cite the recipes above rather than re-litigating identity,
 wash vs ring, first-PR scope, or Pluto coupling.
 

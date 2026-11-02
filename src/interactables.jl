@@ -2046,7 +2046,7 @@ end
 
 # ============================ ViewInteractable =============================
 """
-    ViewInteractable(ax; id=:view)
+    ViewInteractable(ax; id=:view, controls=:hover)
 
 Drag-to-pan and wheel zoom (2D `Axis`), or drag-to-orbit, wheel zoom and Shift+drag pan
 (`Axis3`). Produces one `:view` [`HitLayer`](@ref)
@@ -2057,6 +2057,9 @@ drag on those wins without a modifier — **Shift+drag** forces the view gesture
 # Arguments
 - `ax` — a `Makie.Axis` (pan) or `Makie.Axis3` (orbit). `id` — the layer id, used to route
   gesture-channel frame requests back to this axis. Default `:view`.
+- `controls` — the zoom in, zoom out and reset buttons in a corner of the plot: `:hover`
+  (default) shows them while the pointer is over the plot, while the view has keyboard focus,
+  and after a touch on the plot; `:always` keeps them shown; `:none` leaves them out.
 
 **Commits nothing.** A camera is operational state, not an analysis value a notebook reads
 (docs/dev/architecture/12-gesture-channel.md §12.3) — the bond `masque` returns never carries a
@@ -2078,6 +2081,13 @@ limits come back automatic) and, on an `Axis3`, the azimuth and elevation. Axes 
 by `linkaxes!`, `linkxaxes!` or `linkyaxes!` go back with it. Re-running only the `masque`
 cell keeps that starting point, even though the axis still shows the moved view.
 
+**Buttons.** Zoom in and zoom out take the same step as `+` and `-`, about the middle of the
+plot; reset shows once the view has moved. They sit in the top-right corner, or the top-left
+or bottom-right one when a legend or another axis covers it, and never in the bottom-left
+one. On a plot too short for the stack they sit in a row, and on a plot too small for either
+they are left out (drag, the wheel, the keys and a double-click still work). Twin axes in
+one place share one set, which drives the first view there.
+
 `masque` raises `ArgumentError` at build time if `ax` is a `PolarAxis` (a polar pan or zoom
 moves r and θ limits, not Cartesian ones), a `Colorbar`'s value axis (no pan/orbit view applies), a categorical
 2D axis (pan needs numeric limits to shift), or (2D only) either scale isn't client-invertible
@@ -2090,9 +2100,19 @@ ViewInteractable(ax)
 ```
 """
 struct ViewInteractable <: AbstractInteractable
-    ax; id::Symbol
+    ax; id::Symbol; controls::Symbol
 end
-ViewInteractable(ax; id = :view) = ViewInteractable(ax, id)
+const _VIEW_CONTROLS = (:hover, :always, :none)
+function ViewInteractable(ax; id = :view, controls::Symbol = :hover)
+    controls in _VIEW_CONTROLS || throw(
+        ArgumentError(
+            "ViewInteractable: controls = :$(controls) is not one of :hover, :always or :none."
+        )
+    )
+    return ViewInteractable(ax, id, controls)
+end
+# The two-field form from before `controls` (0.4).
+ViewInteractable(ax, id::Symbol) = ViewInteractable(ax, id, :hover)
 events(::ViewInteractable) = (:drag,)
 function validate(i::ViewInteractable, ctx::InteractionContext)
     i.ax isa Makie.Legend && return "ViewInteractable: ax is a Legend, not an Axis/Axis3 — a legend has no pan/orbit view."
@@ -2181,6 +2201,8 @@ function hitlayers(i::ViewInteractable, ctx)
     )
     # Away from where it started (#524): a reset has somewhere to go. Left out at home.
     _view_moved(i.ax) && (geom["moved"] = true)
+    # The corner buttons (#525); left out for the default `:hover`, so manifests don't grow.
+    i.controls === :hover || (geom["controls"] = String(i.controls))
     if !t.is3d && i.ax isa Makie.Axis
         geom["clip"], geom["fill"] = _pan_window(ctx, i.ax)
         links = _pan_links(ctx, i.ax)

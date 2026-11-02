@@ -17,6 +17,9 @@ const S_MAX = 16
 
 export const WHEEL_IDLE_MS = 150
 
+// One wheel notch, in wheelScale's pixel units: the zoom step of `+`, `-` and the corner buttons.
+export const ZOOM_NOTCH = 100
+
 export function isIdentity(m: PhotoMatrix): boolean {
     return Math.abs(m.s - 1) < 1e-6 && Math.abs(m.tx) < 1e-3 && Math.abs(m.ty) < 1e-3
 }

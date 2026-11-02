@@ -30,12 +30,15 @@ export interface GestureChannel {
     // Stops delivering frames and drops anything queued — call from mount's own cleanup so a
     // response arriving after unmount never touches a dead DOM.
     dispose(): void
+    // False once nothing can answer: no kernel (a static export), or a round trip failed.
+    alive(): boolean
 }
 
 const noopChannel: GestureChannel = {
     request() {},
     settle: async () => {},
     dispose() {},
+    alive: () => false,
 }
 
 // §12.9's export backstop: `window.pluto_disable_ui` is set in exported HTML BEFORE any widget
@@ -138,5 +141,6 @@ export function createGestureChannel(
             latest = null
             pendingSettles.clear()
         },
+        alive: () => !disposed,
     }
 }

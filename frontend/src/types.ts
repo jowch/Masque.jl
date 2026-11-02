@@ -222,6 +222,8 @@ export interface ViewGeometry {
     // The view, or an axis linked to it, is away from where it started (#524), so a reset has
     // somewhere to go. Left out when it is at home.
     moved?: boolean
+    // The corner buttons (#525): `ViewInteractable(ax; controls)`. Left out for `:hover`, the default.
+    controls?: "always" | "none"
 }
 
 export type Limits3 = [number, number, number, number, number, number]
