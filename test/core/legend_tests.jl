@@ -484,4 +484,57 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         _, _, ctx = ctx_for(fig)
         @test !haskey(build_manifest(interactables(fig), ctx), "occluders")
     end
+
+    # An opaque `Box` Makie draws over an axis hides the marks under it like a legend does (#547).
+    @testset "a Box over the plot ships its box as an occluder" begin
+        built(; before = false, at = (0.03, 0.97), kw...) = begin
+            fig = Figure(size = (650, 450))
+            mk() = Box(
+                fig[1, 1]; width = 160, height = 70, halign = at[1], valign = at[2],
+                tellwidth = false, tellheight = false, kw...
+            )
+            b = before ? mk() : nothing
+            ax = Axis(fig[1, 1]); limits!(ax, 0, 10, 0, 10)
+            scatter!(ax, [1.5], [9]; markersize = 30, color = :red)
+            b = before ? b : mk()
+            Makie.update_state_before_display!(fig)
+            _, _, ctx = ctx_for(fig)
+            fig, ctx, b, build_manifest(interactables(fig), ctx)
+        end
+        fig, ctx, b, m = built(; color = :white, strokecolor = :red, strokewidth = 4)
+        box = only(m["occluders"])
+        s = ctx.scaling
+        @test box[3] ≈ (160 + 4) * s && box[4] ≈ (70 + 4) * s
+        img = Makie.colorbuffer(fig; px_per_unit = s)
+        px(x, y) = Makie.RGB(img[round(Int, y) + 1, round(Int, x) + 1])
+        red(c) = c.r > 0.8 && c.g < 0.4 && c.b < 0.4
+        # the mark under the middle is hidden, and the stroke Makie drew is inside the box
+        mid = px(box[1] + box[3] / 2, box[2] + box[4] / 2)
+        @test mid.r > 0.95 && mid.g > 0.95 && mid.b > 0.95
+        @test red(px(box[1] + s, box[2] + box[4] / 2)) && red(px(box[1] + box[3] - s, box[2] + box[4] / 2))
+        @test !red(px(box[1] - 2, box[2] + box[4] / 2))
+
+        # the default fill is opaque grey
+        @test haskey(built()[4], "occluders")
+        # what is under it shows through: no box
+        @test !haskey(built(; color = (:white, 0.3))[4], "occluders")
+        @test !haskey(built(; color = :white, visible = false)[4], "occluders")
+        # one made before the axis sits under the axis's background, so the mark shows
+        fig, ctx, _, m = built(; before = true, color = :white)
+        @test !haskey(m, "occluders")
+        pt = ctx.project(only(filter(x -> x isa Axis, fig.content)), Point2f(1.5, 9))
+        @test red(Makie.RGB(Makie.colorbuffer(fig; px_per_unit = ctx.scaling)[round(Int, pt[2]) + 1, round(Int, pt[1]) + 1]))
+
+        # `z` outranks the order: above the plots (0) it covers them, below it they show
+        @test haskey(built(; before = true, color = :white, z = 1)[4], "occluders")
+        @test !haskey(built(; color = :white, z = -1)[4], "occluders")
+
+        # a Box beside the axes covers none of them
+        fig = Figure(size = (600, 400)); ax = Axis(fig[1, 1])
+        scatter!(ax, 1:10, 1:10)
+        Box(fig[1, 2]; color = :white)
+        Makie.update_state_before_display!(fig)
+        _, _, ctx = ctx_for(fig)
+        @test !haskey(build_manifest(interactables(fig), ctx), "occluders")
+    end
 end

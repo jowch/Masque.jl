@@ -209,7 +209,7 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `clip` (in `geometry`) | each `:surface` layer on a `PolarAxis` (#514) | 42 B for the annulus (4 floats), 60 B on a sector (6), measured at `0c23602` on a 50×50 polar surface; the rest of the layer is the Section J surface |
 | `is3d`, `valueaxis` | each axis transform | 6 B and 11 B |
 | `selects` | each selector ROI layer | one short string |
-| `occluders` | once per manifest, only when an opaque legend overlaps an axis (0.4.3) | key 10 B + 4 numbers (~37 B) per such legend; absent otherwise |
+| `occluders` | once per manifest, only when an opaque legend (0.4.3) or `Box` (0.5.0) overlaps an axis | key 10 B + 4 numbers (~37 B) per such box; absent otherwise |
 | `fields`, `initial` | once per manifest (#335) | ~10–20 B per field: its id twice, plus its start (`null` for a pick; a box's four bounds) |
 | `brush` | the target of a `selects` box | ~15 B |
 | `many` | each `select = :many` layer (#335) | 13 B (`payload_envelope.jl` §K) |

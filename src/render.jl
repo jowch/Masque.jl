@@ -605,16 +605,29 @@ function build_manifest(
             fill == m["background"] || (t["fill"] = fill)
         end
     end
-    # The boxes Makie draws over the axes' plots (an opaque legend over an axis): the overlay
-    # draws no data mark's highlight or fade inside them (#437), and a data mark takes no
-    # pointer there (#472).
-    plots = [ctx.transforms[id].viewport for (blk, id) in ctx.ids if blk isa _SUPPORTED_AXES]
+    # The boxes Makie draws over the axes' plots (an opaque legend or `Box` over an axis): the
+    # overlay draws no data mark's highlight or fade inside them (#437), and a data mark takes
+    # no pointer there (#472, #547).
+    axes = [(blk, ctx.transforms[id].viewport) for (blk, id) in ctx.ids if blk isa _SUPPORTED_AXES]
     meets((x, y, w, h), (vx, vy, vw, vh)) = x < vx + vw && vx < x + w && y < vy + vh && vy < y + h
     occluders = Vector{Float64}[]
     for (blk, _) in ctx.ids
         blk isa Makie.Legend || continue
         box = _legend_occluder(blk, ctx.scaling, ctx.height)
-        box === nothing || any(v -> meets(box, v), plots) && push!(occluders, box)
+        box === nothing || any(a -> meets(box, a[2]), axes) && push!(occluders, box)
+    end
+    fig = isempty(axes) ? nothing : first(axes)[1].parent
+    if fig isa Makie.Figure
+        for blk in fig.content
+            blk isa Makie.Box || continue
+            box = _box_occluder(blk, ctx.scaling, ctx.height)
+            box === nothing && continue
+            # Makie draws a Box over an axis's plots when its `z` is above theirs (0), or level
+            # with it and the Box was made after the axis; otherwise the plots show on top (#547).
+            z = blk.z[]
+            over(ax) = z > 0 || (z == 0 && _drawn_after(fig, blk, ax))
+            any(((ax, v),) -> meets(box, v) && over(ax), axes) && push!(occluders, box)
+        end
     end
     isempty(occluders) || (m["occluders"] = sort!(occluders))
     if owners_out !== nothing

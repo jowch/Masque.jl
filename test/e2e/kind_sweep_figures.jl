@@ -1051,6 +1051,24 @@ function build_kind_sweep()
         )
     end
 
+    # A `Box` over marks (#547): Makie draws the opaque top-left box over hid 0 and hid 1, and
+    # the top-right one (made before the axis, but `z = 1`) over hid 5, so the pointer there
+    # finds the box, not the points. The bottom-left box was made before the axis and the
+    # bottom-right one has `z = -1`, so the plot draws over both: hid 2 and hid 3 show and take
+    # the pointer, and two occluders ship. hid 4 is in the open. Not in kind_sweep_meta();
+    # polish_verify.mjs checks it.
+    box_hidden = let
+        fig = Figure(size = (480, 260))
+        boxed(h, v; kw...) = Box(fig[1, 1]; width = 70, height = 50, halign = h, valign = v, color = :white, tellwidth = false, tellheight = false, kw...)
+        boxed(0.03, 0.03)
+        boxed(0.97, 0.97; z = 1)
+        ax = Axis(fig[1, 1]; title = "box-hidden", limits = (0, 10, 0, 10))
+        hid = scatter!(ax, [0.8, 1.6, 1.0, 9.0, 5.0, 9.0], [9.0, 8.3, 1.2, 1.2, 5.0, 8.8]; color = :orange, markersize = 18)
+        boxed(0.02, 0.98; width = 110, height = 70)
+        boxed(0.97, 0.03; z = -1)
+        masque(fig, interactables(hid; id = :hid); auto = false)
+    end
+
     # A plot drawn with `visible = false` (#484): picking a legend entry fades the shown lines and
     # leaves the hidden line's path alone, so the gridlines under it stay whole. The legend
     # sits beside the axis, off every line. Not in kind_sweep_meta(); polish_verify.mjs checks it.
@@ -1874,7 +1892,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
+        polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, box_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )

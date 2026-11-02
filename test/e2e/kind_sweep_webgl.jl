@@ -244,6 +244,16 @@ HTML(
         "<span id=\"occluders_legend_hidden\" style=\"display:none\">$(JSON3.write(get(sweep.legend_hidden.manifest, "occluders", [])))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-00000000019a
+@bind ev_box_hidden sweep.box_hidden
+
+# ╔═╡ d1000000-0000-0000-0000-00000000019b
+HTML(
+    "<span id=\"out_box_hidden\">BOX_HIDDEN=$(sweep_field("box_hidden", ev_box_hidden))</span>" *
+        "<span id=\"coords_box_hidden\" style=\"display:none\">$(JSON3.write(sweep.box_hidden.manifest["layers"]))</span>" *
+        "<span id=\"occluders_box_hidden\" style=\"display:none\">$(JSON3.write(get(sweep.box_hidden.manifest, "occluders", [])))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-0000000000e9
 @bind ev_hidden_plot sweep.hidden_plot
 
@@ -1016,6 +1026,8 @@ HTML(
 # ╟─d1000000-0000-0000-0000-0000000000e6
 # ╠═d1000000-0000-0000-0000-0000000000e7
 # ╟─d1000000-0000-0000-0000-0000000000e8
+# ╠═d1000000-0000-0000-0000-00000000019a
+# ╟─d1000000-0000-0000-0000-00000000019b
 # ╠═d1000000-0000-0000-0000-0000000000e9
 # ╟─d1000000-0000-0000-0000-0000000000ea
 # ╠═d1000000-0000-0000-0000-000000000182

@@ -27,6 +27,11 @@ All notable changes to this project are documented here. The format is based on
   `pick.y` and `pick.z` hold it. `selected=` indices on such a line name points too. To
   upgrade, code that read `pick.index` as the line now reads `pick.line` (#518).
 
+### Fixed
+- An opaque `Box` drawn over an axis hides the marks under it from the pointer too, as a
+  legend does: hovering or clicking the box no longer shows a tooltip or ring for a mark you
+  can't see (#547).
+
 ## [0.4.5] - 2026-11-02
 
 ### Added

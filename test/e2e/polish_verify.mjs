@@ -718,6 +718,39 @@ try {
     passed.push(`${key}/control-ring-visible`);
   }
 
+  // A `Box` over marks (#547): the boxes Makie draws over hid 0 and 1 (made after the axis) and
+  // hid 5 (made before it, `z = 1`) are the two occluders, and the pointer there shows no
+  // tooltip or ring. The plot draws over the box made before the axis and the one with
+  // `z = -1`, so hid 2 and hid 3 show on screen and take the pointer, as does hid 4 in the open.
+  {
+    const key = "box_hidden";
+    const boxes = await page.evaluate((k) => JSON.parse(document.querySelector(`#occluders_${k}`).innerText), key);
+    if (boxes.length !== 2) throw new Error(`${key}: want two occluders, got ${JSON.stringify(boxes)}`);
+    const hid = (await layersOf(key)).find((l) => l.id === "hid").geometry;
+    const at = (k) => [hid[3 * k], hid[3 * k + 1]];
+    const ringOf = (h) => [h.hi.fill, h.hi.edge, h.hi.plain].some((c) => c && !/masque-leave/.test(c.className ?? ""));
+    const away = async () => { await hoverAt(key, 2, 2); await page.waitForTimeout(600); };
+    await away();
+    const rest = await screenOf(key);
+    const orange = (k) => { const [r, g, b] = rest.mean(...at(k), 2); return r > 200 && g > 100 && g < 200 && b < 80; };
+    for (const k of [0, 1, 5]) {
+      const [x, y] = at(k);
+      if (!boxes.some(([bx, by, bw, bh]) => x > bx && x < bx + bw && y > by && y < by + bh)) throw new Error(`${key}: hid ${k} at ${[x, y]} is under no occluder ${JSON.stringify(boxes)}`);
+      if (orange(k)) throw new Error(`${key}: hid ${k} shows through the box on screen (${rest.mean(...at(k), 2)})`);
+      await away();
+      const h = await hoverAt(key, x, y);
+      if (h.show || ringOf(h)) throw new Error(`${key}/hover: the pointer reached hid ${k} through the box (tip ${JSON.stringify(h.text)})`);
+    }
+    for (const k of [2, 3, 4]) {
+      if (!orange(k)) throw new Error(`${key}: hid ${k} is not drawn over its box on screen (${rest.mean(...at(k), 2)})`);
+      await away();
+      const h = await hoverAt(key, ...at(k));
+      if (!h.show || !ringOf(h)) throw new Error(`${key}/control: no tooltip or ring for hid ${k}, which shows (tip ${JSON.stringify(h.text)})`);
+    }
+    await away();
+    passed.push(`${key}/no-hover-through-box`);
+  }
+
   // A plot drawn with `visible = false` (#484): picking legend entry "a" fades line c and leaves
   // the hidden line b's path alone, so the gridlines under it stay whole; hovering b's path
   // shows nothing.

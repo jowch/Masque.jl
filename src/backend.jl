@@ -437,3 +437,32 @@ function _legend_occluder(leg, scaling, out_h)
     (w > 0 && h > 0) || return nothing
     return [x0 * scaling, out_h - (y0 + h) * scaling, w * scaling, h * scaling]
 end
+
+# The image-px box [x, y, w, h] a `Box` block paints, or `nothing` when what is under it shows
+# through: hidden, or a fill less than half opaque (#547). Makie fills the block's bbox and
+# centres a visible stroke on its edge. A rounded corner leaves a sliver of the plot showing,
+# too small to point at, so the box stays square.
+function _box_occluder(box, scaling, out_h)
+    box.visible[] || return nothing
+    a = try
+        Makie.alpha(Makie.to_color(box.color[]))
+    catch
+        return nothing   # a pattern or other non-colour fill: leave the marks under it alone
+    end
+    a >= 0.5 || return nothing
+    bb = box.layoutobservables.computedbbox[]
+    half = box.strokevisible[] ? box.strokewidth[] / 2 : 0.0
+    x0, y0 = bb.origin[1] - half, bb.origin[2] - half
+    w, h = bb.widths[1] + 2half, bb.widths[2] + 2half
+    (w > 0 && h > 0) || return nothing
+    return [x0 * scaling, out_h - (y0 + h) * scaling, w * scaling, h * scaling]
+end
+
+# Whether block `top` was made after block `under`: each block's scene hangs off the figure's
+# scene in the order the blocks were made, and Makie draws plots level in `z` in that order.
+function _drawn_after(fig, top, under)
+    kids = fig.scene.children
+    i = findfirst(s -> s === top.blockscene, kids)
+    j = findfirst(s -> s === under.blockscene, kids)
+    return i !== nothing && j !== nothing && i > j
+end
