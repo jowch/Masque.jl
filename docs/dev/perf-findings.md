@@ -63,6 +63,10 @@ Measured by `bench/payload_envelope.jl` on CairoMakie 0.15, Julia 1.12, default 
 (`px_per_unit` 2); sizes re-confirmed byte-for-byte on 2026-09-20. PNG is the decoded size,
 manifest the MsgPack size.
 
+Re-run on 2026-11-02 for the `:span` layer (`SpanInteractable`, #500, on top of `20f6849`):
+every row below came out the same. A span is constant-size: on a 10-point scatter it adds
+193 B to the manifest (820 → 1 013 B), the layer plus its starting field.
+
 | Plot | PNG | manifest | note |
 |------|----:|---------:|------|
 | line, 10 pts | 51 KB | 0.6 KB | ~50 KB antialiasing and text floor for any plot |
