@@ -423,6 +423,8 @@ kind_sweep_meta() = [
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "span",
         "start" => [3.0, 6.0], "markInside" => "scatter",
+        # The drag readout prints both edges in the axis's format (#543).
+        "dragReadout" => raw"^\[\d+\.\d s, \d+\.\d s\]$",
     ),
     Dict(
         # A band of a vertical colorbar (#500): the colorbar's own readout still answers inside it.
@@ -1484,7 +1486,7 @@ function build_kind_sweep()
 
     span_axis = let
         fig = Figure(size = (480, 260))
-        ax = Axis(fig[1, 1]; title = "span on an axis", limits = (0, 10, 0, 10))
+        ax = Axis(fig[1, 1]; title = "span on an axis", limits = (0, 10, 0, 10), xtickformat = "{:.1f} s")
         scatter!(ax, [1.0, 4.5, 8.0], [5.0, 5.0, 5.0]; markersize = 16)
         masque(fig, SpanInteractable(ax; span = (3.0, 6.0)))
     end

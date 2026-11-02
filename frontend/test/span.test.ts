@@ -3,6 +3,8 @@ import { afterEach, describe, it, expect } from "vitest"
 import { mount as mountOverlay } from "../src/overlay"
 import { hitLayer } from "../src/geometry"
 import { GRIP_LONG_CSS, GRIP_THICK_CSS } from "../src/drag/span"
+import * as spanDrag from "../src/drag/span"
+import type { Drag, SpanBand } from "../src/state"
 import type { AxisTransform, HitLayer, Manifest, SpanGeometry } from "../src/types"
 import { withFields } from "./fields"
 
@@ -291,5 +293,25 @@ describe("span keyboard", () => {
         expect(last(inputs).payload.lo).toBeCloseTo(0)
         key(el, "ArrowUp") // not this band's axis: consumed, nothing moves
         expect(last(inputs).payload.lo).toBeCloseTo(0)
+    })
+})
+
+describe("the drag readout (#543)", () => {
+    const band = (orientation: "h" | "v", t: AxisTransform): SpanBand => {
+        const r = () => document.createElementNS("http://www.w3.org/2000/svg", "rect")
+        const l = () => document.createElementNS("http://www.w3.org/2000/svg", "line")
+        const g: SpanGeometry = orientation === "v" ? { orientation, lo: 360, hi: 720, span: [0, 800] } : { orientation, lo: 600, hi: 400, span: [0, 1200] }
+        return { g_: g, t_: t, dims_: [r(), r()], lines_: [l(), l()], grips_: [r(), r()], k_: 2 }
+    }
+    const dragOf = (b: SpanBand, at: number) => spanDrag.begin("span", b, { edge: "lo" }, at, 1) as Extract<Drag, { kind: "span" }>
+    it("prints both edges in the format of the axis the band runs along", () => {
+        const t = { ...ax1, xfmt: { suffix: " s", spec: ".1f" }, yfmt: { suffix: " mV", spec: ".0f" } } as AxisTransform
+        expect(spanDrag.move(dragOf(band("v", t), 360), { x: 420, y: 0 }, 4)).toBe("[3.5 s, 6.0 s]")
+        expect(spanDrag.move(dragOf(band("h", t), 600), { x: 0, y: 640 }, 4)).toBe("[20 mV, 50 mV]")
+    })
+    it("keeps plain numbers on an axis with no format, and leaves out a polar label", () => {
+        expect(spanDrag.move(dragOf(band("v", ax1), 360), { x: 420, y: 0 }, 4)).toBe("[3.500, 6.000]")
+        const polar = { ...ax1, xfmt: { label: "θ" } } as AxisTransform
+        expect(spanDrag.move(dragOf(band("v", polar), 360), { x: 420, y: 0 }, 4)).toBe("[3.500, 6.000]")
     })
 })

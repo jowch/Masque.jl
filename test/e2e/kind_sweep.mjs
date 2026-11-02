@@ -923,6 +923,19 @@ try {
       if (!near(v.hi, hi0)) throw new Error(`${key}/edge: hi moved from ${hi0} to ${v.hi}`);
       passed.push(`${key}/edge-drag`);
 
+      // Mid-drag, the readout prints both edges the way the axis labels them (#543).
+      if (spec.dragReadout) {
+        [pLo, pHi] = await edges();
+        const back = -out1;
+        await dispatchAt(key, ...at(pLo), "pointerdown");
+        const mid = await dispatchAt(key, ...at(pLo + 10 * back), "pointermove");
+        await dispatchAt(key, ...at(pLo + 10 * back), "pointerup");
+        if (!mid?.show || !new RegExp(spec.dragReadout).test(mid.text ?? "")) throw new Error(`${key}/readout: mid-drag readout ${JSON.stringify(mid?.text)}, want ${spec.dragReadout}`);
+        out = await waitChange(`#out_${key}`, out, `${key}/readout`);
+        passed.push(`${key}/readout`);
+        console.error(`OK  ${key}/readout — ${mid.text}`);
+      }
+
       // Inside, off any mark: 20 px toward the hi edge moves both edges by 20.
       [pLo, pHi] = await edges();
       // The middle of the band, a quarter of the way across, clear of the edges and the marks.

@@ -222,10 +222,10 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                 if (a === b && e.shiftKey) return true
                 const edge = far === g.lo ? "lo" : "hi"
                 d = spanDrag.begin(id, band, { edge }, 0, -1) as typeof d
-                text = spanDrag.move(d, at(far + (e.shiftKey ? -dp : dp)), ctx.tipDigits_)
+                text = spanDrag.move(d, at(far + (e.shiftKey ? -dp : dp)), ctx.tipDigits_, ctx.tipExplicit_)
             } else {
                 d = spanDrag.begin(id, band, { move: true }, 0, -1) as typeof d
-                text = spanDrag.move(d, at(dp), ctx.tipDigits_)
+                text = spanDrag.move(d, at(dp), ctx.tipDigits_, ctx.tipExplicit_)
             }
             place()
             showReadout(text)

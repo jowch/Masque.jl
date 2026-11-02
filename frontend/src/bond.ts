@@ -112,7 +112,7 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
         text = thresholdDrag.move(d, content, ctx.tipDigits_, ctx.tipExplicit_)
         if (liveDrag(ctx, d.id_)) requestState(ctx, { [d.id_]: thresholdDrag.envelopeAt(d, content) })
     } else if (d.kind === "span") {
-        text = spanDrag.move(d, content, ctx.tipDigits_)
+        text = spanDrag.move(d, content, ctx.tipDigits_, ctx.tipExplicit_)
         if (liveDrag(ctx, d.id_)) requestState(ctx, { [d.id_]: spanDrag.envelope(d) })
     } else if (d.kind === "view") {
         if (d.g_.mode === "orbit") {

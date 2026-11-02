@@ -84,8 +84,8 @@ a `PolarAxis`, a point at `(π/2, 2)` shows `θ 90°` and `r 2`. On an axis
 with `ytickformat = "{:.1f} mV"`, `y` shows `3.5 mV`, rounded as the
 format says. The same goes for `MultiplesTicks(4, π, "π")`, which shows
 `1.5π`, and for the readouts of an [`AxisInteractable`](@ref), a
-[`ColorbarInteractable`](@ref), a slice, a dragged threshold, an ROI
-box and a view's limits, and for what the keyboard announces. This
+[`ColorbarInteractable`](@ref), a slice, a dragged threshold or band, an
+ROI box and a view's limits, and for what the keyboard announces. This
 covers the `x`, `y` and `z` Masque fills in itself, next to your own
 `payloads` fields too: a point's, a text label's and an arrow's
 position, a line's nearest sample, and a surface point. A bar's `low`,
