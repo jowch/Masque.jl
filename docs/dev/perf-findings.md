@@ -18,6 +18,8 @@ julia --project="$ENV_DIR" bench/gesture_channel_webgl.jl   # :webgl gesture fra
 JULIA_NOSYSIMAGE=1 julia --project="$ENV_DIR" bench/view_warmup.jl          # :cairo warmup
 JULIA_NOSYSIMAGE=1 julia --project="$ENV_DIR" bench/view_warmup.jl webgl    # :webgl warmup
 julia --project="$ENV_DIR" bench/webgl_payload_size.jl      # :webgl envelope
+julia --project="$ENV_DIR" bench/webgl_density/pages.jl /tmp/wd   # :webgl canvas density pages
+node bench/webgl_density/canvas.mjs /tmp/wd                    # … and their frame times
 julia --project="$ENV_DIR" bench/vs_cairo.jl                # cross-backend head-to-head
 julia bench/encoding_experiment.jl                          # own temp env (MsgPack.jl)
 (cd frontend && npm run bench)                              # JS hit-test microbenchmark
@@ -621,6 +623,29 @@ gzip of JSON through the browser's `DecompressionStream` lands at about the same
 source and glyph-atlas tiles repeat across scenes and could be shared like the bundle; the shaders
 are the larger share. Revisit only if per-frame scene re-shipping shows up as the bottleneck;
 every `:webgl` view-gesture frame re-ships the full scene (#86, closed not planned).
+
+### Canvas density (#548)
+
+Measured 2026-11-02 on the #548 branch, WGLMakie 0.13.15, Julia 1.13, headless Chromium on
+SwiftShader at device pixel ratio 2, one widget per page. Before #548 the `:webgl` canvas was
+always twice the figure's width; now it follows `max_width` as the `:cairo` PNG does. **frame**
+is one draw of the whole scene, the median over three loads of 4 s each, timed around WGLMakie's
+own render loop with a 1-pixel read-back so the software GPU has finished; **packed** is the
+scene as Pluto packs it.
+Reproduce with `bench/webgl_density/pages.jl` then `canvas.mjs` (usage at their tops).
+
+| figure | `max_width` | canvas before → after | frame before → after | packed before → after |
+|---|---:|---|---:|---:|
+| 1600×450 `Axis`, line + 20 markers + text | 700 | 3200×900 → 1400×394 | 99 → **33 ms** | 658.5 → 658.5 KB |
+| 1600×450 `Axis3`, helix + 12 markers | 700 | 3200×900 → 1400×394 | 51 → **23 ms** | 490.3 → 490.3 KB |
+| 800×600 `Axis`, line + 10 markers | 300 | 1600×1200 → 600×450 | 70 → **17 ms** | 526.0 → 526.0 KB |
+
+The scene is resolution-free (`render` serializes geometry; the browser sizes the framebuffer
+from `pxPerUnit`), so the payload is the same at any density; the frame and the canvas's GPU
+memory are what move. Frames got 2–4× cheaper, less than the 5–7× drop in pixels, since part of
+each draw does not scale with the canvas. First draw
+(page load to scene mounted) stayed at 0.4–0.6 s either way. Figures no wider than `max_width`
+keep the same canvas as before.
 
 ### Outside Pluto
 

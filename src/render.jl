@@ -799,9 +799,9 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   `CairoMakie` / `WGLMakie` is loaded, `:cairo` if both. Raises `ArgumentError` if neither is
   loaded, if the named backend's package is not loaded, or for an unknown name.
 - `max_width` — the widest the plot shows on the page, in CSS px (Pluto's column). Default `700`.
-- `px_per_unit` — image pixels per figure unit, on either backend. Default `nothing`: on
-  `:cairo`, `2 * min(figure width, max_width) / figure width`, so the PNG is twice the width it
-  shows at; on `:webgl`, `2`. A larger number gives a sharper, heavier picture. Neither this
+- `px_per_unit` — image pixels per figure unit, on either backend. Default `nothing`:
+  `2 * min(figure width, max_width) / figure width`, so the picture is twice the width it
+  shows at. A larger number gives a sharper, heavier picture. Neither this
   nor `max_width` follows `CairoMakie.activate!` or `WGLMakie.activate!`.
 - `tooltip_sigdigits` — significant figures for a tooltip number that has no format spec.
   Unset, it is 4, so `0.30000000000000004` shows as `0.3` and `2.71828` as `2.718`;
@@ -1337,14 +1337,15 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
 end
 
 function _render_gesture_frame(input, backend, fig, interactables, ppu, max_width; owners_out = nothing)
-    # Frame resolution drops to 1x for every in-drag frame and restores to the mount ppu on
-    # release ("settle", the frontend's terminal request) — the MANIFEST always stays in the
-    # mount ppu's coordinate space below, so image-px geometry (viewBox, hit regions) never
-    # moves out from under the overlay; only the PNG's own pixel density changes (the <img>
-    # is width:100% CSS-scaled — see frontend-delivery.md — so that's decoupled from its
-    # intrinsic size). A figure `resize!`d after display changes the manifest's width and
-    # height, at the same scale, and the frontend resizes the overlay to match (#546).
-    render_ppu = get(input, "settle", false) === true ? ppu : 1.0
+    # Frame resolution drops to 1x (or the mount ppu, if lower) for every in-drag frame and
+    # restores to the mount ppu on release ("settle", the frontend's terminal request) — the
+    # MANIFEST always stays in the mount ppu's coordinate space below, so image-px geometry
+    # (viewBox, hit regions) never moves out from under the overlay; only the PNG's own pixel
+    # density changes (the <img> is width:100% CSS-scaled — see frontend-delivery.md — so
+    # that's decoupled from its intrinsic size). A figure `resize!`d after display changes the
+    # manifest's width and height, at the same scale, and the frontend resizes the overlay to
+    # match (#546).
+    render_ppu = get(input, "settle", false) === true ? ppu : min(ppu, 1.0)
     bg0 = fig.scene.backgroundcolor[]
     try
         # Same forcing masque() does around its own render — that guard is restored in ITS

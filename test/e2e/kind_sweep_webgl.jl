@@ -61,6 +61,16 @@ HTML(
         "<span id=\"coords_scatter\" style=\"display:none\">$(JSON3.write(sweep.scatter.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-00000000a548
+@bind ev_scatter_low sweep.scatter_low
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a549
+HTML(
+    "<span id=\"out_scatter_low\">SCATTER_LOW=$(sweep_field("scatter_low", ev_scatter_low))</span>" *
+        "<span id=\"bond_scatter_low\" style=\"display:none\">$(repr(ev_scatter_low))</span>" *
+        "<span id=\"coords_scatter_low\" style=\"display:none\">$(JSON3.write(sweep.scatter_low.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000012
 @bind ev_lines sweep.lines
 
@@ -392,6 +402,16 @@ HTML(
     "<span id=\"out_surface3d\">SURFACE3D=$(sweep_field("surface3d", ev_surface3d))</span>" *
         "<span id=\"bond_surface3d\" style=\"display:none\">$(repr(ev_surface3d))</span>" *
         "<span id=\"coords_surface3d\" style=\"display:none\">$(JSON3.write(sweep.surface3d.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a550
+@bind ev_surface3d_low sweep.surface3d_low
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a551
+HTML(
+    "<span id=\"out_surface3d_low\">SURFACE3D_LOW=$(sweep_field("surface3d_low", ev_surface3d_low))</span>" *
+        "<span id=\"bond_surface3d_low\" style=\"display:none\">$(repr(ev_surface3d_low))</span>" *
+        "<span id=\"coords_surface3d_low\" style=\"display:none\">$(JSON3.write(sweep.surface3d_low.manifest["layers"]))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000200
@@ -1074,6 +1094,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000004
 # ╠═d1000000-0000-0000-0000-000000000010
 # ╠═d1000000-0000-0000-0000-000000000011
+# ╠═d1000000-0000-0000-0000-00000000a548
+# ╠═d1000000-0000-0000-0000-00000000a549
 # ╠═d1000000-0000-0000-0000-000000000012
 # ╠═d1000000-0000-0000-0000-000000000013
 # ╠═d1000000-0000-0000-0000-000000000045
@@ -1140,6 +1162,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-00000000010a
 # ╠═d1000000-0000-0000-0000-000000000123
 # ╠═d1000000-0000-0000-0000-000000000124
+# ╠═d1000000-0000-0000-0000-00000000a550
+# ╠═d1000000-0000-0000-0000-00000000a551
 # ╠═d1000000-0000-0000-0000-000000000200
 # ╠═d1000000-0000-0000-0000-000000000201
 # ╠═d1000000-0000-0000-0000-000000000188
