@@ -83,7 +83,8 @@ mark can be blocked by a farther one created after it.
 - The keyboard does not reach heatmap or image cells. See
   [Keyboard and screen readers](@ref accessibility-limitations).
 - Some plot types are skipped on `Axis3` and `PolarAxis`, a `surface!`
-  does not respond to the pointer, and `LScene` is not supported.
+  on a 2D `Axis` does not respond to the pointer, and `LScene` is not
+  supported.
   [Supported plots and axes](@ref) has the full list.
 
 If something behaves differently from what this page describes, see

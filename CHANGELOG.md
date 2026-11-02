@@ -15,6 +15,10 @@ All notable changes to this project are documented here. The format is based on
   pointer, as a line on a 2D `Axis` does, and a tooltip template can name `z`. This covers
   `lines!`, `scatterlines!`'s line, `contour3d!` and a 3D `streamplot!`. A click still picks
   the whole line (#502).
+- A `surface!` on a `PolarAxis`, which is how Makie draws a polar heatmap, responds to hover
+  and click like a surface on an `Axis3`: the tooltip shows the point nearest the pointer, and
+  a click gives a `GridCellEvent` with its `(i, j)`. Before, `masque` skipped it with a
+  warning (#514).
 
 ## [0.4.4] - 2026-11-01
 

@@ -52,6 +52,10 @@ export interface SurfaceGeometry {
     y: number[]     // data y: length nj or ni*nj
     z: number[]     // ni*nj
     value?: number[] // ni*nj, the colour matrix when it is separate from z
+    // PolarAxis only: the shown region, image px. [cx, cy, rin, rout] is the annulus around the
+    // polar origin; a sector adds [phi0, span], the counterclockwise screen angle of its first
+    // edge and its signed width. The axis masks the rest, so it is not hit.
+    clip?: number[]
 }
 
 export interface ThresholdGeometry {
