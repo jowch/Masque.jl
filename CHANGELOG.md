@@ -36,6 +36,11 @@ All notable changes to this project are documented here. The format is based on
   and each edge has a grip. Its field is a `SpanEvent` with `lo` and `hi`. Points, lines, bars
   and shapes inside the band still answer hover and click; a heatmap or image inside it
   answers hover, and a press on it moves the band (#500).
+- On a touch screen, a tap on a mark shows its tooltip as well as picking it, and the tooltip
+  stays up after the finger lifts, until the next tap, Escape, or a scroll that moves the plot.
+  A tap on an axis readout or a colorbar shows the value there. Press and hold, then slide, to
+  follow a readout or a line with your finger while the page stays still. A mouse works as
+  before (#529).
 - On a touch screen a finger picks the nearest point or line within 16 pixels of it, instead
   of only the mark under it, so a small marker or a thin line is easy to tap. Bars, polygons
   and heatmap cells still take a tap inside them. `masque(fig; touch = (; radius = 8))` sets

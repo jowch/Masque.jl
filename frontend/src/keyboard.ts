@@ -74,6 +74,7 @@ export function focusTo(ctx: OverlayCtx, state: OverlayState, i: number | null):
     const n = ctx.focusable_.length
     if (i === null || n === 0) {
         state.focusIdx_ = null
+        state.touch_.pin_ = null // Escape or focus leaving the plot takes down a tap's tooltip
         state.focusHit_ = null
         state.focusTipHtml_ = null
         state.focusTipCss_ = null
