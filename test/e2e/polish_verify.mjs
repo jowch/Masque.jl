@@ -1804,6 +1804,11 @@ try {
         btn: [plus.getBoundingClientRect().width, plus.getBoundingClientRect().height], icon: svg.getBoundingClientRect().width,
         stroke: svg.getAttribute("stroke-width"), divider: getComputedStyle(box.querySelector(".masque-vb-out")).borderTopColor,
         reset: getComputedStyle(box.querySelector(".masque-vb-reset")).display,
+        // Each shown button's icon sits in its own button's middle, not stacked in the first.
+        centred: [...box.querySelectorAll("button")].filter((b) => getComputedStyle(b).display !== "none").every((b) => {
+          const a = b.getBoundingClientRect(), i = b.querySelector("svg").getBoundingClientRect();
+          return Math.abs(a.x + a.width / 2 - (i.x + i.width / 2)) <= 1 && Math.abs(a.y + a.height / 2 - (i.y + i.height / 2)) <= 1;
+        }),
         rect: { x: r.left, y: r.top, w: r.width, h: r.height },
       };
       }, key);
@@ -1818,6 +1823,7 @@ try {
     if (st.btn[0] !== 24 || st.btn[1] !== 24 || st.icon !== 14 || st.stroke !== "1.75") fail("button, icon or stroke size is off");
     if (!/opacity 0\.1s/.test(st.transition)) fail("the box does not fade over the tooltip's 100 ms");
     if (st.reset !== "none") fail("reset shows before the view has moved");
+    if (!st.centred) fail("an icon is not in the middle of its button");
     // 0..1 lightness: the L of an lch() colour, else the luminance of an rgb() one.
     const lum = (c) => { const v = c.match(/[\d.]+/g).map(Number); return c.startsWith("lch") ? v[0] / 100 : (0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]) / 255; };
     if (dark ? !(lum(st.bg) < 0.3) : !(lum(st.bg) > 0.8)) fail(`a ${dark ? "dark" : "light"} figure's box is not ${dark ? "dark" : "light"}`);

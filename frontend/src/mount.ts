@@ -110,7 +110,7 @@ const STYLE = `
   .surface:focus-visible:not(.kbd-ring) { outline-color: Highlight; }
   .drag-stop:focus-visible { outline-color: Highlight; }
 }
-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+svg.masque-fill, svg.masque-edge, svg.masque-plain { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
        clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .masque-enter { animation: masque-in ${MOTION_MS}ms ease-out; }
