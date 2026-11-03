@@ -1422,7 +1422,7 @@ end
         ph = PolygonInteractable(ah, ah.scene.plots[1]; id = :violin)
         @test [pl.y for pl in ph.payloads] == [1.0, 2.0, 3.0]
         @test all(pl -> !haskey(pl, :x), ph.payloads)
-        @test Masque._coord_keys(ph.payloads) == [:y]   # follows the y axis's tick format
+        @test Masque._coord_keys(ph.payloads) == [:y => :y]   # follows the y axis's tick format
     end
 
     @testset "Voronoiplot extraction" begin
