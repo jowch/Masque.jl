@@ -3336,36 +3336,6 @@ try {
       // the drag's tooltip showed (#448 is the click's rounding; a release reads the pointerup).
       if (spec.layerKind === "threshold" && !catTarget) {
         const horiz = layer.geometry.orientation === "h";
-        // Grab the line where it is drawn, once the page has stopped moving: the mouse presses at
-        // a page position measured beforehand, so a readout cell above still re-rendering would
-        // move the plot under it.
-        const lineAt = () => page.evaluate((k) => {
-          const span = document.querySelector(`#coords_${k}`);
-          const hosts = [...document.querySelectorAll(".ip-host")];
-          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
-          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-          const b = host.querySelector("img, canvas").getBoundingClientRect();
-          const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
-          const l = sr.querySelector("line.masque-threshold-line");
-          const x = (Number(l.getAttribute("x1")) + Number(l.getAttribute("x2"))) / 2;
-          const y = (Number(l.getAttribute("y1")) + Number(l.getAttribute("y2"))) / 2;
-          return { x: b.left + x * s, y: b.top + y * s, line: [x, y] };
-        }, key);
-        let at = await lineAt();
-        for (let i = 0; i < 20; i++) {
-          await page.waitForTimeout(100);
-          const again = await lineAt();
-          const still = again.x === at.x && again.y === at.y;
-          at = again;
-          if (still) break;
-        }
-        // The drag above released the line here, so it must be drawn here.
-        const along = horiz ? 1 : 0;
-        if (Math.abs(at.line[along] - released[along]) > 1) {
-          throw new Error(`${key}/release-fractional: the line is drawn at ${JSON.stringify(at.line)}, the drag released it at ${JSON.stringify(released)}`);
-        }
-        const sx = at.x, sy = at.y;
-        const ex = horiz ? sx : Math.round(sx + 20) + 0.45, ey = horiz ? Math.round(sy + 20) + 0.45 : sy;
         // Count what the release sends (#567): an "input" event on the host is a value handed
         // to Pluto, so a failure below says whether the gesture committed nothing or Pluto did.
         await page.evaluate((k) => {
@@ -3379,6 +3349,40 @@ try {
             host.addEventListener("pointerup", () => { if (window.__releaseLog) window.__releaseLog.ups++ }, true);
           }
         }, key);
+        // Grab the line where it is drawn, once the page has stopped moving: the mouse presses at
+        // a page position measured beforehand, so a readout cell above still re-rendering would
+        // move the plot under it.
+        const lineAt = () => page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const hosts = [...document.querySelectorAll(".ip-host")];
+          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          const b = host.querySelector("img, canvas").getBoundingClientRect();
+          const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+          // Span edges share the class; these figures each draw one threshold line and nothing else.
+          const lines = sr.querySelectorAll("line.masque-threshold-line");
+          if (lines.length !== 1) return { count: lines.length };
+          const l = lines[0];
+          const x = (Number(l.getAttribute("x1")) + Number(l.getAttribute("x2"))) / 2;
+          const y = (Number(l.getAttribute("y1")) + Number(l.getAttribute("y2"))) / 2;
+          return { x: b.left + x * s, y: b.top + y * s, line: [x, y] };
+        }, key);
+        let at = await lineAt(), still = false;
+        for (let i = 0; i < 20 && !still; i++) {
+          await page.waitForTimeout(100);
+          const again = await lineAt();
+          still = again.x === at.x && again.y === at.y;
+          at = again;
+        }
+        if (at.count !== undefined) throw new Error(`${key}/release-fractional: ${at.count} threshold lines in the overlay, want 1`);
+        if (!still) throw new Error(`${key}/release-fractional: the line was still moving on the page after 2 s`);
+        // The drag above released the line here, so it must be drawn here.
+        const along = horiz ? 1 : 0;
+        if (Math.abs(at.line[along] - released[along]) > 1) {
+          throw new Error(`${key}/release-fractional: the line is drawn at ${JSON.stringify(at.line)}, the drag released it at ${JSON.stringify(released)}`);
+        }
+        const sx = at.x, sy = at.y;
+        const ex = horiz ? sx : Math.round(sx + 20) + 0.45, ey = horiz ? Math.round(sy + 20) + 0.45 : sy;
         await page.mouse.move(sx, sy);
         await page.mouse.down();
         await page.mouse.move((sx + ex) / 2, (sy + ey) / 2, { steps: 4 });
