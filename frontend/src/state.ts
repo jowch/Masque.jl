@@ -231,7 +231,7 @@ export interface TouchState {
     pin_: { left: number; top: number } | null
     hold_: { id: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null
     // Where and when (event timeStamp) the current touch went down.
-    start_: { x: number; y: number; t: number } | null
+    start_: { id: number; x: number; y: number; t: number } | null
     scrub_: boolean
     last_: PointerEvent | null
 }

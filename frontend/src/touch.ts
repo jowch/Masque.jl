@@ -34,7 +34,7 @@ function startScrub(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): void
 // that left the slop before HOLD_MS is a scroll, one at HOLD_MS or later means the hold was due.
 function holdDue(t: TouchState, e: PointerEvent): boolean {
     const s = t.start_
-    if (!t.hold_ || !s) return false
+    if (!t.hold_ || !s || s.id !== e.pointerId) return false
     const samples = e.getCoalescedEvents?.() ?? []
     for (const p of samples.length ? samples : [e]) {
         if (p.timeStamp - s.t >= HOLD_MS) return true
@@ -48,16 +48,21 @@ function cancelHold(t: TouchState): void {
     t.hold_ = null
 }
 
+// The finger the hold and scrub follow is the first one down; start_ is keyed by its pointer id.
+const otherFinger = (t: TouchState, e: PointerEvent) => t.start_ !== null && t.start_.id !== e.pointerId
+
 // After onDown. A new touch takes the last tap's tooltip off its pin: if this touch turns into
 // a scroll, the browser cancels it and pointerleave clears the tooltip as it does for a mouse.
+// A second finger ends the first one's hold or scrub, so a pinch is never a scrub.
 export function touchDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): void {
     const t = state.touch_
     if (!isTouch(e)) return
     t.pin_ = null
     t.scrub_ = false
-    t.last_ = e
-    t.start_ = { x: e.clientX, y: e.clientY, t: e.timeStamp }
     cancelHold(t)
+    if (otherFinger(t, e)) return
+    t.last_ = e
+    t.start_ = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp }
     // A drag layer (threshold, ROI, view) took the press: it already owns the finger.
     if (state.drag_) return
     const id = e.pointerId
@@ -71,6 +76,7 @@ export function touchMove(ctx: OverlayCtx, state: OverlayState, e: PointerEvent)
     const t = state.touch_
     // A mouse or pen moving over the plot owns hover again.
     if (!isTouch(e)) { t.pin_ = null; return }
+    if (otherFinger(t, e)) return
     t.last_ = e
     if (holdDue(t, e)) { startScrub(ctx, state, e); return }
     if (t.scrub_ && movedEarly(t, e.clientX, e.clientY, e.timeStamp)) t.scrub_ = false
@@ -83,6 +89,8 @@ export function touchMove(ctx: OverlayCtx, state: OverlayState, e: PointerEvent)
 export function touchUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): boolean {
     const t = state.touch_
     if (!isTouch(e)) return false
+    if (otherFinger(t, e)) return false
+    t.start_ = null
     cancelHold(t)
     t.scrub_ = false
     if (state.drag_ || state.justDragged_) return false
@@ -95,8 +103,10 @@ export function touchUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): 
 
 export function touchCancel(state: OverlayState, e: PointerEvent): void {
     if (!isTouch(e)) return
-    cancelHold(state.touch_)
-    state.touch_.scrub_ = false
+    const t = state.touch_
+    if (!otherFinger(t, e)) t.start_ = null
+    cancelHold(t)
+    t.scrub_ = false
 }
 
 // A tap ends with pointerleave, which clears hover. Keep what the tap showed.
@@ -120,7 +130,7 @@ export function unpinOnScroll(ctx: OverlayCtx, state: OverlayState): boolean {
 export function onTouchMove(state: OverlayState, e: TouchEvent): void {
     const t = state.touch_
     if (!t.scrub_) return
-    const p = e.changedTouches?.[0] ?? e.touches?.[0]
+    const p = e.touches?.length === 1 ? e.touches[0] : null
     if (p && movedEarly(t, p.clientX, p.clientY, e.timeStamp)) { t.scrub_ = false; return }
     if (e.cancelable) e.preventDefault()
 }

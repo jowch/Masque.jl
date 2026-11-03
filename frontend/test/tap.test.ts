@@ -155,7 +155,7 @@ describe("touch hold", () => {
         vi.advanceTimersByTime(HOLD_MS)
         const e = new Event("touchmove", { bubbles: true, cancelable: true })
         Object.defineProperty(e, "timeStamp", { value: 1100 })
-        Object.defineProperty(e, "changedTouches", { value: [{ clientX: 300, clientY: 240 }] })
+        Object.defineProperty(e, "touches", { value: [{ clientX: 300, clientY: 240 }] })
         surface.dispatchEvent(e)
         expect(e.defaultPrevented).toBe(false)
     })
@@ -174,7 +174,23 @@ describe("touch hold", () => {
         expect(touchmove(surface)).toBe(true)
     })
 
-    it("the long-press menu is ours during a hold", () => {
+    it("a second finger ends the hold, and its moves are not measured against the first", () => {
+        vi.useFakeTimers()
+        const { surface } = setup()
+        const finger = (type: string, x: number, y: number, id: number, ts: number) => {
+            const e = new PointerEvent(type, { clientX: x, clientY: y, pointerType: "touch", pointerId: id, button: 0, bubbles: true })
+            Object.defineProperty(e, "timeStamp", { value: ts })
+            surface.dispatchEvent(e)
+        }
+        finger("pointerdown", 300, 200, 1, 1000)
+        finger("pointerdown", 400, 200, 2, 1100)
+        vi.advanceTimersByTime(HOLD_MS)
+        expect(touchmove(surface)).toBe(false) // no scrub: a pinch is not a hold
+        finger("pointermove", 402, 200, 2, 1000 + HOLD_MS + 50)
+        expect(touchmove(surface)).toBe(false)
+    })
+
+        it("the long-press menu is ours during a hold", () => {
         vi.useFakeTimers()
         const { surface } = setup()
         surface.dispatchEvent(ev("pointerdown", 300, 200, "touch"))

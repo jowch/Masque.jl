@@ -1396,6 +1396,7 @@ try {
     // so poll rather than read once.
     const until = async (f, ms = 3000) => { const end = Date.now() + ms; let v; while (!(v = await f()) && Date.now() < end) await new Promise((r) => setTimeout(r, 100)); return v; };
     await page.mouse.move(1, 1);
+    await page.evaluate(() => { window.__tapClicks = 0; window.addEventListener("click", () => window.__tapClicks++, { capture: true }); });
     await center("scatter");
     await new Promise((r) => setTimeout(r, 300));
     const before = await tipOf("scatter");
@@ -1403,8 +1404,12 @@ try {
     await tapAt(p.x, p.y);
     let t = await tipOf("scatter");
     if (!t.show || !/alpha/i.test(t.text)) throw new Error(`touch/tap-tooltip: ${JSON.stringify(t)}`);
-    for (let a = 0; a < 40 && t.out === before.out; a++) { await new Promise((r) => setTimeout(r, 250)); t = await tipOf("scatter"); }
-    if (t.out === before.out) throw new Error(`touch/tap-picks: bond did not change (${t.out})`);
+    // The same 16 s kind_sweep's waitChange gives a WebGL round trip.
+    for (let a = 0; a < 80 && t.out === before.out; a++) { await new Promise((r) => setTimeout(r, 200)); t = await tipOf("scatter"); }
+    if (t.out === before.out) {
+      const clicked = await page.evaluate(() => window.__tapClicks ?? 0);
+      throw new Error(`touch/tap-picks: bond did not change in 16 s (${t.out}); clicks that reached the page: ${clicked}`);
+    }
     if (!(await tipOf("scatter")).show) throw new Error("touch/tap-tooltip: gone after the bond round-trip");
     passed.push("touch/tap-tooltip", "touch/tap-picks");
     const empty = await clientOf("scatter", 0.98, 0.98, true);
@@ -1425,8 +1430,30 @@ try {
     const r0 = await tipOf("axis");
     if (!r0.show || !r0.text) throw new Error(`touch/readout-tap: ${JSON.stringify(r0)}`);
     passed.push("touch/readout-tap");
-    // Control first: a plain swipe on the plot scrolls the page, so the hold check below tests
-    // the hold.
+    // Before the swipe control: a fling still running would make the page take the touch.
+    // Each touchmove's cancelable/defaultPrevented goes into a failure, to say which side broke.
+    await page.evaluate(() => { window.__tm = []; window.addEventListener("touchmove", (e) => window.__tm.push([e.cancelable, e.defaultPrevented]), { passive: true }); });
+    const t0 = Date.now();
+    await touch("touchStart", [[a0.x, a0.y]], t0);
+    await new Promise((r) => setTimeout(r, 500));
+    const y0 = await page.evaluate(() => window.scrollY);
+    for (let i = 1; i <= 8; i++) {
+      await touch("touchMove", [[a0.x + (a1.x - a0.x) * i / 8, a0.y + 30 * i / 8]], t0 + 500 + 30 * i);
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    const mid = await tipOf("axis");
+    const y1 = await page.evaluate(() => window.scrollY);
+    await touch("touchEnd", []);
+    await new Promise((r) => setTimeout(r, 250));
+    const end = await tipOf("axis");
+    const tm = await page.evaluate(() => JSON.stringify(window.__tm.slice(0, 2)));
+    const why = `scrollY ${y0} -> ${y1}; first touchmoves [cancelable, defaultPrevented] ${tm}`;
+    if (!mid.show || mid.text === r0.text) throw new Error(`touch/hold-scrub: readout did not follow (${r0.text} -> ${mid.text}, show ${mid.show}; ${why})`);
+    if (Math.abs(y1 - y0) > 1) throw new Error(`touch/hold-scrub: page scrolled ${y1 - y0}px during the scrub (${why})`);
+    if (!end.show) throw new Error("touch/hold-scrub: readout gone after lift");
+    passed.push("touch/hold-scrub");
+    // Control: a plain swipe on the plot scrolls the page, so the hold check above tested the
+    // hold and not a page that never scrolls.
     const hitAt = (x, y) => page.evaluate(([x, y]) => {
       let el = document.elementFromPoint(x, y), out = [];
       while (el?.shadowRoot) { const inner = el.shadowRoot.elementFromPoint(x, y); if (!inner || inner === el) break; el = inner; }
@@ -1442,8 +1469,7 @@ try {
       await touch("touchEnd", [], t0 + 16 * 9);
       let y1 = y0;
       await until(async () => Math.abs((y1 = await page.evaluate(() => window.scrollY)) - y0) >= 20);
-      // A quick swipe flings: wait for the page to stop, then put the plot back where the
-      // hold check expects it.
+      // A quick swipe flings: wait for the page to stop, then put it back.
       for (let last = NaN, n = 0; n < 40; n++) {
         await new Promise((r) => setTimeout(r, 150));
         const y = await page.evaluate(() => window.scrollY);
@@ -1469,24 +1495,6 @@ try {
       throw new Error(`touch/swipe-scrolls: a plain swipe moved the page ${moved}px, so the hold check proves nothing (under the finger: ${under}; a swipe in the page margin moved it ${m1 - m0}px; touchmove ${prev})`);
     }
     passed.push("touch/swipe-scrolls");
-    const t0 = Date.now();
-    await touch("touchStart", [[a0.x, a0.y]], t0);
-    await new Promise((r) => setTimeout(r, 500));
-    // Read after the finger is down: the press stops what is left of the swipe's fling.
-    const y0 = await page.evaluate(() => window.scrollY);
-    for (let i = 1; i <= 8; i++) {
-      await touch("touchMove", [[a0.x + (a1.x - a0.x) * i / 8, a0.y + 30 * i / 8]], t0 + 500 + 30 * i);
-      await new Promise((r) => setTimeout(r, 30));
-    }
-    const mid = await tipOf("axis");
-    const y1 = await page.evaluate(() => window.scrollY);
-    await touch("touchEnd", []);
-    await new Promise((r) => setTimeout(r, 250));
-    const end = await tipOf("axis");
-    if (!mid.show || mid.text === r0.text) throw new Error(`touch/hold-scrub: readout did not follow (${r0.text} -> ${mid.text}, show ${mid.show})`);
-    if (Math.abs(y1 - y0) > 1) throw new Error(`touch/hold-scrub: page scrolled ${y1 - y0}px during the scrub`);
-    if (!end.show) throw new Error("touch/hold-scrub: readout gone after lift");
-    passed.push("touch/hold-scrub");
     await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
     await cdp.detach();
   }
