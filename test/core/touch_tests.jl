@@ -75,3 +75,11 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test only(m["layers"])["touch"] == 4.0
     end
 end
+
+# One finger scrolls the page past a view, two move it (#537): no setting for it.
+@testset "Touch views (#537)" begin
+    fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
+    v = ViewInteractable(ax)
+    @test !haskey(masque(fig, v).manifest, "touchViews")
+    @test_throws ArgumentError masque(fig, v; touch = (; views = :onefinger))
+end

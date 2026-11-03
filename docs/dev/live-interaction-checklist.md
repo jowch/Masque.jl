@@ -123,15 +123,17 @@ in that colour (`--masque-mark-border`); the text stays neutral.
 
 View chrome (#526): a moving view's live readout (`x:[…] y:[…]`, `z:[…]` too on an `Axis3`
 zoom or pan, `az=… el=…` while an `Axis3` turns) sits in `.masque-readout` at the figure's
-bottom-left corner, for every input (mouse
-drag, wheel, the view keys), instead of following the pointer, so it is never under a finger.
-It is the tooltip's box and theme, shown and hidden at once, and a mark's tooltip hides while
-the view moves. A plain wheel over a `wheel = :modifier` view shows "Ctrl + scroll to zoom"
-("Cmd" on Apple platforms) in `.masque-note`, the tooltip-themed note in the same corner that
-also carries an `onchange` error, for 1.5 s after the last plain wheel; it never covers an
-error the note is showing (#537's touch hint is the same kind of note). The two stack in a
-column, the note above, so a readout that wraps never sits under it. The bottom-left corner
-belongs to the note and the readout: the view buttons (#525) never use it.
+bottom-left corner, for every input (mouse drag, wheel, the view keys), instead of following
+the pointer, so it is never under a finger. It is the tooltip's box and theme, shown and
+hidden at once, and a mark's tooltip hides while the view moves. A plain wheel over a `wheel =
+:modifier` view shows "Ctrl + scroll to zoom" ("Cmd" on Apple platforms) in `.masque-note`,
+the tooltip-themed note in the same corner that also carries an `onchange` error, for 1.5 s
+after the last plain wheel; it never covers an error the note is showing. On touch, a
+one-finger drag that starts on a view scrolls the page and shows "Use two fingers to move the
+plot" in the same note, by the same rule (#537); two fingers pan and pinch-zoom (or, on an
+`Axis3`, orbit and zoom) through the same readout. The two stack in a column, the note above,
+so a readout that wraps never sits under it. The bottom-left corner belongs to the note and
+the readout: the view buttons (#525) never use it.
 
 ROI chrome: 4 corner handles (7 CSS px, white fill, 1px chrome stroke, ~1.5 CSS px corner
 radius); a corner resizes two axes. The sides have no grip, but the manifest `handle` on each

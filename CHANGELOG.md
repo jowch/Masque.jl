@@ -17,6 +17,12 @@ All notable changes to this project are documented here. The format is based on
   both `xzoomlock` and `yzoomlock`, gets `wheel = :none` unless the call says otherwise;
   Masque 0.4 ignored those settings. See
   [Upgrading](https://jowch.github.io/Masque.jl/stable/upgrading/) (#526).
+- On a touch screen, one finger on a plot with a `ViewInteractable` scrolls the page, and a
+  short hint in its corner says to use two fingers. Two fingers pan the view and a pinch zooms
+  it around them; on an `Axis3` two fingers turn it and a pinch zooms. A tap still picks.
+  Before, one finger panned or turned the view and the page couldn't scroll past the plot, and
+  a pinch did nothing. See [Upgrading](https://jowch.github.io/Masque.jl/stable/upgrading/)
+  (#537).
 
 ### Added
 - A `surface!` on a `PolarAxis`, which is how Makie draws a polar heatmap, responds to hover
@@ -46,6 +52,10 @@ All notable changes to this project are documented here. The format is based on
   and heatmap cells still take a tap inside them. `masque(fig; touch = (; radius = 8))` sets
   the reach for the figure, `touch_radius` sets it for one plot or layer, and `touch = false`
   turns it off. A mouse or a pen keeps its precision, also on a touchscreen laptop (#528).
+- On a touch screen a finger takes a threshold line or a band edge within 16 pixels of it, and
+  an ROI corner, or the middle of a side, anywhere in a 44-pixel square around it; the lines
+  and grips look as before. A finger elsewhere on a threshold, band or ROI plot scrolls the
+  page, where it used to hold the page still (#530).
 - Sliders, toggles and checkboxes are easier to hit with a finger. On a touch screen each
   one answers a touch a little past its drawn edge, up to 44 px across, but never more than
   halfway to the next control or axis, so the rows of a `SliderGrid` don't take each other's
