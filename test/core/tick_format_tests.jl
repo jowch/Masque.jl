@@ -99,23 +99,61 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         tx = text!(ax, [1.0], [2.0]; text = ["a"])
         ar = arrows2d!(ax, [1.0], [1.0], [0.5], [0.5])
         _, _, ctx = ctx_for(fig)
-        coords(i) = get(build_manifest([i], ctx)["layers"][1], "coords", String[])
-        @test coords(PointInteractable(ax, sc)) == ["x", "y"]
-        @test coords(TextInteractable(ax, tx)) == ["x", "y"]
-        @test coords(SegmentInteractable(ax, ar)) == ["x", "y"]       # u/v are offsets: plain
+        coords(i) = get(build_manifest([i], ctx)["layers"][1], "coords", Dict{String, String}())
+        xy = Dict("x" => "x", "y" => "y")
+        none = Dict{String, String}()
+        @test coords(PointInteractable(ax, sc)) == xy
+        @test coords(TextInteractable(ax, tx)) == xy
+        @test coords(SegmentInteractable(ax, ar)) == xy       # u/v are offsets: plain
         # Beside a user's own fields, the x/y Masque merged in still follow the axis.
-        @test coords(PointInteractable(ax, sc; payloads = [(; name = "a"), (; name = "b")])) == ["x", "y"]
-        @test coords(PointInteractable(ax, sc; payloads = [Dict("name" => "a"), Dict("name" => "b")])) == ["x", "y"]
+        @test coords(PointInteractable(ax, sc; payloads = [(; name = "a"), (; name = "b")])) == xy
+        @test coords(PointInteractable(ax, sc; payloads = [Dict("name" => "a"), Dict("name" => "b")])) == xy
         # A field the user sets is theirs, in any element.
-        @test coords(PointInteractable(ax, sc; payloads = [(; x = "left"), (; name = "b")])) == ["y"]
-        @test coords(PointInteractable(ax, sc; payloads = [(; x = 1, y = 2), (; x = 3, y = 4)])) == String[]
-        @test coords(PointInteractable(ax, sc; payloads = ["a", "b"])) == String[]  # not key-value
-        @test coords(RectInteractable(ax, [(0.0, 0.0, 1.0, 1.0)])) == String[]        # (; index) only
-        @test coords(SegmentInteractable(ax, lines!(ax, [1, 2], [1, 2]))) == String[]  # its readout is browser-side
+        @test coords(PointInteractable(ax, sc; payloads = [(; x = "left"), (; name = "b")])) == Dict("y" => "y")
+        @test coords(PointInteractable(ax, sc; payloads = [(; x = 1, y = 2), (; x = 3, y = 4)])) == none
+        @test coords(PointInteractable(ax, sc; payloads = ["a", "b"])) == none  # not key-value
+        @test coords(RectInteractable(ax, [(0.0, 0.0, 1.0, 1.0)])) == none        # (; index) only
+        @test coords(SegmentInteractable(ax, lines!(ax, [1, 2], [1, 2]))) == none  # its readout is browser-side
         # The record is per vector: a copy of Masque's payloads is the user's own.
         p = PointInteractable(ax, sc)
-        @test IP._coord_keys(p.payloads) == [:x, :y]
-        @test IP._coord_keys(copy(p.payloads)) == Symbol[]
+        @test IP._coord_keys(p.payloads) == [:x => :x, :y => :y]
+        @test IP._coord_keys(copy(p.payloads)) == Pair{Symbol, Symbol}[]
+    end
+
+    @testset "bar and statistic fields follow the axis they are measured along (#543)" begin
+        fig = Figure()
+        ax = Axis(fig[1, 1]; xtickformat = "{:.2f} s", ytickformat = "{:.1f} mV")
+        coords(i) = get(build_manifest([i], ctx_for(fig)[3])["layers"][1], "coords", Dict{String, String}())
+        on(dim, ks...) = Dict(string(k) => string(dim) for k in ks)
+        @test coords(RectInteractable(ax, barplot!(ax, [1, 2], [3.0, 4.0]))) == on(:y, :low, :high, :value)
+        @test coords(RectInteractable(ax, barplot!(ax, [1, 2], [3.0, 4.0]; direction = :x))) == on(:x, :low, :high, :value)
+        # A hist's low/high are its bin edges, on the other axis from its value.
+        @test coords(RectInteractable(ax, hist!(ax, randn(50)))) == merge(on(:y, :value), on(:x, :low, :high))
+        @test coords(RectInteractable(ax, hist!(ax, randn(50); direction = :x))) == merge(on(:x, :value), on(:y, :low, :high))
+        @test coords(RectInteractable(ax, waterfall!(ax, [1, 2], [1.0, -0.5]))) == on(:y, :low, :high, :value)
+        @test coords(RectInteractable(ax, hspan!(ax, [1.0], [2.0]))) == on(:y, :low, :high)
+        @test coords(RectInteractable(ax, vspan!(ax, [1.0], [2.0]))) == on(:x, :low, :high)
+        @test coords(RectInteractable(ax, crossbar!(ax, [1], [2.0], [1.0], [3.0]))) == on(:y, :midpoint, :low, :high)
+        @test coords(RectInteractable(ax, crossbar!(ax, [1], [2.0], [1.0], [3.0]; orientation = :horizontal))) == on(:x, :midpoint, :low, :high)
+        g = repeat([1, 2], 10)
+        @test coords(only(IP._construct_unplaced(ax, boxplot!(ax, g, randn(20)), :box))) == on(:y, :q1, :median, :q3)
+        @test coords(only(IP._construct_unplaced(ax, boxplot!(ax, g, randn(20); orientation = :horizontal), :box))) == on(:x, :q1, :median, :q3)
+        # A boxplot sets `NoDimConversion` on its axes; their formats still reach the browser.
+        figb = Figure(); axb = Axis(figb[1, 1]; xtickformat = "{:.1f} kg")
+        boxplot!(axb, fill(1, 5), [1.0, 2.0, 3.0, 4.0, 5.0]; orientation = :horizontal)
+        @test axb.dim1_conversion[] isa Makie.NoDimConversion
+        tb = masque(figb).manifest["transforms"]
+        @test only(values(tb))["xfmt"] == Dict("suffix" => " kg", "spec" => ".1f")
+        notched = only(IP._construct_unplaced(ax, boxplot!(ax, repeat([1, 2], 100), Float64.(1:200); show_notch = true), :box))
+        @test notched isa PolygonInteractable
+        @test coords(notched) == on(:y, :q1, :median, :q3)
+        # A field the user sets stays plain; the rest still follow the axis.
+        bp = barplot!(ax, [1, 2], [3.0, 4.0])
+        @test coords(RectInteractable(ax, bp; payloads = [(; value = 1), (; name = "b")])) == on(:y, :low, :high)
+        @test coords(RectInteractable(ax, bp; payloads = [Dict("value" => 1), Dict("name" => "b")])) == on(:y, :low, :high)
+        @test coords(RectInteractable(ax, bp; payloads = [Dict(:high => 1), Dict(:name => "b")])) == on(:y, :low, :value)
+        # Colour values are read off a colorbar, not an axis: plain.
+        @test coords(PolygonInteractable(ax, contourf!(ax, rand(5, 5)))) == Dict{String, String}()
     end
 
     @testset "tooltip_sigdigits is sent only when set" begin

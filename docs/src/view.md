@@ -109,6 +109,23 @@ A double-click on a point is two clicks on the point, so it does not
 move the view. The first click of a double-click on empty space clears
 a single pick, as any click there does.
 
+## Buttons
+
+While the pointer is over a plot you can pan or orbit, small buttons
+show in a corner: zoom in, zoom out, and, once you have moved the view,
+reset. On an `Axis3` they zoom only.
+They also show while the view has keyboard focus, and after you touch
+the plot on a touch screen. They take the corner a legend leaves free,
+and a plot too small for them goes without (drag, the wheel, the keys
+and a double-click still work).
+
+To keep them on screen, or to leave them out:
+
+```julia
+ViewInteractable(ax; controls = :always)  # always shown
+ViewInteractable(ax; controls = :none)    # no buttons
+```
+
 If you use GLMakie, note that Ctrl+click does not reset the view here:
 in a widget, Ctrl+click (Cmd+click on a Mac) adds a mark to a pick.
 

@@ -224,7 +224,7 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `draw` | each layer whose plot `masque` knows (#462) | 6–8 B (key 5 B + a small integer); `payload_envelope.jl` at `d31f6e1` moved only the 1 000-point scatter manifest, by 6 B, and the two `:many` scatters by 0.1 KB |
 | `groups`, `group` | once per `linked(...)` group, and a tag on each member layer (#346) | under 0.1 KB by position; with `key`, `rows` adds one small integer per mark (`payload_envelope.jl` §M) |
 | `xfmt`, `yfmt`, `zfmt` | each axis transform whose ticks have a format string, `AngularTicks` or `MultiplesTicks`, and both dimensions of a `PolarAxis` (#510) | ~15–60 B per formatted dimension; absent on an axis with automatic ticks |
-| `coords` | each layer whose payloads include coordinates Masque filled in (points, text, arrows) (#510) | 19 B for `["x","y"]` |
+| `coords` | each layer whose payloads include fields Masque filled in that are measured along an axis: points, text, arrows (#510), and a bar's, hist's, waterfall's, box's, crossbar's or span's values (#543) | a field → axis map: 27 B for `{"x":"x","y":"y"}`, ~45 B for a bar's `low`/`high`/`value` |
 | `regions` | each grid layer given `regions = R` (#359) | `[id, n, …]` runs over the row-major cells, one pair per region edge crossed along a row (`payload_envelope.jl` §L) |
 
 Re-running `payload_envelope.jl` and `stress.jl` for the tick-format tooltips (#510, 2026-11-02)
@@ -232,6 +232,12 @@ moved only the 1 000-point scatter manifest, by 19 B (its `coords` list), and th
 meshscatter by under 0.1 KB. No fixture sets a tick format, so no `xfmt` is sent. Every stress
 manifest and PNG size is unchanged at the precision above. Which fields Masque filled in is
 recorded when the payloads are merged, so finding `coords` costs a lookup, not a pass over them.
+
+Re-running `payload_envelope.jl` when `coords` became a field → axis map (#543, 2026-11-02, on
+`b85691f`) grew each layer's `coords` by a few bytes (`["x","y"]` became `{"x":"x","y":"y"}`),
+once per layer, not per element. That moved the 100-point scatter manifest from 4.0 to 4.1 KB
+and the violin layer by 3 B (its `["x"]`), under the 0.1 KB precision of the tables above, so
+no other row moved.
 
 Re-running `payload_envelope.jl` for the composite bind value (#335, 2026-10-10) moved no
 manifest in the tables above by more than 0.1 KB; `fields` and `initial` replace the old
@@ -902,6 +908,22 @@ The cost: each backend extension precompiles in 1.5–2.5 min instead of 9–10 
 parallel), its pkgimage grows from 0.06–0.2 MB to 47–50 MB (about the size of CairoMakie's own,
 38 MB, and WGLMakie's, 60 MB), and loading is 0–1 s slower. The `precompile_workload` preference
 on Masque turns the workload off.
+
+Showing the first value was measured later, on 2026-11-02 with the same bench, on base
+`a6c2567` ("before") and with the show step #567 adds to the workload ("after"). It is how long
+a cell takes to print the first pick's value: the value and each of its fields as `text/plain`,
+the way Pluto shows a `@bind` value. Seconds, as the range of four runs from two sessions:
+
+| step | cairo before | cairo after | webgl before | webgl after |
+|---|---:|---:|---:|---:|
+| first value shown (a pick) | 0.2–0.39 | 0.05–0.08 | 0.19–0.22 | 0.06–0.11 |
+
+The first bond value itself, 0.07–0.28 s before and 0.07–0.2 s after on both backends, doesn't
+change; its spread is noise. Showing a value from a widget whose ids the workload doesn't use (a
+point pick and a segment pick) goes from 0.26–0.27 s to 0.10–0.11 s too. About 0.05 s stays
+compile: the value is a `NamedTuple` named by the notebook's own ids, which no workload can name
+in advance. Pluto's own first round trip after a session opens, 0.3–1.8 s in CI, is separate and
+still open (#567).
 
 ## Axis3 projection hinge (2026-07-01, 2026-07-02)
 

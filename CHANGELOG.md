@@ -33,11 +33,20 @@ All notable changes to this project are documented here. The format is based on
   press `0` while the view has keyboard focus. Limits come back as written, so automatic
   limits are automatic again, and an `Axis3` gets its azimuth and elevation back. Linked axes
   and panels go back together. Re-running only the `masque` cell keeps the starting view (#524).
+- A plot that pans or orbits shows zoom in, zoom out and reset buttons in a corner while the
+  pointer is over it, so a reader can see it moves. Figures that already use
+  `ViewInteractable` gain them; `ViewInteractable(ax; controls = :none)` leaves them out and
+  `controls = :always` keeps them shown (#525).
 - `SpanInteractable` drags a band, a `(lo, hi)` range, on an `Axis` or a `Colorbar`. Drag an
   edge to move that end, or inside the band to move both. The plot outside the band is faded
   and each edge has a grip. Its field is a `SpanEvent` with `lo` and `hi`. Points, lines, bars
   and shapes inside the band still answer hover and click; a heatmap or image inside it
   answers hover, and a press on it moves the band (#500).
+- On a touch screen, a tap on a mark shows its tooltip as well as picking it, and the tooltip
+  stays up after the finger lifts, until the next tap, Escape, or a scroll that moves the plot.
+  A tap on an axis readout or a colorbar shows the value there. Press and hold, then slide, to
+  follow a readout or a line with your finger while the page stays still. A mouse works as
+  before (#529).
 - On a touch screen a finger picks the nearest point or line within 16 pixels of it, instead
   of only the mark under it, so a small marker or a thin line is easy to tap. Bars, polygons
   and heatmap cells still take a tap inside them. `masque(fig; touch = (; radius = 8))` sets
@@ -47,6 +56,11 @@ All notable changes to this project are documented here. The format is based on
   an ROI corner, or the middle of a side, anywhere in a 44-pixel square around it; the lines
   and grips look as before. A finger elsewhere on a threshold, band or ROI plot scrolls the
   page, where it used to hold the page still (#530).
+- Sliders, toggles and checkboxes are easier to hit with a finger. On a touch screen each
+  one answers a touch a little past its drawn edge, up to 44 px across, but never more than
+  halfway to the next control or axis, so the rows of a `SliderGrid` don't take each other's
+  touches. Nothing drawn changes, and on a computer without a touch screen they answer
+  exactly where they did (#531).
 
 ### Changed
 - Default tooltips and readouts show a coordinate the way its axis labels it. On a
@@ -57,6 +71,10 @@ All notable changes to this project are documented here. The format is based on
   your own `payloads` fields. Templates and the fields you set yourself are unchanged, and so
   is the `@bind` value. A set `tooltip_sigdigits` wins over the
   format's precision. See "Axis units" on the Tooltips page (#510).
+- A bar's `low`, `high` and `value` in the default tooltip read in its axis's unit too, as
+  do a histogram's, a waterfall's, a box plot's, a crossbar's and a span's values. A
+  histogram's `low` and `high` are its bin edges, so they read in the bin axis's unit.
+  So does the readout while you drag a `SpanInteractable` band's edges (#543).
 - **Breaking:** a click on a bound line on an `Axis3` picks the point you plotted nearest
   the click, as on a 2D `Axis`, where it used to pick the whole line. `pick.index` is now
   that point's position in your data, `pick.line` says which line it is on, and `pick.x`,
@@ -70,8 +88,13 @@ All notable changes to this project are documented here. The format is based on
 - While you pan, zoom or turn a view, its readout (the axis limits, or an `Axis3`'s angles
   while it turns) shows in the bottom-left corner of the figure instead of beside the pointer,
   and a point's tooltip doesn't show over it (#526).
+- The first click after Julia starts shows its value sooner. A cell that shows the `@bind`
+  value took 0.2–0.4 s to print the first one, and now takes about 0.1 s (part of #567).
 
 ### Fixed
+- A horizontal violin, `violin!(…; orientation = :horizontal)`, names its own category in
+  its tooltip and payload, as the field `y` since the category runs along the y axis. Before,
+  it gave an `x` read from the value axis, which could name the wrong category (#558).
 - An inset axis with its own `ViewInteractable`, inside an axis that has one too, now pans
   and zooms itself when the pointer is over it. Before, a drag or Ctrl+wheel over the inset
   moved the outer plot instead (#559).

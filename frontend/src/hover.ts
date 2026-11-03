@@ -556,12 +556,15 @@ export function onMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): voi
     })
 }
 
-export function onLeave(ctx: OverlayCtx, state: OverlayState): void {
+// `keep`: a finger's tap ends with pointerleave, and what it showed stays up (touch.ts).
+export function onLeave(ctx: OverlayCtx, state: OverlayState, keep = false): void {
     cancelPendingMove(state)
-    if (!restoreFocus(ctx, state)) { clearHover(ctx, state, true); clearLegendLink(ctx, state, true); hideTip(ctx, state) }
-    ctx.surface_.classList.remove("hot")
-    hideCross(ctx, state)
-    setDragHoverChrome(ctx, state, null)
+    if (!keep) {
+        if (!restoreFocus(ctx, state)) { clearHover(ctx, state, true); clearLegendLink(ctx, state, true); hideTip(ctx, state) }
+        ctx.surface_.classList.remove("hot")
+        hideCross(ctx, state)
+        setDragHoverChrome(ctx, state, null)
+    }
     // Fallback for tryCapture's uncaptured path: without real capture, leaving the surface
     // fires pointerleave (capture would otherwise suppress it until release), and the
     // pointermove/pointerup that follow off-element never reach these listeners — so drag

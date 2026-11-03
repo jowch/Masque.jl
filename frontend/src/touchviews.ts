@@ -194,6 +194,8 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
                 apply(pair, e)
                 return
             }
+            // A held finger scrubs a readout (touch.ts) and the page stays still: no hint.
+            if (state.touch_.scrub_) one = null
             if (one && e.touches.length === 1) {
                 const t = e.touches[0]
                 if (t && Math.hypot(t.clientX - one.x, t.clientY - one.y) > SCROLL_SLOP_PX) {
