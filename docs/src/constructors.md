@@ -139,7 +139,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `Surface` | `SurfaceInteractable` | `i`, `j`, `x`, `y`, `z`; `value` when `color` is a separate matrix | `:surface` |
 | `Poly` / `Band` / `Density` / `Voronoiplot` | `PolygonInteractable` | `index` | `:poly`, `:band`, … |
 | `Contourf` | `PolygonInteractable` | `low`, `high` | `:contourf` |
-| `Violin` | `PolygonInteractable` | `x` | `:violin` |
+| `Violin` | `PolygonInteractable` | `x` (`y` when horizontal) | `:violin` |
 | `Hexbin` | `PolygonInteractable` | `x`, `y`, `count` | `:hexbin` |
 | `Text` | `TextInteractable` | `text`, `index`, `x`, `y` | `:text` |
 | `Stem` | `interactables(p)` | points, and stems as a second layer | `stem.points`, `stem.stems` |
@@ -157,7 +157,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | [`SpanInteractable`](@ref) | `(ax; span, orientation=:vertical, id=:span)` | [`SpanEvent`](@ref): `lo`, `hi`, starting at `span` | [Drag a band](@ref) |
 | [`LegendInteractable`](@ref) | `(leg; targets=nothing, tooltip=nothing, id=:legend)` | [`LegendEvent`](@ref): `label`, `group`, `targets` | [Legend](@ref) |
 | [`ROIInteractable`](@ref) | `(ax; bounds=nothing, selects=nothing, id=:roi)` | [`BoundsEvent`](@ref), starting at `bounds`, or the middle half of the axis without them; with `selects`, the target's field holds the marks or cells inside | [Brush a region](@ref) |
-| [`ViewInteractable`](@ref) | `(ax; id=:view)` | no field | [Pan, zoom and orbit](@ref) |
+| [`ViewInteractable`](@ref) | `(ax; wheel=:modifier, controls=:hover, id=:view)` | no field | [Pan, zoom and orbit](@ref) |
 | [`SliceInteractable`](@ref) | `(plots)`, `(ax, plots)`, or `(ax; series, orientation=:vertical, crosshair=true, covers, tooltip)` | no field; hover only | [Slice across series](@ref) |
 
 A threshold's `value`, a band's `span` and a box's `bounds` also accept

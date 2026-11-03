@@ -513,6 +513,16 @@ HTML(
         "<span id=\"coords_violin\" style=\"display:none\">$(JSON3.write(sweep.violin.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000549
+@bind ev_violin_h sweep.violin_h
+
+# ╔═╡ c1000000-0000-0000-0000-00000000054a
+HTML(
+    "<span id=\"out_violin_h\">VIOLIN_H=$(sweep_field("violin_h", ev_violin_h))</span>" *
+        "<span id=\"bond_violin_h\" style=\"display:none\">$(repr(ev_violin_h))</span>" *
+        "<span id=\"coords_violin_h\" style=\"display:none\">$(JSON3.write(sweep.violin_h.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000111
 @bind ev_stairs sweep.stairs
 
@@ -811,6 +821,16 @@ HTML(
     "<span id=\"out_view3d\">VIEW3D=$(sweep_field("view3d", ev_view3d))</span>" *
         "<span id=\"bond_view3d\" style=\"display:none\">$(repr(ev_view3d))</span>" *
         "<span id=\"coords_view3d\" style=\"display:none\">$(JSON3.write(sweep.view3d.manifest["layers"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000525
+@bind ev_view_dark sweep.view_dark
+
+# ╔═╡ c1000000-0000-0000-0000-000000000526
+HTML(
+    "<span id=\"out_view_dark\">VIEW_DARK=$(sweep_field("view_dark", ev_view_dark))</span>" *
+        "<span id=\"bond_view_dark\" style=\"display:none\">$(repr(ev_view_dark))</span>" *
+        "<span id=\"coords_view_dark\" style=\"display:none\">$(JSON3.write(sweep.view_dark.manifest["layers"]))</span>",
 )
 
 # ╔═╡ c1000000-0000-0000-0000-000000000152
@@ -1183,6 +1203,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-00000000010e
 # ╠═c1000000-0000-0000-0000-00000000010f
 # ╠═c1000000-0000-0000-0000-000000000110
+# ╠═c1000000-0000-0000-0000-000000000549
+# ╠═c1000000-0000-0000-0000-00000000054a
 # ╠═c1000000-0000-0000-0000-000000000111
 # ╠═c1000000-0000-0000-0000-000000000112
 # ╠═c1000000-0000-0000-0000-0000000000b5
@@ -1239,6 +1261,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000175
 # ╠═c1000000-0000-0000-0000-000000000115
 # ╠═c1000000-0000-0000-0000-000000000116
+# ╠═c1000000-0000-0000-0000-000000000525
+# ╟─c1000000-0000-0000-0000-000000000526
 # ╠═c1000000-0000-0000-0000-000000000152
 # ╠═c1000000-0000-0000-0000-000000000153
 # ╠═c1000000-0000-0000-0000-000000000202

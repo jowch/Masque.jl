@@ -36,10 +36,10 @@
             ]
         },
         {
-            "coords": [
-                "x",
-                "y"
-            ],
+            "coords": {
+                "y": "y",
+                "x": "x"
+            },
             "kind": "circles",
             "id": "scatter",
             "geometry": [

@@ -354,45 +354,56 @@ _check_payloads(payloads, n, what) = expand_payloads(payloads, n, what)
 # that isn't key-value (a bare string) replaces the default, as there is nothing to merge.
 #
 # The `x`, `y` and `z` Masque fills in are the mark's coordinates, so its default tooltip prints
-# them in the axis's format (#510). `_merge_payloads` records which of them it filled in for
-# every element, keyed by the returned vector, and `_coord_keys` reads that back when the
-# manifest is built. A field the user's own payload sets, and every field of a payload that
-# isn't key-value, stays theirs: a plain number.
-function _merge_payloads(defaults, payloads, who)
+# them in the axis's format (#510). Other default fields measured along one axis (a bar's
+# `low`/`high`/`value`, a box's quartiles) do the same, and `dims` names that axis per field:
+# `(; low = :y, high = :y, value = :y)` (#543). A length such as a bar's `value` prints like a
+# position, which holds because a `CoordFormat` is a scale plus affixes with no offset; an
+# offset joining it would need lengths flagged here. `_merge_payloads` records which fields it
+# filled in for every element, with their axis, keyed by the returned vector, and
+# `_coord_keys` reads that back when the manifest is built. A field the user's own payload
+# sets, and every field of a payload that isn't key-value, stays theirs: a plain number.
+function _merge_payloads(defaults, payloads, who; dims::NamedTuple = (;))
     defaults = convert(Vector{Any}, defaults)
     if payloads === nothing
-        _note_coord_keys!(defaults, _default_coord_keys(defaults))
+        _note_coord_keys!(defaults, _default_coord_keys(defaults, dims))
         return defaults
     end
     pl = expand_payloads(payloads, length(defaults), who)
     out = Any[_merge_payload(d, p) for (d, p) in zip(defaults, pl)]
-    ks = _default_coord_keys(defaults)
+    ks = _default_coord_keys(defaults, dims)
     for p in pl
         isempty(ks) && break
         if p isa NamedTuple
-            ks = filter(k -> !haskey(p, k), ks)
+            ks = filter(kd -> !haskey(p, kd[1]), ks)
         elseif p isa AbstractDict && keytype(p) in (Symbol, String)
-            ks = filter(k -> !haskey(p, keytype(p) === Symbol ? k : string(k)), ks)
+            ks = filter(kd -> !haskey(p, keytype(p) === Symbol ? kd[1] : string(kd[1])), ks)
         else
-            ks = Symbol[]
+            ks = Pair{Symbol, Symbol}[]
         end
     end
     _note_coord_keys!(out, ks)
     return out
 end
 
-# The coordinate fields every default payload has.
-function _default_coord_keys(defaults)
-    isempty(defaults) && return Symbol[]
-    return Symbol[k for k in (:x, :y, :z) if all(d -> d isa NamedTuple && haskey(d, k), defaults)]
+# The fields every default payload has that are measured along an axis, each with that axis:
+# `x`, `y` and `z` along their own, and those `dims` names along the one it gives.
+function _default_coord_keys(defaults, dims::NamedTuple = (;))
+    isempty(defaults) && return Pair{Symbol, Symbol}[]
+    has(k) = all(d -> d isa NamedTuple && haskey(d, k), defaults)
+    ks = Pair{Symbol, Symbol}[k => k for k in (:x, :y, :z) if has(k)]
+    for (k, dim) in pairs(dims)
+        has(k) && !any(kd -> kd[1] === k, ks) && push!(ks, k => dim)
+    end
+    return ks
 end
 
-# A weak identity table: payload vector => the coordinate fields Masque filled in. Keyed by
-# `objectid` and checked with `===` through a `WeakRef`, so it neither keeps a vector alive nor
-# answers for a different vector that reuses the id. Dead entries are dropped as new ones come.
-const _COORD_KEYS = Dict{UInt, Tuple{WeakRef, Vector{Symbol}}}()
+# A weak identity table: payload vector => the coordinate fields Masque filled in, each with its
+# axis. Keyed by `objectid` and checked with `===` through a `WeakRef`, so it neither keeps a
+# vector alive nor answers for a different vector that reuses the id. Dead entries are dropped
+# as new ones come.
+const _COORD_KEYS = Dict{UInt, Tuple{WeakRef, Vector{Pair{Symbol, Symbol}}}}()
 const _COORD_KEYS_LOCK = ReentrantLock()
-function _note_coord_keys!(v::Vector{Any}, ks::Vector{Symbol})
+function _note_coord_keys!(v::Vector{Any}, ks::Vector{Pair{Symbol, Symbol}})
     return lock(_COORD_KEYS_LOCK) do
         length(_COORD_KEYS) > 64 && filter!(kv -> kv[2][1].value !== nothing, _COORD_KEYS)
         if isempty(ks)
@@ -406,7 +417,7 @@ end
 function _coord_keys(v)
     return lock(_COORD_KEYS_LOCK) do
         e = get(_COORD_KEYS, objectid(v), nothing)
-        (e === nothing || e[1].value !== v) ? Symbol[] : e[2]
+        (e === nothing || e[1].value !== v) ? Pair{Symbol, Symbol}[] : e[2]
     end
 end
 _default_fields(d::NamedTuple) = Base.structdiff(d, NamedTuple{(:index, :segment_index)})
@@ -1685,7 +1696,7 @@ Arbitrary filled polygons, hit-tested even-odd. Produces one `:polygons` [`HitLa
 | `Makie.Band` | `:band` | lower curve + reversed upper curve, as drawn (`direction = :y` swaps x and y) | always exactly one open ring |
 | `Makie.Density` | `:density` | its descendant `Band`'s KDE fill | same shape as `Band` |
 | `Makie.Contourf` | `:contourf` | each filled polygon's exterior, plus its holes as further rings of the same element | payload `(; low, high)`, the band edges nearest each polygon's fill color |
-| `Makie.Violin` | `:violin` | each violin's outline | payload `(; x)`, the nearest category to the ring's geometric center |
+| `Makie.Violin` | `:violin` | each violin's outline | payload `(; x)`, the nearest category to the ring's geometric center; `(; y)` when `orientation = :horizontal` |
 | `Makie.Voronoiplot` | `:voronoiplot` | each cell's exterior ring | cells come back in tessellation order (no cheap cell→generator map), so default payload is `(; index)` only |
 | `Makie.Hexbin` | `:hexbin` | each drawn hexagon's six corners | payload `(; x, y, count)`: the hexagon's center in data units and its count (summed `weights` when given); `threshold = 0` keeps the empty hexagons |
 
@@ -2083,7 +2094,7 @@ end
 
 # ============================ ViewInteractable =============================
 """
-    ViewInteractable(ax; id=:view, wheel=nothing)
+    ViewInteractable(ax; id=:view, wheel=nothing, controls=:hover)
 
 Drag-to-pan and wheel zoom (2D `Axis`), or drag-to-orbit, wheel zoom and Shift+drag pan
 (`Axis3`). Produces one `:view` [`HitLayer`](@ref)
@@ -2102,6 +2113,9 @@ drag on those wins without a modifier — **Shift+drag** forces the view gesture
   is turned off in Makie (`deregister_interaction!(ax, :scrollzoom)`,
   `deactivate_interaction!(ax, :scrollzoom)`, or both `xzoomlock` and `yzoomlock`), which
   gets `:none`.
+- `controls` — the zoom in, zoom out and reset buttons in a corner of the plot: `:hover`
+  (default) shows them while the pointer is over the plot, while the view has keyboard focus,
+  and after a touch on the plot; `:always` keeps them shown; `:none` leaves them out.
 
 **Commits nothing.** A camera is operational state, not an analysis value a notebook reads
 (docs/dev/architecture/12-gesture-channel.md §12.3) — the bond `masque` returns never carries a
@@ -2123,6 +2137,13 @@ limits come back automatic) and, on an `Axis3`, the azimuth and elevation. Axes 
 by `linkaxes!`, `linkxaxes!` or `linkyaxes!` go back with it. Re-running only the `masque`
 cell keeps that starting point, even though the axis still shows the moved view.
 
+**Buttons.** Zoom in and zoom out take the same step as `+` and `-`, about the middle of the
+plot; reset shows once the view has moved. They sit in the top-right corner, or the top-left
+or bottom-right one when a legend or another axis covers it, and never in the bottom-left
+one. On a plot too short for the stack they sit in a row, and on a plot too small for either
+they are left out (drag, the wheel, the keys and a double-click still work). Twin axes in
+one place share one set, which drives the first view there.
+
 `masque` raises `ArgumentError` at build time if `ax` is a `PolarAxis` (a polar pan or zoom
 moves r and θ limits, not Cartesian ones), a `Colorbar`'s value axis (no pan/orbit view applies), a categorical
 2D axis (pan needs numeric limits to shift), or (2D only) either scale isn't client-invertible
@@ -2137,13 +2158,23 @@ ViewInteractable(ax)
 struct ViewInteractable <: AbstractInteractable
     ax; id::Symbol
     wheel::Union{Symbol, Nothing} # `nothing`: follow Makie's own scroll zoom, see `_view_wheel`
+    controls::Symbol
 end
 const _WHEEL_MODES = (:modifier, :always, :none)
-function ViewInteractable(ax; id = :view, wheel = nothing)
+const _VIEW_CONTROLS = (:hover, :always, :none)
+function ViewInteractable(ax; id = :view, wheel = nothing, controls = :hover)
     wheel === nothing || wheel in _WHEEL_MODES ||
         throw(ArgumentError("ViewInteractable: wheel = $(repr(wheel)) is not one of :modifier, :always or :none."))
-    return ViewInteractable(ax, id, wheel)
+    controls isa Symbol && controls in _VIEW_CONTROLS || throw(
+        ArgumentError(
+            "ViewInteractable: controls = $(repr(controls)) is not one of :hover, :always or :none."
+        )
+    )
+    return ViewInteractable(ax, id, wheel, controls)
 end
+# The positional forms from before `controls`, checked as the keyword form is.
+ViewInteractable(ax, id::Symbol) = ViewInteractable(ax; id)
+ViewInteractable(ax, id::Symbol, wheel) = ViewInteractable(ax; id, wheel)
 # The wheel policy a view ships. An explicit `wheel` wins. Without one, an axis whose scroll
 # zoom the author turned off in Makie, with `deregister_interaction!(ax, :scrollzoom)`,
 # `deactivate_interaction!(ax, :scrollzoom)` or (2D) both `xzoomlock` and `yzoomlock`, doesn't zoom on the wheel either; any other axis takes the
@@ -2251,6 +2282,8 @@ function hitlayers(i::ViewInteractable, ctx)
     )
     # Away from where it started (#524): a reset has somewhere to go. Left out at home.
     _view_moved(i.ax) && (geom["moved"] = true)
+    # The corner buttons (#525); left out for the default `:hover`, so manifests don't grow.
+    i.controls === :hover || (geom["controls"] = String(i.controls))
     if !t.is3d && i.ax isa Makie.Axis
         geom["clip"], geom["fill"] = _pan_window(ctx, i.ax)
         links = _pan_links(ctx, i.ax)
