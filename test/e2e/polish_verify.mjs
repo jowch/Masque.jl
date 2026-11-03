@@ -1406,10 +1406,21 @@ try {
       const span = document.querySelector(`#coords_${k}`);
       const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-      const s = sr.querySelector(".surface");
+      // The `0` key belongs to the view's keyboard stop, not the surface.
+      const s = sr.querySelector(".drag-stop-view");
       s.focus();
       s.dispatchEvent(new KeyboardEvent("keydown", { key: "0", bubbles: true, cancelable: true }));
-    }, key);
+      s.blur();
+    }, key).then(async () => {
+      // Later legs expect the view where it started: wait for its reset button to leave.
+      const moved = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        return sr.querySelector(".masque-vb.moved") !== null;
+      }, key);
+      if (!(await until(async () => !(await moved())))) throw new Error(`touch/${key}: the 0 key did not reset the view`);
+    });
     // A one-finger swipe up from (x, y); returns how far the page moved, then puts it back.
     const swipe = async (x, y, dy = 120) => {
       const y0 = await page.evaluate(() => window.scrollY);
