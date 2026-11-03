@@ -52,11 +52,12 @@ export function fmtCoord(v: unknown, f: CoordFormat | undefined, digits: number,
     return (f.prefix ?? "") + body + (f.suffix ?? "")
 }
 
-// Which of a hit's fields are coordinates, each with its axis's format: the payload fields
-// Masque filled in (`layer.coords`, even beside a user's own fields); a line's readout, `x` and
-// `y` unless the payload has its own; a surface point, the `x`, `y` and `z` its payload doesn't
-// override. A field the user set stays a plain number. Only fields whose axis has a format are
-// listed.
+// Which of a hit's fields are measured along an axis, each with that axis's format: the payload
+// fields Masque filled in (`layer.coords`, even beside a user's own fields), such as a point's
+// `x`/`y` or a bar's `value`; a line's readout, `x` and `y` unless the payload has its own; a
+// surface point, the `x`, `y` and `z` its payload doesn't override. A field the user set stays a
+// plain number. Only fields whose axis has a format are listed. The format's `label` (θ, r)
+// renames only the axis's own field: a `value` along r stays `value`.
 export type CoordFields = Record<string, CoordFormat>
 // The coordinates a line hover's readout fills in: `x`, `y`, and `z` on an Axis3 line.
 export function readoutKeys(hit: Hit): readonly string[] {
@@ -66,9 +67,13 @@ export function coordFields(t: AxisTransform | undefined, layer: HitLayer, paylo
     if (!t || !(t.xfmt || t.yfmt || t.zfmt)) return undefined
     const own = payload != null && typeof payload === "object" ? payload as Record<string, unknown> : {}
     const out: CoordFields = {}
-    for (const k of ["x", "y", "z"] as const) {
-        const f = t[`${k}fmt`]
-        if (f && (layer.coords?.includes(k) || (computed.includes(k) && !(k in own)))) out[k] = f
+    for (const [k, dim] of Object.entries(layer.coords ?? {})) {
+        const f = t[`${dim}fmt`]
+        if (f) out[k] = k === dim || f.label === undefined ? f : { ...f, label: undefined }
+    }
+    for (const k of computed) {
+        const f = (k === "x" || k === "y" || k === "z") && t[`${k}fmt`]
+        if (f && !(k in own) && !(k in out)) out[k] = f
     }
     return out
 }

@@ -102,7 +102,13 @@ with those positions, pass `radius` in pixels. On an `Axis3`,
 
 For segments, `mode = :pairs` treats the vertices as separate pairs
 instead of one path, and `unit = :line` makes the whole path one mark.
-`tol` is how far from the line, in pixels, a hover still counts.
+`tol` is how far from the line, in pixels, a mouse hover still counts.
+
+On a touch screen a finger picks the nearest point or line within 16
+pixels of it, so a tap between marks still lands on one. Pass
+`touch_radius` to a point or line layer, or to
+[`interactables`](@ref), to change that reach for one plot, and
+`touch` to [`masque`](@ref) to change it for the whole figure.
 
 `holes` gives each polygon its hole rings, so hovering inside a hole
 does not reach that polygon. `clamp_to_viewport = true` trims a

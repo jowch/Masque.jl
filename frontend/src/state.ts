@@ -1,5 +1,5 @@
 import type { GridMask } from "./gridmask"
-import type { Anchor } from "./geometry"
+import type { Anchor, TouchReach } from "./geometry"
 import type { CrossEls } from "./cross"
 import type { Fade } from "./fade"
 import type { GestureChannel } from "./gesture"
@@ -37,6 +37,15 @@ export const imgPx = (base: HTMLElement, manifest: Manifest, e: MouseEvent): { x
     const r = base.getBoundingClientRect()
     const s = manifest.width / r.width // image-px per CSS-px (manifest renderWidth ÷ live rect; never the base's intrinsic size)
     return { x: (e.clientX - r.left) * s, y: (e.clientY - r.top) * s }
+}
+
+// A finger's hit test for an event from a touch (`pointerType`), with the image px per CSS px
+// of the base's layout box (the width layoutImagePx measures in); null for a mouse or a pen,
+// which keep the tight rule (geometry.ts's hitTestAt).
+export function touchReach(base: HTMLElement, manifest: Manifest, pointerType: string | undefined): TouchReach | null {
+    if (pointerType !== "touch") return null
+    const w = base.offsetWidth > 0 ? base.offsetWidth : base.getBoundingClientRect().width
+    return { pxPerCss_: w > 0 ? manifest.width / w : manifest.scaling }
 }
 
 // Image pixel under the cursor in the base's border box. `offsetWidth` cancels, so a
@@ -230,7 +239,7 @@ export interface OverlayState {
     justDragged_: boolean
     // The last primary pointerup, in client px. Chromium rounds a click's clientX/Y to whole
     // px but not a pointer event's, so onClick reads this to commit the value hover showed (#448).
-    lastUp_: { x: number, y: number } | null
+    lastUp_: { x: number, y: number, type_: string } | null
     // Hover chrome still in g.hi, live or mid-leave. Null once those nodes are gone.
     // drawSelection reads it to drop a ring whose key just entered the selection (#97).
     hiKey_: string | null
