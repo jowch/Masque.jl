@@ -1,0 +1,4 @@
+image = "explore_3d.png"
+
+[outputs]
+b3d00001-0001-4000-8000-000000000005 = "click a station"
