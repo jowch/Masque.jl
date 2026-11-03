@@ -61,6 +61,7 @@ interface Pair {
     // Axis3: the limits the gesture started from, the pinch so far, and the last limits asked.
     base3_?: Limits3
     k3_: number
+    zoomed3_?: boolean
     lim3_?: Limits3
 }
 
@@ -113,7 +114,6 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
         if (!m) return
         const layout = layoutImagePx(ctx.base_, ctx.manifest_, m.x, m.y)
         const k = Math.max(m.d, 1) / p.d_
-        p.d_ = Math.max(m.d, 1)
         if (d.g_.mode === "pan") {
             // The content under the fingers stays under them: the anchor follows the midpoint,
             // and the spread scales the photograph. Both are in the frame on screen now, which
@@ -122,7 +122,9 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
             state.photoAnchor_ = anchor
             const next = panTo(anchor, layout, clampScale(state.photo_.s * k))
             const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), next)
+            // A refused step keeps its spread for the next move.
             if (!lim) return
+            p.d_ = Math.max(m.d, 1)
             state.photo_ = next
             state.photoViewId_ = d.id_
             ctx.photoPaint_(next)
@@ -132,10 +134,14 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
             showViewReadout(ctx, state, viewDrag.limitsTip(lim, ctx.tipDigits_, d.t_, ctx.tipExplicit_))
             return
         }
-        // Axis3: the midpoint orbits; the spread zooms the limits about their center.
+        // Axis3: the midpoint orbits; the spread zooms the limits about their center. Once a
+        // pinch zooms, every later request carries limits, so the settle and the remembered
+        // view match what was last asked.
+        p.d_ = Math.max(m.d, 1)
         p.k3_ *= k
         const input: Record<string, unknown> = viewDrag.requestInput(d, layout, false)
-        const zoomed = p.base3_ !== undefined && Math.abs(p.k3_ - 1) > PINCH_MIN
+        if (p.base3_ !== undefined && Math.abs(p.k3_ - 1) > PINCH_MIN) p.zoomed3_ = true
+        const zoomed = p.zoomed3_ === true
         if (zoomed) {
             const home = state.view3_.get(d.id_)?.home ?? (d.g_.limits as Limits3)
             p.lim3_ = zoomLimits3(p.base3_ as Limits3, p.k3_, home)
@@ -170,7 +176,9 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
 
     return {
         start_(e) {
-            if (oneFingerViews(ctx.manifest_)) return
+            // `views = :onefinger` with a view sets touch-action none and attaches none of this;
+            // without a view it still takes the handles below.
+            const views = !oneFingerViews(ctx.manifest_)
             if (e.touches.length === 1) {
                 const t = e.touches[0]
                 if (!t) return
@@ -180,6 +188,7 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
                     one = null
                     return
                 }
+                if (!views) return
                 const layout = layoutImagePx(ctx.base_, ctx.manifest_, t.clientX, t.clientY)
                 one = innermostView(ctx.manifest_, layout.x, layout.y) ? { x: t.clientX, y: t.clientY } : null
                 return
@@ -187,7 +196,7 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
             one = null
             // Once the page is scrolling the browser owns the touch (not cancelable), and a
             // second finger keeps scrolling it.
-            if (pair || !e.cancelable) return
+            if (!views || pair || !e.cancelable) return
             if (begin(e)) e.preventDefault()
         },
         move_(e) {

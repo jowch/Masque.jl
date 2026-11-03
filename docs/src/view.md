@@ -156,12 +156,13 @@ end
 Ctrl+scroll (Cmd+scroll on a Mac) to zoom in or out around the middle of
 the axis box, and Shift+drag to pan. `wheel` works as it does on a 2D
 axis. On a touch screen, drag with two fingers to turn the view and
-pinch to zoom; one finger scrolls the page. The box keeps its size while the data grows or slides inside it,
-and marks that leave the box are hidden and no longer respond to hover
-or clicks. A line that crosses the edge of the box still responds along
-the part you can see. A sphere from `meshscatter` stops responding once
-its center leaves the box, even if part of it is still showing. From the
-keyboard, `+` / `-` zoom and Shift with an arrow key pans.
+pinch to zoom; one finger scrolls the page. The box keeps its size while
+the data grows or slides inside it, and marks that leave the box are
+hidden and no longer respond to hover or clicks. A line that crosses the
+edge of the box still responds along the part you can see. A sphere from
+`meshscatter` stops responding once its center leaves the box, even if
+part of it is still showing. From the keyboard, `+` / `-` zoom and Shift
+with an arrow key pans.
 
 ## Turn several panels together
 

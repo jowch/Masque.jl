@@ -822,7 +822,8 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   plot it scrolls the page. On a [`ViewInteractable`](@ref), one finger scrolls the page and
   two fingers pan, pinch-zoom or (on an `Axis3`) orbit the view; `touch = (; views = :onefinger)`
   makes one finger pan or orbit it again, as in Masque 0.4, and then a finger on the plot
-  doesn't scroll the page. A mouse or a pen is never affected, so a touchscreen laptop keeps
+  doesn't scroll the page. `touch = false` changes only how a finger picks marks: views still
+  take two fingers. A mouse or a pen is never affected, so a touchscreen laptop keeps
   the mouse's precision. Default `true`.
 - `tooltip_sigdigits` — significant figures for a tooltip number that has no format spec.
   Unset, it is 4, so `0.30000000000000004` shows as `0.3` and `2.71828` as `2.718`;

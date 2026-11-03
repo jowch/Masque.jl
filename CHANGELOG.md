@@ -44,9 +44,9 @@ All notable changes to this project are documented here. The format is based on
   the reach for the figure, `touch_radius` sets it for one plot or layer, and `touch = false`
   turns it off. A mouse or a pen keeps its precision, also on a touchscreen laptop (#528).
 - On a touch screen a finger takes a threshold line or a band edge within 16 pixels of it, and
-  an ROI corner, or the middle of a side, anywhere in a 44-pixel square around it; the lines and grips look
-  as before. A finger elsewhere on a threshold, band or ROI plot scrolls the page, where it
-  used to hold the page still (#530).
+  an ROI corner, or the middle of a side, anywhere in a 44-pixel square around it; the lines
+  and grips look as before. A finger elsewhere on a threshold, band or ROI plot scrolls the
+  page, where it used to hold the page still (#530).
 
 ### Changed
 - Default tooltips and readouts show a coordinate the way its axis labels it. On a

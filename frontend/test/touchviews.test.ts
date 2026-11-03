@@ -38,7 +38,7 @@ const ax = { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "ident
 
 const viewManifest = (mode: "pan" | "orbit", extra: Partial<Manifest> = {}): Manifest => ({
     width: 1200, height: 800, scaling: 2,
-    transforms: { ax1: { ...ax } } as Manifest["transforms"],
+    transforms: { ax1: { ...ax } } as unknown as Manifest["transforms"],
     layers: [{
         id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
         geometry: mode === "pan" ? { x: 0, y: 0, w: 1200, h: 800, mode } :
@@ -118,7 +118,7 @@ describe("touch on a view (#537)", () => {
         expect(readout?.textContent).toMatch(/^x:\[/)
         await vi.advanceTimersByTimeAsync(0)
         expect(requestFrame).toHaveBeenCalled()
-        expect(requestFrame.mock.calls.at(-1)![0]).toMatchObject({ id: "view", settle: false })
+        expect(requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0]).toMatchObject({ id: "view", settle: false })
         // One finger lifts: the gesture ends and settles; the other finger doesn't pan.
         touchEvent(surface, "touchend", [[370, 200]])
         pointer(surface, "pointerup", 170, 200, 1)
@@ -154,7 +154,7 @@ describe("touch on a view (#537)", () => {
         expect(touchEvent(surface, "touchstart", [[200, 200], [300, 200]]).defaultPrevented).toBe(true)
         touchEvent(surface, "touchmove", [[175, 220], [375, 220]])
         await vi.advanceTimersByTimeAsync(0)
-        const last = requestFrame.mock.calls.at(-1)![0] as Record<string, unknown>
+        const last = requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0] as Record<string, unknown>
         expect(last.id).toBe("view")
         expect(typeof last.azimuth).toBe("number")
         expect(last.azimuth).not.toBeCloseTo(0.4)
@@ -166,6 +166,23 @@ describe("touch on a view (#537)", () => {
         const settled = requestFrame.mock.calls.map((c) => c[0] as Record<string, unknown>).find((c) => c.settle === true)
         expect(settled).toMatchObject({ id: "view", settle: true })
         expect((settled!.limits as number[])[1] - (settled!.limits as number[])[0]).toBeCloseTo(5)
+    })
+
+    it("Axis3: a pinch that comes back to its start still sends and settles the limits", async () => {
+        vi.useFakeTimers()
+        const { surface, requestFrame } = setup(viewManifest("orbit"))
+        touchEvent(surface, "touchstart", [[200, 200]])
+        touchEvent(surface, "touchstart", [[200, 200], [300, 200]])
+        touchEvent(surface, "touchmove", [[150, 200], [350, 200]])
+        touchEvent(surface, "touchmove", [[200, 200], [300, 200]])
+        await vi.advanceTimersByTimeAsync(0)
+        const last = requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0] as Record<string, unknown>
+        expect(Array.isArray(last.limits)).toBe(true)
+        expect((last.limits as number[])[1] - (last.limits as number[])[0]).toBeCloseTo(10)
+        touchEvent(surface, "touchend", [])
+        await vi.advanceTimersByTimeAsync(500)
+        const settled = requestFrame.mock.calls.map((c) => c[0] as Record<string, unknown>).find((c) => c.settle === true)
+        expect(Array.isArray(settled!.limits)).toBe(true)
     })
 
     it("touch = (; views = :onefinger) keeps 0.4's one-finger pan", async () => {
@@ -184,13 +201,13 @@ describe("touch on a view (#537)", () => {
 describe("touch on a handle (#530)", () => {
     const threshold = (): Manifest => ({
         width: 1200, height: 800, scaling: 2,
-        transforms: { ax1: { ...ax } } as Manifest["transforms"],
+        transforms: { ax1: { ...ax } } as unknown as Manifest["transforms"],
         layers: [{ id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
             geometry: { orientation: "v", pos: 600, span: [0, 800] } } as unknown as HitLayer],
     })
     const roi = (): Manifest => ({
         width: 1200, height: 800, scaling: 2,
-        transforms: { ax1: { ...ax } } as Manifest["transforms"],
+        transforms: { ax1: { ...ax } } as unknown as Manifest["transforms"],
         layers: [{ id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
             geometry: { x: 200, y: 200, w: 400, h: 400, handle: 16 } } as unknown as HitLayer],
     })
@@ -203,6 +220,14 @@ describe("touch on a handle (#530)", () => {
         expect(surface.classList.contains("grabbing")).toBe(true)
         pointer(surface, "pointerup", 312, 200)
         touchEvent(surface, "touchend", [])
+    })
+
+    it("with views = :onefinger and no view, a finger on the line still holds the page", () => {
+        const { surface } = setup({ ...threshold(), touchViews: "onefinger" })
+        expect(surface.style.touchAction).toBe("pan-x pan-y")
+        pointer(surface, "pointerdown", 312, 200)
+        expect(touchEvent(surface, "touchstart", [[312, 200]]).defaultPrevented).toBe(true)
+        expect(surface.classList.contains("grabbing")).toBe(true)
     })
 
     it("a mouse keeps its own reach on the line", () => {
