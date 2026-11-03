@@ -1414,7 +1414,7 @@ try {
       const t0 = Date.now();
       await touch("touchStart", [[x, y]], t0);
       for (let i = 1; i <= 8; i++) await touch("touchMove", [[x, y - dy * i / 8]], t0 + 16 * i);
-      await touch("touchEnd", [], t0 + 16 * 9);
+      await touch("touchEnd", [], Math.max(t0 + 16 * 9, Date.now()));
       let y1 = y0;
       await until(async () => Math.abs((y1 = await page.evaluate(() => window.scrollY)) - y0) >= 20);
       for (let last = NaN, n = 0; n < 40; n++) { await wait(150); const yy = await page.evaluate(() => window.scrollY); if (yy === last) break; last = yy; }
@@ -1439,13 +1439,36 @@ try {
       if (u.touchAction !== "pan-x pan-y") throw new Error(`touch/view-touch-action: ${u.touchAction}`);
       const g = (await layersOf("view")).find((l) => l.id === "view").geometry;
       const cx = u.left + (g.x + g.w / 2) * u.s, cy = u.top + (g.y + g.h / 2) * u.s;
+      // Diagnostics for a failure: what the surface's touch listeners saw, and what is under the finger.
+      await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        window.__touchSeen = [];
+        for (const t of ["touchstart", "touchmove", "touchend"]) sr.querySelector(".surface").addEventListener(t, (e) => window.__touchSeen.push(`${t}:${e.touches.length}:${e.cancelable}`), { passive: true });
+        // The hint shows for 1.5 s. On a busy WebGL page each CDP touch waits on the page, so the
+        // swipe itself can outlast it: record every note it showed instead of reading it after.
+        const note = sr.querySelector(".masque-note");
+        window.__notes = [];
+        new MutationObserver(() => { if (note.classList.contains("show")) window.__notes.push(note.textContent); })
+          .observe(note, { attributes: true, childList: true, characterData: true, subtree: true });
+      }, "view");
+      const under = await page.evaluate(([x, y]) => {
+        let el = document.elementFromPoint(x, y), out = [];
+        while (el?.shadowRoot) { const inner = el.shadowRoot.elementFromPoint(x, y); if (!inner || inner === el) break; el = inner; }
+        for (let n = el; n && out.length < 4; n = n.parentNode instanceof ShadowRoot ? n.parentNode.host : n.parentElement) out.push(`${n.tagName}.${n.className?.baseVal ?? n.className}`);
+        return out.join(" < ");
+      }, [cx, cy]);
       const moved = await swipe(cx, cy);
       if (Math.abs(moved) < 20) throw new Error(`touch/view-one-finger-scrolls: the page moved ${moved}px`);
       const after = await ui("view");
       if (after.photo) throw new Error(`touch/view-one-finger-scrolls: one finger moved the view (${after.photo})`);
       passed.push("touch/view-one-finger-scrolls");
-      const hinted = await until(async () => /two fingers/i.test((await ui("view")).note), 1000) || /two fingers/i.test(after.note);
-      if (!hinted) throw new Error(`touch/view-hint: no "Use two fingers" note (note: ${JSON.stringify(after.note)})`);
+      const notes = await page.evaluate(() => window.__notes ?? []);
+      if (!notes.some((t) => /two fingers/i.test(t))) {
+        const seen = await page.evaluate(() => (window.__touchSeen ?? []).slice(0, 6).join(" "));
+        throw new Error(`touch/view-hint: no "Use two fingers" note (notes: ${JSON.stringify(notes)}; under the finger: ${under}; surface saw: ${seen}; finger at ${cx},${cy}, view ${JSON.stringify(g)}, s ${u.s})`);
+      }
       passed.push("touch/view-hint");
 
       // Two fingers spread apart: the view zooms in about their midpoint, the readout sits in the
