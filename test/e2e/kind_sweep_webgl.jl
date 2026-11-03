@@ -524,6 +524,16 @@ HTML(
         "<span id=\"coords_violin_h\" style=\"display:none\">$(JSON3.write(sweep.violin_h.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-00000000054b
+@bind ev_raincloud sweep.raincloud
+
+# ╔═╡ d1000000-0000-0000-0000-00000000054c
+HTML(
+    "<span id=\"out_raincloud\">RAINCLOUD=$(sweep_field("raincloud", ev_raincloud))</span>" *
+        "<span id=\"bond_raincloud\" style=\"display:none\">$(repr(ev_raincloud))</span>" *
+        "<span id=\"coords_raincloud\" style=\"display:none\">$(JSON3.write(sweep.raincloud.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000111
 @bind ev_stairs sweep.stairs
 
@@ -1206,6 +1216,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000110
 # ╠═d1000000-0000-0000-0000-000000000549
 # ╠═d1000000-0000-0000-0000-00000000054a
+# ╠═d1000000-0000-0000-0000-00000000054b
+# ╠═d1000000-0000-0000-0000-00000000054c
 # ╠═d1000000-0000-0000-0000-000000000111
 # ╠═d1000000-0000-0000-0000-000000000112
 # ╠═d1000000-0000-0000-0000-0000000000b5

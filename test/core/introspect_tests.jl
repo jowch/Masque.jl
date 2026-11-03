@@ -1423,6 +1423,15 @@ end
         @test [pl.y for pl in ph.payloads] == [1.0, 2.0, 3.0]
         @test all(pl -> !haskey(pl, :x), ph.payloads)
         @test Masque._coord_keys(ph.payloads) == [:y => :y]   # follows the y axis's tick format
+        # A raincloud nudges its violin off the categories; the payload names the category (#564).
+        for orientation in (:vertical, :horizontal)
+            fr = Figure(); ar = Axis(fr[1, 1])
+            rainclouds!(ar, repeat([1, 2], inner = 30), randn(60); orientation)
+            Makie.update_state_before_display!(fr)
+            v = only(filter(i -> i.id === :violin, interactables(fr)))
+            k = orientation === :horizontal ? :y : :x
+            @test [getproperty(pl, k) for pl in v.payloads] == [1.0, 2.0]
+        end
     end
 
     @testset "Voronoiplot extraction" begin

@@ -92,6 +92,9 @@ All notable changes to this project are documented here. The format is based on
   value took 0.2–0.4 s to print the first one, and now takes about 0.1 s (part of #567).
 
 ### Fixed
+- The violin of a `rainclouds!` plot names its category in its tooltip and payload, `1`
+  rather than `0.9775`. Before, it gave the position the violin is nudged to, beside the box
+  and the raindrops (#564).
 - A horizontal violin, `violin!(…; orientation = :horizontal)`, names its own category in
   its tooltip and payload, as the field `y` since the category runs along the y axis. Before,
   it gave an `x` read from the value axis, which could name the wrong category (#558).
