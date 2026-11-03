@@ -819,8 +819,8 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   [`interactables`](@ref)) wins over it. A finger takes a threshold line or a band edge within
   the same radius, and an ROI grip anywhere in a 44 CSS px square around it; elsewhere on the
   plot it scrolls the page. On a [`ViewInteractable`](@ref), one finger scrolls the page and
-  two fingers pan, pinch-zoom or (on an `Axis3`) orbit the view. `touch = false` changes only
-  how a finger picks marks: handles and views work as above. A mouse or a pen is never
+  two fingers pan, pinch-zoom or (on an `Axis3`) orbit the view. `touch = false` gives a finger
+  the mouse's reach on marks and handles; views still take two fingers. A mouse or a pen is never
   affected, so a touchscreen laptop keeps the mouse's precision. Default `true`.
 - `tooltip_sigdigits` — significant figures for a tooltip number that has no format spec.
   Unset, it is 4, so `0.30000000000000004` shows as `0.3` and `2.71828` as `2.718`;
