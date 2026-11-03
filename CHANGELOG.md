@@ -58,8 +58,9 @@ All notable changes to this project are documented here. The format is based on
 
 ### Removed
 - A call to `masque` with one of the `tooltip_*` keywords removed in 0.4, such as
-  `tooltip_bg`, no longer prints a line under the error naming `tooltipstyle`. The call has
-  failed since 0.4; write `tooltipstyle = (; bg = …)` instead (#401).
+  `tooltip_bg`, no longer prints the extra line under the error that says the keyword was
+  removed in 0.4 and gives its `tooltipstyle` form. The call has failed since 0.4; write
+  `tooltipstyle = (; bg = …)` instead (#401).
 
 ### Fixed
 - An inset axis with its own `ViewInteractable`, inside an axis that has one too, now pans
