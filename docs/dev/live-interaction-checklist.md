@@ -121,11 +121,54 @@ to the figure's edge. A
 resolvable per-element `colors` (today `scatter!`'s `color=`) adds a 3px tooltip accent border
 in that colour (`--masque-mark-border`); the text stays neutral.
 
+View chrome (#526): a moving view's live readout (`x:[…] y:[…]`, `z:[…]` too on an `Axis3`
+zoom or pan, `az=… el=…` while an `Axis3` turns) sits in `.masque-readout` at the figure's
+bottom-left corner, for every input (mouse
+drag, wheel, the view keys), instead of following the pointer, so it is never under a finger.
+It is the tooltip's box and theme, shown and hidden at once, and a mark's tooltip hides while
+the view moves. A plain wheel over a `wheel = :modifier` view shows "Ctrl + scroll to zoom"
+("Cmd" on Apple platforms) in `.masque-note`, the tooltip-themed note in the same corner that
+also carries an `onchange` error, for 1.5 s after the last plain wheel; it never covers an
+error the note is showing (#537's touch hint is the same kind of note). The two stack in a
+column, the note above, so a readout that wraps never sits under it. The bottom-left corner
+belongs to the note and the readout: the view buttons (#525) never use it.
+
 ROI chrome: 4 corner handles (7 CSS px, white fill, 1px chrome stroke, ~1.5 CSS px corner
 radius); a corner resizes two axes. The sides have no grip, but the manifest `handle` on each
 edge midpoint (8 logical px × scaling, at least 6 image px) still resizes that one edge, with the
 matching resize cursor. The ROI outline is 1px chrome unless an explicit `hoverstyle` stroke sets
 its own width and colour.
+
+View buttons (#525, look signed off 2026-11-02): each axis with a `ViewInteractable` gets zoom
+in, zoom out and reset in one joined box inside a corner of its viewport (`div.masque-vb`). The
+box takes the tooltip's background, border and shadow, radius `--masque-tip-radius` (4 px), with
+1 px dividers in the border colour; light or dark follows the figure background, like the
+tooltip. Buttons are 24 CSS px square with 14 px icons, stroke 1.75 in a 24-unit box, in the
+tooltip text colour; 44 px buttons with 24 px icons under `any-pointer: coarse`. Top to bottom:
+zoom in (+), zoom out (−), reset (a counter-clockwise arrow), and reset joins only once the view
+has moved. The box sits 8 px in from the corner, the same as `.masque-note`, preferring top
+right, then top left, then bottom right: the first one nothing covers, else the least covered.
+A legend or other box in `occluders` covers a corner, and so does any other axis or colorbar
+viewport overlapping this one, except one that holds this axis whole (an inset covers its
+parent's corner, not the other way round). Bottom left is never used: it holds the
+`.masque-note` stack. The stack may take at most half the axis's height; a shorter axis gets the
+same buttons in a row, at most half its width; on a coarse pointer 44 px is tried before 24 px;
+an axis too small for either gets none. Twin axes on one viewport share one box, driving the
+first view there (the one the wheel drives). On an `Axis3` the corner is the layout cell's, not
+the drawn cube's. Shown while the pointer is over the axis, while the view's keyboard stop has
+focus, and after a touch on the axis (`controls = :hover`); always (`:always`); never (`:none`);
+never once the gesture channel is dead (a static export). The box fades in and out over the
+tooltip's 80–120 ms, and reset fades in the same way when it joins; no pulse, no slide. A press
+never reaches the plot: no pick, no clear, no pan.
+
+Band chrome (`SpanInteractable`, #500, Jonathan picked look D on 2026-11-02): two edges drawn
+as threshold lines (same class, width and hover thickening), the area outside the band filled
+with the plot area's colour (the figure background on a colorbar) at 0.65 opacity
+(`1 - --masque-preview-opacity`), and a grip on each edge, centred across it, in the ROI
+handles' style (6 × 16 CSS px, white fill, 1px chrome stroke, ~1.5 CSS px radius). Inside the
+band, marks keep their hover and click (a `:grid` heatmap or image keeps its hover, and a press
+on it moves the band) and a colorbar keeps its readout; the move cursor shows only where no mark
+is under the pointer.
 
 These decisions are settled: cite the recipes above rather than re-litigating identity,
 wash vs ring, first-PR scope, or Pluto coupling.
@@ -213,8 +256,9 @@ bake it; hover/click or drag only.
 | HLines / VLines | `:segments` | ring | tip, click `@bind`, persist |
 | Threshold | `:threshold` | none | drag commit → `@bind` |
 | Threshold (categorical y) | `:threshold` | none | release commits the nearest category's 1-based position and its label (`value`, `category`, #192), and the line snaps onto that category (#199) |
+| Band (axis / colorbar) | `:span` | none | edge drag and move-drag commit `SpanEvent` (`lo`, `hi`) → `@bind`; an edge stops at the other; a flat band opens toward either side; a press that doesn't move commits nothing; a mark inside keeps hover and click (a grid keeps hover only); a colorbar inside keeps its readout |
 | ROI / box-select | `:roi` | none | drag commit → `@bind` (vector if `selects=`; a `selects`-ROI's grid cell-block union rect is fill-layer-only, `"rectfill"`) |
-| View (2D pan / 3D orbit) | `:view` | none | **commits nothing** (§12.3) — drag readout only, no `@bind` write. On both backends, in-drag frames stream over the gesture channel (`with_js_link`, #102/#133) — the picture and hit manifest swap together on every camera move, `px_per_unit` drops to 1 mid-gesture and restores on release, a pre-existing selection on another layer survives the swap. `:cairo`'s picture is a PNG; `:webgl`'s is a serialized scene applied to the existing canvas |
+| View (2D pan / 3D orbit) | `:view` | none | **commits nothing** (§12.3) — drag readout only, no `@bind` write. On both backends, in-drag frames stream over the gesture channel (`with_js_link`, #102/#133) — the picture and hit manifest swap together on every camera move, `px_per_unit` drops to 1 (or stays at a lower mount density) mid-gesture and restores on release, a pre-existing selection on another layer survives the swap. `:cairo`'s picture is a PNG; `:webgl`'s is a serialized scene applied to the existing canvas |
 | Legend | `:rects` | wash (entry row) | no default tooltip card (a `masque"..."` template still shows), screen reader announces the entry label, hover previews linked layers (closed marks: the entry's series kept, the legend's other series faded; lines: the ring in `g.link`, fade on leave; `g.sel` untouched), click `@bind` payload carries `targets`. A `series!` legend entry pins one path (`series:k`), not every series |
 | Axis / Colorbar readout | `:axis` | none — a click is NOT a selection gesture; must leave a pre-existing selection on ANOTHER layer of the same widget untouched | hover coordinate readout inverted from the `AxisTransform` (`x=…, y=…`; a `Colorbar`'s tooltip is a bare number, no `x=`/`y=` prefix), click → `@bind` `(index=-1, payload=(;x,y)` or `(;value))`, an axis click and a colorbar click both leave a pre-existing `:pts` selection alone (#107 regression), colorbar's bounded bbox is a different hit-test branch from the axis catch-all (a pixel just outside the bbox reads as the axis catch-all, not the colorbar), no overlay hair |
 | Axis readout (categorical y) | `:axis` | none | hover card reads the category label (`y=b`); click → `AxisEvent` with the category's 1-based position and its label as `ycat` (#192) |

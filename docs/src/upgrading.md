@@ -6,6 +6,24 @@ break a call. The
 [changelog](https://github.com/jowch/Masque.jl/blob/main/CHANGELOG.md)
 has every change.
 
+## From 0.4 to 0.5
+
+In Masque 0.5, a plot with a [`ViewInteractable`](@ref) no longer takes
+the page's scroll. Scrolling over the plot scrolls the page instead of
+zooming. To zoom, hold Ctrl (Cmd on a Mac) while scrolling; a trackpad
+pinch zooms too. To zoom on a plain scroll as 0.4 did, pass
+`wheel = :always`:
+
+| 0.4 | 0.5 |
+|---|---|
+| `ViewInteractable(ax)`: scroll zooms | `ViewInteractable(ax)`: Ctrl+scroll zooms, scroll moves the page; `ViewInteractable(ax; wheel = :always)`: scroll zooms |
+| scroll zoom turned off in Makie, the wheel zooms anyway | the wheel does not zoom; pass `wheel = :modifier` or `:always` to zoom |
+
+Scroll zoom counts as turned off in Makie after
+`deregister_interaction!(ax, :scrollzoom)` or
+`deactivate_interaction!(ax, :scrollzoom)`, or with both `xzoomlock`
+and `yzoomlock` set. See [Pan and zoom a 2D axis](@ref).
+
 ## From 0.3 to 0.4
 
 Masque 0.4 changes two things a 0.3 notebook can notice, besides

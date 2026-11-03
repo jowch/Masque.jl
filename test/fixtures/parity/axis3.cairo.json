@@ -2,11 +2,11 @@
     "height": 900,
     "layers": [
         {
-            "coords": [
-                "x",
-                "y",
-                "z"
-            ],
+            "coords": {
+                "y": "y",
+                "z": "z",
+                "x": "x"
+            },
             "kind": "circles",
             "id": "scatter",
             "geometry": [
@@ -103,6 +103,7 @@
         "lines": null,
         "scatter": null
     },
+    "cssWidth": 600,
     "transforms": {
         "ax1": {
             "xscale": "identity",

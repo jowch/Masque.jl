@@ -10,10 +10,10 @@
             "events": [
                 "hover"
             ],
-            "coords": [
-                "x",
-                "y"
-            ],
+            "coords": {
+                "y": "y",
+                "x": "x"
+            },
             "kind": "circles",
             "id": "pts",
             "geometry": [
@@ -102,6 +102,7 @@
             ]
         }
     },
+    "cssWidth": 600,
     "transforms": {
         "ax1": {
             "xscale": "identity",

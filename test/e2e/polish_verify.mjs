@@ -612,6 +612,8 @@ try {
     await page.mouse.down();
     for (let i = 1; i <= 6; i++) await page.mouse.move(cx + 5 * i, cy + 2 * i);
     await page.mouse.up();
+    // Off the figure, so the corner view buttons (#525) hide before the screenshots.
+    await page.mouse.move(2, 2);
     let st = null;
     for (let i = 0; i < (backend === "webgl" ? 50 : 25); i++) {
       await new Promise((r) => setTimeout(r, backend === "webgl" ? 300 : 200));
@@ -716,6 +718,123 @@ try {
     await away();
     await clickAt(...at(0)); // deselect
     passed.push(`${key}/control-ring-visible`);
+  }
+
+  // A `Box` over marks (#547): the boxes Makie draws over hid 0 and 1 (made after the axis) and
+  // hid 5 (made before it, `z = 1`) are the two occluders, and the pointer there shows no
+  // tooltip or ring. The plot draws over the box made before the axis and the one with
+  // `z = -1`, so hid 2 and hid 3 show on screen and take the pointer, as does hid 4 in the open.
+  {
+    const key = "box_hidden";
+    const boxes = await page.evaluate((k) => JSON.parse(document.querySelector(`#occluders_${k}`).innerText), key);
+    if (boxes.length !== 2) throw new Error(`${key}: want two occluders, got ${JSON.stringify(boxes)}`);
+    const hid = (await layersOf(key)).find((l) => l.id === "hid").geometry;
+    const at = (k) => [hid[3 * k], hid[3 * k + 1]];
+    const ringOf = (h) => [h.hi.fill, h.hi.edge, h.hi.plain].some((c) => c && !/masque-leave/.test(c.className ?? ""));
+    const away = async () => { await hoverAt(key, 2, 2); await page.waitForTimeout(600); };
+    await away();
+    const rest = await screenOf(key);
+    const orange = (k) => { const [r, g, b] = rest.mean(...at(k), 2); return r > 200 && g > 100 && g < 200 && b < 80; };
+    for (const k of [0, 1, 5]) {
+      const [x, y] = at(k);
+      if (!boxes.some(([bx, by, bw, bh]) => x > bx && x < bx + bw && y > by && y < by + bh)) throw new Error(`${key}: hid ${k} at ${[x, y]} is under no occluder ${JSON.stringify(boxes)}`);
+      if (orange(k)) throw new Error(`${key}: hid ${k} shows through the box on screen (${rest.mean(...at(k), 2)})`);
+      await away();
+      const h = await hoverAt(key, x, y);
+      if (h.show || ringOf(h)) throw new Error(`${key}/hover: the pointer reached hid ${k} through the box (tip ${JSON.stringify(h.text)})`);
+    }
+    for (const k of [2, 3, 4]) {
+      if (!orange(k)) throw new Error(`${key}: hid ${k} is not drawn over its box on screen (${rest.mean(...at(k), 2)})`);
+      await away();
+      const h = await hoverAt(key, ...at(k));
+      if (!h.show || !ringOf(h)) throw new Error(`${key}/control: no tooltip or ring for hid ${k}, which shows (tip ${JSON.stringify(h.text)})`);
+    }
+    await away();
+    passed.push(`${key}/no-hover-through-box`);
+  }
+
+  // A `Box` over each kind of axis (#547): the backends draw it differently, so on each one a
+  // mark is hidden on screen exactly when it sits under a shipped occluder, and every other
+  // mark takes the pointer. Two centre marks hide on each backend (Cairo: after, polar; WebGL:
+  // after, 3D), so the check sees both outcomes.
+  {
+    const key = "box_axes";
+    const boxes = await page.evaluate((k) => JSON.parse(document.querySelector(`#occluders_${k}`).innerText), key);
+    const layers = (await layersOf(key)).filter((l) => /^p[1-6]$/.test(l.id)).sort((a, b) => a.id.localeCompare(b.id));
+    if (layers.length !== 6) throw new Error(`${key}: want six mark layers, got ${JSON.stringify(layers.map((l) => l.id))}`);
+    const ringOf = (h) => [h.hi.fill, h.hi.edge, h.hi.plain].some((c) => c && !/masque-leave/.test(c.className ?? ""));
+    const away = async () => { await hoverAt(key, 2, 2); await page.waitForTimeout(600); };
+    await away();
+    const rest = await screenOf(key);
+    const orange = ([x, y]) => { const [r, g, b] = rest.mean(x, y, 2); return r > 200 && g > 100 && g < 200 && b < 80; };
+    const under = ([x, y]) => boxes.some(([bx, by, bw, bh]) => x > bx && x < bx + bw && y > by && y < by + bh);
+    const hidden = [];
+    for (const l of layers) {
+      for (let k = 0; 3 * k < l.geometry.length; k++) {
+        const at = [l.geometry[3 * k], l.geometry[3 * k + 1]];
+        const occluded = under(at), shown = orange(at);
+        if (occluded === shown) throw new Error(`${key}: ${l.id}:${k} at ${at.map(Math.round)} is ${shown ? "drawn" : "hidden"} on screen but ${occluded ? "under" : "outside"} the occluders ${JSON.stringify(boxes)}`);
+        await away();
+        const h = await hoverAt(key, ...at);
+        if ((h.show && ringOf(h)) === occluded) throw new Error(`${key}/hover: ${l.id}:${k} ${occluded ? "takes the pointer through its box" : "shows but takes no pointer"} (tip ${JSON.stringify(h.text)})`);
+        if (occluded) hidden.push(`${l.id}:${k}`);
+      }
+    }
+    const want = backend === "webgl" ? ["p1:0", "p5:0"] : ["p1:0", "p4:0"];
+    if (JSON.stringify(hidden) !== JSON.stringify(want)) throw new Error(`${key}: hidden marks ${JSON.stringify(hidden)}, want ${JSON.stringify(want)}`);
+    await away();
+    passed.push(`${key}/hidden-exactly-under-occluders`);
+  }
+
+  // A band (#500): outside it the picture fades toward the plot area at the preview strength
+  // (0.35 of the picture left showing), inside it the picture is untouched, and each edge's grip
+  // is white. Measured against the same widget with its overlay hidden.
+  for (const key of ["span_axis", "span_colorbar"]) {
+    const layers = await layersOf(key);
+    const layer = layers.find((l) => l.kind === "span");
+    if (!layer) throw new Error(`${key}: no span layer`);
+    const overlay = (show) => page.evaluate(([k, on]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      for (const svg of sr.querySelectorAll("svg")) svg.style.visibility = on ? "" : "hidden";
+      const bg = getComputedStyle(sr.host).getPropertyValue("--masque-fig-bg");
+      const dim = sr.querySelector("rect.masque-span-dim");
+      const g = (sel) => [...sr.querySelectorAll(sel)].map((r) => ["x", "y", "width", "height", "x1", "y1"].map((a) => Number(r.getAttribute(a))));
+      return { fill: dim ? getComputedStyle(dim).fill : null, bg, lines: g("line.masque-threshold-line"), grips: g("rect.masque-handle") };
+    }, [key, show]);
+    await hoverAt(key, 2, 2);
+    const info = await overlay(false);
+    const bare = await screenOf(key);
+    await overlay(true);
+    await page.waitForTimeout(200);
+    const shot = await screenOf(key);
+    const fill = (info.fill.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+    const h = layer.geometry.orientation === "h";
+    const [s0, s1] = layer.geometry.span;
+    const q = s0 + 0.3 * (s1 - s0);
+    const ed = info.lines.map((l) => (h ? l[5] : l[4])).sort((a, b) => a - b);
+    const at = (p) => (h ? [q, p] : [p, q]);
+    const t = (await page.evaluate((k) => JSON.parse(document.querySelector(`#axes_${k}`).textContent), key))[layer.axis];
+    const [e0, e1] = h ? [t.viewport[1], t.viewport[1] + t.viewport[3]] : [t.viewport[0], t.viewport[0] + t.viewport[2]];
+    const probes = [
+      { p: (e0 + ed[0]) / 2, out: true, what: "below" }, { p: (ed[1] + e1) / 2, out: true, what: "above" },
+      { p: (ed[0] + ed[1]) / 2, out: false, what: "inside" },
+    ];
+    for (const { p, out, what } of probes) {
+      const [x, y] = at(p);
+      const was = bare.mean(x, y, 1.5), now = shot.mean(x, y, 1.5);
+      const want = out ? was.map((c, i) => 0.35 * c + 0.65 * fill[i]) : was;
+      if (now.some((c, i) => Math.abs(c - want[i]) > 10)) {
+        throw new Error(`${key}/${what}: pixel ${now.map(Math.round)} at ${x.toFixed(0)},${y.toFixed(0)}, want ${want.map(Math.round)} (bare ${was.map(Math.round)}, fade toward ${fill})`);
+      }
+    }
+    passed.push(`${key}/fade-outside`);
+    for (const [gx, gy, gw, gh] of info.grips) {
+      const c = shot.mean(gx + gw / 2, gy + gh / 2, 1);
+      if (c.some((v) => v < 235)) throw new Error(`${key}/grip: the grip at ${gx.toFixed(0)},${gy.toFixed(0)} reads ${c.map(Math.round)}, want white`);
+    }
+    passed.push(`${key}/grips`);
   }
 
   // A plot drawn with `visible = false` (#484): picking legend entry "a" fades line c and leaves
@@ -1226,13 +1345,19 @@ try {
       const b = host.querySelector("img, canvas").getBoundingClientRect();
       const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
       sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", {
-        bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: dy,
+        bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: dy, ctrlKey: true,
       }));
       // Read in the same turn as the wheel: the readout hides 150 ms after the last notch, and
       // on a loaded software-GL page two animation frames can take longer than that.
-      const t = sr.querySelector(".masque-tip");
+      // The readout sits in the figure's bottom-left corner (#526), and no mark tooltip shows.
+      const t = sr.querySelector(".masque-readout");
       const cs = getComputedStyle(t);
-      const during = { show: t.classList.contains("show"), text: t.innerText, bg: cs.backgroundColor, color: cs.color };
+      const tb = t.getBoundingClientRect(), hb = sr.host.getBoundingClientRect();
+      const during = {
+        show: t.classList.contains("show"), text: t.innerText, bg: cs.backgroundColor, color: cs.color,
+        left: tb.left - hb.left, bottom: hb.bottom - tb.bottom,
+        tip: sr.querySelector(".masque-tip").classList.contains("show"),
+      };
       await new Promise((res) => setTimeout(res, 600));   // past the wheel's idle settle
       return { during, after: t.classList.contains("show") };
     }, ["view3d", view3.x + view3.w / 2, view3.y + view3.h / 2, deltaY]);
@@ -1242,6 +1367,10 @@ try {
     if (r.during.bg !== lightTip.bg || r.during.color !== lightTip.color) {
       throw new Error(`view3d/zoom-readout: readout theme ${r.during.bg}/${r.during.color} differs from the hover tooltip's ${lightTip.bg}/${lightTip.color}`);
     }
+    if (!(Math.abs(r.during.left - 8) <= 2 && Math.abs(r.during.bottom - 8) <= 2)) {
+      throw new Error(`view3d/zoom-readout: the readout is not in the figure's bottom-left corner: ${JSON.stringify(r.during)}`);
+    }
+    if (r.during.tip) throw new Error("view3d/zoom-readout: a mark tooltip shows while the view zooms");
     if (r.after) throw new Error("view3d/zoom-readout: the readout is still showing after the zoom settled");
     await wheel3(300);
     passed.push("view3d/zoom-readout");
@@ -1306,6 +1435,75 @@ try {
     },
   });
   passed.push("tooltip-theme-follows-figure-bg");
+
+  // #525: the corner view buttons' look ("Visual language (settled)"). Hovered by the real
+  // mouse on a light figure (`view`) and a dark one whose legend takes the top-right corner
+  // (`view_dark`): the box wears the tooltip's background, text and border colours, light or
+  // dark after the figure; 4 px radius; 24 px buttons with 14 px icons at stroke 1.75; the
+  // tooltip's fade; reset out until the view moves; the pixels on screen are the box's.
+  for (const [key, corner, dark] of [["view", "tr", false], ["view_dark", "tl", true]]) {
+    const vp = await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      const g = JSON.parse(span.textContent).find((l) => l.kind === "view").geometry;
+      return { x: b.left + g.x * s, y: b.top + g.y * s, w: g.w * s, h: g.h * s };
+    }, key);
+    await page.mouse.move(vp.x + vp.w / 2, vp.y + vp.h / 2);
+    // Read once the fade in has ended (a busy WebGL page can start it late), for up to 3 s.
+    let st = null;
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      st = await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const box = sr.querySelector(".masque-vb");
+      const tip = getComputedStyle(sr.querySelector(".masque-tip"));
+      const cs = getComputedStyle(box);
+      const plus = box.querySelector(".masque-vb-in");
+      const svg = plus.querySelector("svg");
+      const r = box.getBoundingClientRect();
+      return {
+        corner: box.dataset.corner, show: box.classList.contains("show"), opacity: Number(cs.opacity),
+        bg: cs.backgroundColor, color: cs.color, border: cs.borderTopColor, radius: cs.borderTopLeftRadius,
+        shadow: cs.boxShadow, transition: cs.transitionProperty + " " + cs.transitionDuration,
+        tipBg: tip.backgroundColor, tipColor: tip.color, tipBorder: tip.borderTopColor, tipShadow: tip.boxShadow,
+        btn: [plus.getBoundingClientRect().width, plus.getBoundingClientRect().height], icon: svg.getBoundingClientRect().width,
+        stroke: svg.getAttribute("stroke-width"), divider: getComputedStyle(box.querySelector(".masque-vb-out")).borderTopColor,
+        reset: getComputedStyle(box.querySelector(".masque-vb-reset")).display,
+        rect: { x: r.left, y: r.top, w: r.width, h: r.height },
+      };
+      }, key);
+      if (st.show && st.opacity >= 0.99) break;
+    }
+    const fail = (m) => { throw new Error(`${key}-view-buttons: ${m} (${JSON.stringify(st)})`); };
+    if (!st.show || st.opacity < 0.99) fail("hover did not show the box");
+    if (st.corner !== corner) fail(`corner ${st.corner}, expected ${corner}`);
+    if (st.bg !== st.tipBg || st.color !== st.tipColor || st.border !== st.tipBorder || st.divider !== st.tipBorder) fail("box colours are not the tooltip's");
+    if (st.shadow !== st.tipShadow) fail("box shadow is not the tooltip's");
+    if (st.radius !== "4px") fail("radius is not 4 px");
+    if (st.btn[0] !== 24 || st.btn[1] !== 24 || st.icon !== 14 || st.stroke !== "1.75") fail("button, icon or stroke size is off");
+    if (!/opacity 0\.1s/.test(st.transition)) fail("the box does not fade over the tooltip's 100 ms");
+    if (st.reset !== "none") fail("reset shows before the view has moved");
+    // 0..1 lightness: the L of an lch() colour, else the luminance of an rgb() one.
+    const lum = (c) => { const v = c.match(/[\d.]+/g).map(Number); return c.startsWith("lch") ? v[0] / 100 : (0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]) / 255; };
+    if (dark ? !(lum(st.bg) < 0.3) : !(lum(st.bg) > 0.8)) fail(`a ${dark ? "dark" : "light"} figure's box is not ${dark ? "dark" : "light"}`);
+    // On screen: a spot inside the box, between the icon and the edge, reads the box's colour.
+    const png = PNG.sync.read(await page.screenshot({ clip: { x: st.rect.x + 3, y: st.rect.y + 3, width: 2, height: 2 } }));
+    // The browser resolves the box's colour (lch or rgb) to sRGB through a canvas.
+    const want = await page.evaluate((css) => {
+      const c = document.createElement("canvas").getContext("2d");
+      c.fillStyle = css; c.fillRect(0, 0, 1, 1);
+      return [...c.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+    }, st.bg);
+    if (![0, 1, 2].every((c) => Math.abs(png.data[c] - want[c]) <= 12)) fail(`screen reads ${[...png.data.slice(0, 3)]} inside the box, not ${want}`);
+    await page.mouse.move(1, 1);
+    passed.push(`${key}/view-buttons-look`);
+  }
 
   if (unexpected.length) throw new Error(`page errors: ${unexpected.join(" | ")}`);
   passed.push("no-console-errors");

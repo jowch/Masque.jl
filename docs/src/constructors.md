@@ -102,7 +102,13 @@ with those positions, pass `radius` in pixels. On an `Axis3`,
 
 For segments, `mode = :pairs` treats the vertices as separate pairs
 instead of one path, and `unit = :line` makes the whole path one mark.
-`tol` is how far from the line, in pixels, a hover still counts.
+`tol` is how far from the line, in pixels, a mouse hover still counts.
+
+On a touch screen a finger picks the nearest point or line within 16
+pixels of it, so a tap between marks still lands on one. Pass
+`touch_radius` to a point or line layer, or to
+[`interactables`](@ref), to change that reach for one plot, and
+`touch` to [`masque`](@ref) to change it for the whole figure.
 
 `holes` gives each polygon its hole rings, so hovering inside a hole
 does not reach that polygon. `clamp_to_viewport = true` trims a
@@ -133,7 +139,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `Surface` | `SurfaceInteractable` | `i`, `j`, `x`, `y`, `z`; `value` when `color` is a separate matrix | `:surface` |
 | `Poly` / `Band` / `Density` / `Voronoiplot` | `PolygonInteractable` | `index` | `:poly`, `:band`, … |
 | `Contourf` | `PolygonInteractable` | `low`, `high` | `:contourf` |
-| `Violin` | `PolygonInteractable` | `x` | `:violin` |
+| `Violin` | `PolygonInteractable` | `x` (`y` when horizontal) | `:violin` |
 | `Hexbin` | `PolygonInteractable` | `x`, `y`, `count` | `:hexbin` |
 | `Text` | `TextInteractable` | `text`, `index`, `x`, `y` | `:text` |
 | `Stem` | `interactables(p)` | points, and stems as a second layer | `stem.points`, `stem.stems` |
@@ -148,13 +154,14 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | [`AxisInteractable`](@ref) | `(ax; id=:axis)` | [`AxisEvent`](@ref): `x`, `y` | [Read coordinates](@ref) |
 | [`ColorbarInteractable`](@ref) | `(cb; id=:colorbar)` | [`ColorbarEvent`](@ref): `value` | [Read coordinates](@ref) |
 | [`ThresholdInteractable`](@ref) | `(ax; orientation=:horizontal, value=nothing, id=:threshold)` | [`ThresholdEvent`](@ref): `value`, starting at `value`, or mid-axis without one | [Read coordinates](@ref) |
+| [`SpanInteractable`](@ref) | `(ax; span, orientation=:vertical, id=:span)` | [`SpanEvent`](@ref): `lo`, `hi`, starting at `span` | [Drag a band](@ref) |
 | [`LegendInteractable`](@ref) | `(leg; targets=nothing, tooltip=nothing, id=:legend)` | [`LegendEvent`](@ref): `label`, `group`, `targets` | [Legend](@ref) |
 | [`ROIInteractable`](@ref) | `(ax; bounds=nothing, selects=nothing, id=:roi)` | [`BoundsEvent`](@ref), starting at `bounds`, or the middle half of the axis without them; with `selects`, the target's field holds the marks or cells inside | [Brush a region](@ref) |
-| [`ViewInteractable`](@ref) | `(ax; id=:view)` | no field | [Pan, zoom and orbit](@ref) |
+| [`ViewInteractable`](@ref) | `(ax; wheel=:modifier, controls=:hover, id=:view)` | no field | [Pan, zoom and orbit](@ref) |
 | [`SliceInteractable`](@ref) | `(plots)`, `(ax, plots)`, or `(ax; series, orientation=:vertical, crosshair=true, covers, tooltip)` | no field; hover only | [Slice across series](@ref) |
 
-A threshold's `value` and a box's `bounds` also accept the event they
-produce, so one widget can set where another starts. Without `targets`, a
+A threshold's `value`, a band's `span` and a box's `bounds` also accept
+the event they produce, so one widget can set where another starts. Without `targets`, a
 legend links each entry to the layers its plots have in the same
 `masque` call.
 

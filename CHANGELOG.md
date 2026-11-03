@@ -6,11 +6,41 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Breaking
+- Scrolling over a plot with a `ViewInteractable` scrolls the page, as it does everywhere else
+  on the page. To zoom, hold Ctrl (Cmd on a Mac) while scrolling; a trackpad pinch zooms
+  too, now in Safari as well (#541). A plain scroll over the plot shows a short hint in its
+  corner saying so. Before, any scroll over the plot zoomed it and the page stopped scrolling.
+  `ViewInteractable(ax; wheel = :always)` brings back the old behavior, and `wheel = :none`
+  turns wheel zoom off. An axis whose scroll zoom is turned off in Makie, with
+  `deregister_interaction!(ax, :scrollzoom)`, `deactivate_interaction!(ax, :scrollzoom)` or
+  both `xzoomlock` and `yzoomlock`, gets `wheel = :none` unless the call says otherwise;
+  Masque 0.4 ignored those settings. See
+  [Upgrading](https://jowch.github.io/Masque.jl/stable/upgrading/) (#526).
+
 ### Added
 - A `surface!` on a `PolarAxis`, which is how Makie draws a polar heatmap, responds to hover
   and click like a surface on an `Axis3`: the tooltip shows the point nearest the pointer, and
   a click gives a `GridCellEvent` with its `(i, j)`. Before, `masque` skipped it with a
   warning (#514).
+- A moved view can go back to where it started: double-click an empty part of the plot, or
+  press `0` while the view has keyboard focus. Limits come back as written, so automatic
+  limits are automatic again, and an `Axis3` gets its azimuth and elevation back. Linked axes
+  and panels go back together. Re-running only the `masque` cell keeps the starting view (#524).
+- A plot that pans or orbits shows zoom in, zoom out and reset buttons in a corner while the
+  pointer is over it, so a reader can see it moves. Figures that already use
+  `ViewInteractable` gain them; `ViewInteractable(ax; controls = :none)` leaves them out and
+  `controls = :always` keeps them shown (#525).
+- `SpanInteractable` drags a band, a `(lo, hi)` range, on an `Axis` or a `Colorbar`. Drag an
+  edge to move that end, or inside the band to move both. The plot outside the band is faded
+  and each edge has a grip. Its field is a `SpanEvent` with `lo` and `hi`. Points, lines, bars
+  and shapes inside the band still answer hover and click; a heatmap or image inside it
+  answers hover, and a press on it moves the band (#500).
+- On a touch screen a finger picks the nearest point or line within 16 pixels of it, instead
+  of only the mark under it, so a small marker or a thin line is easy to tap. Bars, polygons
+  and heatmap cells still take a tap inside them. `masque(fig; touch = (; radius = 8))` sets
+  the reach for the figure, `touch_radius` sets it for one plot or layer, and `touch = false`
+  turns it off. A mouse or a pen keeps its precision, also on a touchscreen laptop (#528).
 - Sliders, toggles and checkboxes are easier to hit with a finger. On a touch screen each
   one answers a touch a little past its drawn edge, up to 44 px across, but never more than
   halfway to the next control or axis, so the rows of a `SliderGrid` don't take each other's
@@ -26,11 +56,46 @@ All notable changes to this project are documented here. The format is based on
   your own `payloads` fields. Templates and the fields you set yourself are unchanged, and so
   is the `@bind` value. A set `tooltip_sigdigits` wins over the
   format's precision. See "Axis units" on the Tooltips page (#510).
+- A bar's `low`, `high` and `value` in the default tooltip read in its axis's unit too, as
+  do a histogram's, a waterfall's, a box plot's, a crossbar's and a span's values. A
+  histogram's `low` and `high` are its bin edges, so they read in the bin axis's unit.
+  So does the readout while you drag a `SpanInteractable` band's edges (#543).
 - **Breaking:** a click on a bound line on an `Axis3` picks the point you plotted nearest
   the click, as on a 2D `Axis`, where it used to pick the whole line. `pick.index` is now
   that point's position in your data, `pick.line` says which line it is on, and `pick.x`,
   `pick.y` and `pick.z` hold it. `selected=` indices on such a line name points too. To
   upgrade, code that read `pick.index` as the line now reads `pick.line` (#518).
+- A `:webgl` figure wider than `max_width`, or any `:webgl` figure with a small
+  `max_width`, now draws its canvas at about twice the width it shows at, as `:cairo` does.
+  Before, the canvas was always twice the figure's own width, so a 1600-wide figure drew
+  3200 pixels across to show at 700. Figures no wider than `max_width` are unchanged, and
+  `px_per_unit` still sets the density when you pass it (#548).
+- While you pan, zoom or turn a view, its readout (the axis limits, or an `Axis3`'s angles
+  while it turns) shows in the bottom-left corner of the figure instead of beside the pointer,
+  and a point's tooltip doesn't show over it (#526).
+
+### Fixed
+- A horizontal violin, `violin!(…; orientation = :horizontal)`, names its own category in
+  its tooltip and payload, as the field `y` since the category runs along the y axis. Before,
+  it gave an `x` read from the value axis, which could name the wrong category (#558).
+- An inset axis with its own `ViewInteractable`, inside an axis that has one too, now pans
+  and zooms itself when the pointer is over it. Before, a drag or Ctrl+wheel over the inset
+  moved the outer plot instead (#559).
+- A figure shown narrower than it was drawn for, as in the docs on a phone or in a narrow
+  Pluto window, keeps its hover and click targets the same size on screen. Before, every
+  target shrank with the picture: on a phone a scatter dot's target was about half its size
+  in Pluto, and a threshold line was hard to grab. Pluto at full width is unchanged (#527).
+- A figure you `resize!` after it is shown keeps its highlights on the marks. The next pan,
+  zoom or `onchange` redraw shows the new size, and the hover ring and selection now follow
+  it, where they used to land up to a few hundred pixels below the mark (#546).
+- With WebGLMakie, on a page with many plots, the first pan or zoom of a view after scrolling
+  back to it redraws the plot while the key or the mouse button is down. Before, that redraw
+  was dropped, and the plot showed the old picture shifted until the gesture ended.
+
+### Fixed
+- An opaque `Box` drawn over an axis hides the marks under it from the pointer too, as a
+  legend does: hovering or clicking the box no longer shows a tooltip or ring for a mark you
+  can't see (#547).
 
 ## [0.4.5] - 2026-11-02
 

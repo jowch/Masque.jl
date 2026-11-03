@@ -444,6 +444,128 @@ try {
   // layer dict every other kind gets by from `layersOf`.
   const transformsOf = (key) => page.evaluate((k) => JSON.parse(document.querySelector(`#axes_${k}`).textContent), key);
 
+  // #524: a real double-click on an empty part of a view's plot (`g`, the view layer's
+  // geometry), through Chromium's own input path, then the reset frame's stamp. The spot is the
+  // first of a few around the viewport where hover finds no mark.
+  const resetByDoubleClick = async (key, g) => {
+    const readStamp = async () => {
+      const raw = await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        return host?.dataset.masqueGestureFrame ?? "";
+      }, key);
+      return raw ? JSON.parse(raw) : null;
+    };
+    const before = await readStamp();
+    let spot = null;
+    for (const [fx, fy] of [[0.08, 0.08], [0.92, 0.08], [0.08, 0.92], [0.92, 0.92], [0.5, 0.08], [0.08, 0.5], [0.5, 0.5]]) {
+      const x = g.x + fx * g.w, y = g.y + fy * g.h;
+      if (!(await dispatchAt(key, x, y, "pointermove")).show) { spot = { x, y }; break; }
+    }
+    if (!spot) throw new Error(`${key}-reset: no empty spot in the view to double-click`);
+    const at = await page.evaluate(([k, ix, iy]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      return { x: b.left + ix * s, y: b.top + iy * s };
+    }, [key, spot.x, spot.y]);
+    await page.mouse.dblclick(at.x, at.y);
+    const tries = backend === "webgl" ? 50 : 25;
+    const delayMs = backend === "webgl" ? 300 : 200;
+    for (let i = 0; i < tries; i++) {
+      await new Promise((r) => setTimeout(r, delayMs));
+      const st = await readStamp();
+      if (st && st.n > (before?.n ?? 0) && st.reset === true && st.settle === true) {
+        await page.mouse.move(1, 1);
+        return st;
+      }
+    }
+    throw new Error(`${key}-reset: no reset frame landed after a double-click at ${JSON.stringify(spot)} (last ${JSON.stringify(await readStamp())})`);
+  };
+  // #525: the corner view buttons, through Chromium's own input path. A real hover over the
+  // view's viewport shows its box in the expected corner, 8 CSS px in; zoom in lands a settled
+  // frame with narrower limits and brings reset in; reset lands the reset frame and takes reset
+  // out; nothing commits; leaving the plot hides the box.
+  const driveButtons = async (key, layer, corner) => {
+    const g = layer.geometry;
+    const probe = () => page.evaluate(([k, id]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const box = sr.querySelector(`.masque-vb[data-view="${id}"]`);
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      const rect = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
+      const btn = (c) => { const el = box?.querySelector(`.masque-vb-${c}`); return el && getComputedStyle(el).display !== "none" ? rect(el) : null; };
+      return {
+        stamp: host.dataset.masqueGestureFrame ?? "", base: { x: b.left, y: b.top, s },
+        box: box && !box.hidden ? { corner: box.dataset.corner, show: box.classList.contains("show"), opacity: Number(getComputedStyle(box).opacity), r: rect(box), in: btn("in"), out: btn("out"), reset: btn("reset") } : null,
+      };
+    }, [key, layer.id]);
+    await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1).scrollIntoView({ block: "center" });
+    }, key);
+    await page.mouse.move(1, 1);
+    let p = await probe();
+    if (!p.box) throw new Error(`${key}-buttons: no button box for view ${layer.id}`);
+    if (p.box.show) throw new Error(`${key}-buttons: the box shows before any hover`);
+    const vp = { x: p.base.x + g.x * p.base.s, y: p.base.y + g.y * p.base.s, w: g.w * p.base.s, h: g.h * p.base.s };
+    await page.mouse.move(vp.x + vp.w / 2, vp.y + vp.h / 2);
+    // Read once the fade in has ended (a busy WebGL page can start it late), for up to 3 s.
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      p = await probe();
+      if (p.box.show && p.box.opacity >= 0.99) break;
+    }
+    if (!p.box.show || p.box.opacity < 0.99) throw new Error(`${key}-buttons: hover did not show the box (${JSON.stringify(p.box)})`);
+    if (p.box.corner !== corner) throw new Error(`${key}-buttons: box in corner ${p.box.corner}, expected ${corner}`);
+    const r = p.box.r, near = (a, b) => Math.abs(a - b) <= 1.5;
+    const xOk = corner === "tl" ? near(r.x, vp.x + 8) : near(r.x + r.w, vp.x + vp.w - 8);
+    const yOk = corner === "br" ? near(r.y + r.h, vp.y + vp.h - 8) : near(r.y, vp.y + 8);
+    if (!xOk || !yOk) throw new Error(`${key}-buttons: box ${JSON.stringify(r)} is not 8 px inside the ${corner} corner of ${JSON.stringify(vp)}`);
+    if (p.box.reset) throw new Error(`${key}-buttons: reset shows before the view has moved`);
+    const before = await textOf(`#out_${key}`);
+    const waitStamp = async (n0, want) => {
+      const tries = backend === "webgl" ? 50 : 25, delayMs = backend === "webgl" ? 300 : 200;
+      for (let i = 0; i < tries; i++) {
+        await new Promise((res) => setTimeout(res, delayMs));
+        const st = (await probe()).stamp;
+        if (st) { const o = JSON.parse(st); if (o.n > n0 && want(o)) return o; }
+      }
+      throw new Error(`${key}-buttons: no frame landed (last ${(await probe()).stamp})`);
+    };
+    const n0 = p.stamp ? JSON.parse(p.stamp).n : 0;
+    await page.mouse.click(p.box.in.x + p.box.in.w / 2, p.box.in.y + p.box.in.h / 2);
+    const z = await waitStamp(n0, (o) => o.settle === true && o.reset !== true);
+    const width = (o) => (Array.isArray(o.limits) ? o.limits[1] - o.limits[0] : o.xmax - o.xmin);
+    const inAt = p.box.in;
+    p = await probe();
+    if (!p.box.reset) throw new Error(`${key}-buttons: reset did not join after zoom in`);
+    // Reset joining moves no button already there: a second click on + is still +.
+    if (Math.abs(p.box.in.x - inAt.x) > 0.5 || Math.abs(p.box.in.y - inAt.y) > 0.5) throw new Error(`${key}-buttons: zoom in moved from ${JSON.stringify(inAt)} to ${JSON.stringify(p.box.in)} when reset joined`);
+    if (!p.box.show) throw new Error(`${key}-buttons: the box hid while the pointer was on it`);
+    await page.mouse.click(p.box.reset.x + p.box.reset.w / 2, p.box.reset.y + p.box.reset.h / 2);
+    const home = await waitStamp(z.n, (o) => o.reset === true && o.settle === true);
+    // Against the home limits the reset lands at (orbit frames carry `limits`, pans x/y spans).
+    if (!(width(z) < 0.99 * width(home))) throw new Error(`${key}-buttons: zoom in did not narrow the limits (${JSON.stringify(z)}, home ${JSON.stringify(home)})`);
+    p = await probe();
+    if (p.box.reset) throw new Error(`${key}-buttons: reset still shows after the view went home`);
+    const after = await textOf(`#out_${key}`);
+    if (after !== before) throw new Error(`${key}-buttons: a button press committed ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+    await page.mouse.move(1, 1);
+    await new Promise((res) => setTimeout(res, 250));
+    if ((await probe()).box.show) throw new Error(`${key}-buttons: the box stayed after the pointer left`);
+    passed.push(`${key}/view-buttons`);
+    console.error(`OK  ${key}/buttons — ${corner} corner, zoom in then reset, nothing committed`);
+  };
+
+  // Within a millionth of the span: the limits a reset lands at are the mount's own.
+  const sameLims = (a, b) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= 1e-6 * Math.max(1, Math.abs(b[i]), Math.abs(b[i ^ 1] - b[i])));
+
   // A real mouse click at image px (x, y), through Chromium's own input path rather than a
   // synthetic event, so the browser's focus handling runs as it would for a user (#380). The
   // plot is scrolled into view first; the click itself must not scroll the page or draw the
@@ -470,6 +592,69 @@ try {
     if (!after.focused) throw new Error(`${key}: a mouse click left the figure without keyboard focus, so Escape cannot clear (#380)`);
     if (after.outline !== "none") throw new Error(`${key}: a mouse click drew the keyboard focus outline (${after.outline})`);
     return null;
+  };
+
+  // #526: on a default `wheel = :modifier` view a plain wheel scrolls the page, leaves the view
+  // alone, and shows the "Ctrl + scroll to zoom" hint in the corner note. A real wheel (no
+  // modifier) at the view's center; scrolls up instead when the page is near its bottom.
+  const plainWheelScrolls = async (key, g, what) => {
+    if ((g.wheel ?? "modifier") !== "modifier") throw new Error(`${key}: expected the default wheel = modifier, got ${JSON.stringify(g.wheel)}`);
+    const at = await page.evaluate(([k, ix, iy]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      const se = document.scrollingElement;
+      return { x: b.left + ix * s, y: b.top + iy * s, top: se.scrollTop, room: se.scrollHeight - se.clientHeight - se.scrollTop, photo: host.dataset.masquePhoto || "" };
+    }, [key, g.x + g.w / 2, g.y + g.h / 2]);
+    await page.evaluate(() => {
+      window.__masqueWheelSeen = [];
+      if (!window.__masqueWheelSpy) {
+        window.__masqueWheelSpy = true;
+        // Bubble phase on window: runs after the target's own handlers, so it sees whether any
+        // of them took the wheel.
+        window.addEventListener("wheel", (e) => {
+          const t = e.composedPath()[0];
+          window.__masqueWheelSeen.push({ prevented: e.defaultPrevented, target: `${t?.tagName ?? "?"}.${t?.className?.baseVal ?? t?.className ?? ""}` });
+        }, { passive: true });
+      }
+    });
+    await page.mouse.move(at.x, at.y);
+    // A short scroll, so the pointer stays over the plot.
+    const dy = at.room > 300 ? 40 : -40;
+    await page.mouse.wheel(0, dy);
+    // Playwright doesn't wait for the scroll, and a busy WebGL page can take a while to apply it.
+    // The hint can lapse first, so it is read on every poll.
+    let hint = "";
+    for (let i = 0; i < 30; i++) {
+      const now = await page.evaluate(([k]) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const note = sr.querySelector(".masque-note");
+        return { top: document.scrollingElement.scrollTop, hint: note?.classList.contains("show") ? note.textContent : "" };
+      }, [key]);
+      if (now.hint) hint = now.hint;
+      if (now.top !== at.top && hint) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    const after = await page.evaluate(([k]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      return { seen: window.__masqueWheelSeen, top: document.scrollingElement.scrollTop, photo: host.dataset.masquePhoto || "" };
+    }, [key]);
+    if (Math.sign(after.top - at.top) !== Math.sign(dy)) throw new Error(`${key}-wheel: a plain wheel over the ${what} view did not scroll the page (${at.top} -> ${after.top}): ${JSON.stringify({ at, after })}`);
+    if (after.photo !== at.photo) throw new Error(`${key}-wheel: a plain wheel zoomed the ${what} view (${JSON.stringify(after.photo)})`);
+    if (!/^(Ctrl|Cmd) \+ scroll to zoom$/.test(hint)) throw new Error(`${key}-wheel: no zoom hint in the corner note after a plain wheel: ${JSON.stringify({ at, after, hint })}`);
+    await page.mouse.move(1, 1);
+    await dispatchAt(key, 1, 1, "pointermove");
+    // Let the hint lapse so later checks start from a hidden note.
+    await new Promise((r) => setTimeout(r, 1700));
+    passed.push(`${key}/plain-wheel-scrolls`);
+    console.error(`OK  ${key} — a plain wheel scrolled the page by ${after.top - at.top} px and showed "${hint}"`);
   };
 
   const dispatchAt = async (key, x, y, type, mod = {}) => page.evaluate(async ([k, ix, iy, typ, md, haloCapture]) => {
@@ -732,6 +917,168 @@ try {
     const layers = await layersOf(key);
     const layer = findLayer(layers, spec);
 
+    // A band (#500): its chrome (the outside faded at the preview strength in the plot area's
+    // colour, an edge line and a grip on each edge), an edge drag that moves one edge, a drag
+    // inside that moves both, a mark or a colorbar readout inside the band still answering, and
+    // an edge that stops at the other one. Each release sets the field to the band's drawn
+    // edges, read back through the axis's own inversion.
+    if (spec.mode === "span") {
+      if (layer.kind !== "span") throw new Error(`${key}: layer ${layer.id} is a ${layer.kind}`);
+      const t = (await transformsOf(key))[layer.axis];
+      const h = layer.geometry.orientation === "h";
+      const [s0, s1] = layer.geometry.span;
+      const mid = (s0 + s1) / 2;
+      const log = /log/.test(h ? t.yscale : t.xscale);
+      const lims = h ? t.ylims : t.xlims;
+      const valueAt = (p) => invertAxisJs(t, h ? mid : p, h ? p : mid)[h ? "y" : "x"];
+      const near = (a, b) => Math.abs(a - b) <= (log ? 0.01 * Math.abs(b) : 0.005 * Math.abs(lims[1] - lims[0]));
+      const at = (p) => (h ? [mid, p] : [p, mid]);
+      const chrome = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((hh) => (hh.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const box = (r) => ["x", "y", "width", "height"].map((a) => Number(r.getAttribute(a)));
+        return {
+          dims: [...sr.querySelectorAll("rect.masque-span-dim")].map((r) => ({ box: box(r), fill: getComputedStyle(r).fill, op: Number(getComputedStyle(r).fillOpacity) })),
+          lines: [...sr.querySelectorAll("line.masque-threshold-line")].map((l) => ["x1", "y1", "x2", "y2"].map((a) => Number(l.getAttribute(a)))),
+          grips: [...sr.querySelectorAll("rect.masque-handle")].map(box),
+        };
+      }, key);
+      const edges = async () => (await chrome()).lines.map((l) => (h ? l[1] : l[0]));
+      const value = (text) => {
+        const m = /SpanEvent\(:(\w+), lo = ([-+\d.e]+), hi = ([-+\d.e]+)\)/.exec(text);
+        if (!m) throw new Error(`${key}: value ${JSON.stringify(text)} is not a SpanEvent`);
+        return { id: m[1], lo: Number(m[2]), hi: Number(m[3]) };
+      };
+      // The field reads the drawn band.
+      const reads = async (text, what) => {
+        const v = value(text);
+        const [a, b] = await edges();
+        const want = [valueAt(a), valueAt(b)].sort((p, q) => p - q);
+        if (!near(v.lo, want[0]) || !near(v.hi, want[1])) throw new Error(`${key}/${what}: field ${JSON.stringify(v)}, the drawn edges read ${JSON.stringify(want)}`);
+        return v;
+      };
+
+      let c = await chrome();
+      if (c.dims.length !== 2 || c.lines.length !== 2 || c.grips.length !== 2) throw new Error(`${key}: chrome ${JSON.stringify({ dims: c.dims.length, lines: c.lines.length, grips: c.grips.length })}, want 2 of each`);
+      // The plot area's colour: the axis's own fill, else the figure's background.
+      const plotFill = t.fill ?? await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((hh) => (hh.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sh = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sh = el; });
+        return sh.style.getPropertyValue("--masque-fig-bg");
+      }, key);
+      const rgb = (css) => (css.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).join(",");
+      for (const d of c.dims) {
+        if (Math.abs(d.op - 0.65) > 0.01) throw new Error(`${key}: the outside fades at ${d.op}, want 0.65 (the preview strength)`);
+        if (!plotFill || rgb(d.fill) !== rgb(plotFill)) throw new Error(`${key}: the outside fades toward ${d.fill}, want the plot area's ${plotFill}`);
+      }
+      for (let k = 0; k < 2; k++) {
+        const [gx, gy, gw, gh] = c.grips[k];
+        const centre = h ? gy + gh / 2 : gx + gw / 2, across = h ? gx + gw / 2 : gy + gh / 2;
+        const line = h ? c.lines[k][1] : c.lines[k][0];
+        if (Math.abs(centre - line) > 0.5 || Math.abs(across - mid) > 0.5) throw new Error(`${key}: grip ${k} at ${JSON.stringify(c.grips[k])} is off its edge ${line} / the middle ${mid}`);
+      }
+      // Julia drew the edges where the browser reads the starting band. (The field itself may
+      // already hold an earlier run's drags, so it is read against the drawn edges.)
+      const g0 = [valueAt(layer.geometry.lo), valueAt(layer.geometry.hi)];
+      if (!near(g0[0], spec.start[0]) || !near(g0[1], spec.start[1])) throw new Error(`${key}: the edges are drawn at ${JSON.stringify(g0)}, want ${spec.start}`);
+      let out = await textOf(`#out_${key}`);
+      let v = await reads(out, "start");
+      passed.push(`${key}/chrome`);
+
+      // The lo edge, 30 image px further out (or in, when an earlier run left it at the end).
+      let [pLo, pHi] = await edges();
+      const hi0 = v.hi;
+      const [e0, e1] = h ? [t.viewport[1], t.viewport[1] + t.viewport[3]] : [t.viewport[0], t.viewport[0] + t.viewport[2]];
+      let out1 = Math.sign(pLo - pHi) || (h ? 1 : -1);
+      if (pLo + 30 * out1 < e0 || pLo + 30 * out1 > e1) out1 = -out1;
+      await drag(key, ...at(pLo), ...at(pLo + 30 * out1));
+      out = await waitChange(`#out_${key}`, out, `${key}/edge`);
+      const after = await edges();
+      if (Math.abs(after[0] - (pLo + 30 * out1)) > 1 || Math.abs(after[1] - pHi) > 0.5) throw new Error(`${key}/edge: edges ${JSON.stringify(after)}, want lo at ${pLo + 30 * out1} and hi kept at ${pHi}`);
+      v = await reads(out, "edge");
+      if (!near(v.hi, hi0)) throw new Error(`${key}/edge: hi moved from ${hi0} to ${v.hi}`);
+      passed.push(`${key}/edge-drag`);
+
+      // Mid-drag, the readout prints both edges the way the axis labels them (#543).
+      if (spec.dragReadout) {
+        [pLo, pHi] = await edges();
+        const back = -out1;
+        await dispatchAt(key, ...at(pLo), "pointerdown");
+        const mid = await dispatchAt(key, ...at(pLo + 10 * back), "pointermove");
+        await dispatchAt(key, ...at(pLo + 10 * back), "pointerup");
+        if (!mid?.show || !new RegExp(spec.dragReadout).test(mid.text ?? "")) throw new Error(`${key}/readout: mid-drag readout ${JSON.stringify(mid?.text)}, want ${spec.dragReadout}`);
+        out = await waitChange(`#out_${key}`, out, `${key}/readout`);
+        passed.push(`${key}/readout`);
+        console.error(`OK  ${key}/readout — ${mid.text}`);
+      }
+
+      // Inside, off any mark: 20 px toward the hi edge moves both edges by 20.
+      [pLo, pHi] = await edges();
+      // The middle of the band, a quarter of the way across, clear of the edges and the marks.
+      const inside = (pLo + pHi) / 2, q = s0 + 0.25 * (s1 - s0);
+      let step = 20 * (Math.sign(pHi - pLo) || 1);
+      const fits = (d) => [pLo + d, pHi + d].every((p) => p >= e0 && p <= e1);
+      if (!fits(step)) step = -step;
+      const atQ = (p) => (h ? [q, p] : [p, q]);
+      await drag(key, ...atQ(inside), ...atQ(inside + step));
+      out = await waitChange(`#out_${key}`, out, `${key}/move`);
+      const moved = await edges();
+      if (Math.abs(moved[0] - pLo - step) > 1 || Math.abs(moved[1] - pHi - step) > 1) throw new Error(`${key}/move: edges ${JSON.stringify(moved)}, want ${[pLo + step, pHi + step]}`);
+      await reads(out, "move");
+      passed.push(`${key}/move-drag`);
+
+      // A mark inside the band keeps its hover and its click; the band stays put.
+      if (spec.markInside) {
+        const marks = layers.find((l) => l.id === spec.markInside);
+        const [a, b] = (await edges()).sort((p, q) => p - q);
+        let idx = -1;
+        for (let i = 0; i < marks.geometry.length / 3; i++) {
+          const along = h ? marks.geometry[3 * i + 1] : marks.geometry[3 * i];
+          if (along > a + 8 && along < b - 8) idx = i;
+        }
+        if (idx < 0) throw new Error(`${key}: no ${spec.markInside} mark inside the band ${a}..${b}`);
+        const p = hitPoint(marks, idx);
+        const tip = await dispatchAt(key, p.x, p.y, "pointermove");
+        if (!tip.show || !tip.text) throw new Error(`${key}/mark-hover: no tooltip on the mark inside the band`);
+        const before = await edges();
+        const bond = await textOf(`#bond_${key}`);
+        await dispatchAt(key, p.x, p.y, "click");
+        const bondAfter = await waitChange(`#bond_${key}`, bond, `${key}/mark-click`);
+        if (!/scatter = ElementEvent/.test(bondAfter)) throw new Error(`${key}/mark-click: value ${JSON.stringify(bondAfter)} has no pick`);
+        if (JSON.stringify(await edges()) !== JSON.stringify(before)) throw new Error(`${key}/mark-click: the band moved under a click on a mark`);
+        await dispatchAt(key, 2, 2, "pointermove");
+        passed.push(`${key}/mark-inside`);
+      }
+
+      // The colorbar's own readout answers inside the band.
+      if (spec.colorbarReadout) {
+        const [a, b] = await edges();
+        const p = (a + b) / 2;
+        const tip = await dispatchAt(key, ...at(p), "pointermove");
+        const want = valueAt(p);
+        const num = /(-?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s*$/i.exec((tip?.text ?? "").trim());
+        if (!tip?.show || !num || !(Math.abs(Number(num[1]) - want) <= 0.02 * Math.abs(want) + 1e-9)) {
+          throw new Error(`${key}/colorbar-readout: hover inside the band showed ${JSON.stringify(tip?.text)}, want about ${want}`);
+        }
+        await dispatchAt(key, 2, 2, "pointermove");
+        passed.push(`${key}/colorbar-readout`);
+      }
+
+      // The lo edge dragged past the hi edge stops on it.
+      [pLo, pHi] = await edges();
+      await drag(key, ...at(pLo), ...at(pHi + (pHi - pLo) / 2));
+      out = await waitChange(`#out_${key}`, out, `${key}/cross`);
+      const flat = await edges();
+      if (Math.abs(flat[0] - pHi) > 0.5 || Math.abs(flat[1] - pHi) > 0.5) throw new Error(`${key}/cross: edges ${JSON.stringify(flat)}, want both at ${pHi}`);
+      v = await reads(out, "cross");
+      if (v.lo !== v.hi) throw new Error(`${key}/cross: ${JSON.stringify(v)}, want lo == hi`);
+      passed.push(`${key}/edge-stops`);
+      console.error(`OK  ${key} — ${out.slice(0, 100)}`);
+      continue;
+    }
+
     // Regression check for the `build_manifest` precedence fix (src/render.jl ~line 259):
     // a `LegendInteractable` layer drawn over filled plot geometry must sort BEFORE that
     // geometry's layer in the manifest, or the frontend's first-match `hitTest` gives every
@@ -805,6 +1152,244 @@ try {
       }
       passed.push(`${key}/overlap-order`);
       passed.push(`${key}/overlap-pixel-contested`);
+    }
+
+    // The other wheel policies (#526). `wheel = :always` takes a plain wheel: the page stays
+    // put and the view zooms, with its readout in the corner. Scroll zoom turned off in Makie
+    // (`deactivate_interaction!`) gives `wheel = :none`: a plain wheel scrolls the page with no
+    // hint, and Ctrl+wheel is left to the browser (not prevented, no zoom).
+    if (spec.mode === "wheel") {
+      const gAlways = layers.find((l) => l.id === "view")?.geometry;
+      const gNone = layers.find((l) => l.id === "view_none")?.geometry;
+      if (gAlways?.wheel !== "always" || gNone?.wheel !== "none") {
+        throw new Error(`${key}: expected wheel always/none, got ${JSON.stringify([gAlways?.wheel, gNone?.wheel])}`);
+      }
+      const state = (k) => page.evaluate(([kk]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const note = sr.querySelector(".masque-note"), ro = sr.querySelector(".masque-readout");
+        return {
+          top: document.scrollingElement.scrollTop, photo: host.dataset.masquePhoto || "",
+          hint: note.classList.contains("show") ? note.textContent : "",
+          readout: ro.classList.contains("show") ? ro.textContent : "",
+        };
+      }, [k]);
+      const centerOf = (g) => page.evaluate(([kk, ix, iy]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        const se = document.scrollingElement;
+        return { x: b.left + ix * s, y: b.top + iy * s, room: se.scrollHeight - se.clientHeight - se.scrollTop };
+      }, [key, g.x + g.w / 2, g.y + g.h / 2]);
+      // Polls for up to 3 s, keeping the first time each field showed.
+      const watch = async (start, done) => {
+        const seen = { top: start.top, photo: "", hint: "", readout: "" };
+        for (let i = 0; i < 30; i++) {
+          const st = await state(key);
+          seen.top = st.top;
+          for (const f of ["photo", "hint", "readout"]) if (st[f] && !seen[f]) seen[f] = st[f];
+          if (done(seen)) break;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        return seen;
+      };
+
+      // :always — a real plain wheel zooms and leaves the page where it is.
+      let c = await centerOf(gAlways);
+      await page.mouse.move(c.x, c.y);
+      let s0 = await state(key);
+      await page.mouse.wheel(0, c.room > 300 ? -120 : 120);
+      let seen = await watch(s0, (x) => x.photo && x.readout);
+      if (seen.top !== s0.top) throw new Error(`${key}: a plain wheel over a wheel = :always view scrolled the page (${s0.top} -> ${seen.top})`);
+      if (!seen.photo) throw new Error(`${key}: a plain wheel over a wheel = :always view did not zoom it`);
+      if (!/x:\[/.test(seen.readout)) throw new Error(`${key}: no corner readout while the :always view zoomed: ${JSON.stringify(seen)}`);
+      if (seen.hint) throw new Error(`${key}: a wheel = :always view showed the zoom hint "${seen.hint}"`);
+      passed.push(`${key}/always-plain-wheel-zooms`);
+      // Let the zoom settle before the next view.
+      for (let i = 0; ; i++) {
+        const st = await state(key);
+        if (!st.photo && !st.readout) break;
+        if (i > 100) throw new Error(`${key}: the :always zoom never settled: ${JSON.stringify(st)}`);
+        await new Promise((r) => setTimeout(r, 200));
+      }
+
+      // #541: a Safari trackpad pinch (gesturestart / gesturechange / gestureend with a
+      // cumulative `scale`). Chromium never fires these, so they are dispatched here; each step
+      // goes through the real frame round trip and the idle settle.
+      const pinch = (kk, x, y) => page.evaluate(([k2, px, py]) => {
+        const span = document.querySelector(`#coords_${k2}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const surface = sr.querySelector(".surface");
+        const prevented = [];
+        for (const [type, scale] of [["gesturestart", 1], ["gesturechange", 1.3], ["gesturechange", 1.6], ["gestureend", 1.6]]) {
+          const ev = new Event(type, { bubbles: true, cancelable: true });
+          Object.defineProperty(ev, "scale", { value: scale });
+          Object.defineProperty(ev, "clientX", { value: px });
+          Object.defineProperty(ev, "clientY", { value: py });
+          surface.dispatchEvent(ev);
+          prevented.push(ev.defaultPrevented);
+        }
+        const ro = sr.querySelector(".masque-readout");
+        return { prevented, photo: host.dataset.masquePhoto || "", readout: ro.classList.contains("show") ? ro.textContent : "" };
+      }, [kk, x, y]);
+      c = await centerOf(gAlways);
+      const pz = await pinch(key, c.x, c.y);
+      if (!pz.prevented.every(Boolean)) throw new Error(`${key}: a Safari pinch over a zooming view was left to the page: ${JSON.stringify(pz)}`);
+      const scaleOf = (ph) => Number(ph.split(",")[0]);
+      if (!(Math.abs(scaleOf(pz.photo) - 1.6) < 1e-6)) throw new Error(`${key}: a Safari pinch to 1.6 did not scale the view by 1.6: ${JSON.stringify(pz)}`);
+      if (!/x:\[/.test(pz.readout)) throw new Error(`${key}: no corner readout while a Safari pinch zoomed: ${JSON.stringify(pz)}`);
+      for (let i = 0; ; i++) {
+        const st = await state(key);
+        if (!st.photo && !st.readout) break;
+        if (i > 100) throw new Error(`${key}: the Safari pinch zoom never settled: ${JSON.stringify(st)}`);
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      passed.push(`${key}/safari-pinch-zooms`);
+
+      // :none — Ctrl+wheel is not taken, and a real plain wheel scrolls the page with no hint.
+      c = await centerOf(gNone);
+      const pn = await pinch(key, c.x, c.y);
+      if (pn.prevented.some(Boolean) || pn.photo) throw new Error(`${key}: a Safari pinch was taken by a wheel = :none view: ${JSON.stringify(pn)}`);
+      passed.push(`${key}/none-safari-pinch-left-to-page`);
+      const ctrl = await page.evaluate(([kk, x, y]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: x, clientY: y, deltaY: -120, ctrlKey: true });
+        sr.querySelector(".surface").dispatchEvent(ev);
+        return { prevented: ev.defaultPrevented, photo: host.dataset.masquePhoto || "" };
+      }, [key, c.x, c.y]);
+      if (ctrl.prevented || ctrl.photo) throw new Error(`${key}: Ctrl+wheel was taken by a view whose scroll zoom is off in Makie: ${JSON.stringify(ctrl)}`);
+      await page.mouse.move(c.x, c.y);
+      s0 = await state(key);
+      const dy = c.room > 300 ? 40 : -40;
+      await page.mouse.wheel(0, dy);
+      seen = await watch(s0, (x) => x.top !== s0.top);
+      if (Math.sign(seen.top - s0.top) !== Math.sign(dy)) throw new Error(`${key}: a plain wheel over a wheel = :none view did not scroll the page (${s0.top} -> ${seen.top})`);
+      if (seen.photo || seen.hint || seen.readout) throw new Error(`${key}: a wheel = :none view responded to a plain wheel: ${JSON.stringify(seen)}`);
+      passed.push(`${key}/none-wheel-left-to-page`);
+      await page.mouse.move(1, 1);
+      console.error(`OK  ${key} — :always zoomed on a plain wheel; Makie-off view left Ctrl+wheel and scroll to the page`);
+      continue;
+    }
+
+    // Nested views (#559): an inset axis with its own view inside its parent's. Over the inset,
+    // Ctrl+wheel and a drag move the inset's view; outside it, the parent's. Which one moved is
+    // read off the corner readout: the inset spans 0–1 and the parent 0–10.
+    if (spec.mode === "nested") {
+      const gOut = layers.find((l) => l.id === "view")?.geometry;
+      const gIn = layers.find((l) => l.id === "inset")?.geometry;
+      if (!gOut || !gIn) throw new Error(`${key}: expected views "view" and "inset", got ${layers.map((l) => l.id)}`);
+      if (!(gIn.x > gOut.x && gIn.x + gIn.w < gOut.x + gOut.w && gIn.y > gOut.y && gIn.y + gIn.h < gOut.y + gOut.h)) {
+        throw new Error(`${key}: the inset view ${JSON.stringify(gIn)} is not inside the parent's ${JSON.stringify(gOut)}`);
+      }
+      // Client px of an image px, with the plot on screen.
+      const clientAt = (ix, iy) => page.evaluate(([kk, x, y]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        return { x: b.left + x * s, y: b.top + y * s };
+      }, [key, ix, iy]);
+      const readout = () => page.evaluate((kk) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const ro = sr.querySelector(".masque-readout");
+        return { photo: host.dataset.masquePhoto || "", text: ro.classList.contains("show") ? ro.textContent : "" };
+      }, key);
+      // The x range the readout shows, polled for up to 3 s.
+      const xRange = async (what) => {
+        for (let i = 0; i < 30; i++) {
+          const r = await readout();
+          const m = /x:\[\s*(-?[\d.e+-]+)\s*[,–]\s*(-?[\d.e+-]+)/.exec(r.text.replace(/\u2212/g, "-"));
+          if (m) return Number(m[2]) - Number(m[1]);
+          await new Promise((res) => setTimeout(res, 100));
+        }
+        throw new Error(`${key}: no limits readout after ${what}`);
+      };
+      const settled = async () => {
+        for (let i = 0; ; i++) {
+          const r = await readout();
+          if (!r.photo && !r.text) return;
+          if (i > 100) throw new Error(`${key}: the view never settled: ${JSON.stringify(r)}`);
+          await new Promise((res) => setTimeout(res, 200));
+        }
+      };
+      const ctrlWheel = (c) => page.evaluate(([kk, x, y]) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: x, clientY: y, deltaY: -120, ctrlKey: true });
+        sr.querySelector(".surface").dispatchEvent(ev);
+        return ev.defaultPrevented;
+      }, [key, c.x, c.y]);
+      const inner = await clientAt(gIn.x + gIn.w / 2, gIn.y + gIn.h / 2);
+      // Left of the inset, inside the parent.
+      const outer = await clientAt(gOut.x + (gIn.x - gOut.x) / 2, gIn.y + gIn.h / 2);
+      const isInset = (w) => w > 0 && w < 1.5, isParent = (w) => w > 2 && w < 12;
+
+      if (!(await ctrlWheel(inner))) throw new Error(`${key}: Ctrl+wheel over the inset was not taken`);
+      let w = await xRange("Ctrl+wheel over the inset");
+      if (!isInset(w)) throw new Error(`${key}: Ctrl+wheel over the inset zoomed a view spanning ${w} in x, not the inset's (0–1)`);
+      passed.push(`${key}/wheel-over-inset-zooms-inset`);
+      await settled();
+
+      if (!(await ctrlWheel(outer))) throw new Error(`${key}: Ctrl+wheel over the parent was not taken`);
+      w = await xRange("Ctrl+wheel over the parent");
+      if (!isParent(w)) throw new Error(`${key}: Ctrl+wheel beside the inset zoomed a view spanning ${w} in x, not the parent's (0–10)`);
+      passed.push(`${key}/wheel-beside-inset-zooms-parent`);
+      await settled();
+
+      for (const [c, want, name] of [[inner, isInset, "inset"], [outer, isParent, "parent"]]) {
+        await page.mouse.move(c.x, c.y);
+        await page.mouse.down();
+        await page.mouse.move(c.x + 15, c.y + 8, { steps: 4 });
+        w = await xRange(`a drag over the ${name}`);
+        await page.mouse.up();
+        if (!want(w)) throw new Error(`${key}: a drag over the ${name} moved a view spanning ${w} in x`);
+        passed.push(`${key}/drag-over-${name}-pans-${name}`);
+        await settled();
+      }
+      // The corner buttons follow the same rule (#525): over the inset its own box shows, beside
+      // it the parent's, and the two boxes don't overlap.
+      const boxes = () => page.evaluate((kk) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const one = (id) => {
+          const b = sr.querySelector(`.masque-vb[data-view="${id}"]`);
+          if (!b || b.hidden) return null;
+          const r = b.getBoundingClientRect();
+          return { show: b.classList.contains("show"), r: [r.left, r.top, r.right, r.bottom] };
+        };
+        return { view: one("view"), inset: one("inset") };
+      }, key);
+      const shownOver = async (c, want) => {
+        await page.mouse.move(c.x, c.y);
+        for (let i = 0; i < 15; i++) {
+          await new Promise((res) => setTimeout(res, 200));
+          const b = await boxes();
+          if (b[want]?.show && !b[want === "view" ? "inset" : "view"]?.show) return b;
+        }
+        throw new Error(`${key}: over the ${want === "view" ? "parent" : "inset"}, the boxes are ${JSON.stringify(await boxes())}`);
+      };
+      await shownOver(inner, "inset");
+      const bx = await shownOver(outer, "view");
+      if (!bx.inset || !bx.view) throw new Error(`${key}: expected a box for each view, got ${JSON.stringify(bx)}`);
+      const [a, b] = [bx.view.r, bx.inset.r];
+      if (a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]) throw new Error(`${key}: the parent's box ${a} overlaps the inset's ${b}`);
+      passed.push(`${key}/buttons-follow-innermost-view`);
+      await page.mouse.move(1, 1);
+      console.error(`OK  ${key} — the wheel, a drag and the corner buttons over the inset drive the inset's view; beside it, the parent's`);
+      continue;
     }
 
     // Several fields at once (#335): a click on a point sets `scatter`, a drag of the threshold
@@ -2191,7 +2776,7 @@ try {
           let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
           const b = host.querySelector("img, canvas").getBoundingClientRect();
           const sc = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
-          sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * sc, clientY: b.top + iy * sc, deltaY: -300 }));
+          sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * sc, clientY: b.top + iy * sc, deltaY: -300, ctrlKey: true }));
         }, [key, vg.x + vg.w / 2, vg.y + vg.h / 2]);
         for (let i = 0; i < tries; i++) {
           await new Promise((r) => setTimeout(r, delayMs));
@@ -2207,6 +2792,18 @@ try {
       if (!(wx(z2.limits) < 0.95 * wx(z1.limits))) throw new Error(`${key}: the second panel's zoom did not start from the first's (${wx(z1.limits)} -> ${wx(z2.limits)})`);
       if (!(wx(z3.limits) < 0.95 * wx(z2.limits))) throw new Error(`${key}: zooming the first panel again dropped the second panel's zoom (${wx(z1.limits)}, ${wx(z2.limits)}, ${wx(z3.limits)})`);
       passed.push(`${key}/alternating-zoom`);
+      // #524: resetting the dragged panel turns and zooms both back (`limits = true`), so the
+      // follower's points answer where the page mounted them again.
+      const rs = await resetByDoubleClick(key, g);
+      if (Math.abs(rs.azimuth - g.azimuth) > 1e-9 || Math.abs(rs.elevation - g.elevation) > 1e-9 || !sameLims(rs.limits ?? [], g.limits)) {
+        throw new Error(`${key}-reset: the dragged panel came back at ${JSON.stringify(rs)}, not ${JSON.stringify({ azimuth: g.azimuth, elevation: g.elevation, limits: g.limits })}`);
+      }
+      for (const p of old) {
+        const r = await dispatchAt(key, p.x, p.y, "pointermove");
+        if (!r.show) throw new Error(`${key}-reset: the follower's point at its mount spot ${JSON.stringify(p)} does not answer after the reset`);
+      }
+      await dispatchAt(key, 1, 1, "pointermove");
+      passed.push(`${key}/reset-dblclick`);
       console.error(`OK  ${key} — orbit az ${g.azimuth.toFixed(2)} -> ${st.azimuth.toFixed(2)}, follower redrawn, its point answers at ${JSON.stringify(far)}; zoom widths ${[z1, z2, z3].map((z) => wx(z.limits).toFixed(3)).join(" > ")}`);
       continue;
     }
@@ -2253,6 +2850,7 @@ try {
       const g = layer.geometry;
       const lim0 = g.limits;
       if (!Array.isArray(lim0) || lim0.length !== 6) throw new Error(`${key}: view geometry has no Axis3 limits: ${JSON.stringify(g)}`);
+      await plainWheelScrolls(key, g, "Axis3");
       const s0 = await stamp3();
       const prevented = await page.evaluate(([k, ix, iy]) => {
         const span = document.querySelector(`#coords_${k}`);
@@ -2261,11 +2859,11 @@ try {
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         const b = host.querySelector("img, canvas").getBoundingClientRect();
         const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
-        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -600 });
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -600, ctrlKey: true });
         sr.querySelector(".surface").dispatchEvent(ev);
         return ev.defaultPrevented;
       }, [key, g.x + g.w / 2, g.y + g.h / 2]);
-      if (!prevented) throw new Error(`${key}-wheel: the wheel was not taken by the Axis3 view`);
+      if (!prevented) throw new Error(`${key}-wheel: the Ctrl+wheel was not taken by the Axis3 view`);
       const w = (l, i) => l[2 * i + 1] - l[2 * i];
       const zs = await waitStamp(s0, "wheel", (st) => Array.isArray(st.limits) && [0, 1, 2].every((i) => w(st.limits, i) < 0.75 * w(lim0, i)));
       passed.push(`${key}/wheel-zoom`);
@@ -2292,11 +2890,98 @@ try {
       passed.push(`${key}/drag-orbit`);
       const after = await textOf(`#out_${key}`);
       if (after !== before) throw new Error(`${key}: a view gesture must not commit (${before} -> ${after})`);
-      console.error(`OK  ${key} — wheel zoom ${JSON.stringify(zs.limits)}, clipped corner, pan, orbit`);
+      // #524: a double-click on empty plot area turns the camera back and zooms back out.
+      const g3 = layer.geometry;
+      const rs = await resetByDoubleClick(key, g3);
+      if (Math.abs(rs.azimuth - g3.azimuth) > 1e-9 || Math.abs(rs.elevation - g3.elevation) > 1e-9 || !sameLims(rs.limits ?? [], g3.limits)) {
+        throw new Error(`${key}-reset: the view came back at ${JSON.stringify(rs)}, not its mount camera ${JSON.stringify({ azimuth: g3.azimuth, elevation: g3.elevation, limits: g3.limits })}`);
+      }
+      passed.push(`${key}/reset-dblclick`);
+      console.error(`OK  ${key} — wheel zoom ${JSON.stringify(zs.limits)}, clipped corner, pan, orbit, reset`);
+      continue;
+    }
+
+    if (spec.mode === "view_buttons") {
+      await driveButtons(key, layer, spec.corner);
+      continue;
+    }
+    if (spec.resizeAfterDisplay) {
+      // #546: a later cell `resize!`d the figure after it was shown. The pan's frame draws it
+      // at the new size, so the overlay must take that size too: its svgs' viewBox matches the
+      // picture, the host may grow to the new width (`#resized_<key>`'s `width`), and a hover on each of the lower axis's
+      // points, where the resized figure draws them (its `marks`, image px), rings it.
+      const p = hitPoint(layer, 0);
+      const probe = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center", inline: "nearest" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const base = host.querySelector("img, canvas");
+        return {
+          stamp: host.dataset.masqueGestureFrame ?? null,
+          viewBoxes: [...sr.querySelectorAll("svg.masque-fill, svg.masque-edge, svg.masque-plain")].map((v) => v.getAttribute("viewBox")),
+          picture: base.tagName === "IMG" ? [base.naturalWidth, base.naturalHeight] : [base.width, base.height],
+          maxWidth: host.style.maxWidth,
+        };
+      }, key);
+      const before = await probe();
+      await drag(key, p.x, p.y, p.x + 40, p.y, true);
+      const tries = backend === "webgl" ? 50 : 25;
+      const delayMs = backend === "webgl" ? 300 : 200;
+      let after = before;
+      for (let i = 0; i < tries; i++) {
+        await new Promise((r) => setTimeout(r, delayMs));
+        after = await probe();
+        const st = after.stamp ? JSON.parse(after.stamp) : null;
+        if (st && st.settle === true && after.stamp !== before.stamp) break;
+      }
+      const st = after.stamp ? JSON.parse(after.stamp) : null;
+      if (!st || st.settle !== true || after.stamp === before.stamp) {
+        throw new Error(`${key}: no settle frame after the pan (stamp ${JSON.stringify(after.stamp)})`);
+      }
+      const [pw, ph] = after.picture;
+      const sized = after.viewBoxes.every((vb) => {
+        const [, , w, h] = vb.split(" ").map(Number);
+        return Math.abs(w - pw) <= 1 && Math.abs(h - ph) <= 1;
+      });
+      if (!sized || after.viewBoxes[0] === before.viewBoxes[0]) {
+        throw new Error(`${key}: overlay kept its size after the resized frame: viewBox ${JSON.stringify(after.viewBoxes)} (was ${before.viewBoxes[0]}), picture ${pw}×${ph}`);
+      }
+      passed.push(`${key}/resized-viewbox`);
+      const { marks, width } = await page.evaluate((k) => JSON.parse(document.querySelector(`#resized_${k}`).textContent), key);
+      if (after.maxWidth !== `${width}px`) {
+        throw new Error(`${key}: the host's max-width is ${after.maxWidth} after the resized frame, want ${width}px`);
+      }
+      passed.push(`${key}/resized-max-width`);
+      const rings = await page.evaluate(([k, marks]) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const surface = sr.querySelector(".surface");
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        return marks.map(([x, y]) => {
+          const cx = b.left + x * s, cy = b.top + y * s;
+          surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: false }));
+          surface.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, clientX: cx, clientY: cy }));
+          const ring = sr.querySelector(`svg g.masque-clip g.hi > *`);
+          const r = ring?.getBoundingClientRect();
+          return { at: [Math.round(cx), Math.round(cy)], off: r ? Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy) : null };
+        });
+      }, [key, marks]);
+      if (rings.length !== 3 || rings.some((r) => r.off === null || r.off > 3)) {
+        throw new Error(`${key}: a hover ring is off its mark after the resized frame: ${JSON.stringify(rings)}`);
+      }
+      passed.push(`${key}/resized-ring`);
+      console.error(`OK  ${key}/resized — viewBox ${after.viewBoxes[0]} on a ${pw}×${ph} picture, max-width ${after.maxWidth}, rings ${JSON.stringify(rings.map((r) => +r.off.toFixed(2)))} px off`);
       continue;
     }
 
     if (spec.mode === "drag" && spec.layerKind === "view") {
+      // #525: the corner buttons drive each view and leave it where it started.
+      await driveButtons(key, layer, key === "view_twin" ? "tl" : "tr");
       // #102/§12.3: a view gesture commits nothing anymore — the OLD assertion here waited for
       // #out_view's bond text to change and would now fail for the right reason (nothing ever
       // commits) for the WRONG reason (the test still expects a commit). Asserting "the bond
@@ -2366,6 +3051,7 @@ try {
       }
 
       if (layer.geometry && layer.geometry.mode === "pan") {
+        await plainWheelScrolls(key, layer.geometry, "pan");
         // #379: a mark on each axis off the pan axis. The drag above moved a linked axis's
         // marks off this page's manifest, so there the probe is its pick's ring, which the
         // overlay draws where that axis now has the mark; an unlinked axis's first mark has not
@@ -2390,7 +3076,7 @@ try {
           const s = b.width / vb.width;
           const ev = new WheelEvent("wheel", {
             bubbles: true, cancelable: true,
-            clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -120,
+            clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -120, ctrlKey: true,
           });
           surface.dispatchEvent(ev);
           const base = host.querySelector("img, canvas");
@@ -2586,6 +3272,23 @@ try {
         passed.push(`${key}/wheel-zoom`);
         console.error(`OK  ${key}/wheel — photo cleared, zoomed gesture frame ${zoomStamp}`);
       }
+      // #524: a double-click on empty plot area puts the pan view, and each axis linked to it,
+      // back at the limits the page mounted with.
+      if (key === "view" || key === "view_linked") {
+        const tr = await transformsOf(key);
+        const home = (axis) => [...tr[axis].xlims, ...tr[axis].ylims];
+        const st = await resetByDoubleClick(key, layer.geometry);
+        if (!sameLims([st.xmin, st.xmax, st.ymin, st.ymax], home(layer.axis))) {
+          throw new Error(`${key}-reset: the view came back at ${JSON.stringify(st)}, not its mount limits ${JSON.stringify(home(layer.axis))}`);
+        }
+        for (const l of links) {
+          if (!sameLims(st[`linked:${l.axis}`] ?? [], home(l.axis))) {
+            throw new Error(`${key}-reset: linked axis ${l.axis} came back at ${JSON.stringify(st[`linked:${l.axis}`])}, not ${JSON.stringify(home(l.axis))}`);
+          }
+        }
+        passed.push(`${key}/reset-dblclick`);
+        console.error(`OK  ${key}/reset — double-click back at the mount limits${links.length ? `, ${links.length} linked axis too` : ""}`);
+      }
       continue;
     }
 
@@ -2658,6 +3361,19 @@ try {
         // Grab the line where the drag above released it, then release 20.45 px further on.
         const sx = frame.left + released[0] * frame.s, sy = frame.top + released[1] * frame.s;
         const ex = horiz ? sx : Math.round(sx + 20) + 0.45, ey = horiz ? Math.round(sy + 20) + 0.45 : sy;
+        // Count what the release sends (#567): an "input" event on the host is a value handed
+        // to Pluto, so a failure below says whether the gesture committed nothing or Pluto did.
+        await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          window.__releaseLog = { inputs: [], downs: 0, ups: 0 };
+          if (!host.__releaseCounting) {
+            host.__releaseCounting = true;
+            host.addEventListener("input", () => window.__releaseLog?.inputs.push(JSON.stringify(host.value).slice(0, 160)));
+            host.addEventListener("pointerdown", () => { if (window.__releaseLog) window.__releaseLog.downs++ }, true);
+            host.addEventListener("pointerup", () => { if (window.__releaseLog) window.__releaseLog.ups++ }, true);
+          }
+        }, key);
         await page.mouse.move(sx, sy);
         await page.mouse.down();
         await page.mouse.move((sx + ex) / 2, (sy + ey) / 2, { steps: 4 });
@@ -2683,6 +3399,18 @@ try {
           await new Promise((r) => setTimeout(r, 200));
         }
         if (t === prev || !Number.isFinite(got) || Math.abs(got - tipVal) > tipTol) {
+          const log = await page.evaluate(() => window.__releaseLog);
+          let late = t;
+          for (let i = 0; i < 100 && late === prev; i++) { await new Promise((r) => setTimeout(r, 200)); late = await textOf(`#out_${key}`); }
+          const out = t !== prev ? `changed to ${JSON.stringify(t)} (no wait)` : late === prev ? "still unchanged 20 s later" : `became ${JSON.stringify(late)} within 20 s more`;
+          // The host's value now: Pluto writes its server value back into the host, so a stale
+          // value here with the new one in `inputs` means it wrote an old one back (#567).
+          const hostValue = await page.evaluate((k) => {
+            const span = document.querySelector(`#coords_${k}`);
+            const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+            return JSON.stringify(host.value).slice(0, 160);
+          }, key);
+          console.error(`${key}/release-fractional: pointerdown ${log?.downs}, pointerup ${log?.ups}, inputs ${JSON.stringify(log?.inputs)}; #out_${key} ${out}; host value ${hostValue}`);
           throw new Error(`${key}/release-fractional: committed ${JSON.stringify(t)}, want the tooltip's ${JSON.stringify(tipText)}`);
         }
         passed.push(`${key}/release-fractional`);
@@ -2912,6 +3640,33 @@ try {
         console.error(`OK  ${key}/${which} — ${tip.text}`);
       }
       if (seen.size !== 3) throw new Error(`${key}: expected the polar, mV and function axes, saw ${[...seen]}`);
+      // #543: a bar's low/high/value print in its value axis's format, a hist's value in its
+      // value axis's and its low/high (the bin edges) in the bin axis's.
+      const rectWant = {
+        bars: { coords: { low: "y", high: "y", value: "y" }, want: [/\blow 0\.0 mV\b/, /\bhigh 3\.5 mV\b/, /\bvalue 3\.5 mV\b/], never: [/3\.472/] },
+        hist: { coords: { value: "y", low: "x", high: "x" }, want: [/\bvalue 3 n\b/, /\blow 0\.0 s\b/, /\bhigh 1\.0 s\b/], never: [/\bvalue 3 s\b/, /\blow 0 n\b/] },
+        boxplot: { coords: { q1: "x", median: "x", q3: "x" }, want: [/\bq1 2\.0 kg\b/, /\bmedian 3\.0 kg\b/, /\bq3 4\.0 kg\b/], never: [] },
+        vspan: { coords: { low: "x", high: "x" }, want: [/\blow 1\.0 s\b/, /\bhigh 2\.0 s\b/], never: [] },
+      };
+      const rects = layers.filter((l) => l.kind === "rects");
+      if (rects.length !== 4) throw new Error(`${key}: expected 2 rects layers, got ${rects.length}`);
+      for (const L of rects) {
+        const which = Object.keys(rectWant).find((w) => L.id.startsWith(w)) ?? "bars";
+        const { coords, want, never } = rectWant[which];
+        if (JSON.stringify(Object.entries(L.coords ?? {}).sort()) !== JSON.stringify(Object.entries(coords).sort()))
+          throw new Error(`${key}/${which}: coords ${JSON.stringify(L.coords)}, want ${JSON.stringify(coords)}`);
+        const r = hitPoint(L, 0);
+        let tip = null;
+        for (let a = 0; a < 6; a++) {
+          tip = await dispatchAt(key, r.x, r.y, "pointermove");   // rects are [cx, cy, w, h]
+          if (tip?.show && want.every((w) => w.test(tip.text))) break;
+          await new Promise((res) => setTimeout(res, 200));
+        }
+        for (const w of want) if (!w.test(tip?.text ?? "")) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip?.text)} should match ${w}`);
+        for (const w of never) if (w.test(tip.text)) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip.text)} should not match ${w}`);
+        passed.push(`${key}/${which}`);
+        console.error(`OK  ${key}/${which} — ${tip.text}`);
+      }
       await dispatchAt(key, 1, 1, "pointermove");
       continue;
     }
@@ -4107,8 +4862,13 @@ try {
         host.scrollIntoView({ block: "center", inline: "nearest" });
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         const b = host.querySelector("img, canvas").getBoundingClientRect();
-        return { left: b.left, top: b.top, s: b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
+        const vbw = sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        return { left: b.left, top: b.top, s: b.width / vbw, vbw };
       }, key);
+      // Steps are a fixed share of the picture's width, so the orbit turns the same angle at any
+      // px_per_unit (orbitAngles divides the drag by the axis width in image px): 4 image px
+      // at the 960-px picture of a 480-wide figure at px_per_unit 2.
+      const unit = box.vbw / 960;
       const pointer = (type, ix, iy) => page.evaluate(([k, t, cx, cy]) => {
         const span = document.querySelector(`#coords_${k}`);
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -4124,7 +4884,7 @@ try {
       await pointer("pointerdown", clickPt.x, clickPt.y);
       let mid = null;
       for (let step = 1; step <= tries && !mid; step++) {
-        await pointer("pointermove", clickPt.x + 4 * step, clickPt.y);
+        await pointer("pointermove", clickPt.x + 4 * unit * step, clickPt.y);
         await new Promise((r) => setTimeout(r, delayMs));
         const st = await readStamp();
         const parsed = st ? JSON.parse(st) : null;
@@ -4140,7 +4900,7 @@ try {
         throw new Error(`${key}/orbit-suspend: the selected point still draws ${during.sel} shape(s) mid-drag`);
       }
       passed.push(`${key}/orbit-suspend`);
-      await pointer("pointerup", clickPt.x + 4 * tries, clickPt.y);
+      await pointer("pointerup", clickPt.x + 4 * unit * tries, clickPt.y);
       let settled = null;
       for (let i = 0; i < tries && !settled; i++) {
         await new Promise((r) => setTimeout(r, delayMs));
@@ -4264,6 +5024,158 @@ try {
       computedFor,
     });
     passed.push("tooltip-theme-follows-figure-bg");
+  }
+
+  // --- Touch (#528): a finger picks the nearest point or line within 16 CSS px of it ---
+  // Real taps (CDP touch emulation, so the browser sends pointerType "touch" and its own
+  // click), at a spot 8–14 CSS px off a mark's drawn edge: past a mouse's slack, inside a
+  // finger's reach. A real mouse click there first must miss. Last in the sweep, since touch
+  // emulation stays on for the page.
+  {
+    const TOUCH_SPECS = [
+      { key: "scatter" }, { key: "lines", sample: true }, { key: "segments" },
+      { key: "scatter3d" }, { key: "lines3d", sample: true },
+    ];
+    const cssScale = (key) => page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const vb = sr.querySelector("svg.masque-plain").viewBox.baseVal;
+      return { s: b.width / vb.width, left: b.left, top: b.top, w: vb.width, h: vb.height };
+    }, key);
+    // Distance from (x, y) to element k's drawn edge, image px, and the nearest element.
+    const segDist = (px, py, x0, y0, x1, y1) => {
+      const dx = x1 - x0, dy = y1 - y0, l2 = dx * dx + dy * dy;
+      const t = l2 ? Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / l2)) : 0;
+      return Math.hypot(px - (x0 + t * dx), py - (y0 + t * dy));
+    };
+    const nearestOf = (layer, x, y) => {
+      const g = layer.geometry, half = (layer.linewidth ?? 0) / 2;
+      const ds = [];
+      if (layer.kind === "circles") for (let k = 0; k < g.length / 3; k++) ds.push(Math.max(0, Math.hypot(x - g[3 * k], y - g[3 * k + 1]) - g[3 * k + 2]));
+      if (layer.kind === "segments") for (let k = 0; k < g.length / 4; k++) ds.push(Math.max(0, segDist(x, y, g[4 * k], g[4 * k + 1], g[4 * k + 2], g[4 * k + 3]) - half));
+      if (layer.kind === "lines") for (const a of g) {
+        let d = Infinity;
+        for (let i = 0; i < a.length / 2 - 1; i++) {
+          if (![a[2 * i], a[2 * i + 1], a[2 * i + 2], a[2 * i + 3]].every(Number.isFinite)) continue;
+          d = Math.min(d, segDist(x, y, a[2 * i], a[2 * i + 1], a[2 * i + 2], a[2 * i + 3]));
+        }
+        ds.push(Math.max(0, d - half));
+      }
+      let best = -1;
+      ds.forEach((d, k) => { if (best < 0 || d < ds[best]) best = k; });
+      return { index: best, dist: ds[best], second: Math.min(...ds.filter((_, k) => k !== best), Infinity) };
+    };
+    const tapPoint = (layer, idx, anchor, sc) => {
+      for (const css of [10, 9, 11, 12, 8, 13, 14]) {
+        for (let a = 0; a < 16; a++) {
+          const th = (a * Math.PI) / 8;
+          // Off the anchor by the mark's own radius plus `css` CSS px, then measured exactly.
+          const reach = (anchor.r ?? 0) + css / sc.s
+          const x = anchor.x + Math.cos(th) * reach, y = anchor.y + Math.sin(th) * reach;
+          if (x < 4 || y < 4 || x > sc.w - 4 || y > sc.h - 4) continue;
+          const n = nearestOf(layer, x, y);
+          // `sc.s` is CSS px per image px.
+          const dCss = n.dist * sc.s;
+          // A clear winner: the target, 8–14 CSS px off its edge, others at least 4 CSS px further.
+          if (n.index === idx && dCss >= 8 && dCss <= 14 && (n.second - n.dist) * sc.s >= 4) return { x, y, dCss };
+        }
+      }
+      return null;
+    };
+    const fieldValue = async (key, field) => (await inspect(key)).bondAll?.[field] ?? null;
+    const settle = () => new Promise((r) => setTimeout(r, 400));
+    const cdp = await context.newCDPSession(page);
+    const plans = [];
+    for (const t of TOUCH_SPECS) {
+      const spec = meta.find((m) => m.key === t.key);
+      if (!spec) throw new Error(`touch: no kind-sweep spec ${t.key}`);
+      const layer = findLayer(await layersOf(t.key), spec);
+      const sc = await cssScale(t.key);
+      const idx = spec.clickIndex ?? 0;
+      const anchor = layer.kind === "lines"
+        ? { x: layer.geometry[idx][2 * spec.clickSample], y: layer.geometry[idx][2 * spec.clickSample + 1] }
+        : hitPoint(layer, idx);
+      const at = tapPoint(layer, idx, anchor, sc);
+      if (!at) throw new Error(`touch/${t.key}: no spot 8–14 CSS px off element ${idx} with it clearly nearest`);
+      const field = spec.field ?? spec.layerId;
+      // A real mouse click there misses: past the mouse's slack, a one-pick field clears.
+      await page.mouse.click(sc.left + at.x * sc.s, sc.top + at.y * sc.s);
+      await settle();
+      const missed = await fieldValue(t.key, field);
+      if (missed !== null) throw new Error(`touch/${t.key}: a mouse click ${at.dCss.toFixed(1)} CSS px off the mark picked ${JSON.stringify(missed)}; want no pick`);
+      plans.push({ ...t, spec, layer, idx, at, field });
+    }
+    await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+    for (const p of plans) {
+      const sc = await cssScale(p.key);
+      const x = sc.left + p.at.x * sc.s, y = sc.top + p.at.y * sc.s;
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await settle();
+      const v = await fieldValue(p.key, p.field);
+      if (!v || v.index === undefined) throw new Error(`touch/${p.key}: a tap ${p.at.dCss.toFixed(1)} CSS px off element ${p.idx} picked nothing (${JSON.stringify(v)})`);
+      // The envelope names the pick by its 0-based element, or, for a line's point, by its line
+      // and sample (bond.ts's commitClick).
+      const got = p.sample ? v.sample ?? v.index : v.index;
+      const want = p.sample ? p.spec.clickSample : p.idx;
+      if (got !== want) throw new Error(`touch/${p.key}: a tap near element ${p.idx}${p.sample ? ` sample ${want}` : ""} picked ${JSON.stringify(v)}`);
+      passed.push(`${p.key}/touch-nearest`);
+      console.error(`OK  ${p.key} — touch ${p.at.dCss.toFixed(1)} CSS px off the mark picks it; a mouse there misses`);
+    }
+    // An axis readout that answers anywhere (`AxisInteractable` with no bbox, listed last) is a
+    // miss's fallback: a tap near a mark still picks the mark, where a mouse gets the readout.
+    {
+      const pts = (await layersOf("axis")).find((l) => l.id === "pts" && l.kind === "circles");
+      if (!pts) throw new Error("touch/axis: no pts layer");
+      const sc = await cssScale("axis");
+      const before = await fieldValue("axis", "pts");
+      const idx = [0, 1, 2].find((k) => before?.index !== k);
+      const at = tapPoint(pts, idx, hitPoint(pts, idx), sc);
+      if (!at) throw new Error(`touch/axis: no spot 8–14 CSS px off element ${idx} with it clearly nearest`);
+      const x = sc.left + at.x * sc.s, y = sc.top + at.y * sc.s;
+      await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+      await page.mouse.click(x, y);
+      await settle();
+      const mouse = await fieldValue("axis", "pts");
+      if (mouse?.index === idx) throw new Error(`touch/axis: a mouse click ${at.dCss.toFixed(1)} CSS px off element ${idx} picked it; want the axis readout`);
+      await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await settle();
+      const v = await fieldValue("axis", "pts");
+      if (v?.index !== idx) throw new Error(`touch/axis: a tap ${at.dCss.toFixed(1)} CSS px off element ${idx} picked ${JSON.stringify(v)}; want the mark over the axis readout`);
+      passed.push("axis/touch-nearest-over-readout");
+      console.error(`OK  axis — a tap ${at.dCss.toFixed(1)} CSS px off a mark picks it over the axis readout`);
+    }
+    // A bar takes a tap inside it only.
+    {
+      const spec = meta.find((m) => m.key === "barplot");
+      const layer = findLayer(await layersOf("barplot"), spec);
+      const field = spec.field ?? spec.layerId;
+      const idx = spec.clickIndex ?? 0;
+      const b = hitPoint(layer, idx);
+      const sc = await cssScale("barplot");
+      const tap = async (ix, iy) => {
+        const x = sc.left + ix * sc.s, y = sc.top + iy * sc.s;
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await settle();
+        return fieldValue("barplot", field);
+      };
+      // 6 CSS px past its top edge, in empty space: a miss, which clears the field. Then inside:
+      // picked. (In that order: a tap on the bar it already holds would take the pick back.)
+      const top = Math.min(b.y - b.h / 2, b.y + b.h / 2);
+      const outside = await tap(b.x, top - 6 / sc.s);
+      if (outside !== null) throw new Error(`touch/barplot: a tap 6 CSS px above bar ${idx} picked ${JSON.stringify(outside)}; bars are inside-only`);
+      const inside = await tap(b.x, b.y);
+      if (inside?.index !== idx) throw new Error(`touch/barplot: a tap inside bar ${idx} picked ${JSON.stringify(inside)}`);
+      passed.push("barplot/touch-inside-only");
+      console.error("OK  barplot — a tap picks a bar only inside it");
+    }
+    await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
   }
 
   if (unexpected.length) throw new Error(`page errors: ${unexpected.join(" | ")}`);

@@ -1,19 +1,20 @@
-import { axisPoint, findBin, hitTestAt, layerPoint, lineReadout, matrixLimits, resolvePayload } from "./geometry"
+import { axisPoint, findBin, hitTestAt, innermostView, layerPoint, lineReadout, matrixLimits, resolvePayload, slopScale } from "./geometry"
 import { drawHover, renderSelection } from "./highlight"
-import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent, updateLinkForHit } from "./hover"
+import { onMove, hideTip, hideViewReadout, showViewReadout, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent, updateLinkForHit } from "./hover"
 import { hideCross } from "./cross"
 import { cellRange, elementPicks, legendEdit, linePointHit, linkedIndices, manyHits, picksPoints, selectionFor, SELECTED_KINDS } from "./selection"
 import { emptyMask, encodeMask, maskCount, maskHit, setBlock } from "./gridmask"
 import { hasRegions, regionCells, regionOf, setRegionsOf } from "./regions"
 import { clickRows, groupEnvelope, groupOf, groupSelection, legendEntryHeld, rowOf, rowsOfMarks } from "./linked"
 import type { GridMask, MaskEnvelope } from "./gridmask"
-import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
+import { layoutImagePx, touchReach, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, FieldPick, FieldSelection, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
+import * as spanDrag from "./drag/span"
 import * as viewDrag from "./drag/view"
 import * as marquee from "./drag/marquee"
-import { panTo, unmapPoint } from "./photo"
+import { isIdentity, panTo, unmapPoint } from "./photo"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Limits3, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 
 // setPointerCapture throws InvalidPointerId if the UA doesn't consider this pointerId active
@@ -41,6 +42,13 @@ function clearWheelTimer(state: OverlayState): boolean {
     clearTimeout(state.wheelTimer_)
     state.wheelTimer_ = null
     return true
+}
+
+// One photograph previews one view's pan or zoom at a time. Until that view's frame lands, a
+// pan or zoom on another view would start from the first view's matrix and jump, so it waits
+// (#559: an inset is grabbed right after its parent is panned).
+export function photoHeldByOther(state: OverlayState, id: string): boolean {
+    return state.photoViewId_ !== null && state.photoViewId_ !== id && !isIdentity(state.photo_)
 }
 
 function armPan(ctx: OverlayCtx, state: OverlayState, e: PointerEvent, viewId: string): void {
@@ -80,7 +88,7 @@ function pointerSpace(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): {
     return { layout, content: (axis) => axisPoint(ctx.manifest_, state.photo_, state.photoViewId_, axis, layout) }
 }
 
-// The axis a marquee, threshold or ROI drag draws on.
+// The axis a marquee, threshold, span or ROI drag draws on.
 function dragAxis(ctx: OverlayCtx, d: Exclude<Drag, { kind: "view" }>): string {
     if (d.kind === "marquee") return d.axis_
     return ctx.manifest_.layers.find((l) => l.id === d.id_)?.axis ?? ""
@@ -110,6 +118,9 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
     } else if (d.kind === "threshold") {
         text = thresholdDrag.move(d, content, ctx.tipDigits_, ctx.tipExplicit_)
         if (liveDrag(ctx, d.id_)) requestState(ctx, { [d.id_]: thresholdDrag.envelopeAt(d, content) })
+    } else if (d.kind === "span") {
+        text = spanDrag.move(d, content, ctx.tipDigits_, ctx.tipExplicit_)
+        if (liveDrag(ctx, d.id_)) requestState(ctx, { [d.id_]: spanDrag.envelope(d) })
     } else if (d.kind === "view") {
         if (d.g_.mode === "orbit") {
             text = viewDrag.tip(d, layout, ctx.tipDigits_, ctx.tipExplicit_)
@@ -138,6 +149,10 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
     } else {
         text = roiDrag.move(ctx, state, d, content)
         if (liveDrag(ctx, d.id_)) requestState(ctx, roiDrag.fieldsNow(ctx, d))
+    }
+    if (d.kind === "view") {
+        showViewReadout(ctx, state, text)
+        return
     }
     setMarkAccent(ctx, null) // a drag readout is never a coloured element's tooltip
     setTipText(ctx, state, text)
@@ -249,14 +264,14 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
     ctx.surface_.classList.add("pointer-focus")
     ctx.surface_.focus({ preventScroll: true })
     const { layout, content } = pointerSpace(ctx, state, e)
+    const slop = slopScale(ctx.manifest_, ctx.base_.getBoundingClientRect().width)
     // Shift+drag forces view (arbitration vs box-select / ROI / threshold).
     if (e.shiftKey) {
-        const viewLayer = ctx.manifest_.layers.find((l) => {
-            if (l.kind !== "view" || !l.events.includes("drag")) return false
-            return hitTestAt({ ...ctx.manifest_, layers: [l] }, layout.x, layout.y, state.photo_, "drag", state.photoViewId_) !== null
-        })
+        // The innermost view under the press, as for a plain drag (#559).
+        const viewLayer = innermostView(ctx.manifest_, layout.x, layout.y)
         if (viewLayer) {
             const g = viewLayer.geometry as ViewGeometry
+            if (g.mode === "pan" && photoHeldByOther(state, viewLayer.id)) { e.preventDefault(); return }
             // On an Axis3, Shift+drag pans the limits instead of orbiting (#321).
             const base = g.mode === "orbit" && g.limits ? viewDrag.view3Base(state, viewLayer.id, g.limits) : undefined
             state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], layout.x, layout.y, e.pointerId, true, base)
@@ -268,14 +283,14 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             return
         }
     }
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_, slop)
     // A marquee: a drag on a plot with no view, or Alt-drag on any plot, where a field holds
     // several picks. A threshold line or an ROI box under the press still takes the drag.
     if (!hit || (hit.layer.kind === "view" && e.altKey)) {
         const axis = marquee.marqueeAxis(ctx, axesAt(ctx, layout.x, layout.y))
         const targets = axis === null ? [] : marquee.marqueeTargets(ctx, axis)
         // A press on a legend inside the axis is a press on the legend.
-        const under = targets.length ? hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_) : null
+        const under = targets.length ? hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_, slop) : null
         if (axis !== null && targets.length && !under?.layer.links) {
             const p = content(axis)
             state.drag_ = marquee.begin(state, axis, targets, marqueeMode(ctx.manifest_, state, under, targets, p), p.x, p.y, { x: e.clientX, y: e.clientY }, e.pointerId)
@@ -289,6 +304,17 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         const line = ctx.thresholdLines_.get(hit.layer.id)
         if (!line) return
         state.drag_ = thresholdDrag.begin(hit.layer.id, line, hit.layer.geometry as ThresholdGeometry, ctx.manifest_.transforms[hit.layer.axis], e.pointerId)
+    } else if (hit.layer.kind === "span" && hit.spanPart_) {
+        const band = ctx.spanBands_.get(hit.layer.id)
+        if (!band) return
+        // Inside the band a mark under the press keeps its click; the band moves from
+        // anywhere else inside it.
+        if (hit.spanPart_.move) {
+            const under = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_, slop)
+            if (under && SELECTED_KINDS.has(under.layer.kind)) return
+        }
+        const p = content(hit.layer.axis)
+        state.drag_ = spanDrag.begin(hit.layer.id, band, hit.spanPart_, band.g_.orientation === "h" ? p.y : p.x, e.pointerId)
     } else if (hit.layer.kind === "roi" && hit.roiPart_) {
         const box = ctx.roiBoxes_.get(hit.layer.id)
         if (!box) return
@@ -311,6 +337,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         }
     } else if (hit.layer.kind === "view") {
         const g = hit.layer.geometry as ViewGeometry
+        if (g.mode === "pan" && photoHeldByOther(state, hit.layer.id)) { e.preventDefault(); return }
         state.drag_ = viewDrag.begin(hit.layer.id, g, ctx.manifest_.transforms[hit.layer.axis], layout.x, layout.y, e.pointerId)
         if (g.mode === "pan") armPan(ctx, state, e, hit.layer.id)
     } else return
@@ -322,7 +349,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
 
 export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): void {
     cancelPendingMove(state)
-    state.lastUp_ = e.button === 0 ? { x: e.clientX, y: e.clientY } : null
+    state.lastUp_ = e.button === 0 ? { x: e.clientX, y: e.clientY, type_: e.pointerType } : null
     const d = state.drag_
     // Ignore a pointer that isn't the one that owns this drag (e.g. a second touch lifting
     // first) — without this, any pointer's up committed and ended whichever drag happened
@@ -352,6 +379,9 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     const { layout, content } = pointerSpace(ctx, state, e)
     if (d.kind === "threshold") {
         ctx.commit_({ [d.id_]: thresholdDrag.end(d, content(dragAxis(ctx, d))) })
+    } else if (d.kind === "span") {
+        // A press that never moved the band leaves the field as it was.
+        if (d.moved_) ctx.commit_({ [d.id_]: spanDrag.envelope(d) })
     } else if (d.kind === "view") {
         // §12.3: a view gesture commits nothing — no bond write, no "input" event.
         // Settle is gated on whether a request actually went out during this drag
@@ -371,7 +401,7 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     } else {
         ctx.commit_(roiDrag.end(ctx, state, d))
     }
-    hideTip(ctx, state); ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
+    hideTip(ctx, state); hideViewReadout(ctx); ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     if (d.kind === "view") {
         const dist = Math.hypot(layout.x - d.x0_, layout.y - d.y0_)
         state.justDragged_ = dist >= viewDrag.VIEW_MIN_PX
@@ -395,6 +425,7 @@ export function onCancel(ctx: OverlayCtx, state: OverlayState, e: PointerEvent):
     if (ctx.surface_.hasPointerCapture(e.pointerId)) ctx.surface_.releasePointerCapture(e.pointerId)
     ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     hideTip(ctx, state)
+    hideViewReadout(ctx)
     if (d.kind === "marquee") { marquee.cancel(ctx, state, d); return }
     // §12.5 (round-1 review, finding #2): a cancelled gesture is not a commit, but if it already
     // sent an in-drag (ppu=1) request it still owes the ppu restore — nothing else ever
@@ -431,6 +462,7 @@ export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
     const d = state.drag_ // claim before nulling, same reentrancy hazard onUp documents
     ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     hideTip(ctx, state)
+    hideViewReadout(ctx)
     state.drag_ = null
     if (d.kind === "marquee") { marquee.cancel(ctx, state, d); return }
     // Same §12.5 obligation as onCancel — but this handler gets no event/position at all, so the
@@ -747,27 +779,32 @@ function axesAt(ctx: OverlayCtx, x: number, y: number): string[] {
 // Where a click landed. Chromium rounds a click's clientX/Y to whole px, while the pointer
 // events hover reads keep the fraction, so a readout click off its pointerup would commit up to
 // half a px from the value the tooltip shows (#448). The pointerup this click follows keeps it.
-function clickPoint(state: OverlayState, e: MouseEvent): { x: number, y: number } {
+// Its pointer type comes from that pointerup too: not every browser's click says it.
+function clickPoint(state: OverlayState, e: MouseEvent): { x: number, y: number, type_: string } {
     const up = state.lastUp_
     state.lastUp_ = null
     if (up && Math.abs(up.x - e.clientX) < 1 && Math.abs(up.y - e.clientY) < 1) return up
-    return { x: e.clientX, y: e.clientY }
+    return { x: e.clientX, y: e.clientY, type_: (e as PointerEvent).pointerType ?? up?.type_ ?? "mouse" }
 }
 
 export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {
     const at = clickPoint(state, e)
-    if (state.justDragged_) { state.justDragged_ = false; return }
+    if (state.justDragged_) { state.justDragged_ = false; state.plainClicks_ = 0; return }
     // Chromium still dispatches click after a Mac ctrl-click.
     if (isMacContextClick(e)) return
+    state.plainClicks_ += 1
     const layout = layoutImagePx(ctx.base_, ctx.manifest_, at.x, at.y)
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_)
+    const slop = slopScale(ctx.manifest_, ctx.base_.getBoundingClientRect().width)
+    // A finger picks the nearest mark within its reach (#528).
+    const touch = touchReach(ctx.base_, ctx.manifest_, at.type_)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_, slop, touch)
     if (!hit) {
         // A click on an empty part of a plot clears the one-pick fields there; a `many` field
         // keeps its picks, since a near miss among many small marks is the likeliest slip and
         // Escape clears them (#384). A mark that only shows a tooltip isn't empty space, and a
         // Cmd/Ctrl-click that misses keeps the picks, as a modified miss does in a file browser.
         if (isToggleClick(e)) return
-        if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_)) return
+        if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_, slop, touch)) return
         // A click inside an opaque legend that takes no clicks is on the legend too (#472).
         if (ctx.manifest_.occluders?.some(([bx, by, bw, bh]) => layout.x >= bx && layout.x <= bx + bw && layout.y >= by && layout.y <= by + bh)) return
         const axes = axesAt(ctx, layout.x, layout.y)
@@ -776,6 +813,53 @@ export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): vo
     }
     const sample = layerPoint(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer, layout)
     commitClick(ctx, state, hit, sample.x, sample.y, isToggleClick(e))
+}
+
+// A double-click on a view's plot, away from anything a click picks, puts the view back where
+// it started (#524). On a mark the two clicks are already two picks, and on a line, a box or a
+// legend they are that control's. An axis or colorbar readout and a mark that only shows a
+// tooltip pick nothing a reset would undo, so they don't stand in its way. The first click has
+// already cleared a one-pick field there, as any click on empty space does (#384): waiting to
+// see whether a second click comes would slow every pick.
+export function onDoubleClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {
+    if (state.drag_ || state.plainClicks_ < 2 || isToggleClick(e)) return
+    const m = ctx.manifest_
+    const p = layoutImagePx(ctx.base_, m, e.clientX, e.clientY)
+    const slop = slopScale(m, ctx.base_.getBoundingClientRect().width)
+    const under = hitTestAt(m, p.x, p.y, state.photo_, "drag", state.photoViewId_, slop)
+    if (under?.layer.kind !== "view") return
+    const picked = hitTestAt(m, p.x, p.y, state.photo_, "click", state.photoViewId_, slop)
+    if (picked && picked.layer.kind !== "axis") return
+    if (m.occluders?.some(([bx, by, bw, bh]) => p.x >= bx && p.x <= bx + bw && p.y >= by && p.y <= by + bh)) return
+    if (resetView(ctx, state, under.layer.id)) { e.preventDefault(); e.stopPropagation() }
+}
+
+// The views a reset of `id` puts back with it: itself, and each view on an axis tied to its
+// own by `linkaxes!` (either way round). Panels tied by `linkcameras!` are not listed in the
+// manifest; the reset's frame says where they are.
+function viewsResetWith(m: Manifest, id: string): string[] {
+    const own = m.layers.find((l) => l.id === id && l.kind === "view")
+    if (!own) return []
+    const linksOf = (g: ViewGeometry) => (g.links ?? []).map((k) => k.axis)
+    const ownLinks = linksOf(own.geometry as ViewGeometry)
+    return m.layers.filter((l) => l.kind === "view" &&
+        (l === own || ownLinks.includes(l.axis) || linksOf(l.geometry as ViewGeometry).includes(own.axis))).map((l) => l.id)
+}
+
+// Put the view `id` back where it started (#524): one request on the gesture channel, settled
+// at full resolution, with no bond write (§12.3). Julia holds where it started. The double-click,
+// the `0` key and the corner reset button (#525) all come here. False when the view has not
+// moved, so there is nothing to send.
+export function resetView(ctx: OverlayCtx, state: OverlayState, id: string): boolean {
+    if (state.drag_ || !state.viewMoved_.has(id)) return false
+    // A wheel's idle settle still to come would undo the reset.
+    if (state.wheelTimer_ !== null) { clearTimeout(state.wheelTimer_); state.wheelTimer_ = null }
+    hideTip(ctx, state)
+    for (const v of viewsResetWith(ctx.manifest_, id)) state.viewMoved_.delete(v)
+    // An Axis3 zoom or pan starts from the frame on screen again, not from the last ones asked for.
+    state.view3Last_ = null
+    void ctx.gesture_.settle({ id, reset: true, settle: true })
+    return true
 }
 
 // Single entry point for pointermove: while a drag owns the pointer, route to the

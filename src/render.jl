@@ -182,13 +182,18 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         "events" => [string(e) for e in L.events],
         "style" => style,
     )
-    # The coordinate fields Masque filled in (`_merge_payloads`): the default tooltip prints
-    # them in the axis's format (#510).
+    # The fields Masque filled in that are measured along an axis (`_merge_payloads`), each
+    # with that axis: the default tooltip prints them in the axis's format (#510, #543).
     ck = _coord_keys(L.payloads)
-    isempty(ck) || (d["coords"] = String[string(k) for k in ck])
+    isempty(ck) || (d["coords"] = Dict{String, String}(string(k) => string(dim) for (k, dim) in ck))
     if L.kind in (:segments, :polyline, :lines, :rects, :polygons)
         t = hit_tol(i)
         t === nothing || (d["tol"] = round(Int, t * ctx.scaling))
+    end
+    if L.kind in (:circles, :segments, :polyline, :lines)
+        # CSS px, as `masque`'s `touch`: the overlay scales a finger's reach to the screen.
+        r = touch_radius(i)
+        r === nothing || (d["touch"] = r)
     end
     if L.kind in (:segments, :polyline, :lines)
         # A layer built from bare vertices has no plot to read: Makie's default line width.
@@ -480,6 +485,7 @@ function build_manifest(
         interactables, ctx::InteractionContext;
         selected = nothing, tip_style = nothing, tip_digits = nothing, background = nothing,
         overlay_style = nothing, owners_out = nothing, suspend_surfaces = false, with_initial = true,
+        touch = nothing,
     )
     plan = interactables
     # A threshold or box with no start takes it from the limits. `masque` sets it once at mount;
@@ -578,6 +584,9 @@ function build_manifest(
     permute!(layer_owners, perm)
     m = Dict{String, Any}(
         "width" => ctx.width, "height" => ctx.height, "scaling" => ctx.scaling,
+        # The CSS width the figure is drawn for: hit slack keeps its on-screen size when the
+        # figure is shown narrower (frontend `slopScale`, #527).
+        "cssWidth" => round(Int, ctx.width * ctx.display_scale),
         "layers" => layers,
         "transforms" => Dict(string(id) => _transform_dict(t) for (id, t) in ctx.transforms),
     )
@@ -594,6 +603,8 @@ function build_manifest(
     # Sent only when the user set it: a set `tooltip_sigdigits` outranks a Makie format string's
     # precision, and Masque's default does not (#510).
     tip_digits === nothing || (m["tipDigits"] = tip_digits)
+    # Sent only when the user set it; the overlay's default radius is 16 CSS px (#528).
+    touch === nothing || (m["touch"] = touch)
     background === nothing || (m["background"] = _css_color(background))
     # An axis whose empty plot area is not the figure's colour ships that colour as `fill`: the
     # selected look fades unpicked marks toward it (#394).
@@ -605,16 +616,26 @@ function build_manifest(
             fill == m["background"] || (t["fill"] = fill)
         end
     end
-    # The boxes Makie draws over the axes' plots (an opaque legend over an axis): the overlay
-    # draws no data mark's highlight or fade inside them (#437), and a data mark takes no
-    # pointer there (#472).
-    plots = [ctx.transforms[id].viewport for (blk, id) in ctx.ids if blk isa _SUPPORTED_AXES]
+    # The boxes Makie draws over the axes' plots (an opaque legend or `Box` over an axis): the
+    # overlay draws no data mark's highlight or fade inside them (#437), and a data mark takes
+    # no pointer there (#472, #547).
+    axes = [(blk, ctx.transforms[id].viewport) for (blk, id) in ctx.ids if blk isa _SUPPORTED_AXES]
     meets((x, y, w, h), (vx, vy, vw, vh)) = x < vx + vw && vx < x + w && y < vy + vh && vy < y + h
     occluders = Vector{Float64}[]
     for (blk, _) in ctx.ids
         blk isa Makie.Legend || continue
         box = _legend_occluder(blk, ctx.scaling, ctx.height)
-        box === nothing || any(v -> meets(box, v), plots) && push!(occluders, box)
+        box === nothing || any(a -> meets(box, a[2]), axes) && push!(occluders, box)
+    end
+    fig = isempty(axes) ? nothing : first(axes)[1].parent
+    if fig isa Makie.Figure
+        for blk in fig.content
+            blk isa Makie.Box || continue
+            box = _box_occluder(blk, ctx.scaling, ctx.height)
+            box === nothing && continue
+            over(ax) = _box_over_plots(fig, blk, ax, ctx.depth_test)
+            any(((ax, v),) -> meets(box, v) && over(ax), axes) && push!(occluders, box)
+        end
     end
     isempty(occluders) || (m["occluders"] = sort!(occluders))
     if owners_out !== nothing
@@ -718,7 +739,7 @@ them, or `interactables(plot; …)` for one plot.
 - `interactables(plot; …)` replaces that plot's default layers, at the same position and with
   the same ids.
 - An interactable whose layer id matches a default's replaces that default.
-- Anything else (`ViewInteractable`, `ThresholdInteractable`, `ROIInteractable`,
+- Anything else (`ViewInteractable`, `ThresholdInteractable`, `SpanInteractable`, `ROIInteractable`,
   `PointInteractable(ax, pts)`, …) is added after the defaults, in argument order.
 
 Two layers with the same id raise `ArgumentError`. Legends link to the layers of this call.
@@ -730,7 +751,8 @@ The `@bind` value is a `NamedTuple` with one field per layer a reader can set, n
 id, in the order the layers are listed. A plot that takes clicks holds its pick: `nothing`
 until a click, then one [`InteractionEvent`](@ref), and `nothing` again when the same mark is
 clicked twice. A [`ThresholdInteractable`](@ref) holds a [`ThresholdEvent`](@ref), starting
-at its `value` (or the middle of the axis without one), and an [`ROIInteractable`](@ref) a
+at its `value` (or the middle of the axis without one), a [`SpanInteractable`](@ref) a
+[`SpanEvent`](@ref), starting at its `span`, and an [`ROIInteractable`](@ref) a
 [`BoundsEvent`](@ref), starting at its `bounds` (or the middle half of the axis without
 them). A box with `selects` also fills its target's field with what it contains: a
 `Vector{ElementEvent}` over points (an empty box is `ElementEvent[]`), one
@@ -776,7 +798,7 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   `onchange` and still takes clicks. The function changes plots that already exist, with
   Makie's `update!(plot, args...; attrs...)` or `plot[1] = …`; adding or removing a plot
   raises `ArgumentError`. It runs once inside `masque`, before the first picture, then on
-  every click and release, and while a threshold or box moves unless that control was built
+  every click and release, and while a threshold, span or box moves unless that control was built
   with `update_while_dragging = false`. A plot whose number of marks changes loses its picks.
   An error while the reader works the widget keeps the last picture, shows a short note over
   it, and logs the full error. It needs a running kernel: in a static export the picture
@@ -785,10 +807,17 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   `CairoMakie` / `WGLMakie` is loaded, `:cairo` if both. Raises `ArgumentError` if neither is
   loaded, if the named backend's package is not loaded, or for an unknown name.
 - `max_width` — the widest the plot shows on the page, in CSS px (Pluto's column). Default `700`.
-- `px_per_unit` — image pixels per figure unit, on either backend. Default `nothing`: on
-  `:cairo`, `2 * min(figure width, max_width) / figure width`, so the PNG is twice the width it
-  shows at; on `:webgl`, `2`. A larger number gives a sharper, heavier picture. Neither this
+- `px_per_unit` — image pixels per figure unit, on either backend. Default `nothing`:
+  `2 * min(figure width, max_width) / figure width`, so the picture is twice the width it
+  shows at. A larger number gives a sharper, heavier picture. Neither this
   nor `max_width` follows `CairoMakie.activate!` or `WGLMakie.activate!`.
+- `touch` — how a finger picks a mark. A touch picks the nearest point or line whose drawn
+  edge is within `radius` CSS px of the finger, rather than only the one under it, as a mouse
+  does; bars, polygons and heatmap cells take a touch inside them. `touch = (; radius = 8)`
+  sets the radius (default 16), `(; radius = 0)` picks only what the finger lands on, and
+  `touch = false` gives a finger the mouse's rule. A layer's own `touch_radius` (see
+  [`interactables`](@ref)) wins over it. A mouse or a pen is never affected, so a touchscreen
+  laptop keeps the mouse's precision. Default `true`.
 - `tooltip_sigdigits` — significant figures for a tooltip number that has no format spec.
   Unset, it is 4, so `0.30000000000000004` shows as `0.3` and `2.71828` as `2.718`;
   integers, and the whole-number part of a value at or above `10^tooltip_sigdigits`, show in
@@ -845,6 +874,21 @@ _as_figure(x) = throw(
     ),
 )
 
+# `masque(...; touch)` as the manifest's `touch`: `nothing` for the default (sent as nothing),
+# `false` for a finger that hits as a mouse does, or `{radius}` in CSS px.
+_touch_dict(t::Bool) = t ? nothing : false
+function _touch_dict(t::NamedTuple)
+    for k in keys(t)
+        k === :radius || throw(ArgumentError("masque: `touch` takes the key `radius`, got `$k`"))
+    end
+    haskey(t, :radius) || return nothing
+    r = t.radius
+    r isa Real && isfinite(r) && r >= 0 ||
+        throw(ArgumentError("masque: `touch.radius` must be a finite number of CSS px, at least 0; got $(repr(r))"))
+    return Dict{String, Any}("radius" => Float64(r))
+end
+_touch_dict(t) = throw(ArgumentError("masque: `touch` must be `true`, `false`, or a NamedTuple such as `(; radius = 16)`; got $(repr(t))"))
+
 _check_onchange(f) = f === nothing || f isa Function || throw(
     ArgumentError("masque: `onchange` must be a function of the widget's state, `state -> …`, got $(typeof(f))"),
 )
@@ -852,9 +896,10 @@ _check_onchange(f) = f === nothing || f isa Function || throw(
 function _masque(
         fig, interactables::AbstractVector; backend::Union{Nothing, Symbol, AbstractBackend} = nothing,
         max_width = nothing, px_per_unit = nothing, selected = nothing, onchange = nothing,
-        tooltipstyle = nothing, tooltip_sigdigits = nothing, overlaystyle = nothing,
+        tooltipstyle = nothing, tooltip_sigdigits = nothing, overlaystyle = nothing, touch = true,
     )
     tip_digits = _check_sigdigits(tooltip_sigdigits)
+    touch = _touch_dict(touch)
     _check_onchange(onchange)
     interactables = _with_onchange(interactables, onchange)
     tip_style = tip_style_dict(tooltipstyle)
@@ -863,6 +908,8 @@ function _masque(
     bg0 = fig.scene.backgroundcolor[]
     try
         fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
+        # Before anything draws: a view's home is the limits the author wrote (#524).
+        _record_view_homes!(interactables)
         _finalize!(fig)        # finalize once; render + context share it
         _pin_pan_ticklabelspace!(fig, interactables)
         ppu = something(px_per_unit, _ppu(backend, fig, max_width))
@@ -875,7 +922,7 @@ function _masque(
         owners_out = Ref(Dict{String, LayerOwner}())
         build() = build_manifest(
             interactables, ctx; selected, tip_style, tip_digits,
-            background = fig.scene.backgroundcolor[], overlay_style, owners_out,
+            background = fig.scene.backgroundcolor[], overlay_style, owners_out, touch,
         )
         manifest = build()
         if onchange !== nothing
@@ -1164,7 +1211,7 @@ function _pick_counts(manifest)
         counts[g["id"]] = reinterpret(Int, hash((g["n"], _group_table(manifest, g))))
     end
     for d in manifest["layers"]
-        d["id"] in fields && get(d, "bond", nothing) ∉ ("threshold", "bounds", "control") || continue
+        d["id"] in fields && get(d, "bond", nothing) ∉ ("threshold", "span", "bounds", "control") || continue
         # A hidden plot has no marks to pick: hiding it clears its picks.
         get(d, "hidden", false) === true && (counts[d["id"]] = 0; continue)
         n = try
@@ -1218,13 +1265,17 @@ function _move_controls!(live::_LiveFigure, manifest, owners, js)
     ints = live.plan.ints
     for k in eachindex(ints)
         i = ints[k]
-        i isa Union{ThresholdInteractable, ROIInteractable} || continue
+        i isa Union{ThresholdInteractable, SpanInteractable, ROIInteractable} || continue
         f = string(i.id)
         haskey(js, f) && js[f] !== nothing || continue
         ev = _field_value(manifest, owners, f, js[f])
-        ints[k] = i isa ThresholdInteractable ?
-            ThresholdInteractable(i.ax, i.orientation, _threshold_value(ev), i.id, i.update_while_dragging) :
+        ints[k] = if i isa ThresholdInteractable
+            ThresholdInteractable(i.ax, i.orientation, _threshold_value(ev), i.id, i.update_while_dragging)
+        elseif i isa SpanInteractable
+            SpanInteractable(i.ax, i.orientation, _span_values(ev)..., i.id, i.update_while_dragging)
+        else
             ROIInteractable(i.ax, _roi_bounds(ev), i.id, i.selects, i.update_while_dragging)
+        end
     end
     return nothing
 end
@@ -1289,7 +1340,9 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
     ax === nothing && throw(
         ArgumentError("Masque gesture channel: no ViewInteractable with id :$(id) on this widget"),
     )
-    if haskey(input, "azimuth") || haskey(input, "limits")
+    if get(input, "reset", false) === true
+        _reset_view!(ax)
+    elseif haskey(input, "azimuth") || haskey(input, "limits")
         if haskey(input, "azimuth")
             ax.azimuth[] = Float64(input["azimuth"])
             ax.elevation[] = Float64(input["elevation"])
@@ -1306,6 +1359,7 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
         ax.limits[] = (xlims..., ylims...)
         _pan_linked_axes!(ax, xlims, ylims)
     end
+    _note_view_left!(view_axes)
     live === nothing && return _render_gesture_frame(input, backend, fig, interactables, ppu, max_width)
     owners_out = Ref(Dict{String, LayerOwner}())
     frame = _render_gesture_frame(input, backend, fig, live.plan, ppu, max_width; owners_out)
@@ -1314,13 +1368,15 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
 end
 
 function _render_gesture_frame(input, backend, fig, interactables, ppu, max_width; owners_out = nothing)
-    # Frame resolution drops to 1x for every in-drag frame and restores to the mount ppu on
-    # release ("settle", the frontend's terminal request) — the MANIFEST always stays in the
-    # mount ppu's coordinate space below, so image-px geometry (viewBox, hit regions) never
-    # moves out from under the overlay; only the PNG's own pixel density changes (the <img>
-    # is width:100% CSS-scaled — see frontend-delivery.md — so that's decoupled from its
-    # intrinsic size).
-    render_ppu = get(input, "settle", false) === true ? ppu : 1.0
+    # Frame resolution drops to 1x (or the mount ppu, if lower) for every in-drag frame and
+    # restores to the mount ppu on release ("settle", the frontend's terminal request) — the
+    # MANIFEST always stays in the mount ppu's coordinate space below, so image-px geometry
+    # (viewBox, hit regions) never moves out from under the overlay; only the PNG's own pixel
+    # density changes (the <img> is width:100% CSS-scaled — see frontend-delivery.md — so
+    # that's decoupled from its intrinsic size). A figure `resize!`d after display changes the
+    # manifest's width and height, at the same scale, and the frontend resizes the overlay to
+    # match (#546).
+    render_ppu = get(input, "settle", false) === true ? ppu : min(ppu, 1.0)
     bg0 = fig.scene.backgroundcolor[]
     try
         # Same forcing masque() does around its own render — that guard is restored in ITS
@@ -1335,6 +1391,8 @@ function _render_gesture_frame(input, backend, fig, interactables, ppu, max_widt
         result = _with_blocks_hidden(() -> render(backend, fig, render_ppu), interactables)
         frame = _gesture_frame(result)
         frame["manifest"] = manifest
+        # The figure can be resized after display (#546); the widget follows it, as at mount.
+        frame["displayWidth"] = round(Int, min(size(fig.scene)[1], max_width))
         return frame
     finally
         fig.scene.backgroundcolor[] = bg0
@@ -1383,7 +1441,12 @@ _suspended_surface(i::SurfaceInteractable, ctx) =
 # one farther pose cover the compile a coalesced first drag otherwise still pays. `stop`
 # bails between frames when the cell is replaced; the camera is put back either way.
 function _warm_view_render_frame!(frame, view_axes; stop = () -> false, extra = ())
-    _warm_view_poses!(frame, view_axes, stop)
+    left = _view_left_snapshot(view_axes)
+    try
+        _warm_view_poses!(frame, view_axes, stop)
+    finally
+        _restore_view_left!(left)
+    end
     for input in extra
         stop() && break
         frame(input)

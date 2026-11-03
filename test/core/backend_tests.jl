@@ -28,7 +28,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test IP._resolve_backend(nothing) isa _CairoExt.CairoBackend      # the one loaded
         @test IP._resolve_backend(:cairo) isa _CairoExt.CairoBackend
         w = masque(f; backend = :cairo)
-        @test w isa MasqueWidget && w.manifest["scaling"] == 2.0 && w.display_css == 600
+        @test w isa MasqueWidget && w.manifest["scaling"] == 2.0 && w.display_css == 600 == w.manifest["cssWidth"]
         err = (@test_throws ArgumentError masque(f; backend = :webgl)).value
         @test occursin("using WGLMakie", err.msg)
         err = (@test_throws ArgumentError masque(f; backend = :svg)).value
@@ -36,7 +36,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 
         # max_width sets the display width and, by default, the density
         w = masque(f; max_width = 300)
-        @test w.display_css == 300
+        @test w.display_css == 300 == w.manifest["cssWidth"]   # hit slack's design width (#527)
         @test w.manifest["scaling"] == 2 * 300 / 600 && w.manifest["width"] == 600
         # px_per_unit sets the density on Cairo too, independent of max_width
         w = masque(f; px_per_unit = 3)
@@ -44,7 +44,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         png = parentmodule(Masque.base64encode).base64decode(w.b64)   # IHDR: width, height
         @test ntoh.(reinterpret(UInt32, png[17:24])) == [1800, 1200]
         w = masque(f; px_per_unit = 3, max_width = 300)
-        @test w.manifest["scaling"] == 3.0 && w.display_css == 300
+        @test w.manifest["scaling"] == 3.0 && w.display_css == 300 == w.manifest["cssWidth"]
         @test_throws ArgumentError masque(f; px_per_unit = 0)
         @test_throws ArgumentError masque(f; px_per_unit = :big)
         @test_throws ArgumentError masque(f; max_width = -1)

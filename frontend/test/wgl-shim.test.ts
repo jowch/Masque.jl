@@ -469,6 +469,30 @@ describe("WebGL context pool", () => {
         expect(m.inits).toHaveLength(1)
     })
 
+    it("hands a frame held while asleep to the overlay once its base is the new canvas", async () => {
+        const { host, canvas } = at(4000)
+        type Host = HTMLElement & {
+            masqueRetargetBase?: (next: HTMLElement) => void
+            masqueFlushPending?: () => void
+            masqueRequestLive?: () => void
+        }
+        const h = host as Host
+        let base: HTMLElement = canvas
+        let flushedOn: HTMLElement | null = null
+        h.masqueRetargetBase = (next) => { base = next }
+        h.masqueFlushPending = () => { flushedOn = base }
+        const m = await mod()
+        m.inits.length = 0
+        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: { tag: "mount" }, width: 80, height: 40 })
+        await settle()
+        base = document.createElement("img") // the overlay sits on a still while the plot sleeps
+        // A key or a drag on the sleeping plot: its frame waits on the host, and the plot asks to wake.
+        h.masqueRequestLive!()
+        await settle()
+        expect(m.inits).toHaveLength(1)
+        expect(flushedOn).toBe(m.inits[0][1])
+    })
+
     it("lets a right-click reach the browser menu on a live canvas", async () => {
         const { canvas } = at(0)
         await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 80, height: 40, visible: true })

@@ -3,11 +3,12 @@ import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, panLimits3,
     anchorFor, axisFrame, computeAnchoredPlacement, layerPoint, occludedAt, previewWindows, lineReadout, readoutAt, samplePoint,
-    closestPointOnPath,
+    closestPointOnPath, slopScale, innermostView,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
 import { begin as beginView, tip as viewTip, limitsTip, view3Base, rememberView3, seedView3Homes, zoom3 } from "../src/drag/view"
 import { createOverlayState } from "../src/state"
+import { IDENTITY } from "../src/photo"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Limits3, Manifest, ThresholdGeometry } from "../src/types"
 
 describe("primitives", () => {
@@ -639,6 +640,63 @@ describe("roi hit-test", () => {
         const small: HitLayer = { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
             geometry: { x: 0, y: 0, w: 20, h: 20, handle: 8 } }
         expect(hitLayer(small, 3, 3)).toMatchObject({ roiPart_: { corner: 0 } })
+    })
+})
+
+describe("hit slack keeps its on-screen size when the figure is shown narrower (#527)", () => {
+    const m = (cssWidth?: number): Manifest => ({ width: 1200, height: 800, scaling: 2, cssWidth, layers: [], transforms: {} })
+    it("slopScale is the design width over the live width, never below 1", () => {
+        expect(slopScale(m(600), 600)).toBe(1)        // Pluto at full column width: unchanged
+        expect(slopScale(m(600), 300)).toBe(2)        // shown at half width: slack doubles
+        expect(slopScale(m(600), 900)).toBe(1)        // shown larger: today's slack, not less
+        expect(slopScale(m(600), 0)).toBe(1)          // not laid out yet
+        expect(slopScale(m(undefined), 300)).toBe(1)  // no design width sent
+    })
+    const circles: HitLayer = { id: "pts", kind: "circles", axis: "ax1", events: ["hover"], payloads: [{}], geometry: [100, 100, 6] }
+    const seg: HitLayer = { id: "segs", kind: "segments", axis: "ax1", events: ["hover"], payloads: [{}], geometry: [0, 0, 100, 0], tol: 6 }
+    const thr: HitLayer = { id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+        geometry: { orientation: "h", pos: 100, span: [0, 200] } }
+    const roi: HitLayer = { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
+        geometry: { x: 100, y: 50, w: 200, h: 120, handle: 8 } }
+    it("every slack scales with slop: circle reach, line tol, threshold band, ROI grip", () => {
+        // circle: the hit circle r 6 + HIT_TOL 4 = 10 at slop 1, (6 + 4) × 2 = 20 at slop 2, the
+        // size it has on screen at the design width
+        expect(hitLayer(circles, 112, 100)).toBeNull()
+        expect(hitLayer(circles, 119, 100, undefined, 2)).toMatchObject({ index: 0 })
+        expect(hitLayer(circles, 121, 100, undefined, 2)).toBeNull()
+        // segments: tol 6 → 12
+        expect(hitLayer(seg, 50, 10)).toBeNull()
+        expect(hitLayer(seg, 50, 10, undefined, 2)).toMatchObject({ index: 0 })
+        // threshold: SEG_TOL 8 → 16
+        expect(hitLayer(thr, 50, 112)).toBeNull()
+        expect(hitLayer(thr, 50, 112, undefined, 2)).toMatchObject({ index: 0 })
+        // ROI: grip half-size 16 → 32; (70, 20) is 30 px from the TL corner on both axes
+        expect(hitLayer(roi, 70, 20)).toBeNull()
+        expect(hitLayer(roi, 70, 20, undefined, 2)).toMatchObject({ roiPart_: { corner: 0 } })
+    })
+    it("an inside hit still wins over a neighbour's grown reach", () => {
+        // Two dots 20 px apart: at slop 3 the second dot's hit circle ((6 + 4) × 3 = 30) covers
+        // the first, but a pointer inside the first keeps it.
+        const two: HitLayer = { ...circles, payloads: [{}, {}], geometry: [120, 100, 6, 100, 100, 6] }
+        expect(hitLayer(two, 118, 100, undefined, 3)).toMatchObject({ index: 0 })
+        // Outside both, the nearer dot wins, whichever is drawn on top.
+        expect(hitLayer(two, 112, 100, undefined, 3)).toMatchObject({ index: 0 })
+        expect(hitLayer(two, 108, 100, undefined, 3)).toMatchObject({ index: 1 })
+    })
+    it("a top-drawn dot's grown reach never takes the pointer from a nearer dot", () => {
+        // Two r = 9 dots 30 px apart, the second drawn on top; the pointer is 12 px from the
+        // lower dot and 18 px from the top one. Both reaches cover it at the docs-on-a-phone
+        // slop, and the nearer, lower dot wins there as it does at slop 1.
+        const two: HitLayer = { ...circles, payloads: [{}, {}], geometry: [100, 100, 9, 130, 100, 9] }
+        expect(hitLayer(two, 112, 100, undefined, 1)).toMatchObject({ index: 0 })
+        expect(hitLayer(two, 112, 100, undefined, 1.97)).toMatchObject({ index: 0 })
+        // Equally far from both edges: the top-drawn one wins.
+        expect(hitLayer(two, 115, 100, undefined, 1.97)).toMatchObject({ index: 1 })
+    })
+    it("hitTestAt passes slop to every layer", () => {
+        const mm: Manifest = { ...m(600), layers: [seg] }
+        expect(hitTestAt(mm, 50, 10, IDENTITY, "hover")).toBeNull()
+        expect(hitTestAt(mm, 50, 10, IDENTITY, "hover", null, 2)).toMatchObject({ index: 0 })
     })
 })
 
@@ -1449,5 +1507,35 @@ describe("samplePoint", () => {
         const t: AxisTransform = { xlims: [0, 4], ylims: [0, 2], xscale: "identity", yscale: "identity",
             viewport: [0, -200, 400, 200], xreversed: false, yreversed: false }
         expect(samplePoint(center, 0, 1, t)).toEqual({ x: 100, y: -100 })
+    })
+})
+
+// #559: of nested views, the smallest that holds the point takes it.
+describe("innermostView", () => {
+    const view = (id: string, x: number, y: number, w: number, h: number): HitLayer =>
+        ({ id, kind: "view", axis: id, events: ["drag"], payloads: [], geometry: { x, y, w, h, mode: "pan" } }) as HitLayer
+    const m = (layers: HitLayer[]): Manifest => ({ width: 1000, height: 1000, scaling: 1, transforms: {}, layers })
+
+    it("picks the inset over its parent, whichever is listed first", () => {
+        for (const layers of [[view("out", 0, 0, 1000, 1000), view("in", 100, 100, 200, 200)],
+            [view("in", 100, 100, 200, 200), view("out", 0, 0, 1000, 1000)]]) {
+            expect(innermostView(m(layers), 150, 150)?.id).toBe("in")
+            expect(innermostView(m(layers), 500, 500)?.id).toBe("out")
+            expect(hitTest(m(layers), 150, 150, "drag")?.layer.id).toBe("in")
+            expect(hitTestAt(m(layers), 150, 150, IDENTITY, "drag")?.layer.id).toBe("in")
+            expect(hitTestAt(m(layers), 500, 500, IDENTITY, "drag")?.layer.id).toBe("out")
+        }
+    })
+
+    it("gives two views of the same size (twin axes) to the first listed", () => {
+        const layers = [view("a", 0, 0, 500, 500), view("b", 0, 0, 500, 500)]
+        expect(innermostView(m(layers), 10, 10)?.id).toBe("a")
+        expect(hitTest(m(layers), 10, 10, "drag")?.layer.id).toBe("a")
+    })
+
+    it("leaves a point to the parent when the inset can't take it", () => {
+        const layers = [view("out", 0, 0, 1000, 1000), view("in", 100, 100, 200, 200)]
+        expect(innermostView(m(layers), 150, 150, "drag", (l) => l.id !== "in")?.id).toBe("out")
+        expect(innermostView(m(layers), 2000, 2000)).toBeNull()
     })
 })

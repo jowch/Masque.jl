@@ -60,6 +60,16 @@ HTML(
         "<span id=\"coords_scatter\" style=\"display:none\">$(JSON3.write(sweep.scatter.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-00000000a548
+@bind ev_scatter_low sweep.scatter_low
+
+# ╔═╡ c1000000-0000-0000-0000-00000000a549
+HTML(
+    "<span id=\"out_scatter_low\">SCATTER_LOW=$(sweep_field("scatter_low", ev_scatter_low))</span>" *
+        "<span id=\"bond_scatter_low\" style=\"display:none\">$(repr(ev_scatter_low))</span>" *
+        "<span id=\"coords_scatter_low\" style=\"display:none\">$(JSON3.write(sweep.scatter_low.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000012
 @bind ev_lines sweep.lines
 
@@ -243,6 +253,26 @@ HTML(
         "<span id=\"occluders_legend_hidden\" style=\"display:none\">$(JSON3.write(get(sweep.legend_hidden.manifest, "occluders", [])))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-00000000019a
+@bind ev_box_hidden sweep.box_hidden
+
+# ╔═╡ c1000000-0000-0000-0000-00000000019b
+HTML(
+    "<span id=\"out_box_hidden\">BOX_HIDDEN=$(sweep_field("box_hidden", ev_box_hidden))</span>" *
+        "<span id=\"coords_box_hidden\" style=\"display:none\">$(JSON3.write(sweep.box_hidden.manifest["layers"]))</span>" *
+        "<span id=\"occluders_box_hidden\" style=\"display:none\">$(JSON3.write(get(sweep.box_hidden.manifest, "occluders", [])))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-00000000019c
+@bind ev_box_axes sweep.box_axes
+
+# ╔═╡ c1000000-0000-0000-0000-00000000019d
+HTML(
+    "<span id=\"out_box_axes\">BOX_AXES=$(sweep_field("box_axes", ev_box_axes))</span>" *
+        "<span id=\"coords_box_axes\" style=\"display:none\">$(JSON3.write(sweep.box_axes.manifest["layers"]))</span>" *
+        "<span id=\"occluders_box_axes\" style=\"display:none\">$(JSON3.write(get(sweep.box_axes.manifest, "occluders", [])))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-0000000000e9
 @bind ev_hidden_plot sweep.hidden_plot
 
@@ -373,6 +403,16 @@ HTML(
         "<span id=\"coords_surface3d\" style=\"display:none\">$(JSON3.write(sweep.surface3d.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-00000000a550
+@bind ev_surface3d_low sweep.surface3d_low
+
+# ╔═╡ c1000000-0000-0000-0000-00000000a551
+HTML(
+    "<span id=\"out_surface3d_low\">SURFACE3D_LOW=$(sweep_field("surface3d_low", ev_surface3d_low))</span>" *
+        "<span id=\"bond_surface3d_low\" style=\"display:none\">$(repr(ev_surface3d_low))</span>" *
+        "<span id=\"coords_surface3d_low\" style=\"display:none\">$(JSON3.write(sweep.surface3d_low.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000200
 @bind ev_surface_polar sweep.surface_polar
 
@@ -471,6 +511,16 @@ HTML(
     "<span id=\"out_violin\">VIOLIN=$(sweep_field("violin", ev_violin))</span>" *
         "<span id=\"bond_violin\" style=\"display:none\">$(repr(ev_violin))</span>" *
         "<span id=\"coords_violin\" style=\"display:none\">$(JSON3.write(sweep.violin.manifest["layers"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000549
+@bind ev_violin_h sweep.violin_h
+
+# ╔═╡ c1000000-0000-0000-0000-00000000054a
+HTML(
+    "<span id=\"out_violin_h\">VIOLIN_H=$(sweep_field("violin_h", ev_violin_h))</span>" *
+        "<span id=\"bond_violin_h\" style=\"display:none\">$(repr(ev_violin_h))</span>" *
+        "<span id=\"coords_violin_h\" style=\"display:none\">$(JSON3.write(sweep.violin_h.manifest["layers"]))</span>",
 )
 
 # ╔═╡ c1000000-0000-0000-0000-000000000111
@@ -606,6 +656,39 @@ HTML(
         "<span id=\"axes_threshold_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar_h.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000206
+@bind ev_span_axis sweep.span_axis
+
+# ╔═╡ c1000000-0000-0000-0000-000000000207
+HTML(
+    "<span id=\"out_span_axis\">SPAN_AXIS=$(sweep_field("span_axis", ev_span_axis))</span>" *
+        "<span id=\"bond_span_axis\" style=\"display:none\">$(repr(ev_span_axis))</span>" *
+        "<span id=\"coords_span_axis\" style=\"display:none\">$(JSON3.write(sweep.span_axis.manifest["layers"]))</span>" *
+        "<span id=\"axes_span_axis\" style=\"display:none\">$(JSON3.write(sweep.span_axis.manifest["transforms"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000208
+@bind ev_span_colorbar sweep.span_colorbar
+
+# ╔═╡ c1000000-0000-0000-0000-000000000209
+HTML(
+    "<span id=\"out_span_colorbar\">SPAN_COLORBAR=$(sweep_field("span_colorbar", ev_span_colorbar))</span>" *
+        "<span id=\"bond_span_colorbar\" style=\"display:none\">$(repr(ev_span_colorbar))</span>" *
+        "<span id=\"coords_span_colorbar\" style=\"display:none\">$(JSON3.write(sweep.span_colorbar.manifest["layers"]))</span>" *
+        "<span id=\"axes_span_colorbar\" style=\"display:none\">$(JSON3.write(sweep.span_colorbar.manifest["transforms"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000204
+@bind ev_span_colorbar_h sweep.span_colorbar_h
+
+# ╔═╡ c1000000-0000-0000-0000-000000000205
+HTML(
+    "<span id=\"out_span_colorbar_h\">SPAN_COLORBAR_H=$(sweep_field("span_colorbar_h", ev_span_colorbar_h))</span>" *
+        "<span id=\"bond_span_colorbar_h\" style=\"display:none\">$(repr(ev_span_colorbar_h))</span>" *
+        "<span id=\"coords_span_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.span_colorbar_h.manifest["layers"]))</span>" *
+        "<span id=\"axes_span_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.span_colorbar_h.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000194
 @bind ev_onchange_colorbar sweep.onchange_colorbar
 
@@ -695,7 +778,8 @@ HTML(
 HTML(
     "<span id=\"out_view\">VIEW=$(sweep_field("view", ev_view))</span>" *
         "<span id=\"bond_view\" style=\"display:none\">$(repr(ev_view))</span>" *
-        "<span id=\"coords_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["layers"]))</span>",
+        "<span id=\"coords_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["layers"]))</span>" *
+        "<span id=\"axes_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["transforms"]))</span>",
 )
 
 # ╔═╡ c1000000-0000-0000-0000-000000000146
@@ -705,7 +789,8 @@ HTML(
 HTML(
     "<span id=\"out_view_linked\">VIEW_LINKED=$(sweep_field("view_linked", ev_view_linked))</span>" *
         "<span id=\"bond_view_linked\" style=\"display:none\">$(repr(ev_view_linked))</span>" *
-        "<span id=\"coords_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["layers"]))</span>",
+        "<span id=\"coords_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["layers"]))</span>" *
+        "<span id=\"axes_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["transforms"]))</span>",
 )
 
 # ╔═╡ c1000000-0000-0000-0000-000000000172
@@ -738,6 +823,16 @@ HTML(
         "<span id=\"coords_view3d\" style=\"display:none\">$(JSON3.write(sweep.view3d.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000525
+@bind ev_view_dark sweep.view_dark
+
+# ╔═╡ c1000000-0000-0000-0000-000000000526
+HTML(
+    "<span id=\"out_view_dark\">VIEW_DARK=$(sweep_field("view_dark", ev_view_dark))</span>" *
+        "<span id=\"bond_view_dark\" style=\"display:none\">$(repr(ev_view_dark))</span>" *
+        "<span id=\"coords_view_dark\" style=\"display:none\">$(JSON3.write(sweep.view_dark.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000152
 @bind ev_view3d_linked sweep.view3d_linked
 
@@ -747,6 +842,45 @@ HTML(
         "<span id=\"bond_view3d_linked\" style=\"display:none\">$(repr(ev_view3d_linked))</span>" *
         "<span id=\"coords_view3d_linked\" style=\"display:none\">$(JSON3.write(sweep.view3d_linked.manifest["layers"]))</span>",
 )
+
+# ╔═╡ c1000000-0000-0000-0000-000000000202
+@bind ev_view_wheel sweep.view_wheel
+
+# ╔═╡ c1000000-0000-0000-0000-000000000203
+HTML(
+    "<span id=\"out_view_wheel\">VIEW_WHEEL=$(sweep_field("view_wheel", ev_view_wheel))</span>" *
+        "<span id=\"bond_view_wheel\" style=\"display:none\">$(repr(ev_view_wheel))</span>" *
+        "<span id=\"coords_view_wheel\" style=\"display:none\">$(JSON3.write(sweep.view_wheel.manifest["layers"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000559
+@bind ev_view_nested sweep.view_nested
+
+# ╔═╡ c1000000-0000-0000-0000-000000000560
+HTML(
+    "<span id=\"out_view_nested\">VIEW_NESTED=$(sweep_field("view_nested", ev_view_nested))</span>" *
+        "<span id=\"bond_view_nested\" style=\"display:none\">$(repr(ev_view_nested))</span>" *
+        "<span id=\"coords_view_nested\" style=\"display:none\">$(JSON3.write(sweep.view_nested.manifest["layers"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000546
+@bind ev_view_resized sweep.view_resized
+
+# ╔═╡ c1000000-0000-0000-0000-000000000547
+HTML(
+    "<span id=\"out_view_resized\">VIEW_RESIZED=$(sweep_field("view_resized", ev_view_resized))</span>" *
+        "<span id=\"bond_view_resized\" style=\"display:none\">$(repr(ev_view_resized))</span>" *
+        "<span id=\"coords_view_resized\" style=\"display:none\">$(JSON3.write(sweep.view_resized.manifest["layers"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000548
+# After the widget is shown (#546): the next pan draws the figure at its new size.
+let
+    ev_view_resized
+    sleep(1)
+    resized = resize_view_resized!(sweep.view_resized.manifest["scaling"])
+    HTML("<span id=\"resized_view_resized\" style=\"display:none\">$(JSON3.write(resized))</span>")
+end
 
 # ╔═╡ c1000000-0000-0000-0000-000000000038
 @bind ev_legend sweep.legend
@@ -979,6 +1113,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000004
 # ╠═c1000000-0000-0000-0000-000000000010
 # ╠═c1000000-0000-0000-0000-000000000011
+# ╠═c1000000-0000-0000-0000-00000000a548
+# ╠═c1000000-0000-0000-0000-00000000a549
 # ╠═c1000000-0000-0000-0000-000000000012
 # ╠═c1000000-0000-0000-0000-000000000013
 # ╠═c1000000-0000-0000-0000-000000000045
@@ -1015,6 +1151,10 @@ HTML(
 # ╟─c1000000-0000-0000-0000-0000000000e6
 # ╠═c1000000-0000-0000-0000-0000000000e7
 # ╟─c1000000-0000-0000-0000-0000000000e8
+# ╠═c1000000-0000-0000-0000-00000000019a
+# ╟─c1000000-0000-0000-0000-00000000019b
+# ╠═c1000000-0000-0000-0000-00000000019c
+# ╟─c1000000-0000-0000-0000-00000000019d
 # ╠═c1000000-0000-0000-0000-0000000000e9
 # ╟─c1000000-0000-0000-0000-0000000000ea
 # ╠═c1000000-0000-0000-0000-000000000182
@@ -1041,6 +1181,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-00000000010a
 # ╠═c1000000-0000-0000-0000-000000000123
 # ╠═c1000000-0000-0000-0000-000000000124
+# ╠═c1000000-0000-0000-0000-00000000a550
+# ╠═c1000000-0000-0000-0000-00000000a551
 # ╠═c1000000-0000-0000-0000-000000000200
 # ╠═c1000000-0000-0000-0000-000000000201
 # ╠═c1000000-0000-0000-0000-000000000188
@@ -1061,6 +1203,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-00000000010e
 # ╠═c1000000-0000-0000-0000-00000000010f
 # ╠═c1000000-0000-0000-0000-000000000110
+# ╠═c1000000-0000-0000-0000-000000000549
+# ╠═c1000000-0000-0000-0000-00000000054a
 # ╠═c1000000-0000-0000-0000-000000000111
 # ╠═c1000000-0000-0000-0000-000000000112
 # ╠═c1000000-0000-0000-0000-0000000000b5
@@ -1087,6 +1231,12 @@ HTML(
 # ╟─c1000000-0000-0000-0000-000000000191
 # ╠═c1000000-0000-0000-0000-000000000192
 # ╟─c1000000-0000-0000-0000-000000000193
+# ╠═c1000000-0000-0000-0000-000000000206
+# ╟─c1000000-0000-0000-0000-000000000207
+# ╠═c1000000-0000-0000-0000-000000000208
+# ╟─c1000000-0000-0000-0000-000000000209
+# ╠═c1000000-0000-0000-0000-000000000204
+# ╟─c1000000-0000-0000-0000-000000000205
 # ╠═c1000000-0000-0000-0000-000000000119
 # ╟─c1000000-0000-0000-0000-000000000120
 # ╠═c1000000-0000-0000-0000-000000000121
@@ -1111,8 +1261,17 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000175
 # ╠═c1000000-0000-0000-0000-000000000115
 # ╠═c1000000-0000-0000-0000-000000000116
+# ╠═c1000000-0000-0000-0000-000000000525
+# ╟─c1000000-0000-0000-0000-000000000526
 # ╠═c1000000-0000-0000-0000-000000000152
 # ╠═c1000000-0000-0000-0000-000000000153
+# ╠═c1000000-0000-0000-0000-000000000202
+# ╠═c1000000-0000-0000-0000-000000000203
+# ╠═c1000000-0000-0000-0000-000000000559
+# ╠═c1000000-0000-0000-0000-000000000560
+# ╠═c1000000-0000-0000-0000-000000000546
+# ╠═c1000000-0000-0000-0000-000000000547
+# ╠═c1000000-0000-0000-0000-000000000548
 # ╠═c1000000-0000-0000-0000-000000000038
 # ╠═c1000000-0000-0000-0000-000000000039
 # ╠═c1000000-0000-0000-0000-000000000047
