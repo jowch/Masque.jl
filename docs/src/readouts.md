@@ -10,7 +10,8 @@ colorbar a readout for you. For the other two, pass an
 ## Read `(x, y)` from the axis
 
 With an [`AxisInteractable`](@ref), a tooltip follows the pointer
-anywhere on the axis and shows the data coordinates under it. A click
+anywhere on the axis and shows the data coordinates under it (on a touch
+screen, see [On a touch screen](@ref)). A click
 sets the readout's field, `sel.axis`, to an [`AxisEvent`](@ref) with
 `x` and `y`. With `bind = ints`, where `ints` is the readout, `pick`
 is that event:

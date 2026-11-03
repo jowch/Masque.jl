@@ -234,6 +234,21 @@ export interface OverlayCtx {
     value_: () => Record<string, unknown>
 }
 
+export interface TouchState {
+    // The surface's client position when a tap left its tooltip up. A scroll that moves the
+    // plot away from it takes the tooltip down.
+    pin_: { left: number; top: number } | null
+    hold_: { id: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null
+    // Where and when (event timeStamp) the current touch went down.
+    start_: { id: number; x: number; y: number; t: number } | null
+    scrub_: boolean
+    last_: PointerEvent | null
+}
+
+export function createTouchState(): TouchState {
+    return { pin_: null, hold_: null, start_: null, scrub_: false, last_: null }
+}
+
 export interface OverlayState {
     drag_: Drag | null
     justDragged_: boolean
@@ -320,6 +335,8 @@ export interface OverlayState {
     // as they were before it. Newest last.
     undo_: Record<string, unknown>[]
     redo_: Record<string, unknown>[]
+    // A finger's tap and hold (touch.ts, #529).
+    touch_: TouchState
 }
 
 export function createOverlayState(): OverlayState {
@@ -365,6 +382,7 @@ export function createOverlayState(): OverlayState {
         plainClicks_: 0,
         undo_: [],
         redo_: [],
+        touch_: createTouchState(),
     }
 }
 

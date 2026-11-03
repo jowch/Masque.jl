@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { CONTROLS_STYLE } from "../src/controls"
+import { CONTROLS_STYLE, reachCaps } from "../src/controls"
 import { afterEach, describe, it, expect, vi } from "vitest"
 import { mount as mountOverlay } from "../src/overlay"
 
@@ -984,16 +984,16 @@ describe("pointer capture, cancel, and coalesced drag release", () => {
         expect(fired).toBe(true)
     })
 
-    it("sets touch-action:none only on surfaces with a drag-capable layer", () => {
+    it("a surface with a drag layer lets a finger scroll the page but not zoom it (#530)", () => {
         const hover = setup()
         mount(hover.script, manifest) // click/hover circles layer, no drag layer
         const hoverSurface = shadowOf(hover.host).querySelector(".surface") as HTMLElement
-        expect(hoverSurface.style.touchAction).not.toBe("none") // page scroll must still work here
+        expect(hoverSurface.style.touchAction).toBe("") // the browser's own
 
         const drag = setup()
         mount(drag.script, thresholdManifest())
         const dragSurface = shadowOf(drag.host).querySelector(".surface") as HTMLElement
-        expect(dragSurface.style.touchAction).toBe("none")
+        expect(dragSurface.style.touchAction).toBe("pan-x pan-y")
     })
 
     it("a second pointer's move/up cannot hijack a drag it didn't start", () => {
@@ -7641,6 +7641,68 @@ describe("block controls (#345)", () => {
         expect(val(host).word).toEqual({ layer: "word", index: 0, payload: "12" })
         expect(el.classList.contains("unstored")).toBe(false)
         expect(sent).toBe(1)
+    })
+
+    it("a finger's reach past each control stops halfway to the next control or axis (#531)", () => {
+        // An axis above the slider, 100 image px up.
+        const m = controlsManifest({ transforms: { ax: { viewport: [100, 100, 400, 500] } as unknown as Manifest["transforms"][string] } })
+        m.layers.push({ id: "fine", kind: "control", axis: "", events: ["change"], payloads: [], label: "fine",
+            geometry: { control: "checkbox", x: 950, y: 700, w: 40, h: 30, value: false, size: 20 } })
+        m.fields = [...(m.fields ?? []), "fine"]
+        m.initial!.fine = { layer: "fine", index: 0, payload: false }
+        const { host, script } = setup()
+        mount(script, m)
+        const v = (id: string, name: string) => ctl(host, id).style.getPropertyValue(name)
+        // The slider: the axis 100 px above, the interval slider 20 px below, the toggle 100 px
+        // to the right. Room is half each gap, as a share of the slider's own box.
+        expect(v("deg", "--ct")).toBe(`${(100 * 50) / 20}cqh`)
+        expect(v("deg", "--cb")).toBe(`${(100 * 10) / 20}cqh`)
+        expect(v("deg", "--cr")).toBe(`${(100 * 50) / 400}cqw`)
+        // Left, nothing but the figure's edge 100 px away: the whole distance, not half.
+        expect(v("deg", "--cl")).toBe(`${(100 * 100) / 400}cqw`)
+        expect(v("span", "--ct")).toBe(`${(100 * 10) / 20}cqh`)
+        // Below, the figure's bottom edge 40 px away.
+        expect(v("span", "--cb")).toBe(`${(100 * 40) / 20}cqh`)
+        // The toggle sits between the slider and the menu; nothing above or below it.
+        expect(v("show", "--cl")).toBe(`${(100 * 50) / 60}cqw`)
+        expect(v("show", "--cr")).toBe(`${(100 * 20) / 60}cqw`)
+        expect(v("show", "--ct")).toBe(`${(100 * 700) / 30}cqh`)
+        // A menu is a neighbour but doesn't reach itself.
+        expect(v("pick", "--cl")).toBe("")
+        // A checkbox reaches from its square, 10 px in from its box: 60 px from the menu.
+        expect(v("fine", "--ew")).toBe(`${(100 * 20) / 40}cqw`)
+        expect(v("fine", "--eh")).toBe(`${(100 * 20) / 30}cqh`)
+        expect(v("fine", "--cl")).toBe(`${(100 * 30) / 40}cqw`)
+        // Only where some input is coarse, and nothing drawn grows.
+        expect(CONTROLS_STYLE).toContain("@media (any-pointer: coarse)")
+        expect(reachCaps([0, 0, 10, 10], [[0, 30, 10, 10], [20, 0, 10, 10], [20, 30, 10, 10], [2, 2, 4, 4]])).toEqual({ t: Infinity, b: 10, l: Infinity, r: 5 })
+        // A control at the figure's edge reaches no further than the picture.
+        expect(reachCaps([0, 5, 10, 10], [], [100, 20])).toEqual({ t: 5, b: 5, l: 0, r: 90 })
+    })
+
+    it("a slider grid's rows split the gap between them, and a new frame moves the room with the boxes (#531)", async () => {
+        const grid = (dy: number): Manifest["layers"][number] => ({ id: "grid", kind: "control", axis: "", events: ["change"], payloads: [], label: "grid",
+            geometry: { control: "slidergrid", x: 100, y: 500, w: 600, h: 100, value: [2, 1], sliders: [
+                { control: "slider", x: 200, y: 500, w: 400, h: 20, value: 2, n: 5, horizontal: true },
+                { control: "slider", x: 200, y: 530 + dy, w: 400, h: 20, value: 1, n: 5, horizontal: true },
+            ] } })
+        const m = controlsManifest({ onchange: true })
+        m.layers.push(grid(0))
+        m.fields = [...(m.fields ?? []), "grid"]
+        m.initial!.grid = { layer: "grid", index: 0, payload: [2, 1] }
+        const next = controlsManifest({ onchange: true })
+        next.layers.push(grid(20))
+        const { host, script } = setup()
+        mount(script, m, undefined, vi.fn(frame(next)))
+        const kids = () => [...ctl(host, "grid").querySelectorAll(".masque-control")] as HTMLElement[]
+        expect(kids()[0].style.getPropertyValue("--cb")).toBe(`${(100 * 5) / 20}cqh`)
+        expect(kids()[1].style.getPropertyValue("--ct")).toBe(`${(100 * 5) / 20}cqh`)
+        const range = kids()[0].querySelector("input") as HTMLInputElement
+        range.value = "3"
+        range.dispatchEvent(new Event("change", { bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+        host.querySelector("img")!.dispatchEvent(new Event("load"))
+        expect(kids()[1].style.getPropertyValue("--ct")).toBe(`${(100 * 15) / 20}cqh`)
     })
 
     it("a slider grid draws each slider and its value label, and commits all its values together (#430)", () => {
