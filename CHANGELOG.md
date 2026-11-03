@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-03
+
 ### Breaking
 - Scrolling over a plot with a `ViewInteractable` scrolls the page, as it does everywhere else
   on the page. To zoom, hold Ctrl (Cmd on a Mac) while scrolling; a trackpad pinch zooms
@@ -23,6 +25,12 @@ All notable changes to this project are documented here. The format is based on
   Before, one finger panned or turned the view and the page couldn't scroll past the plot, and
   a pinch did nothing. See [Upgrading](https://jowch.github.io/Masque.jl/stable/upgrading/)
   (#537).
+- A click on a bound line on an `Axis3` picks the point you plotted nearest the click, as on
+  a 2D `Axis`, where it used to pick the whole line. `pick.index` is now that point's
+  position in your data, `pick.line` says which line it is on, and `pick.x`, `pick.y` and
+  `pick.z` hold it. `selected=` indices on such a line name points too. To upgrade, code
+  that read `pick.index` as the line now reads `pick.line`. See
+  [Upgrading](https://jowch.github.io/Masque.jl/stable/upgrading/) (#518).
 
 ### Added
 - A `surface!` on a `PolarAxis`, which is how Makie draws a polar heatmap, responds to hover
@@ -75,11 +83,6 @@ All notable changes to this project are documented here. The format is based on
   do a histogram's, a waterfall's, a box plot's, a crossbar's and a span's values. A
   histogram's `low` and `high` are its bin edges, so they read in the bin axis's unit.
   So does the readout while you drag a `SpanInteractable` band's edges (#543).
-- **Breaking:** a click on a bound line on an `Axis3` picks the point you plotted nearest
-  the click, as on a 2D `Axis`, where it used to pick the whole line. `pick.index` is now
-  that point's position in your data, `pick.line` says which line it is on, and `pick.x`,
-  `pick.y` and `pick.z` hold it. `selected=` indices on such a line name points too. To
-  upgrade, code that read `pick.index` as the line now reads `pick.line` (#518).
 - A `:webgl` figure wider than `max_width`, or any `:webgl` figure with a small
   `max_width`, now draws its canvas at about twice the width it shows at, as `:cairo` does.
   Before, the canvas was always twice the figure's own width, so a 1600-wide figure drew
@@ -116,7 +119,7 @@ All notable changes to this project are documented here. The format is based on
   it, where they used to land up to a few hundred pixels below the mark (#546).
 - With WebGLMakie, on a page with many plots, the first pan or zoom of a view after scrolling
   back to it redraws the plot while the key or the mouse button is down. Before, that redraw
-  was dropped, and the plot showed the old picture shifted until the gesture ended.
+  was dropped, and the plot showed the old picture shifted until the gesture ended (#560).
 - An opaque `Box` drawn over an axis hides the marks under it from the pointer too, as a
   legend does: hovering or clicking the box no longer shows a tooltip or ring for a mark you
   can't see (#547).
@@ -893,7 +896,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.5...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/jowch/Masque.jl/compare/v0.4.5...v0.5.0
 [0.4.5]: https://github.com/jowch/Masque.jl/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/jowch/Masque.jl/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/jowch/Masque.jl/compare/v0.4.2...v0.4.3

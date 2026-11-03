@@ -32,6 +32,19 @@ Scroll zoom counts as turned off in Makie after
 `deactivate_interaction!(ax, :scrollzoom)`, or with both `xzoomlock`
 and `yzoomlock` set. See [Pan and zoom a 2D axis](@ref).
 
+On an `Axis3`, a click on a line named in `bind` picks the point you
+plotted nearest the click, as it does on a 2D `Axis`. In 0.4 it picked
+the whole line, and `pick.index` said which line. Now `pick.index` is the point's
+position in your data and `pick.line` says which line it is on, so code
+that read the line from `pick.index` reads `pick.line` instead.
+`selected=` indices on such a line name points too. A `stairs!` on an
+`Axis3` is still picked whole. See [What each mark returns](@ref).
+
+| 0.4 | 0.5 |
+|---|---|
+| `pick.index`: the line clicked | `pick.line`: the line clicked; `pick.index`: the point on it |
+| `selected = (path = [2],)`: the second line of `path` | `selected = (path = [2],)`: the second point of `path` |
+
 ## From 0.3 to 0.4
 
 Masque 0.4 changes two things a 0.3 notebook can notice, besides
