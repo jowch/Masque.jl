@@ -599,18 +599,33 @@ end
 # category. A horizontal violin is drawn with x and y swapped (`flip_xy`), so its category
 # runs along y: the snap reads the ring's y extent and the field is `y`, which then follows
 # the y axis's categories and tick format (#558).
+#
+# `rainclouds!` draws its violin at positions nudged off the categories (to make room for the
+# box and the raindrops), so a violin inside a raincloud snaps once more, from its own
+# position to the nearest of the raincloud's categories (#564).
 function _violin_payloads(p, rings)
     cats = sort(unique(Float64.(_conv(p)[1])))
+    outer = _raincloud_cats(p)
     horiz = p.orientation[] === :horizontal
     d = horiz ? 2 : 1
+    near(vs, v) = vs[argmin(abs.(vs .- v))]
     return Any[
         let vs = [Float64(pt[d]) for pt in ring]
-            ctr = (minimum(vs) + maximum(vs)) / 2
-            c = cats[argmin(abs.(cats .- ctr))]
+            c = near(cats, (minimum(vs) + maximum(vs)) / 2)
+            outer === nothing || (c = near(outer, c))
             horiz ? (; y = c) : (; x = c)
         end
             for ring in rings
     ]
+end
+# The categories of the `rainclouds!` a plot was drawn by, or `nothing` outside one.
+function _raincloud_cats(p)
+    q = p.parent
+    while q isa Makie.AbstractPlot
+        q isa Makie.RainClouds && return sort(unique(Float64.(q.x_positions[])))
+        q = q.parent
+    end
+    return nothing
 end
 function PolygonInteractable(ax, p::Makie.Violin; id = :violin, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     poly = _childof(p, Makie.Poly)
