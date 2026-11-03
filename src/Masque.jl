@@ -59,7 +59,6 @@ function __init__()
     dir = normpath(joinpath(@__DIR__, ".."))
     _OVERLAY_JS[] = read(joinpath(dir, "assets", "overlay.js"), String)
     _OVERLAY_CDN[] = _overlay_cdn(dir, pkgversion(@__MODULE__), _OVERLAY_JS[])
-    _register_error_hints()
     return nothing
 end
 
@@ -98,7 +97,6 @@ include("bond.jl")
 include("render.jl")
 include("viewhome.jl")
 include("describe.jl")
-include("hints.jl")
 include("link.jl")
 include("precompile.jl")
 

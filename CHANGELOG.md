@@ -56,6 +56,11 @@ All notable changes to this project are documented here. The format is based on
   while it turns) shows in the bottom-left corner of the figure instead of beside the pointer,
   and a point's tooltip doesn't show over it (#526).
 
+### Removed
+- A call to `masque` with one of the `tooltip_*` keywords removed in 0.4, such as
+  `tooltip_bg`, no longer prints a line under the error naming `tooltipstyle`. The call has
+  failed since 0.4; write `tooltipstyle = (; bg = …)` instead (#401).
+
 ### Fixed
 - An inset axis with its own `ViewInteractable`, inside an axis that has one too, now pans
   and zooms itself when the pointer is over it. Before, a drag or Ctrl+wheel over the inset
@@ -70,8 +75,6 @@ All notable changes to this project are documented here. The format is based on
 - With WebGLMakie, on a page with many plots, the first pan or zoom of a view after scrolling
   back to it redraws the plot while the key or the mouse button is down. Before, that redraw
   was dropped, and the plot showed the old picture shifted until the gesture ended.
-
-### Fixed
 - An opaque `Box` drawn over an axis hides the marks under it from the pointer too, as a
   legend does: hovering or clicking the box no longer shows a tooltip or ring for a mark you
   can't see (#547).
