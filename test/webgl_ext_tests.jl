@@ -503,8 +503,10 @@ end
     @test cdn !== nothing
     @test !occursin(_WGLExt._bundle_text()[1:2000], html)
     @test all(u -> occursin(u, html), cdn.urls) && occursin(cdn.integrity, html)
-    # Smaller than the scene's JSON, which Pluto publishes as is.
-    @test sizeof(html) < sizeof(JSON3.write(w.scene; allow_inf = true))
+    # Past the overlay script every page carries, smaller than the scene's JSON, which Pluto
+    # publishes as is. (The script's size is the frontend's; the scene's encoding is what's tested.)
+    @test occursin(Masque._OVERLAY_JS[], html)
+    @test sizeof(html) - sizeof(Masque._OVERLAY_JS[]) < sizeof(JSON3.write(w.scene; allow_inf = true))
     # The note tells a copy that fails the hash apart from being offline, and names the Makie.
     @test occursin("needs an internet connection", html)
     @test occursin("published with Makie v$(cdn.makie) differs", html)
