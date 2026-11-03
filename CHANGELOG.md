@@ -70,6 +70,9 @@ All notable changes to this project are documented here. The format is based on
   and a point's tooltip doesn't show over it (#526).
 
 ### Fixed
+- A horizontal violin, `violin!(…; orientation = :horizontal)`, names its own category in
+  its tooltip and payload, as the field `y` since the category runs along the y axis. Before,
+  it gave an `x` read from the value axis, which could name the wrong category (#558).
 - An inset axis with its own `ViewInteractable`, inside an axis that has one too, now pans
   and zooms itself when the pointer is over it. Before, a drag or Ctrl+wheel over the inset
   moved the outer plot instead (#559).
