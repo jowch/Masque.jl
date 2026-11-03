@@ -21,12 +21,11 @@ pinch zooms too. To zoom on a plain scroll as 0.4 did, pass
 
 On a touch screen, one finger on the plot scrolls the page too, where
 in 0.4 it panned or turned the view. Drag with two fingers to pan or
-turn it, and pinch to zoom. To pan with one finger as 0.4 did, pass
-`touch = (; views = :onefinger)` to `masque`:
+turn it, and pinch to zoom:
 
 | 0.4 | 0.5 |
 |---|---|
-| one finger pans or turns the view, the page can't scroll past it | one finger scrolls the page; two fingers pan or turn, a pinch zooms; `masque(fig, pan; touch = (; views = :onefinger))`: one finger pans |
+| one finger pans or turns the view, the page can't scroll past it | one finger scrolls the page; two fingers pan or turn, a pinch zooms |
 
 Scroll zoom counts as turned off in Makie after
 `deregister_interaction!(ax, :scrollzoom)` or

@@ -879,7 +879,6 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         newManifest.overlayStyle ??= ctx.manifest_.overlayStyle
         newManifest.tipStyle ??= ctx.manifest_.tipStyle
         newManifest.touch ??= ctx.manifest_.touch
-        newManifest.touchViews ??= ctx.manifest_.touchViews
         const onchangeFrame = input.onchange === true
         // An in-drag \`onchange\` frame trails the pointer by a round trip. Its lines and boxes
         // would pull the control back to where it was then, so the ones on screen stay, with
@@ -1471,7 +1470,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const touchMove = (e: TouchEvent) => views.move_(e)
     const touchEnd = (e: TouchEvent) => views.end_(e)
     const touchCancelAll = () => views.cancel_()
-    const touchOn = touchAction !== "" && touchAction !== "none"
+    const touchOn = touchAction !== ""
     if (touchOn) {
         surface.addEventListener("touchstart", touchStart, { passive: false })
         surface.addEventListener("touchmove", touchMove, { passive: false })

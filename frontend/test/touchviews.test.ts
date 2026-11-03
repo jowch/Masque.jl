@@ -185,17 +185,6 @@ describe("touch on a view (#537)", () => {
         expect(Array.isArray(settled!.limits)).toBe(true)
     })
 
-    it("touch = (; views = :onefinger) keeps 0.4's one-finger pan", async () => {
-        vi.useFakeTimers()
-        const { host, surface, note } = setup(viewManifest("pan", { touchViews: "onefinger" }))
-        expect(surface.style.touchAction).toBe("none")
-        pointer(surface, "pointerdown", 300, 200)
-        expect(touchEvent(surface, "touchstart", [[300, 200]]).defaultPrevented).toBe(false)
-        pointer(surface, "pointermove", 340, 200)
-        await vi.advanceTimersByTimeAsync(50)
-        expect(photoOf(host).tx).toBeCloseTo(80)
-        expect(note.textContent).not.toBe(TWO_FINGER_HINT)
-    })
 })
 
 describe("touch on a handle (#530)", () => {
@@ -222,13 +211,6 @@ describe("touch on a handle (#530)", () => {
         touchEvent(surface, "touchend", [])
     })
 
-    it("with views = :onefinger and no view, a finger on the line still holds the page", () => {
-        const { surface } = setup({ ...threshold(), touchViews: "onefinger" })
-        expect(surface.style.touchAction).toBe("pan-x pan-y")
-        pointer(surface, "pointerdown", 312, 200)
-        expect(touchEvent(surface, "touchstart", [[312, 200]]).defaultPrevented).toBe(true)
-        expect(surface.classList.contains("grabbing")).toBe(true)
-    })
 
     it("a mouse keeps its own reach on the line", () => {
         const { surface } = setup(threshold())

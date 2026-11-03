@@ -339,7 +339,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         }
     } else if (hit.layer.kind === "view") {
         // One finger scrolls the page past a view; two move it (touchviews.ts, #537).
-        if (finger && ctx.manifest_.touchViews !== "onefinger") return
+        if (finger) return
         const g = hit.layer.geometry as ViewGeometry
         if (g.mode === "pan" && photoHeldByOther(state, hit.layer.id)) { e.preventDefault(); return }
         state.drag_ = viewDrag.begin(hit.layer.id, g, ctx.manifest_.transforms[hit.layer.axis], layout.x, layout.y, e.pointerId)

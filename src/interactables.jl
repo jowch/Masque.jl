@@ -2104,8 +2104,7 @@ drag on those wins without a modifier — **Shift+drag** forces the view gesture
   gets `:none`.
 
 On a touch screen one finger scrolls the page past the view, and two fingers pan it (orbit,
-on an `Axis3`) and pinch-zoom it, whatever `wheel` says; a tap still clicks. `masque(...;
-touch = (; views = :onefinger))` makes one finger pan or orbit, as in Masque 0.4.
+on an `Axis3`) and pinch-zoom it, whatever `wheel` says; a tap still clicks.
 
 **Commits nothing.** A camera is operational state, not an analysis value a notebook reads
 (docs/dev/architecture/12-gesture-channel.md §12.3) — the bond `masque` returns never carries a

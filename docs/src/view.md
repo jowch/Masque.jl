@@ -52,9 +52,7 @@ the view has no field of its own.
 
 On a touch screen, one finger scrolls the page past the plot, and the
 corner says to use two fingers. Drag with two fingers to pan, and pinch
-to zoom around them. A tap still picks a point. To pan with one finger
-instead, pass `touch = (; views = :onefinger)` to [`masque`](@ref); a
-finger on the plot then no longer scrolls the page.
+to zoom around them. A tap still picks a point.
 
 To zoom on a plain scroll instead, pass `wheel = :always`. The page then
 stops scrolling while the pointer is over the plot. `wheel = :none`

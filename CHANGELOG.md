@@ -21,8 +21,8 @@ All notable changes to this project are documented here. The format is based on
   short hint in its corner says to use two fingers. Two fingers pan the view and a pinch zooms
   it around them; on an `Axis3` two fingers turn it and a pinch zooms. A tap still picks.
   Before, one finger panned or turned the view and the page couldn't scroll past the plot, and
-  a pinch did nothing. `masque(fig, ...; touch = (; views = :onefinger))` brings back the
-  one-finger pan. See [Upgrading](https://jowch.github.io/Masque.jl/stable/upgrading/) (#537).
+  a pinch did nothing. See [Upgrading](https://jowch.github.io/Masque.jl/stable/upgrading/)
+  (#537).
 
 ### Added
 - A `surface!` on a `PolarAxis`, which is how Makie draws a polar heatmap, responds to hover

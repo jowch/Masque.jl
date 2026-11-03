@@ -9,9 +9,6 @@
 // - Two fingers on a view pan it and pinch-zoom it around their midpoint, through the same
 //   photograph and readout a drag uses. An Axis3 orbits with two fingers and a pinch zooms its
 //   limits. Lifting a finger settles the view.
-//
-// `masque(...; touch = (; views = :onefinger))` keeps 0.4's one-finger pan: the surface takes
-// `touch-action: none` and none of this runs.
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import { layoutImagePx } from "./state"
 import type { HitLayer, Limits3, Manifest, ViewGeometry } from "./types"
@@ -32,17 +29,12 @@ const SCROLL_SLOP_PX = 10
 // A pinch that changes the finger spread by less than this is a two-finger orbit, not a zoom.
 const PINCH_MIN = 0.02
 
-// What the surface's `touch-action` is: none for 0.4's one-finger views, pan-x pan-y for any
-// other plot with a drag layer, and the browser's own for a plot without one. Decided up front:
-// browsers read it at a touch's first contact.
+// What the surface's `touch-action` is: pan-x pan-y for a plot with a drag layer, and the
+// browser's own for a plot without one. Decided up front: browsers read it at a touch's first
+// contact.
 export function surfaceTouchAction(manifest: Manifest): string {
-    if (!manifest.layers.some((l) => l.events.includes("drag"))) return ""
-    if (manifest.touchViews === "onefinger" && manifest.layers.some((l) => l.kind === "view")) return "none"
-    return "pan-x pan-y"
+    return manifest.layers.some((l) => l.events.includes("drag")) ? "pan-x pan-y" : ""
 }
-
-// True when one finger would move a view here: 0.4's rule, on request.
-export const oneFingerViews = (manifest: Manifest): boolean => manifest.touchViews === "onefinger"
 
 // The drag layer a finger at this client point takes, other than a view: a threshold line, a
 // band or an ROI box, hit with the finger's grab area.
@@ -176,9 +168,6 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
 
     return {
         start_(e) {
-            // `views = :onefinger` with a view sets touch-action none and attaches none of this;
-            // without a view it still takes the handles below.
-            const views = !oneFingerViews(ctx.manifest_)
             if (e.touches.length === 1) {
                 const t = e.touches[0]
                 if (!t) return
@@ -188,7 +177,6 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
                     one = null
                     return
                 }
-                if (!views) return
                 const layout = layoutImagePx(ctx.base_, ctx.manifest_, t.clientX, t.clientY)
                 one = innermostView(ctx.manifest_, layout.x, layout.y) ? { x: t.clientX, y: t.clientY } : null
                 return
@@ -196,7 +184,7 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
             one = null
             // Once the page is scrolling the browser owns the touch (not cancelable), and a
             // second finger keeps scrolling it.
-            if (!views || pair || !e.cancelable) return
+            if (pair || !e.cancelable) return
             if (begin(e)) e.preventDefault()
         },
         move_(e) {
