@@ -2094,7 +2094,7 @@ end
 
 # ============================ ViewInteractable =============================
 """
-    ViewInteractable(ax; id=:view, wheel=nothing)
+    ViewInteractable(ax; id=:view, wheel=nothing, controls=:hover)
 
 Drag-to-pan and wheel zoom (2D `Axis`), or drag-to-orbit, wheel zoom and Shift+drag pan
 (`Axis3`). Produces one `:view` [`HitLayer`](@ref)
@@ -2113,6 +2113,9 @@ drag on those wins without a modifier — **Shift+drag** forces the view gesture
   is turned off in Makie (`deregister_interaction!(ax, :scrollzoom)`,
   `deactivate_interaction!(ax, :scrollzoom)`, or both `xzoomlock` and `yzoomlock`), which
   gets `:none`.
+- `controls` — the zoom in, zoom out and reset buttons in a corner of the plot: `:hover`
+  (default) shows them while the pointer is over the plot, while the view has keyboard focus,
+  and after a touch on the plot; `:always` keeps them shown; `:none` leaves them out.
 
 **Commits nothing.** A camera is operational state, not an analysis value a notebook reads
 (docs/dev/architecture/12-gesture-channel.md §12.3) — the bond `masque` returns never carries a
@@ -2134,6 +2137,13 @@ limits come back automatic) and, on an `Axis3`, the azimuth and elevation. Axes 
 by `linkaxes!`, `linkxaxes!` or `linkyaxes!` go back with it. Re-running only the `masque`
 cell keeps that starting point, even though the axis still shows the moved view.
 
+**Buttons.** Zoom in and zoom out take the same step as `+` and `-`, about the middle of the
+plot; reset shows once the view has moved. They sit in the top-right corner, or the top-left
+or bottom-right one when a legend or another axis covers it, and never in the bottom-left
+one. On a plot too short for the stack they sit in a row, and on a plot too small for either
+they are left out (drag, the wheel, the keys and a double-click still work). Twin axes in
+one place share one set, which drives the first view there.
+
 `masque` raises `ArgumentError` at build time if `ax` is a `PolarAxis` (a polar pan or zoom
 moves r and θ limits, not Cartesian ones), a `Colorbar`'s value axis (no pan/orbit view applies), a categorical
 2D axis (pan needs numeric limits to shift), or (2D only) either scale isn't client-invertible
@@ -2148,13 +2158,23 @@ ViewInteractable(ax)
 struct ViewInteractable <: AbstractInteractable
     ax; id::Symbol
     wheel::Union{Symbol, Nothing} # `nothing`: follow Makie's own scroll zoom, see `_view_wheel`
+    controls::Symbol
 end
 const _WHEEL_MODES = (:modifier, :always, :none)
-function ViewInteractable(ax; id = :view, wheel = nothing)
+const _VIEW_CONTROLS = (:hover, :always, :none)
+function ViewInteractable(ax; id = :view, wheel = nothing, controls = :hover)
     wheel === nothing || wheel in _WHEEL_MODES ||
         throw(ArgumentError("ViewInteractable: wheel = $(repr(wheel)) is not one of :modifier, :always or :none."))
-    return ViewInteractable(ax, id, wheel)
+    controls isa Symbol && controls in _VIEW_CONTROLS || throw(
+        ArgumentError(
+            "ViewInteractable: controls = $(repr(controls)) is not one of :hover, :always or :none."
+        )
+    )
+    return ViewInteractable(ax, id, wheel, controls)
 end
+# The positional forms from before `controls`, checked as the keyword form is.
+ViewInteractable(ax, id::Symbol) = ViewInteractable(ax; id)
+ViewInteractable(ax, id::Symbol, wheel) = ViewInteractable(ax; id, wheel)
 # The wheel policy a view ships. An explicit `wheel` wins. Without one, an axis whose scroll
 # zoom the author turned off in Makie, with `deregister_interaction!(ax, :scrollzoom)`,
 # `deactivate_interaction!(ax, :scrollzoom)` or (2D) both `xzoomlock` and `yzoomlock`, doesn't zoom on the wheel either; any other axis takes the
@@ -2262,6 +2282,8 @@ function hitlayers(i::ViewInteractable, ctx)
     )
     # Away from where it started (#524): a reset has somewhere to go. Left out at home.
     _view_moved(i.ax) && (geom["moved"] = true)
+    # The corner buttons (#525); left out for the default `:hover`, so manifests don't grow.
+    i.controls === :hover || (geom["controls"] = String(i.controls))
     if !t.is3d && i.ax isa Makie.Axis
         geom["clip"], geom["fill"] = _pan_window(ctx, i.ax)
         links = _pan_links(ctx, i.ax)

@@ -27,6 +27,10 @@ All notable changes to this project are documented here. The format is based on
   press `0` while the view has keyboard focus. Limits come back as written, so automatic
   limits are automatic again, and an `Axis3` gets its azimuth and elevation back. Linked axes
   and panels go back together. Re-running only the `masque` cell keeps the starting view (#524).
+- A plot that pans or orbits shows zoom in, zoom out and reset buttons in a corner while the
+  pointer is over it, so a reader can see it moves. Figures that already use
+  `ViewInteractable` gain them; `ViewInteractable(ax; controls = :none)` leaves them out and
+  `controls = :always` keeps them shown (#525).
 - `SpanInteractable` drags a band, a `(lo, hi)` range, on an `Axis` or a `Colorbar`. Drag an
   edge to move that end, or inside the band to move both. The plot outside the band is faded
   and each edge has a grip. Its field is a `SpanEvent` with `lo` and `hi`. Points, lines, bars

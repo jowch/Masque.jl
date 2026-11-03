@@ -612,6 +612,8 @@ try {
     await page.mouse.down();
     for (let i = 1; i <= 6; i++) await page.mouse.move(cx + 5 * i, cy + 2 * i);
     await page.mouse.up();
+    // Off the figure, so the corner view buttons (#525) hide before the screenshots.
+    await page.mouse.move(2, 2);
     let st = null;
     for (let i = 0; i < (backend === "webgl" ? 50 : 25); i++) {
       await new Promise((r) => setTimeout(r, backend === "webgl" ? 300 : 200));
@@ -1433,6 +1435,75 @@ try {
     },
   });
   passed.push("tooltip-theme-follows-figure-bg");
+
+  // #525: the corner view buttons' look ("Visual language (settled)"). Hovered by the real
+  // mouse on a light figure (`view`) and a dark one whose legend takes the top-right corner
+  // (`view_dark`): the box wears the tooltip's background, text and border colours, light or
+  // dark after the figure; 4 px radius; 24 px buttons with 14 px icons at stroke 1.75; the
+  // tooltip's fade; reset out until the view moves; the pixels on screen are the box's.
+  for (const [key, corner, dark] of [["view", "tr", false], ["view_dark", "tl", true]]) {
+    const vp = await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      const g = JSON.parse(span.textContent).find((l) => l.kind === "view").geometry;
+      return { x: b.left + g.x * s, y: b.top + g.y * s, w: g.w * s, h: g.h * s };
+    }, key);
+    await page.mouse.move(vp.x + vp.w / 2, vp.y + vp.h / 2);
+    // Read once the fade in has ended (a busy WebGL page can start it late), for up to 3 s.
+    let st = null;
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      st = await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const box = sr.querySelector(".masque-vb");
+      const tip = getComputedStyle(sr.querySelector(".masque-tip"));
+      const cs = getComputedStyle(box);
+      const plus = box.querySelector(".masque-vb-in");
+      const svg = plus.querySelector("svg");
+      const r = box.getBoundingClientRect();
+      return {
+        corner: box.dataset.corner, show: box.classList.contains("show"), opacity: Number(cs.opacity),
+        bg: cs.backgroundColor, color: cs.color, border: cs.borderTopColor, radius: cs.borderTopLeftRadius,
+        shadow: cs.boxShadow, transition: cs.transitionProperty + " " + cs.transitionDuration,
+        tipBg: tip.backgroundColor, tipColor: tip.color, tipBorder: tip.borderTopColor, tipShadow: tip.boxShadow,
+        btn: [plus.getBoundingClientRect().width, plus.getBoundingClientRect().height], icon: svg.getBoundingClientRect().width,
+        stroke: svg.getAttribute("stroke-width"), divider: getComputedStyle(box.querySelector(".masque-vb-out")).borderTopColor,
+        reset: getComputedStyle(box.querySelector(".masque-vb-reset")).display,
+        rect: { x: r.left, y: r.top, w: r.width, h: r.height },
+      };
+      }, key);
+      if (st.show && st.opacity >= 0.99) break;
+    }
+    const fail = (m) => { throw new Error(`${key}-view-buttons: ${m} (${JSON.stringify(st)})`); };
+    if (!st.show || st.opacity < 0.99) fail("hover did not show the box");
+    if (st.corner !== corner) fail(`corner ${st.corner}, expected ${corner}`);
+    if (st.bg !== st.tipBg || st.color !== st.tipColor || st.border !== st.tipBorder || st.divider !== st.tipBorder) fail("box colours are not the tooltip's");
+    if (st.shadow !== st.tipShadow) fail("box shadow is not the tooltip's");
+    if (st.radius !== "4px") fail("radius is not 4 px");
+    if (st.btn[0] !== 24 || st.btn[1] !== 24 || st.icon !== 14 || st.stroke !== "1.75") fail("button, icon or stroke size is off");
+    if (!/opacity 0\.1s/.test(st.transition)) fail("the box does not fade over the tooltip's 100 ms");
+    if (st.reset !== "none") fail("reset shows before the view has moved");
+    // 0..1 lightness: the L of an lch() colour, else the luminance of an rgb() one.
+    const lum = (c) => { const v = c.match(/[\d.]+/g).map(Number); return c.startsWith("lch") ? v[0] / 100 : (0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]) / 255; };
+    if (dark ? !(lum(st.bg) < 0.3) : !(lum(st.bg) > 0.8)) fail(`a ${dark ? "dark" : "light"} figure's box is not ${dark ? "dark" : "light"}`);
+    // On screen: a spot inside the box, between the icon and the edge, reads the box's colour.
+    const png = PNG.sync.read(await page.screenshot({ clip: { x: st.rect.x + 3, y: st.rect.y + 3, width: 2, height: 2 } }));
+    // The browser resolves the box's colour (lch or rgb) to sRGB through a canvas.
+    const want = await page.evaluate((css) => {
+      const c = document.createElement("canvas").getContext("2d");
+      c.fillStyle = css; c.fillRect(0, 0, 1, 1);
+      return [...c.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+    }, st.bg);
+    if (![0, 1, 2].every((c) => Math.abs(png.data[c] - want[c]) <= 12)) fail(`screen reads ${[...png.data.slice(0, 3)]} inside the box, not ${want}`);
+    await page.mouse.move(1, 1);
+    passed.push(`${key}/view-buttons-look`);
+  }
 
   if (unexpected.length) throw new Error(`page errors: ${unexpected.join(" | ")}`);
   passed.push("no-console-errors");

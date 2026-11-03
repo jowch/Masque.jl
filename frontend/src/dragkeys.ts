@@ -8,7 +8,7 @@ import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as spanDrag from "./drag/span"
 import * as viewDrag from "./drag/view"
-import { mapPoint, unmapPoint, wheelScale, zoomAt } from "./photo"
+import { mapPoint, unmapPoint, wheelScale, zoomAt, ZOOM_NOTCH } from "./photo"
 import type { HitLayer, Limits3, SpanGeometry, ThresholdGeometry, ViewGeometry } from "./types"
 
 // Keyboard path for the drag kinds (#169). Each drag layer gets its own tab stop after
@@ -20,7 +20,6 @@ import type { HitLayer, Limits3, SpanGeometry, ThresholdGeometry, ViewGeometry }
 const STEP_CSS = 1
 const PAGE_CSS = 10
 const VIEW_STEP = 0.1 // fraction of the axis viewport per arrow press, pan and orbit alike
-const ZOOM_NOTCH = 100 // one wheel notch, in wheelScale's pixel units
 
 const NUDGE_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", "+", "=", "-", "_", "0"])
 

@@ -485,6 +485,84 @@ try {
     }
     throw new Error(`${key}-reset: no reset frame landed after a double-click at ${JSON.stringify(spot)} (last ${JSON.stringify(await readStamp())})`);
   };
+  // #525: the corner view buttons, through Chromium's own input path. A real hover over the
+  // view's viewport shows its box in the expected corner, 8 CSS px in; zoom in lands a settled
+  // frame with narrower limits and brings reset in; reset lands the reset frame and takes reset
+  // out; nothing commits; leaving the plot hides the box.
+  const driveButtons = async (key, layer, corner) => {
+    const g = layer.geometry;
+    const probe = () => page.evaluate(([k, id]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const box = sr.querySelector(`.masque-vb[data-view="${id}"]`);
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      const rect = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
+      const btn = (c) => { const el = box?.querySelector(`.masque-vb-${c}`); return el && getComputedStyle(el).display !== "none" ? rect(el) : null; };
+      return {
+        stamp: host.dataset.masqueGestureFrame ?? "", base: { x: b.left, y: b.top, s },
+        box: box && !box.hidden ? { corner: box.dataset.corner, show: box.classList.contains("show"), opacity: Number(getComputedStyle(box).opacity), r: rect(box), in: btn("in"), out: btn("out"), reset: btn("reset") } : null,
+      };
+    }, [key, layer.id]);
+    await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1).scrollIntoView({ block: "center" });
+    }, key);
+    await page.mouse.move(1, 1);
+    let p = await probe();
+    if (!p.box) throw new Error(`${key}-buttons: no button box for view ${layer.id}`);
+    if (p.box.show) throw new Error(`${key}-buttons: the box shows before any hover`);
+    const vp = { x: p.base.x + g.x * p.base.s, y: p.base.y + g.y * p.base.s, w: g.w * p.base.s, h: g.h * p.base.s };
+    await page.mouse.move(vp.x + vp.w / 2, vp.y + vp.h / 2);
+    // Read once the fade in has ended (a busy WebGL page can start it late), for up to 3 s.
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      p = await probe();
+      if (p.box.show && p.box.opacity >= 0.99) break;
+    }
+    if (!p.box.show || p.box.opacity < 0.99) throw new Error(`${key}-buttons: hover did not show the box (${JSON.stringify(p.box)})`);
+    if (p.box.corner !== corner) throw new Error(`${key}-buttons: box in corner ${p.box.corner}, expected ${corner}`);
+    const r = p.box.r, near = (a, b) => Math.abs(a - b) <= 1.5;
+    const xOk = corner === "tl" ? near(r.x, vp.x + 8) : near(r.x + r.w, vp.x + vp.w - 8);
+    const yOk = corner === "br" ? near(r.y + r.h, vp.y + vp.h - 8) : near(r.y, vp.y + 8);
+    if (!xOk || !yOk) throw new Error(`${key}-buttons: box ${JSON.stringify(r)} is not 8 px inside the ${corner} corner of ${JSON.stringify(vp)}`);
+    if (p.box.reset) throw new Error(`${key}-buttons: reset shows before the view has moved`);
+    const before = await textOf(`#out_${key}`);
+    const waitStamp = async (n0, want) => {
+      const tries = backend === "webgl" ? 50 : 25, delayMs = backend === "webgl" ? 300 : 200;
+      for (let i = 0; i < tries; i++) {
+        await new Promise((res) => setTimeout(res, delayMs));
+        const st = (await probe()).stamp;
+        if (st) { const o = JSON.parse(st); if (o.n > n0 && want(o)) return o; }
+      }
+      throw new Error(`${key}-buttons: no frame landed (last ${(await probe()).stamp})`);
+    };
+    const n0 = p.stamp ? JSON.parse(p.stamp).n : 0;
+    await page.mouse.click(p.box.in.x + p.box.in.w / 2, p.box.in.y + p.box.in.h / 2);
+    const z = await waitStamp(n0, (o) => o.settle === true && o.reset !== true);
+    const width = (o) => (Array.isArray(o.limits) ? o.limits[1] - o.limits[0] : o.xmax - o.xmin);
+    const inAt = p.box.in;
+    p = await probe();
+    if (!p.box.reset) throw new Error(`${key}-buttons: reset did not join after zoom in`);
+    // Reset joining moves no button already there: a second click on + is still +.
+    if (Math.abs(p.box.in.x - inAt.x) > 0.5 || Math.abs(p.box.in.y - inAt.y) > 0.5) throw new Error(`${key}-buttons: zoom in moved from ${JSON.stringify(inAt)} to ${JSON.stringify(p.box.in)} when reset joined`);
+    if (!p.box.show) throw new Error(`${key}-buttons: the box hid while the pointer was on it`);
+    await page.mouse.click(p.box.reset.x + p.box.reset.w / 2, p.box.reset.y + p.box.reset.h / 2);
+    const home = await waitStamp(z.n, (o) => o.reset === true && o.settle === true);
+    // Against the home limits the reset lands at (orbit frames carry `limits`, pans x/y spans).
+    if (!(width(z) < 0.99 * width(home))) throw new Error(`${key}-buttons: zoom in did not narrow the limits (${JSON.stringify(z)}, home ${JSON.stringify(home)})`);
+    p = await probe();
+    if (p.box.reset) throw new Error(`${key}-buttons: reset still shows after the view went home`);
+    const after = await textOf(`#out_${key}`);
+    if (after !== before) throw new Error(`${key}-buttons: a button press committed ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+    await page.mouse.move(1, 1);
+    await new Promise((res) => setTimeout(res, 250));
+    if ((await probe()).box.show) throw new Error(`${key}-buttons: the box stayed after the pointer left`);
+    passed.push(`${key}/view-buttons`);
+    console.error(`OK  ${key}/buttons — ${corner} corner, zoom in then reset, nothing committed`);
+  };
+
   // Within a millionth of the span: the limits a reset lands at are the mount's own.
   const sameLims = (a, b) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= 1e-6 * Math.max(1, Math.abs(b[i]), Math.abs(b[i ^ 1] - b[i])));
 
@@ -1280,8 +1358,37 @@ try {
         passed.push(`${key}/drag-over-${name}-pans-${name}`);
         await settled();
       }
+      // The corner buttons follow the same rule (#525): over the inset its own box shows, beside
+      // it the parent's, and the two boxes don't overlap.
+      const boxes = () => page.evaluate((kk) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const one = (id) => {
+          const b = sr.querySelector(`.masque-vb[data-view="${id}"]`);
+          if (!b || b.hidden) return null;
+          const r = b.getBoundingClientRect();
+          return { show: b.classList.contains("show"), r: [r.left, r.top, r.right, r.bottom] };
+        };
+        return { view: one("view"), inset: one("inset") };
+      }, key);
+      const shownOver = async (c, want) => {
+        await page.mouse.move(c.x, c.y);
+        for (let i = 0; i < 15; i++) {
+          await new Promise((res) => setTimeout(res, 200));
+          const b = await boxes();
+          if (b[want]?.show && !b[want === "view" ? "inset" : "view"]?.show) return b;
+        }
+        throw new Error(`${key}: over the ${want === "view" ? "parent" : "inset"}, the boxes are ${JSON.stringify(await boxes())}`);
+      };
+      await shownOver(inner, "inset");
+      const bx = await shownOver(outer, "view");
+      if (!bx.inset || !bx.view) throw new Error(`${key}: expected a box for each view, got ${JSON.stringify(bx)}`);
+      const [a, b] = [bx.view.r, bx.inset.r];
+      if (a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]) throw new Error(`${key}: the parent's box ${a} overlaps the inset's ${b}`);
+      passed.push(`${key}/buttons-follow-innermost-view`);
       await page.mouse.move(1, 1);
-      console.error(`OK  ${key} — the wheel and a drag over the inset moved the inset's view; beside it, the parent's`);
+      console.error(`OK  ${key} — the wheel, a drag and the corner buttons over the inset drive the inset's view; beside it, the parent's`);
       continue;
     }
 
@@ -2674,6 +2781,10 @@ try {
       continue;
     }
 
+    if (spec.mode === "view_buttons") {
+      await driveButtons(key, layer, spec.corner);
+      continue;
+    }
     if (spec.resizeAfterDisplay) {
       // #546: a later cell `resize!`d the figure after it was shown. The pan's frame draws it
       // at the new size, so the overlay must take that size too: its svgs' viewBox matches the
@@ -2749,6 +2860,8 @@ try {
     }
 
     if (spec.mode === "drag" && spec.layerKind === "view") {
+      // #525: the corner buttons drive each view and leave it where it started.
+      await driveButtons(key, layer, key === "view_twin" ? "tl" : "tr");
       // #102/§12.3: a view gesture commits nothing anymore — the OLD assertion here waited for
       // #out_view's bond text to change and would now fail for the right reason (nothing ever
       // commits) for the WRONG reason (the test still expects a commit). Asserting "the bond

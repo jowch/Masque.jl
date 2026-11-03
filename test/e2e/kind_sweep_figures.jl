@@ -581,6 +581,14 @@ kind_sweep_meta() = [
         "inside" => 2, "outside" => 0,
     ),
     Dict(
+        # Corner view buttons (#525): a dark figure with its legend in the top-right corner.
+        # kind_sweep.mjs drives the buttons and polish_verify.mjs checks their look.
+        "key" => "view_dark", "layerId" => "view", "layerKind" => "view",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "view_buttons",
+        "corner" => "tl",
+    ),
+    Dict(
         # Two Axis3 panels linked by `linkcameras!(...; limits = true)` (#362), a view on each.
         # Orbiting the left one must turn the right panel's picture and move its hit areas, and
         # wheel zooms that alternate between the panels must each start from the shared limits.
@@ -1749,6 +1757,19 @@ function build_kind_sweep()
         masque(fig, interactables(sc; id = :pts), interactables(ln; id = :line), ViewInteractable(ax; id = :view))
     end
 
+    # Corner view buttons (#525) on a dark figure whose legend takes the top-right corner: the
+    # buttons go top left, in the dark tooltip theme.
+    view_dark = let
+        fig = Figure(size = (480, 300); backgroundcolor = :gray12)
+        ax = Axis(
+            fig[1, 1]; title = "view-dark", limits = (0, 8, 0, 8), backgroundcolor = :gray20,
+            titlecolor = :gray90, xtickcolor = :gray80, ytickcolor = :gray80,
+        )
+        sc = scatter!(ax, [1.0, 4.0, 2.0], [1.0, 4.0, 6.0]; markersize = 14, color = :orange, label = "pts")
+        axislegend(ax)
+        masque(fig, interactables(sc; id = :pts), ViewInteractable(ax; id = :view))
+    end
+
     view3d_linked = let
         pts = Makie.Point3f[(0, 0, 0), (4, 4, 4), (4, 0, 0)]
         fig = Figure(size = (640, 320))
@@ -2076,7 +2097,7 @@ function build_kind_sweep()
     return (;
         scatter, scatter_low, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, box_hidden, box_axes, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_resized, view_nested, legend, series_legend,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_resized, view_nested, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
