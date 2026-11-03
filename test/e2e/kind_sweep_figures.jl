@@ -158,9 +158,11 @@ kind_sweep_meta() = [
         "anchorKey" => "polar", "anchorIndex" => 1, "theta" => π / 2, "r" => 2.0, "rmax" => 2.5,
     ),
     Dict(
-        # Default tooltips follow the axis's tick format (#510): one auto widget, three axes.
+        # Default tooltips follow the axis's tick format (#510): one auto widget, seven axes.
         # Each scatter's first point is hovered; the driver picks the expectation by the axis's
-        # transform (polar, a `"{:.1f} mV"` format, a function format left plain).
+        # transform (polar, a `"{:.1f} mV"` format, a function format left plain). A bar, a hist
+        # bin, a horizontal box and a vspan are hovered too: their fields follow the axis each
+        # is measured along (#543).
         "key" => "tick_units", "layerId" => "", "layerKind" => "circles",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "tick_units",
@@ -437,6 +439,8 @@ kind_sweep_meta() = [
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "span",
         "start" => [3.0, 6.0], "markInside" => "scatter",
+        # The drag readout prints both edges in the axis's format (#543).
+        "dragReadout" => raw"^\[\d+\.\d s, \d+\.\d s\]$",
     ),
     Dict(
         # A band of a vertical colorbar (#500): the colorbar's own readout still answers inside it.
@@ -1029,13 +1033,23 @@ function build_kind_sweep()
     end
 
     tick_units = let
-        fig = Figure(size = (720, 260))
+        fig = Figure(size = (720, 700))
         ax_mv = Axis(fig[1, 1]; title = "mV", ytickformat = "{:.1f} mV", limits = (0, 3, 0, 5))
         scatter!(ax_mv, [1.0, 2.0], [3.4721, 1.5]; color = :gray, markersize = 22)
         ax_fn = Axis(fig[1, 2]; title = "function", ytickformat = vs -> string.(vs) .* "!", limits = (0, 3, 0, 5))
         scatter!(ax_fn, [1.0, 2.0], [3.4721, 1.5]; color = :gray, markersize = 22)
         ax_p = PolarAxis(fig[1, 3])
         scatter!(ax_p, [π / 2, π], [2.0, 1.0]; color = :gray, markersize = 22)
+        # A bar's low/high/value follow its value axis, a hist's low/high its bin axis (#543).
+        ax_bar = Axis(fig[2, 1]; title = "bars", ytickformat = "{:.1f} mV", limits = (0, 3, 0, 5))
+        barplot!(ax_bar, [1, 2], [3.4721, 1.5]; color = :gray)
+        ax_hist = Axis(fig[2, 2]; title = "hist", xtickformat = "{:.1f} s", ytickformat = "{:.0f} n")
+        hist!(ax_hist, [0.2, 0.4, 0.6, 1.5]; bins = [0.0, 1.0, 2.0], color = :gray)
+        # A horizontal box plot (its axes carry `NoDimConversion`) and a vspan read along x.
+        ax_box = Axis(fig[3, 1]; xtickformat = "{:.1f} kg")
+        boxplot!(ax_box, fill(1, 5), [1.0, 2.0, 3.0, 4.0, 5.0]; orientation = :horizontal, color = :gray)
+        ax_vs = Axis(fig[3, 2]; xtickformat = "{:.1f} s", limits = (0, 3, 0, 1))
+        vspan!(ax_vs, [1.0], [2.0]; color = (:gray, 0.5))
         masque(fig)
     end
 
@@ -1568,7 +1582,7 @@ function build_kind_sweep()
 
     span_axis = let
         fig = Figure(size = (480, 260))
-        ax = Axis(fig[1, 1]; title = "span on an axis", limits = (0, 10, 0, 10))
+        ax = Axis(fig[1, 1]; title = "span on an axis", limits = (0, 10, 0, 10), xtickformat = "{:.1f} s")
         scatter!(ax, [1.0, 4.5, 8.0], [5.0, 5.0, 5.0]; markersize = 16)
         masque(fig, SpanInteractable(ax; span = (3.0, 6.0)))
     end

@@ -47,6 +47,10 @@ All notable changes to this project are documented here. The format is based on
   your own `payloads` fields. Templates and the fields you set yourself are unchanged, and so
   is the `@bind` value. A set `tooltip_sigdigits` wins over the
   format's precision. See "Axis units" on the Tooltips page (#510).
+- A bar's `low`, `high` and `value` in the default tooltip read in its axis's unit too, as
+  do a histogram's, a waterfall's, a box plot's, a crossbar's and a span's values. A
+  histogram's `low` and `high` are its bin edges, so they read in the bin axis's unit.
+  So does the readout while you drag a `SpanInteractable` band's edges (#543).
 - **Breaking:** a click on a bound line on an `Axis3` picks the point you plotted nearest
   the click, as on a 2D `Axis`, where it used to pick the whole line. `pick.index` is now
   that point's position in your data, `pick.line` says which line it is on, and `pick.x`,

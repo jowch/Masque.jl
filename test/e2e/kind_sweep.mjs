@@ -923,6 +923,19 @@ try {
       if (!near(v.hi, hi0)) throw new Error(`${key}/edge: hi moved from ${hi0} to ${v.hi}`);
       passed.push(`${key}/edge-drag`);
 
+      // Mid-drag, the readout prints both edges the way the axis labels them (#543).
+      if (spec.dragReadout) {
+        [pLo, pHi] = await edges();
+        const back = -out1;
+        await dispatchAt(key, ...at(pLo), "pointerdown");
+        const mid = await dispatchAt(key, ...at(pLo + 10 * back), "pointermove");
+        await dispatchAt(key, ...at(pLo + 10 * back), "pointerup");
+        if (!mid?.show || !new RegExp(spec.dragReadout).test(mid.text ?? "")) throw new Error(`${key}/readout: mid-drag readout ${JSON.stringify(mid?.text)}, want ${spec.dragReadout}`);
+        out = await waitChange(`#out_${key}`, out, `${key}/readout`);
+        passed.push(`${key}/readout`);
+        console.error(`OK  ${key}/readout — ${mid.text}`);
+      }
+
       // Inside, off any mark: 20 px toward the hi edge moves both edges by 20.
       [pLo, pHi] = await edges();
       // The middle of the band, a quarter of the way across, clear of the edges and the marks.
@@ -3394,6 +3407,33 @@ try {
         console.error(`OK  ${key}/${which} — ${tip.text}`);
       }
       if (seen.size !== 3) throw new Error(`${key}: expected the polar, mV and function axes, saw ${[...seen]}`);
+      // #543: a bar's low/high/value print in its value axis's format, a hist's value in its
+      // value axis's and its low/high (the bin edges) in the bin axis's.
+      const rectWant = {
+        bars: { coords: { low: "y", high: "y", value: "y" }, want: [/\blow 0\.0 mV\b/, /\bhigh 3\.5 mV\b/, /\bvalue 3\.5 mV\b/], never: [/3\.472/] },
+        hist: { coords: { value: "y", low: "x", high: "x" }, want: [/\bvalue 3 n\b/, /\blow 0\.0 s\b/, /\bhigh 1\.0 s\b/], never: [/\bvalue 3 s\b/, /\blow 0 n\b/] },
+        boxplot: { coords: { q1: "x", median: "x", q3: "x" }, want: [/\bq1 2\.0 kg\b/, /\bmedian 3\.0 kg\b/, /\bq3 4\.0 kg\b/], never: [] },
+        vspan: { coords: { low: "x", high: "x" }, want: [/\blow 1\.0 s\b/, /\bhigh 2\.0 s\b/], never: [] },
+      };
+      const rects = layers.filter((l) => l.kind === "rects");
+      if (rects.length !== 4) throw new Error(`${key}: expected 2 rects layers, got ${rects.length}`);
+      for (const L of rects) {
+        const which = Object.keys(rectWant).find((w) => L.id.startsWith(w)) ?? "bars";
+        const { coords, want, never } = rectWant[which];
+        if (JSON.stringify(Object.entries(L.coords ?? {}).sort()) !== JSON.stringify(Object.entries(coords).sort()))
+          throw new Error(`${key}/${which}: coords ${JSON.stringify(L.coords)}, want ${JSON.stringify(coords)}`);
+        const r = hitPoint(L, 0);
+        let tip = null;
+        for (let a = 0; a < 6; a++) {
+          tip = await dispatchAt(key, r.x, r.y, "pointermove");   // rects are [cx, cy, w, h]
+          if (tip?.show && want.every((w) => w.test(tip.text))) break;
+          await new Promise((res) => setTimeout(res, 200));
+        }
+        for (const w of want) if (!w.test(tip?.text ?? "")) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip?.text)} should match ${w}`);
+        for (const w of never) if (w.test(tip.text)) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip.text)} should not match ${w}`);
+        passed.push(`${key}/${which}`);
+        console.error(`OK  ${key}/${which} — ${tip.text}`);
+      }
       await dispatchAt(key, 1, 1, "pointermove");
       continue;
     }
