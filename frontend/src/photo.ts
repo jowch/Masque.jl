@@ -19,6 +19,9 @@ export const WHEEL_IDLE_MS = 150
 // How long the "Ctrl + scroll to zoom" hint stays after the last plain wheel over a view.
 export const WHEEL_HINT_MS = 1500
 
+// One wheel notch, in wheelScale's pixel units: the zoom step of `+`, `-` and the corner buttons.
+export const ZOOM_NOTCH = 100
+
 export function isIdentity(m: PhotoMatrix): boolean {
     return Math.abs(m.s - 1) < 1e-6 && Math.abs(m.tx) < 1e-3 && Math.abs(m.ty) < 1e-3
 }
@@ -29,8 +32,10 @@ export function wheelScale(deltaY: number, deltaMode: number): number {
     return Math.exp(-lines * 0.001)
 }
 
+export const clampScale = (s: number): number => Math.min(S_MAX, Math.max(S_MIN, s))
+
 export function zoomAt(m: PhotoMatrix, local: { x: number; y: number }, k: number): PhotoMatrix {
-    const ns = Math.min(S_MAX, Math.max(S_MIN, m.s * k))
+    const ns = clampScale(m.s * k)
     return {
         s: ns,
         tx: m.tx + (m.s - ns) * local.x,

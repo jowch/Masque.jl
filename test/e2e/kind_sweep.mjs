@@ -485,6 +485,84 @@ try {
     }
     throw new Error(`${key}-reset: no reset frame landed after a double-click at ${JSON.stringify(spot)} (last ${JSON.stringify(await readStamp())})`);
   };
+  // #525: the corner view buttons, through Chromium's own input path. A real hover over the
+  // view's viewport shows its box in the expected corner, 8 CSS px in; zoom in lands a settled
+  // frame with narrower limits and brings reset in; reset lands the reset frame and takes reset
+  // out; nothing commits; leaving the plot hides the box.
+  const driveButtons = async (key, layer, corner) => {
+    const g = layer.geometry;
+    const probe = () => page.evaluate(([k, id]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const box = sr.querySelector(`.masque-vb[data-view="${id}"]`);
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      const rect = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
+      const btn = (c) => { const el = box?.querySelector(`.masque-vb-${c}`); return el && getComputedStyle(el).display !== "none" ? rect(el) : null; };
+      return {
+        stamp: host.dataset.masqueGestureFrame ?? "", base: { x: b.left, y: b.top, s },
+        box: box && !box.hidden ? { corner: box.dataset.corner, show: box.classList.contains("show"), opacity: Number(getComputedStyle(box).opacity), r: rect(box), in: btn("in"), out: btn("out"), reset: btn("reset") } : null,
+      };
+    }, [key, layer.id]);
+    await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1).scrollIntoView({ block: "center" });
+    }, key);
+    await page.mouse.move(1, 1);
+    let p = await probe();
+    if (!p.box) throw new Error(`${key}-buttons: no button box for view ${layer.id}`);
+    if (p.box.show) throw new Error(`${key}-buttons: the box shows before any hover`);
+    const vp = { x: p.base.x + g.x * p.base.s, y: p.base.y + g.y * p.base.s, w: g.w * p.base.s, h: g.h * p.base.s };
+    await page.mouse.move(vp.x + vp.w / 2, vp.y + vp.h / 2);
+    // Read once the fade in has ended (a busy WebGL page can start it late), for up to 3 s.
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      p = await probe();
+      if (p.box.show && p.box.opacity >= 0.99) break;
+    }
+    if (!p.box.show || p.box.opacity < 0.99) throw new Error(`${key}-buttons: hover did not show the box (${JSON.stringify(p.box)})`);
+    if (p.box.corner !== corner) throw new Error(`${key}-buttons: box in corner ${p.box.corner}, expected ${corner}`);
+    const r = p.box.r, near = (a, b) => Math.abs(a - b) <= 1.5;
+    const xOk = corner === "tl" ? near(r.x, vp.x + 8) : near(r.x + r.w, vp.x + vp.w - 8);
+    const yOk = corner === "br" ? near(r.y + r.h, vp.y + vp.h - 8) : near(r.y, vp.y + 8);
+    if (!xOk || !yOk) throw new Error(`${key}-buttons: box ${JSON.stringify(r)} is not 8 px inside the ${corner} corner of ${JSON.stringify(vp)}`);
+    if (p.box.reset) throw new Error(`${key}-buttons: reset shows before the view has moved`);
+    const before = await textOf(`#out_${key}`);
+    const waitStamp = async (n0, want) => {
+      const tries = backend === "webgl" ? 50 : 25, delayMs = backend === "webgl" ? 300 : 200;
+      for (let i = 0; i < tries; i++) {
+        await new Promise((res) => setTimeout(res, delayMs));
+        const st = (await probe()).stamp;
+        if (st) { const o = JSON.parse(st); if (o.n > n0 && want(o)) return o; }
+      }
+      throw new Error(`${key}-buttons: no frame landed (last ${(await probe()).stamp})`);
+    };
+    const n0 = p.stamp ? JSON.parse(p.stamp).n : 0;
+    await page.mouse.click(p.box.in.x + p.box.in.w / 2, p.box.in.y + p.box.in.h / 2);
+    const z = await waitStamp(n0, (o) => o.settle === true && o.reset !== true);
+    const width = (o) => (Array.isArray(o.limits) ? o.limits[1] - o.limits[0] : o.xmax - o.xmin);
+    const inAt = p.box.in;
+    p = await probe();
+    if (!p.box.reset) throw new Error(`${key}-buttons: reset did not join after zoom in`);
+    // Reset joining moves no button already there: a second click on + is still +.
+    if (Math.abs(p.box.in.x - inAt.x) > 0.5 || Math.abs(p.box.in.y - inAt.y) > 0.5) throw new Error(`${key}-buttons: zoom in moved from ${JSON.stringify(inAt)} to ${JSON.stringify(p.box.in)} when reset joined`);
+    if (!p.box.show) throw new Error(`${key}-buttons: the box hid while the pointer was on it`);
+    await page.mouse.click(p.box.reset.x + p.box.reset.w / 2, p.box.reset.y + p.box.reset.h / 2);
+    const home = await waitStamp(z.n, (o) => o.reset === true && o.settle === true);
+    // Against the home limits the reset lands at (orbit frames carry `limits`, pans x/y spans).
+    if (!(width(z) < 0.99 * width(home))) throw new Error(`${key}-buttons: zoom in did not narrow the limits (${JSON.stringify(z)}, home ${JSON.stringify(home)})`);
+    p = await probe();
+    if (p.box.reset) throw new Error(`${key}-buttons: reset still shows after the view went home`);
+    const after = await textOf(`#out_${key}`);
+    if (after !== before) throw new Error(`${key}-buttons: a button press committed ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+    await page.mouse.move(1, 1);
+    await new Promise((res) => setTimeout(res, 250));
+    if ((await probe()).box.show) throw new Error(`${key}-buttons: the box stayed after the pointer left`);
+    passed.push(`${key}/view-buttons`);
+    console.error(`OK  ${key}/buttons — ${corner} corner, zoom in then reset, nothing committed`);
+  };
+
   // Within a millionth of the span: the limits a reset lands at are the mount's own.
   const sameLims = (a, b) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= 1e-6 * Math.max(1, Math.abs(b[i]), Math.abs(b[i ^ 1] - b[i])));
 
@@ -923,6 +1001,19 @@ try {
       if (!near(v.hi, hi0)) throw new Error(`${key}/edge: hi moved from ${hi0} to ${v.hi}`);
       passed.push(`${key}/edge-drag`);
 
+      // Mid-drag, the readout prints both edges the way the axis labels them (#543).
+      if (spec.dragReadout) {
+        [pLo, pHi] = await edges();
+        const back = -out1;
+        await dispatchAt(key, ...at(pLo), "pointerdown");
+        const mid = await dispatchAt(key, ...at(pLo + 10 * back), "pointermove");
+        await dispatchAt(key, ...at(pLo + 10 * back), "pointerup");
+        if (!mid?.show || !new RegExp(spec.dragReadout).test(mid.text ?? "")) throw new Error(`${key}/readout: mid-drag readout ${JSON.stringify(mid?.text)}, want ${spec.dragReadout}`);
+        out = await waitChange(`#out_${key}`, out, `${key}/readout`);
+        passed.push(`${key}/readout`);
+        console.error(`OK  ${key}/readout — ${mid.text}`);
+      }
+
       // Inside, off any mark: 20 px toward the hi edge moves both edges by 20.
       [pLo, pHi] = await edges();
       // The middle of the band, a quarter of the way across, clear of the edges and the marks.
@@ -1267,8 +1358,37 @@ try {
         passed.push(`${key}/drag-over-${name}-pans-${name}`);
         await settled();
       }
+      // The corner buttons follow the same rule (#525): over the inset its own box shows, beside
+      // it the parent's, and the two boxes don't overlap.
+      const boxes = () => page.evaluate((kk) => {
+        const span = document.querySelector(`#coords_${kk}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const one = (id) => {
+          const b = sr.querySelector(`.masque-vb[data-view="${id}"]`);
+          if (!b || b.hidden) return null;
+          const r = b.getBoundingClientRect();
+          return { show: b.classList.contains("show"), r: [r.left, r.top, r.right, r.bottom] };
+        };
+        return { view: one("view"), inset: one("inset") };
+      }, key);
+      const shownOver = async (c, want) => {
+        await page.mouse.move(c.x, c.y);
+        for (let i = 0; i < 15; i++) {
+          await new Promise((res) => setTimeout(res, 200));
+          const b = await boxes();
+          if (b[want]?.show && !b[want === "view" ? "inset" : "view"]?.show) return b;
+        }
+        throw new Error(`${key}: over the ${want === "view" ? "parent" : "inset"}, the boxes are ${JSON.stringify(await boxes())}`);
+      };
+      await shownOver(inner, "inset");
+      const bx = await shownOver(outer, "view");
+      if (!bx.inset || !bx.view) throw new Error(`${key}: expected a box for each view, got ${JSON.stringify(bx)}`);
+      const [a, b] = [bx.view.r, bx.inset.r];
+      if (a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]) throw new Error(`${key}: the parent's box ${a} overlaps the inset's ${b}`);
+      passed.push(`${key}/buttons-follow-innermost-view`);
       await page.mouse.move(1, 1);
-      console.error(`OK  ${key} — the wheel and a drag over the inset moved the inset's view; beside it, the parent's`);
+      console.error(`OK  ${key} — the wheel, a drag and the corner buttons over the inset drive the inset's view; beside it, the parent's`);
       continue;
     }
 
@@ -1691,6 +1811,126 @@ try {
         v = await bondHas(/sure = false/, v, "checkbox-space");
         r = await once("checkbox-space", r);
         passed.push(`${key}/checkbox-drawn`);
+      }
+      // A finger (#531): where some input is coarse, each slider, toggle and checkbox takes the
+      // pointer past its drawn box, up to 44 CSS px across, but only halfway to the next control
+      // or axis; nothing drawn changes. Chromium's touch emulation turns on `any-pointer: coarse`.
+      {
+        const reachers = ["level", "show", "span", "fine", "tall", "sure", "grid"];
+        // Each control's hit area (its inputs' union; the interval slider's box reaches as far
+        // as its inputs) and drawn box, in CSS px, plus the boxes a finger must not reach into.
+        const areas = () => page.evaluate(([k, ids]) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          const rect = (r) => [r.left, r.top, r.right, r.bottom];
+          const out = {};
+          for (const box of sr.querySelectorAll(".masque-control")) {
+            if (box.classList.contains("masque-ctl-slidergrid")) continue;
+            const top = box.closest("[data-masque-control]:not([data-masque-control*='-'])") ?? box;
+            const id = box.dataset.masqueControl;
+            const ins = [...box.querySelectorAll(":scope > input, :scope > button, :scope > select")].map((i) => i.getBoundingClientRect());
+            const hit = ins.length ? [Math.min(...ins.map((r) => r.left)), Math.min(...ins.map((r) => r.top)), Math.max(...ins.map((r) => r.right)), Math.max(...ins.map((r) => r.bottom))] : rect(box.getBoundingClientRect());
+            out[id] = { top: top.dataset.masqueControl, box: rect(box.getBoundingClientRect()), hit, reach: ids.includes(top.dataset.masqueControl) && !box.classList.contains("masque-ctl-menu") };
+          }
+          const img = host.querySelector("img, canvas").getBoundingClientRect();
+          return { out, img: rect(img), coarse: matchMedia("(any-pointer: coarse)").matches };
+        }, [key, reachers]);
+        const s1 = await screenOf();
+        const axisBox = [s1.left + ax.viewport[0] * s1.sc, s1.top + ax.viewport[1] * s1.sc, s1.left + (ax.viewport[0] + ax.viewport[2]) * s1.sc, s1.top + (ax.viewport[1] + ax.viewport[3]) * s1.sc];
+        await page.mouse.move(0, 0);
+        const figClip = async () => {
+          const { img } = await areas();
+          return PNG.sync.read(await page.screenshot({ clip: { x: img[0], y: img[1], width: img[2] - img[0], height: img[3] - img[1] } }));
+        };
+        const before = await figClip();
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+        try {
+          const a = await areas();
+          if (!a.coarse) throw new Error(`${key}/touch-reach: touch emulation didn't turn on any-pointer: coarse`);
+          const overlap = (p, q) => p[0] < q[2] - 0.5 && q[0] < p[2] - 0.5 && p[1] < q[3] - 0.5 && q[1] < p[3] - 0.5;
+          const ids = Object.keys(a.out);
+          let grown = 0;
+          for (const id of ids) {
+            const { box, hit, reach } = a.out[id];
+            const w = hit[2] - hit[0], h = hit[3] - hit[1];
+            if (!reach) continue;
+            // It covers what's drawn, and grows only up to 44 CSS px across.
+            const drawn = id === "fine" || id === "sure" ? null : box;
+            if (drawn && (hit[0] > drawn[0] + 0.5 || hit[1] > drawn[1] + 0.5 || hit[2] < drawn[2] - 0.5 || hit[3] < drawn[3] - 0.5)) throw new Error(`${key}/touch-reach: ${id} hit ${JSON.stringify(hit)} doesn't cover its box ${JSON.stringify(box)}`);
+            if ((w > 44.5 && w > box[2] - box[0] + 0.5) || (h > 44.5 && h > box[3] - box[1] + 0.5)) throw new Error(`${key}/touch-reach: ${id} hit ${w.toFixed(1)}×${h.toFixed(1)} grows past 44 px`);
+            if (h > box[3] - box[1] + 2 || w > box[2] - box[0] + 2) grown++;
+            // It never reaches into another control's area, or the axis.
+            for (const other of ids) if (other !== id && a.out[other].top !== a.out[id].top && overlap(hit, a.out[other].hit)) throw new Error(`${key}/touch-reach: ${id} ${JSON.stringify(hit)} overlaps ${other} ${JSON.stringify(a.out[other].hit)}`);
+            if (overlap(hit, axisBox)) throw new Error(`${key}/touch-reach: ${id} ${JSON.stringify(hit)} reaches into the axis ${JSON.stringify(axisBox)}`);
+            // Nor off the picture onto the page.
+            if (hit[0] < a.img[0] - 0.5 || hit[1] < a.img[1] - 0.5 || hit[2] > a.img[2] + 0.5 || hit[3] > a.img[3] + 0.5) throw new Error(`${key}/touch-reach: ${id} ${JSON.stringify(hit)} reaches past the picture ${JSON.stringify(a.img)}`);
+          }
+          if (grown < 4) throw new Error(`${key}/touch-reach: only ${grown} controls grew their hit area: ${JSON.stringify(a.out)}`);
+          // Nothing drawn moved: the figure's pixels are the same with touch on.
+          await page.waitForTimeout(300);
+          const after = await figClip();
+          let diff = 0;
+          const bb = [Infinity, Infinity, -Infinity, -Infinity];
+          if (before.width === after.width && before.height === after.height) {
+            for (let o = 0; o < before.data.length; o += 4) {
+              // Re-rasterising can move an antialiased edge by a level or two; a drawn change is more.
+              if (Math.max(Math.abs(before.data[o] - after.data[o]), Math.abs(before.data[o + 1] - after.data[o + 1]), Math.abs(before.data[o + 2] - after.data[o + 2])) <= 3) continue;
+              diff++;
+              const px = (o / 4) % before.width, py = Math.floor(o / 4 / before.width);
+              bb[0] = Math.min(bb[0], px); bb[1] = Math.min(bb[1], py); bb[2] = Math.max(bb[2], px); bb[3] = Math.max(bb[3], py);
+            }
+          }
+          if (before.width !== after.width || before.height !== after.height || diff > 0) {
+            if (artifactDir) {
+              writeFileSync(join(artifactDir, `touch-reach-${backend}-before.png`), PNG.sync.write(before));
+              writeFileSync(join(artifactDir, `touch-reach-${backend}-after.png`), PNG.sync.write(after));
+            }
+            throw new Error(`${key}/touch-reach: ${diff} pixels changed with touch on, in ${JSON.stringify(bb)} of ${before.width}×${before.height} (${after.width}×${after.height} after)`);
+          }
+          passed.push(`${key}/touch-reach`);
+
+          // A finger's tap, sent as touch input (the page's context has no touchscreen of its own).
+          const tap = async (x, y) => {
+            await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+            await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+          };
+          // A tap past the drawn box works: the slider's left end, under its bar.
+          const lv = a.out.level;
+          const below = (lv.box[3] + lv.hit[3]) / 2;
+          if (lv.hit[3] - lv.box[3] < 3) throw new Error(`${key}/touch-tap: the slider reaches only ${(lv.hit[3] - lv.box[3]).toFixed(1)} px below its bar`);
+          await tap(lv.box[0] + 2, below);
+          v = await bondHas(/level = 0,/, v, "touch-slider");
+          r = await settle();
+          // The toggle, above its track.
+          const sh = a.out.show;
+          const wasOn = /show = true/.test(v);
+          await tap((sh.box[0] + sh.box[2]) / 2, (sh.box[1] + sh.hit[1]) / 2);
+          v = await bondHas(wasOn ? /show = false/ : /show = true/, v, "touch-toggle");
+          r = await settle();
+          // The interval slider's bar, under it, near its start: the low knob comes there.
+          const sp = a.out.span;
+          const lowWas = Number(/span = \((\d+), (\d+)\)/.exec(v)[1]);
+          const target = lowWas === 1 ? 2 : 1;
+          // Five values, so value k sits at (k - 1) / 4 of the knob's travel.
+          const knob = sp.box[3] - sp.box[1];
+          const tx = sp.box[0] + knob / 2 + ((target - 1) / 4) * (sp.box[2] - sp.box[0] - knob);
+          await tap(tx, (sp.box[3] + sp.hit[3]) / 2);
+          v = await bondHas(new RegExp(`span = \\(${target}, `), v, "touch-interval");
+          r = await settle();
+          passed.push(`${key}/touch-tap`);
+        } finally {
+          await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+          await cdp.detach();
+        }
+        // With touch off again, the hit areas are the drawn boxes.
+        const off = await areas();
+        for (const id of ["level", "show"]) {
+          const { box, hit } = off.out[id];
+          if (box.some((c, i) => Math.abs(c - hit[i]) > 0.5)) throw new Error(`${key}/touch-reach-off: ${id} hit ${JSON.stringify(hit)} past its box ${JSON.stringify(box)} without touch`);
+        }
+        passed.push(`${key}/touch-reach-off`);
       }
       console.error(`OK  ${key} — ${v.slice(0, 120)}`);
       continue;
@@ -2661,6 +2901,10 @@ try {
       continue;
     }
 
+    if (spec.mode === "view_buttons") {
+      await driveButtons(key, layer, spec.corner);
+      continue;
+    }
     if (spec.resizeAfterDisplay) {
       // #546: a later cell `resize!`d the figure after it was shown. The pan's frame draws it
       // at the new size, so the overlay must take that size too: its svgs' viewBox matches the
@@ -2736,6 +2980,8 @@ try {
     }
 
     if (spec.mode === "drag" && spec.layerKind === "view") {
+      // #525: the corner buttons drive each view and leave it where it started.
+      await driveButtons(key, layer, key === "view_twin" ? "tl" : "tr");
       // #102/§12.3: a view gesture commits nothing anymore — the OLD assertion here waited for
       // #out_view's bond text to change and would now fail for the right reason (nothing ever
       // commits) for the WRONG reason (the test still expects a commit). Asserting "the bond
@@ -3115,6 +3361,19 @@ try {
         // Grab the line where the drag above released it, then release 20.45 px further on.
         const sx = frame.left + released[0] * frame.s, sy = frame.top + released[1] * frame.s;
         const ex = horiz ? sx : Math.round(sx + 20) + 0.45, ey = horiz ? Math.round(sy + 20) + 0.45 : sy;
+        // Count what the release sends (#567): an "input" event on the host is a value handed
+        // to Pluto, so a failure below says whether the gesture committed nothing or Pluto did.
+        await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          window.__releaseLog = { inputs: [], downs: 0, ups: 0 };
+          if (!host.__releaseCounting) {
+            host.__releaseCounting = true;
+            host.addEventListener("input", () => window.__releaseLog?.inputs.push(JSON.stringify(host.value).slice(0, 160)));
+            host.addEventListener("pointerdown", () => { if (window.__releaseLog) window.__releaseLog.downs++ }, true);
+            host.addEventListener("pointerup", () => { if (window.__releaseLog) window.__releaseLog.ups++ }, true);
+          }
+        }, key);
         await page.mouse.move(sx, sy);
         await page.mouse.down();
         await page.mouse.move((sx + ex) / 2, (sy + ey) / 2, { steps: 4 });
@@ -3140,6 +3399,18 @@ try {
           await new Promise((r) => setTimeout(r, 200));
         }
         if (t === prev || !Number.isFinite(got) || Math.abs(got - tipVal) > tipTol) {
+          const log = await page.evaluate(() => window.__releaseLog);
+          let late = t;
+          for (let i = 0; i < 100 && late === prev; i++) { await new Promise((r) => setTimeout(r, 200)); late = await textOf(`#out_${key}`); }
+          const out = t !== prev ? `changed to ${JSON.stringify(t)} (no wait)` : late === prev ? "still unchanged 20 s later" : `became ${JSON.stringify(late)} within 20 s more`;
+          // The host's value now: Pluto writes its server value back into the host, so a stale
+          // value here with the new one in `inputs` means it wrote an old one back (#567).
+          const hostValue = await page.evaluate((k) => {
+            const span = document.querySelector(`#coords_${k}`);
+            const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+            return JSON.stringify(host.value).slice(0, 160);
+          }, key);
+          console.error(`${key}/release-fractional: pointerdown ${log?.downs}, pointerup ${log?.ups}, inputs ${JSON.stringify(log?.inputs)}; #out_${key} ${out}; host value ${hostValue}`);
           throw new Error(`${key}/release-fractional: committed ${JSON.stringify(t)}, want the tooltip's ${JSON.stringify(tipText)}`);
         }
         passed.push(`${key}/release-fractional`);
@@ -3369,6 +3640,33 @@ try {
         console.error(`OK  ${key}/${which} — ${tip.text}`);
       }
       if (seen.size !== 3) throw new Error(`${key}: expected the polar, mV and function axes, saw ${[...seen]}`);
+      // #543: a bar's low/high/value print in its value axis's format, a hist's value in its
+      // value axis's and its low/high (the bin edges) in the bin axis's.
+      const rectWant = {
+        bars: { coords: { low: "y", high: "y", value: "y" }, want: [/\blow 0\.0 mV\b/, /\bhigh 3\.5 mV\b/, /\bvalue 3\.5 mV\b/], never: [/3\.472/] },
+        hist: { coords: { value: "y", low: "x", high: "x" }, want: [/\bvalue 3 n\b/, /\blow 0\.0 s\b/, /\bhigh 1\.0 s\b/], never: [/\bvalue 3 s\b/, /\blow 0 n\b/] },
+        boxplot: { coords: { q1: "x", median: "x", q3: "x" }, want: [/\bq1 2\.0 kg\b/, /\bmedian 3\.0 kg\b/, /\bq3 4\.0 kg\b/], never: [] },
+        vspan: { coords: { low: "x", high: "x" }, want: [/\blow 1\.0 s\b/, /\bhigh 2\.0 s\b/], never: [] },
+      };
+      const rects = layers.filter((l) => l.kind === "rects");
+      if (rects.length !== 4) throw new Error(`${key}: expected 2 rects layers, got ${rects.length}`);
+      for (const L of rects) {
+        const which = Object.keys(rectWant).find((w) => L.id.startsWith(w)) ?? "bars";
+        const { coords, want, never } = rectWant[which];
+        if (JSON.stringify(Object.entries(L.coords ?? {}).sort()) !== JSON.stringify(Object.entries(coords).sort()))
+          throw new Error(`${key}/${which}: coords ${JSON.stringify(L.coords)}, want ${JSON.stringify(coords)}`);
+        const r = hitPoint(L, 0);
+        let tip = null;
+        for (let a = 0; a < 6; a++) {
+          tip = await dispatchAt(key, r.x, r.y, "pointermove");   // rects are [cx, cy, w, h]
+          if (tip?.show && want.every((w) => w.test(tip.text))) break;
+          await new Promise((res) => setTimeout(res, 200));
+        }
+        for (const w of want) if (!w.test(tip?.text ?? "")) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip?.text)} should match ${w}`);
+        for (const w of never) if (w.test(tip.text)) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip.text)} should not match ${w}`);
+        passed.push(`${key}/${which}`);
+        console.error(`OK  ${key}/${which} — ${tip.text}`);
+      }
       await dispatchAt(key, 1, 1, "pointermove");
       continue;
     }
@@ -4726,6 +5024,158 @@ try {
       computedFor,
     });
     passed.push("tooltip-theme-follows-figure-bg");
+  }
+
+  // --- Touch (#528): a finger picks the nearest point or line within 16 CSS px of it ---
+  // Real taps (CDP touch emulation, so the browser sends pointerType "touch" and its own
+  // click), at a spot 8–14 CSS px off a mark's drawn edge: past a mouse's slack, inside a
+  // finger's reach. A real mouse click there first must miss. Last in the sweep, since touch
+  // emulation stays on for the page.
+  {
+    const TOUCH_SPECS = [
+      { key: "scatter" }, { key: "lines", sample: true }, { key: "segments" },
+      { key: "scatter3d" }, { key: "lines3d", sample: true },
+    ];
+    const cssScale = (key) => page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const vb = sr.querySelector("svg.masque-plain").viewBox.baseVal;
+      return { s: b.width / vb.width, left: b.left, top: b.top, w: vb.width, h: vb.height };
+    }, key);
+    // Distance from (x, y) to element k's drawn edge, image px, and the nearest element.
+    const segDist = (px, py, x0, y0, x1, y1) => {
+      const dx = x1 - x0, dy = y1 - y0, l2 = dx * dx + dy * dy;
+      const t = l2 ? Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / l2)) : 0;
+      return Math.hypot(px - (x0 + t * dx), py - (y0 + t * dy));
+    };
+    const nearestOf = (layer, x, y) => {
+      const g = layer.geometry, half = (layer.linewidth ?? 0) / 2;
+      const ds = [];
+      if (layer.kind === "circles") for (let k = 0; k < g.length / 3; k++) ds.push(Math.max(0, Math.hypot(x - g[3 * k], y - g[3 * k + 1]) - g[3 * k + 2]));
+      if (layer.kind === "segments") for (let k = 0; k < g.length / 4; k++) ds.push(Math.max(0, segDist(x, y, g[4 * k], g[4 * k + 1], g[4 * k + 2], g[4 * k + 3]) - half));
+      if (layer.kind === "lines") for (const a of g) {
+        let d = Infinity;
+        for (let i = 0; i < a.length / 2 - 1; i++) {
+          if (![a[2 * i], a[2 * i + 1], a[2 * i + 2], a[2 * i + 3]].every(Number.isFinite)) continue;
+          d = Math.min(d, segDist(x, y, a[2 * i], a[2 * i + 1], a[2 * i + 2], a[2 * i + 3]));
+        }
+        ds.push(Math.max(0, d - half));
+      }
+      let best = -1;
+      ds.forEach((d, k) => { if (best < 0 || d < ds[best]) best = k; });
+      return { index: best, dist: ds[best], second: Math.min(...ds.filter((_, k) => k !== best), Infinity) };
+    };
+    const tapPoint = (layer, idx, anchor, sc) => {
+      for (const css of [10, 9, 11, 12, 8, 13, 14]) {
+        for (let a = 0; a < 16; a++) {
+          const th = (a * Math.PI) / 8;
+          // Off the anchor by the mark's own radius plus `css` CSS px, then measured exactly.
+          const reach = (anchor.r ?? 0) + css / sc.s
+          const x = anchor.x + Math.cos(th) * reach, y = anchor.y + Math.sin(th) * reach;
+          if (x < 4 || y < 4 || x > sc.w - 4 || y > sc.h - 4) continue;
+          const n = nearestOf(layer, x, y);
+          // `sc.s` is CSS px per image px.
+          const dCss = n.dist * sc.s;
+          // A clear winner: the target, 8–14 CSS px off its edge, others at least 4 CSS px further.
+          if (n.index === idx && dCss >= 8 && dCss <= 14 && (n.second - n.dist) * sc.s >= 4) return { x, y, dCss };
+        }
+      }
+      return null;
+    };
+    const fieldValue = async (key, field) => (await inspect(key)).bondAll?.[field] ?? null;
+    const settle = () => new Promise((r) => setTimeout(r, 400));
+    const cdp = await context.newCDPSession(page);
+    const plans = [];
+    for (const t of TOUCH_SPECS) {
+      const spec = meta.find((m) => m.key === t.key);
+      if (!spec) throw new Error(`touch: no kind-sweep spec ${t.key}`);
+      const layer = findLayer(await layersOf(t.key), spec);
+      const sc = await cssScale(t.key);
+      const idx = spec.clickIndex ?? 0;
+      const anchor = layer.kind === "lines"
+        ? { x: layer.geometry[idx][2 * spec.clickSample], y: layer.geometry[idx][2 * spec.clickSample + 1] }
+        : hitPoint(layer, idx);
+      const at = tapPoint(layer, idx, anchor, sc);
+      if (!at) throw new Error(`touch/${t.key}: no spot 8–14 CSS px off element ${idx} with it clearly nearest`);
+      const field = spec.field ?? spec.layerId;
+      // A real mouse click there misses: past the mouse's slack, a one-pick field clears.
+      await page.mouse.click(sc.left + at.x * sc.s, sc.top + at.y * sc.s);
+      await settle();
+      const missed = await fieldValue(t.key, field);
+      if (missed !== null) throw new Error(`touch/${t.key}: a mouse click ${at.dCss.toFixed(1)} CSS px off the mark picked ${JSON.stringify(missed)}; want no pick`);
+      plans.push({ ...t, spec, layer, idx, at, field });
+    }
+    await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+    for (const p of plans) {
+      const sc = await cssScale(p.key);
+      const x = sc.left + p.at.x * sc.s, y = sc.top + p.at.y * sc.s;
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await settle();
+      const v = await fieldValue(p.key, p.field);
+      if (!v || v.index === undefined) throw new Error(`touch/${p.key}: a tap ${p.at.dCss.toFixed(1)} CSS px off element ${p.idx} picked nothing (${JSON.stringify(v)})`);
+      // The envelope names the pick by its 0-based element, or, for a line's point, by its line
+      // and sample (bond.ts's commitClick).
+      const got = p.sample ? v.sample ?? v.index : v.index;
+      const want = p.sample ? p.spec.clickSample : p.idx;
+      if (got !== want) throw new Error(`touch/${p.key}: a tap near element ${p.idx}${p.sample ? ` sample ${want}` : ""} picked ${JSON.stringify(v)}`);
+      passed.push(`${p.key}/touch-nearest`);
+      console.error(`OK  ${p.key} — touch ${p.at.dCss.toFixed(1)} CSS px off the mark picks it; a mouse there misses`);
+    }
+    // An axis readout that answers anywhere (`AxisInteractable` with no bbox, listed last) is a
+    // miss's fallback: a tap near a mark still picks the mark, where a mouse gets the readout.
+    {
+      const pts = (await layersOf("axis")).find((l) => l.id === "pts" && l.kind === "circles");
+      if (!pts) throw new Error("touch/axis: no pts layer");
+      const sc = await cssScale("axis");
+      const before = await fieldValue("axis", "pts");
+      const idx = [0, 1, 2].find((k) => before?.index !== k);
+      const at = tapPoint(pts, idx, hitPoint(pts, idx), sc);
+      if (!at) throw new Error(`touch/axis: no spot 8–14 CSS px off element ${idx} with it clearly nearest`);
+      const x = sc.left + at.x * sc.s, y = sc.top + at.y * sc.s;
+      await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+      await page.mouse.click(x, y);
+      await settle();
+      const mouse = await fieldValue("axis", "pts");
+      if (mouse?.index === idx) throw new Error(`touch/axis: a mouse click ${at.dCss.toFixed(1)} CSS px off element ${idx} picked it; want the axis readout`);
+      await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await settle();
+      const v = await fieldValue("axis", "pts");
+      if (v?.index !== idx) throw new Error(`touch/axis: a tap ${at.dCss.toFixed(1)} CSS px off element ${idx} picked ${JSON.stringify(v)}; want the mark over the axis readout`);
+      passed.push("axis/touch-nearest-over-readout");
+      console.error(`OK  axis — a tap ${at.dCss.toFixed(1)} CSS px off a mark picks it over the axis readout`);
+    }
+    // A bar takes a tap inside it only.
+    {
+      const spec = meta.find((m) => m.key === "barplot");
+      const layer = findLayer(await layersOf("barplot"), spec);
+      const field = spec.field ?? spec.layerId;
+      const idx = spec.clickIndex ?? 0;
+      const b = hitPoint(layer, idx);
+      const sc = await cssScale("barplot");
+      const tap = async (ix, iy) => {
+        const x = sc.left + ix * sc.s, y = sc.top + iy * sc.s;
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await settle();
+        return fieldValue("barplot", field);
+      };
+      // 6 CSS px past its top edge, in empty space: a miss, which clears the field. Then inside:
+      // picked. (In that order: a tap on the bar it already holds would take the pick back.)
+      const top = Math.min(b.y - b.h / 2, b.y + b.h / 2);
+      const outside = await tap(b.x, top - 6 / sc.s);
+      if (outside !== null) throw new Error(`touch/barplot: a tap 6 CSS px above bar ${idx} picked ${JSON.stringify(outside)}; bars are inside-only`);
+      const inside = await tap(b.x, b.y);
+      if (inside?.index !== idx) throw new Error(`touch/barplot: a tap inside bar ${idx} picked ${JSON.stringify(inside)}`);
+      passed.push("barplot/touch-inside-only");
+      console.error("OK  barplot — a tap picks a bar only inside it");
+    }
+    await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
   }
 
   if (unexpected.length) throw new Error(`page errors: ${unexpected.join(" | ")}`);

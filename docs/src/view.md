@@ -50,6 +50,10 @@ data moves inside it, and you can hover over and click the points
 wherever they move to. `pick` changes only when you click a point, and
 the view has no field of its own.
 
+On a touch screen, one finger scrolls the page past the plot, and the
+corner says to use two fingers. Drag with two fingers to pan, and pinch
+to zoom around them. A tap still picks a point.
+
 To zoom on a plain scroll instead, pass `wheel = :always`. The page then
 stops scrolling while the pointer is over the plot. `wheel = :none`
 turns wheel zoom off, and `+` / `-` still zoom from the keyboard. If you
@@ -105,6 +109,23 @@ A double-click on a point is two clicks on the point, so it does not
 move the view. The first click of a double-click on empty space clears
 a single pick, as any click there does.
 
+## Buttons
+
+While the pointer is over a plot you can pan or orbit, small buttons
+show in a corner: zoom in, zoom out, and, once you have moved the view,
+reset. On an `Axis3` they zoom only.
+They also show while the view has keyboard focus, and after you touch
+the plot on a touch screen. They take the corner a legend leaves free,
+and a plot too small for them goes without (drag, the wheel, the keys
+and a double-click still work).
+
+To keep them on screen, or to leave them out:
+
+```julia
+ViewInteractable(ax; controls = :always)  # always shown
+ViewInteractable(ax; controls = :none)    # no buttons
+```
+
 If you use GLMakie, note that Ctrl+click does not reset the view here:
 in a widget, Ctrl+click (Cmd+click on a Mac) adds a mark to a pick.
 
@@ -149,12 +170,14 @@ end
 
 Ctrl+scroll (Cmd+scroll on a Mac) to zoom in or out around the middle of
 the axis box, and Shift+drag to pan. `wheel` works as it does on a 2D
-axis. The box keeps its size while the data grows or slides inside it,
-and marks that leave the box are hidden and no longer respond to hover
-or clicks. A line that crosses the edge of the box still responds along
-the part you can see. A sphere from `meshscatter` stops responding once
-its center leaves the box, even if part of it is still showing. From the
-keyboard, `+` / `-` zoom and Shift with an arrow key pans.
+axis. On a touch screen, drag with two fingers to turn the view and
+pinch to zoom; one finger scrolls the page. The box keeps its size while
+the data grows or slides inside it, and marks that leave the box are
+hidden and no longer respond to hover or clicks. A line that crosses the
+edge of the box still responds along the part you can see. A sphere from
+`meshscatter` stops responding once its center leaves the box, even if
+part of it is still showing. From the keyboard, `+` / `-` zoom and Shift
+with an arrow key pans.
 
 ## Turn several panels together
 

@@ -1,8 +1,10 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, surfaceSelection } from "./selection"
 import { emptyMask, maskHit } from "./gridmask"
+import { touchDown, touchMove, touchUp, touchCancel, keepOnLeave, unpinOnScroll, onTouchMove, onContextMenu, disposeTouch } from "./touch"
 import { applyMove, onLeave, hideTip, hideViewReadout, showViewReadout, syncFocusTip, replaceTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
+import { surfaceTouchAction, touchViews, TOUCH_PAIR_ID, TWO_FINGER_HINT } from "./touchviews"
 import { isApplePlatform, photoHeldByOther, onDown, onUp, onCancel, onLostCapture, onClick, onDoubleClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import { buildDragStops } from "./dragkeys"
@@ -16,6 +18,8 @@ import { limitsTip } from "./drag/view"
 import * as viewDrag from "./drag/view"
 import { createGestureChannel } from "./gesture"
 import { buildControls, CONTROLS_STYLE } from "./controls"
+import { buildViewButtons, VIEW_BUTTONS_STYLE } from "./viewbuttons"
+import type { ViewButtons } from "./viewbuttons"
 import { DEFAULT_SIGDIGITS } from "./template"
 import type { GestureChannel } from "./gesture"
 import type { FrameResponse, RenderFrame } from "./gesture"
@@ -61,7 +65,7 @@ const HI_STYLE = {
 
 const STYLE = `
 :host { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
-.surface { position: absolute; inset: 0; cursor: crosshair; pointer-events: auto; }
+.surface { position: absolute; inset: 0; cursor: crosshair; pointer-events: auto; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .surface.passthrough { pointer-events: none; }
 .surface.hot { cursor: pointer; }
 .surface.grab { cursor: grab; }
@@ -106,7 +110,7 @@ const STYLE = `
   .surface:focus-visible:not(.kbd-ring) { outline-color: Highlight; }
   .drag-stop:focus-visible { outline-color: Highlight; }
 }
-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+svg.masque-fill, svg.masque-edge, svg.masque-plain { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
        clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .masque-enter { animation: masque-in ${MOTION_MS}ms ease-out; }
@@ -342,7 +346,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const shadowHost = document.createElement("div")
     const shadow = shadowHost.attachShadow({ mode: "open" })
     const style = document.createElement("style")
-    style.textContent = STYLE + CONTROLS_STYLE
+    style.textContent = STYLE + CONTROLS_STYLE + VIEW_BUTTONS_STYLE
 
     // Three coordinate-identical top-level <svg>s. The fill svg carries color-dodge (Firefox
     // only honours mix-blend-mode on a top-level svg). The edge svg paints the flat chrome
@@ -468,14 +472,16 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const hiFixed = oneHome({ fill_: makeGroup(fillFixed, "hi"), edge_: makeGroup(edgeFixed, "hi"), plain_: makeGroup(plainFixed, "hi") })
     const surface = document.createElement("div")
     surface.className = "surface"
-    // touch-action: block native scroll/pinch on the surface ONLY when this manifest has a drag
-    // interaction (threshold / ROI / view) — a hover/click-only plot (e.g. a plain scatter) must
-    // not hijack page scrolling when a finger lands on it. A `select = :many` field alone doesn't
-    // count: on a touch screen a finger drag there scrolls the page (the browser cancels the
-    // marquee), so the marquee is a mouse and pen gesture. This has to be decided up front, not
-    // toggled per-pointerdown: UAs resolve touch-action at the touch's first contact, so setting
-    // it later has no effect on the gesture already in flight.
-    if (manifest.layers.some((l) => l.events.includes("drag"))) surface.style.touchAction = "none"
+    // touch-action: a plot with a drag layer (threshold / band / ROI / view) lets a finger scroll
+    // the page (pan-x pan-y) but not pinch-zoom or double-tap-zoom it; touchviews.ts takes a
+    // touch back where there is something to move (#530, #537). A hover/click-only plot keeps
+    // the browser's own. A `select = :many` field alone doesn't count: on a touch screen a finger
+    // drag there scrolls the page (the browser cancels the marquee), so the marquee is a mouse
+    // and pen gesture. This has to be decided up front, not toggled per-pointerdown: UAs resolve
+    // touch-action at the touch's first contact, so setting it later has no effect on the
+    // gesture already in flight.
+    const touchAction = surfaceTouchAction(manifest)
+    if (touchAction) surface.style.touchAction = touchAction
     const tip = document.createElement("div")
     tip.className = "masque-tip"
     tip.setAttribute("role", "tooltip")
@@ -612,7 +618,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // Where the pointer last moved over the plot, so an \`onchange\` frame can redraw its hover.
     let lastMove: PointerEvent | null = null
     const onchangeSettle = (): Record<string, unknown> => ({ onchange: true, state: currentState(), settle: true })
-    const rawChannel = createGestureChannel(requestFrame ?? null, applyFrame, () => { clearPhoto() })
+    // The corner view buttons (#525), built once the ctx exists, on a live channel only.
+    let viewButtons: ViewButtons | null = null
+    const rawChannel = createGestureChannel(requestFrame ?? null, applyFrame, () => { clearPhoto(); viewButtons?.dead_() })
     // A docs player answers `onchange` from frames it harvested at build time, where a live
     // kernel would (docs/pluto_html_export.jl). View gestures still have no kernel there.
     const replay = (window as unknown as { masqueReplayFrame?: RenderFrame }).masqueReplayFrame
@@ -632,16 +640,18 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         if (typeof input.id === "string" && input.reset !== true && input.onchange !== true) state.viewMoved_.add(input.id)
     }
     const channel: GestureChannel = {
-        request(input) { builtAt.set(input, photoFrames); noteMoved(input); route(input.onchange === true).request(input) },
+        request(input) { builtAt.set(input, photoFrames); noteMoved(input); viewButtons?.sync_(); route(input.onchange === true).request(input) },
         settle(input, slot) {
             const ch = route(slot === "onchange")
             // A built-when-sent input is relative to the frame on screen when it is sent.
             if (typeof input === "function") return ch.settle(() => { const o = input(); builtAt.set(o, photoFrames); return o }, slot)
             builtAt.set(input, photoFrames)
             noteMoved(input)
+            viewButtons?.sync_()
             return ch.settle(input, slot)
         },
         dispose() { rawChannel.dispose(); replayChannel?.dispose() },
+        alive: () => rawChannel.alive(),
     }
 
     const fade = createFade({
@@ -875,6 +885,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         newManifest.background ??= ctx.manifest_.background
         newManifest.overlayStyle ??= ctx.manifest_.overlayStyle
         newManifest.tipStyle ??= ctx.manifest_.tipStyle
+        newManifest.touch ??= ctx.manifest_.touch
         const onchangeFrame = input.onchange === true
         // An in-drag \`onchange\` frame trails the pointer by a round trip. Its lines and boxes
         // would pull the control back to where it was then, so the ones on screen stay, with
@@ -998,6 +1009,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             paintPhoto(IDENTITY)
         } else adoptPhoto(input)
         dragStops?.sync_()
+        viewButtons?.layout_()
         if (focused && !state.drag_) {
             const k = ctx.focusable_.findIndex((f) => f.layer_.id === focused.id && f.index_ === focused.index)
             if (k >= 0) focusTo(ctx, state, k)
@@ -1100,6 +1112,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ctx.fade_.refresh_()
         state.surfaceSized_ = false
         replaceTip(ctx, state)
+        viewButtons?.layout_()
     }
     // The axis frame (spines, ticks, labels) stays on the untransformed base. A copy of the
     // same pixels, clipped to the pan view's viewport, carries the matrix, so only the data
@@ -1250,7 +1263,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     window.addEventListener("resize", syncOverlayToBase)
     // Capture: the scroll that moves the figure can be any ancestor's, not just the window's.
-    const onScroll = () => replaceTip(ctx, state)
+    const onScroll = () => { if (!unpinOnScroll(ctx, state)) replaceTip(ctx, state) }
     window.addEventListener("scroll", onScroll, { capture: true, passive: true })
     let overlayFrames = 0
     const overlayTick = () => {
@@ -1259,28 +1272,35 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(overlayTick)
 
-    const down = (e: PointerEvent) => onDown(ctx, state, e)
-    const move = (e: PointerEvent) => { lastMove = e; onPointerMove(ctx, state, e) }
+    // Where a pointer is over the figure, for the corner view buttons (#525).
+    const atButtons = (e: PointerEvent) => viewButtons?.pointer_(layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY), e.pointerType === "touch")
+    const down = (e: PointerEvent) => { if (e.pointerType === "touch") atButtons(e); onDown(ctx, state, e); touchDown(ctx, state, e) }
+    const move = (e: PointerEvent) => { lastMove = e; if (e.pointerType !== "touch") atButtons(e); touchMove(ctx, state, e); onPointerMove(ctx, state, e) }
     const releaseChrome = (kind: string | undefined) => {
         if ((kind === "roi" || kind === "threshold" || kind === "span") && !state.drag_) flushPendingChrome()
     }
     const up = (e: PointerEvent) => {
         const kind = state.drag_?.kind
         onUp(ctx, state, e)
+        // A tap's tooltip stays up; an onchange frame re-shows it from here.
+        if (touchUp(ctx, state, e)) lastMove = e
         releaseChrome(kind)
         dragStops?.sync_()
     }
     const cancel = (e: PointerEvent) => {
         const kind = state.drag_?.kind
         onCancel(ctx, state, e)
+        touchCancel(state, e)
         releaseChrome(kind)
     }
-    const leave = () => {
+    const leave = (e: PointerEvent) => {
+        if (e.pointerType !== "touch" && !viewButtons?.owns_(e.relatedTarget)) viewButtons?.pointer_(null, false)
         // onLeave nulls an uncaptured drag. Capture the kind first or the deferred
         // ROI/threshold frame stays pending with the old nodes still on screen.
         const kind = state.drag_?.kind
-        lastMove = null
-        onLeave(ctx, state)
+        const keep = keepOnLeave(state, e)
+        if (!keep) lastMove = null
+        onLeave(ctx, state, keep)
         releaseChrome(kind)
     }
     const lostCapture = () => {
@@ -1290,6 +1310,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     const click = (e: MouseEvent) => onClick(ctx, state, e)
     const dblclick = (e: MouseEvent) => onDoubleClick(ctx, state, e)
+    const touchmove = (e: TouchEvent) => onTouchMove(state, e)
+    const contextmenu = (e: MouseEvent) => onContextMenu(state, e)
     const keydown = (e: KeyboardEvent) => {
         // A key shows where keys go (pointer-focus). Not a modifier held for Cmd/Ctrl-click, and
         // not a Cmd/Ctrl/Alt chord: undo after a click (#386) or a browser shortcut is not
@@ -1426,15 +1448,19 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const hit = viewAt(g.clientX, g.clientY)
         return hit && hit.wheel !== "none" ? hit : null
     }
+    // A two-finger touch on a view is touchviews.ts's: iOS must not also zoom the page.
+    const touchPair = () => state.drag_?.pointerId_ === TOUCH_PAIR_ID
     const onGestureStart = (e: Event) => {
         // A gesturestart always ends whatever pinch came before, even one whose gestureend
         // never arrived.
         pinchScale = null
+        if (touchesDown > 0 && touchPair()) e.preventDefault()
         if (touchesDown > 0 || !pinchView(e)) return
         e.preventDefault()
         pinchScale = 1
     }
     const onGestureChange = (e: Event) => {
+        if (touchesDown > 0 && touchPair()) e.preventDefault()
         if (pinchScale === null) return
         e.preventDefault()
         const scale = (e as SafariGestureEvent).scale
@@ -1455,6 +1481,21 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         pinchScale = null
     }
 
+    // One finger scrolls past a view and two move it; a finger on a handle holds the page still.
+    const touchHint = () => showNote(TWO_FINGER_HINT, "hint", WHEEL_HINT_MS)
+    const views = touchViews(ctx, state, touchHint)
+    const viewsTouchStart = (e: TouchEvent) => views.start_(e)
+    const viewsTouchMove = (e: TouchEvent) => views.move_(e)
+    const viewsTouchEnd = (e: TouchEvent) => views.end_(e)
+    const viewsTouchCancel = () => views.cancel_()
+    const touchOn = touchAction !== ""
+    if (touchOn) {
+        surface.addEventListener("touchstart", viewsTouchStart, { passive: false })
+        surface.addEventListener("touchmove", viewsTouchMove, { passive: false })
+        surface.addEventListener("touchend", viewsTouchEnd)
+        surface.addEventListener("touchcancel", viewsTouchEnd)
+        window.addEventListener("blur", viewsTouchCancel)
+    }
     surface.addEventListener("pointerdown", down)
     surface.addEventListener("wheel", onWheel, { passive: false })
     surface.addEventListener("gesturestart", onGestureStart)
@@ -1470,10 +1511,16 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     surface.addEventListener("lostpointercapture", lostCapture)
     surface.addEventListener("click", click)
     surface.addEventListener("dblclick", dblclick)
+    surface.addEventListener("touchmove", touchmove, { passive: false })
+    surface.addEventListener("contextmenu", contextmenu)
     surface.addEventListener("keydown", keydown)
     surface.addEventListener("focusout", focusout)
     // After the surface in the shadow root, so Tab reaches the plot first, then each drag layer.
     dragStops = buildDragStops(ctx, state, shadow)
+    if (channel.alive()) viewButtons = buildViewButtons(ctx, state, shadow, () => {
+        const w = ctx.base_.getBoundingClientRect().width
+        return w > 0 ? ctx.manifest_.width / w : ctx.manifest_.scaling || 1
+    })
 
     // Drawn into g.sel, not g.hi: it must survive hovers (onMove clears g.hi on every miss)
     // and support multiple selected indices (drawHi keeps only the last).
@@ -1487,6 +1534,15 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         cleaned = true
         loadToken += 1
         controls.remove_()
+        if (touchOn) {
+            surface.removeEventListener("touchstart", viewsTouchStart)
+            surface.removeEventListener("touchmove", viewsTouchMove)
+            surface.removeEventListener("touchend", viewsTouchEnd)
+            surface.removeEventListener("touchcancel", viewsTouchEnd)
+            window.removeEventListener("blur", viewsTouchCancel)
+            views.cancel_()
+        }
+        viewButtons?.remove_()
         surface.removeEventListener("pointerdown", down)
         surface.removeEventListener("wheel", onWheel)
         surface.removeEventListener("gesturestart", onGestureStart)
@@ -1502,6 +1558,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         surface.removeEventListener("lostpointercapture", lostCapture)
         surface.removeEventListener("click", click)
         surface.removeEventListener("dblclick", dblclick)
+        surface.removeEventListener("touchmove", touchmove)
+        surface.removeEventListener("contextmenu", contextmenu)
+        disposeTouch(state)
         surface.removeEventListener("keydown", keydown)
         surface.removeEventListener("focusout", focusout)
         dragStops?.cleanup_()

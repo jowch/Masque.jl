@@ -7,7 +7,7 @@ import { emptyMask, encodeMask, maskCount, maskHit, setBlock } from "./gridmask"
 import { hasRegions, regionCells, regionOf, setRegionsOf } from "./regions"
 import { clickRows, groupEnvelope, groupOf, groupSelection, legendEntryHeld, rowOf, rowsOfMarks } from "./linked"
 import type { GridMask, MaskEnvelope } from "./gridmask"
-import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
+import { layoutImagePx, touchReach, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, FieldPick, FieldSelection, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
@@ -30,14 +30,14 @@ function tryCapture(surface: HTMLElement, pointerId: number): void {
     }
 }
 
-function shownViewTransform(ctx: OverlayCtx, id: string, fallback: AxisTransform): AxisTransform {
+export function shownViewTransform(ctx: OverlayCtx, id: string, fallback: AxisTransform): AxisTransform {
     const layer = ctx.manifest_.layers.find((l) => l.id === id)
     return layer ? ctx.manifest_.transforms[layer.axis] ?? fallback : fallback
 }
 
 // Returns whether a live wheel-idle timer was cleared. That timer is the only
 // settle:true a notch has, so the caller owes a settle of the current photo.
-function clearWheelTimer(state: OverlayState): boolean {
+export function clearWheelTimer(state: OverlayState): boolean {
     if (state.wheelTimer_ === null) return false
     clearTimeout(state.wheelTimer_)
     state.wheelTimer_ = null
@@ -119,7 +119,7 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
         text = thresholdDrag.move(d, content, ctx.tipDigits_, ctx.tipExplicit_)
         if (liveDrag(ctx, d.id_)) requestState(ctx, { [d.id_]: thresholdDrag.envelopeAt(d, content) })
     } else if (d.kind === "span") {
-        text = spanDrag.move(d, content, ctx.tipDigits_)
+        text = spanDrag.move(d, content, ctx.tipDigits_, ctx.tipExplicit_)
         if (liveDrag(ctx, d.id_)) requestState(ctx, { [d.id_]: spanDrag.envelope(d) })
     } else if (d.kind === "view") {
         if (d.g_.mode === "orbit") {
@@ -283,7 +283,9 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             return
         }
     }
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_, slop)
+    // A finger grabs a handle by its larger grab area (#530).
+    const finger = touchReach(ctx.base_, ctx.manifest_, e.pointerType)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_, slop, finger)
     // A marquee: a drag on a plot with no view, or Alt-drag on any plot, where a field holds
     // several picks. A threshold line or an ROI box under the press still takes the drag.
     if (!hit || (hit.layer.kind === "view" && e.altKey)) {
@@ -336,6 +338,8 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             state.drag_ = roiDrag.begin(hit.layer.id, box, { corner: k }, opp[0], opp[1], e.pointerId)
         }
     } else if (hit.layer.kind === "view") {
+        // One finger scrolls the page past a view; two move it (touchviews.ts, #537).
+        if (finger) return
         const g = hit.layer.geometry as ViewGeometry
         if (g.mode === "pan" && photoHeldByOther(state, hit.layer.id)) { e.preventDefault(); return }
         state.drag_ = viewDrag.begin(hit.layer.id, g, ctx.manifest_.transforms[hit.layer.axis], layout.x, layout.y, e.pointerId)
@@ -349,7 +353,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
 
 export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): void {
     cancelPendingMove(state)
-    state.lastUp_ = e.button === 0 ? { x: e.clientX, y: e.clientY } : null
+    state.lastUp_ = e.button === 0 ? { x: e.clientX, y: e.clientY, type_: e.pointerType } : null
     const d = state.drag_
     // Ignore a pointer that isn't the one that owns this drag (e.g. a second touch lifting
     // first) — without this, any pointer's up committed and ended whichever drag happened
@@ -779,11 +783,12 @@ function axesAt(ctx: OverlayCtx, x: number, y: number): string[] {
 // Where a click landed. Chromium rounds a click's clientX/Y to whole px, while the pointer
 // events hover reads keep the fraction, so a readout click off its pointerup would commit up to
 // half a px from the value the tooltip shows (#448). The pointerup this click follows keeps it.
-function clickPoint(state: OverlayState, e: MouseEvent): { x: number, y: number } {
+// Its pointer type comes from that pointerup too: not every browser's click says it.
+function clickPoint(state: OverlayState, e: MouseEvent): { x: number, y: number, type_: string } {
     const up = state.lastUp_
     state.lastUp_ = null
     if (up && Math.abs(up.x - e.clientX) < 1 && Math.abs(up.y - e.clientY) < 1) return up
-    return { x: e.clientX, y: e.clientY }
+    return { x: e.clientX, y: e.clientY, type_: (e as PointerEvent).pointerType ?? up?.type_ ?? "mouse" }
 }
 
 export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {
@@ -794,14 +799,16 @@ export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): vo
     state.plainClicks_ += 1
     const layout = layoutImagePx(ctx.base_, ctx.manifest_, at.x, at.y)
     const slop = slopScale(ctx.manifest_, ctx.base_.getBoundingClientRect().width)
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_, slop)
+    // A finger picks the nearest mark within its reach (#528).
+    const touch = touchReach(ctx.base_, ctx.manifest_, at.type_)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_, slop, touch)
     if (!hit) {
         // A click on an empty part of a plot clears the one-pick fields there; a `many` field
         // keeps its picks, since a near miss among many small marks is the likeliest slip and
         // Escape clears them (#384). A mark that only shows a tooltip isn't empty space, and a
         // Cmd/Ctrl-click that misses keeps the picks, as a modified miss does in a file browser.
         if (isToggleClick(e)) return
-        if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_, slop)) return
+        if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_, slop, touch)) return
         // A click inside an opaque legend that takes no clicks is on the legend too (#472).
         if (ctx.manifest_.occluders?.some(([bx, by, bw, bh]) => layout.x >= bx && layout.x <= bx + bw && layout.y >= by && layout.y <= by + bh)) return
         const axes = axesAt(ctx, layout.x, layout.y)

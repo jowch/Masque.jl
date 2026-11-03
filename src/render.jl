@@ -182,13 +182,18 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         "events" => [string(e) for e in L.events],
         "style" => style,
     )
-    # The coordinate fields Masque filled in (`_merge_payloads`): the default tooltip prints
-    # them in the axis's format (#510).
+    # The fields Masque filled in that are measured along an axis (`_merge_payloads`), each
+    # with that axis: the default tooltip prints them in the axis's format (#510, #543).
     ck = _coord_keys(L.payloads)
-    isempty(ck) || (d["coords"] = String[string(k) for k in ck])
+    isempty(ck) || (d["coords"] = Dict{String, String}(string(k) => string(dim) for (k, dim) in ck))
     if L.kind in (:segments, :polyline, :lines, :rects, :polygons)
         t = hit_tol(i)
         t === nothing || (d["tol"] = round(Int, t * ctx.scaling))
+    end
+    if L.kind in (:circles, :segments, :polyline, :lines)
+        # CSS px, as `masque`'s `touch`: the overlay scales a finger's reach to the screen.
+        r = touch_radius(i)
+        r === nothing || (d["touch"] = r)
     end
     if L.kind in (:segments, :polyline, :lines)
         # A layer built from bare vertices has no plot to read: Makie's default line width.
@@ -480,6 +485,7 @@ function build_manifest(
         interactables, ctx::InteractionContext;
         selected = nothing, tip_style = nothing, tip_digits = nothing, background = nothing,
         overlay_style = nothing, owners_out = nothing, suspend_surfaces = false, with_initial = true,
+        touch = nothing,
     )
     plan = interactables
     # A threshold or box with no start takes it from the limits. `masque` sets it once at mount;
@@ -597,6 +603,8 @@ function build_manifest(
     # Sent only when the user set it: a set `tooltip_sigdigits` outranks a Makie format string's
     # precision, and Masque's default does not (#510).
     tip_digits === nothing || (m["tipDigits"] = tip_digits)
+    # Sent only when the user set it; the overlay's default radius is 16 CSS px (#528).
+    touch === nothing || (m["touch"] = touch)
     background === nothing || (m["background"] = _css_color(background))
     # An axis whose empty plot area is not the figure's colour ships that colour as `fill`: the
     # selected look fades unpicked marks toward it (#394).
@@ -803,6 +811,17 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   `2 * min(figure width, max_width) / figure width`, so the picture is twice the width it
   shows at. A larger number gives a sharper, heavier picture. Neither this
   nor `max_width` follows `CairoMakie.activate!` or `WGLMakie.activate!`.
+- `touch` — how a finger picks a mark. A touch picks the nearest point or line whose drawn
+  edge is within `radius` CSS px of the finger, rather than only the one under it, as a mouse
+  does; bars, polygons and heatmap cells take a touch inside them. `touch = (; radius = 8)`
+  sets the radius (default 16), `(; radius = 0)` picks only what the finger lands on, and
+  `touch = false` gives a finger the mouse's rule. A layer's own `touch_radius` (see
+  [`interactables`](@ref)) wins over it. A finger takes a threshold line or a band edge within
+  the same radius, and an ROI grip anywhere in a 44 CSS px square around it; elsewhere on the
+  plot it scrolls the page. On a [`ViewInteractable`](@ref), one finger scrolls the page and
+  two fingers pan, pinch-zoom or (on an `Axis3`) orbit the view. `touch = false` gives a finger
+  the mouse's reach on marks and handles; views still take two fingers. A mouse or a pen is never
+  affected, so a touchscreen laptop keeps the mouse's precision. Default `true`.
 - `tooltip_sigdigits` — significant figures for a tooltip number that has no format spec.
   Unset, it is 4, so `0.30000000000000004` shows as `0.3` and `2.71828` as `2.718`;
   integers, and the whole-number part of a value at or above `10^tooltip_sigdigits`, show in
@@ -859,6 +878,22 @@ _as_figure(x) = throw(
     ),
 )
 
+# `masque(...; touch)` as the manifest's `touch`: `nothing` for the default (sent as nothing),
+# `false` for a finger that hits as a mouse does, or `{radius}` in CSS px.
+_touch_dict(t::Bool) = t ? nothing : false
+function _touch_dict(t::NamedTuple)
+    for k in keys(t)
+        k === :radius || throw(ArgumentError("masque: `touch` takes the key `radius`, got `$k`"))
+    end
+    haskey(t, :radius) || return nothing
+    r = t.radius
+    r isa Real && isfinite(r) && r >= 0 ||
+        throw(ArgumentError("masque: `touch.radius` must be a finite number of CSS px, at least 0; got $(repr(r))"))
+    return Dict{String, Any}("radius" => Float64(r))
+end
+_touch_dict(t) = throw(ArgumentError("masque: `touch` must be `true`, `false`, or a NamedTuple such as `(; radius = 16)`; got $(repr(t))"))
+
+
 _check_onchange(f) = f === nothing || f isa Function || throw(
     ArgumentError("masque: `onchange` must be a function of the widget's state, `state -> …`, got $(typeof(f))"),
 )
@@ -866,9 +901,10 @@ _check_onchange(f) = f === nothing || f isa Function || throw(
 function _masque(
         fig, interactables::AbstractVector; backend::Union{Nothing, Symbol, AbstractBackend} = nothing,
         max_width = nothing, px_per_unit = nothing, selected = nothing, onchange = nothing,
-        tooltipstyle = nothing, tooltip_sigdigits = nothing, overlaystyle = nothing,
+        tooltipstyle = nothing, tooltip_sigdigits = nothing, overlaystyle = nothing, touch = true,
     )
     tip_digits = _check_sigdigits(tooltip_sigdigits)
+    touch = _touch_dict(touch)
     _check_onchange(onchange)
     interactables = _with_onchange(interactables, onchange)
     tip_style = tip_style_dict(tooltipstyle)
@@ -891,7 +927,7 @@ function _masque(
         owners_out = Ref(Dict{String, LayerOwner}())
         build() = build_manifest(
             interactables, ctx; selected, tip_style, tip_digits,
-            background = fig.scene.backgroundcolor[], overlay_style, owners_out,
+            background = fig.scene.backgroundcolor[], overlay_style, owners_out, touch,
         )
         manifest = build()
         if onchange !== nothing

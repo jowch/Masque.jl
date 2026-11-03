@@ -8,7 +8,7 @@ import { linkedHits } from "./selection"
 import { surfaceFields } from "./surface"
 import { cancel as cancelMarquee } from "./drag/marquee"
 import { hasRegions, regionOf } from "./regions"
-import { cssAnchor, layoutImagePx, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
+import { cssAnchor, layoutImagePx, touchReach, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { OverlayCtx, OverlayState } from "./state"
 import type { AxisTransform, Hit, HitLayer, Manifest, SliceGeometry, SpanGeometry, ThresholdGeometry } from "./types"
 
@@ -450,7 +450,9 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
         return
     }
     setDragHoverChrome(ctx, state, null)
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_, slop)
+    // A finger picks the nearest mark within its reach (#528); a mouse or a pen, the one under it.
+    const touch = touchReach(ctx.base_, ctx.manifest_, (e as PointerEvent).pointerType)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_, slop, touch)
     // The axis frame does not slide, so the viewport and the hair are layout pixels.
     // The sample is the point on the slice axis's pixels under the cursor, so the value
     // follows its slid series.
@@ -554,12 +556,15 @@ export function onMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): voi
     })
 }
 
-export function onLeave(ctx: OverlayCtx, state: OverlayState): void {
+// `keep`: a finger's tap ends with pointerleave, and what it showed stays up (touch.ts).
+export function onLeave(ctx: OverlayCtx, state: OverlayState, keep = false): void {
     cancelPendingMove(state)
-    if (!restoreFocus(ctx, state)) { clearHover(ctx, state, true); clearLegendLink(ctx, state, true); hideTip(ctx, state) }
-    ctx.surface_.classList.remove("hot")
-    hideCross(ctx, state)
-    setDragHoverChrome(ctx, state, null)
+    if (!keep) {
+        if (!restoreFocus(ctx, state)) { clearHover(ctx, state, true); clearLegendLink(ctx, state, true); hideTip(ctx, state) }
+        ctx.surface_.classList.remove("hot")
+        hideCross(ctx, state)
+        setDragHoverChrome(ctx, state, null)
+    }
     // Fallback for tryCapture's uncaptured path: without real capture, leaving the surface
     // fires pointerleave (capture would otherwise suppress it until release), and the
     // pointermove/pointerup that follow off-element never reach these listeners — so drag

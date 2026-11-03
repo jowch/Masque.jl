@@ -1414,6 +1414,24 @@ end
         @test !haskey(pairs(pi.payloads[1]), :index)
         ints = interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
+        # A horizontal violin's category runs along y (#558). Values near 10 put the outlines'
+        # x extent far from every category, so reading x would name category 3 for all three.
+        fh = Figure(); ah = Axis(fh[1, 1])
+        violin!(ah, repeat([1, 2, 3], inner = 80), 10 .+ randn(240); orientation = :horizontal)
+        Makie.update_state_before_display!(fh)
+        ph = PolygonInteractable(ah, ah.scene.plots[1]; id = :violin)
+        @test [pl.y for pl in ph.payloads] == [1.0, 2.0, 3.0]
+        @test all(pl -> !haskey(pl, :x), ph.payloads)
+        @test Masque._coord_keys(ph.payloads) == [:y => :y]   # follows the y axis's tick format
+        # A raincloud nudges its violin off the categories; the payload names the category (#564).
+        for orientation in (:vertical, :horizontal)
+            fr = Figure(); ar = Axis(fr[1, 1])
+            rainclouds!(ar, repeat([1, 2], inner = 30), randn(60); orientation)
+            Makie.update_state_before_display!(fr)
+            v = only(filter(i -> i.id === :violin, interactables(fr)))
+            k = orientation === :horizontal ? :y : :x
+            @test [getproperty(pl, k) for pl in v.payloads] == [1.0, 2.0]
+        end
     end
 
     @testset "Voronoiplot extraction" begin

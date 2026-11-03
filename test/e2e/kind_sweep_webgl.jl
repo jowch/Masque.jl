@@ -514,6 +514,26 @@ HTML(
         "<span id=\"coords_violin\" style=\"display:none\">$(JSON3.write(sweep.violin.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000549
+@bind ev_violin_h sweep.violin_h
+
+# ╔═╡ d1000000-0000-0000-0000-00000000054a
+HTML(
+    "<span id=\"out_violin_h\">VIOLIN_H=$(sweep_field("violin_h", ev_violin_h))</span>" *
+        "<span id=\"bond_violin_h\" style=\"display:none\">$(repr(ev_violin_h))</span>" *
+        "<span id=\"coords_violin_h\" style=\"display:none\">$(JSON3.write(sweep.violin_h.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000054b
+@bind ev_raincloud sweep.raincloud
+
+# ╔═╡ d1000000-0000-0000-0000-00000000054c
+HTML(
+    "<span id=\"out_raincloud\">RAINCLOUD=$(sweep_field("raincloud", ev_raincloud))</span>" *
+        "<span id=\"bond_raincloud\" style=\"display:none\">$(repr(ev_raincloud))</span>" *
+        "<span id=\"coords_raincloud\" style=\"display:none\">$(JSON3.write(sweep.raincloud.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000111
 @bind ev_stairs sweep.stairs
 
@@ -812,6 +832,16 @@ HTML(
     "<span id=\"out_view3d\">VIEW3D=$(sweep_field("view3d", ev_view3d))</span>" *
         "<span id=\"bond_view3d\" style=\"display:none\">$(repr(ev_view3d))</span>" *
         "<span id=\"coords_view3d\" style=\"display:none\">$(JSON3.write(sweep.view3d.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000525
+@bind ev_view_dark sweep.view_dark
+
+# ╔═╡ d1000000-0000-0000-0000-000000000526
+HTML(
+    "<span id=\"out_view_dark\">VIEW_DARK=$(sweep_field("view_dark", ev_view_dark))</span>" *
+        "<span id=\"bond_view_dark\" style=\"display:none\">$(repr(ev_view_dark))</span>" *
+        "<span id=\"coords_view_dark\" style=\"display:none\">$(JSON3.write(sweep.view_dark.manifest["layers"]))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000152
@@ -1184,6 +1214,10 @@ HTML(
 # ╠═d1000000-0000-0000-0000-00000000010e
 # ╠═d1000000-0000-0000-0000-00000000010f
 # ╠═d1000000-0000-0000-0000-000000000110
+# ╠═d1000000-0000-0000-0000-000000000549
+# ╠═d1000000-0000-0000-0000-00000000054a
+# ╠═d1000000-0000-0000-0000-00000000054b
+# ╠═d1000000-0000-0000-0000-00000000054c
 # ╠═d1000000-0000-0000-0000-000000000111
 # ╠═d1000000-0000-0000-0000-000000000112
 # ╠═d1000000-0000-0000-0000-0000000000b5
@@ -1240,6 +1274,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000175
 # ╠═d1000000-0000-0000-0000-000000000115
 # ╠═d1000000-0000-0000-0000-000000000116
+# ╠═d1000000-0000-0000-0000-000000000525
+# ╟─d1000000-0000-0000-0000-000000000526
 # ╠═d1000000-0000-0000-0000-000000000152
 # ╠═d1000000-0000-0000-0000-000000000153
 # ╠═d1000000-0000-0000-0000-000000000202

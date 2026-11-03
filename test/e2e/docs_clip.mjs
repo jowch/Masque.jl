@@ -287,17 +287,28 @@ const CLIPS = {
     },
   },
   // The two short loops on Pan and orbit show only the figure. The pointer rests on the `grab`
-  // point (a fraction of the figure) and every drag ends there on the view it started from, so
-  // the last frame matches the first and the clip loops cleanly.
+  // point (a fraction of the figure) and each clip ends there on the view it started from, with
+  // the corner buttons as they were, so the last frame matches the first and the clip loops
+  // cleanly.
   "view-pan": {
     notebook: "view_pan_notebook.jl", nn: 10, figure: true, grab: [0.45, 0.5],
     async run(c) {
-      // Pan the points to the right and back.
+      // Pan the points to the right, then press reset. A pan dragged back by hand stops a
+      // rounding error away from where it began, so the reset button would stay up and the
+      // loop would jump when it starts over.
       const a = { ...c.rest };
       await c.page.mouse.down();
       await c.glide({ x: a.x + 110, y: a.y - 25 }, 900, 30);
-      await c.glide(a, 900, 30);
       await c.page.mouse.up();
+      await sleep(500);
+      const r = await c.page.locator(".masque-vb-reset").boundingBox();
+      if (!r) throw new Error("no reset button after the pan");
+      const reset = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      await c.glide(reset, 800, 30);
+      await sleep(250);
+      await c.click(reset);
+      await sleep(700);
+      await c.glide(a, 800, 30);
     },
   },
   "view-orbit": {
@@ -644,6 +655,10 @@ try {
   if (lastSig !== startSig) throw new Error("the reset did not bring back the notebook's first state");
   console.error(`phase: warmed up in ${((Date.now() - w0) / 1000).toFixed(1)}s`);
 
+  // The pointer is over the figure before the first frame, so the clip opens with the corner
+  // buttons already shown, as its last frame has them, not fading in.
+  await page.mouse.move(cur.x, cur.y);
+  if (spec.grab) await sleep(600);
   const frames = [];
   const t0 = Date.now();
   let done = false;
@@ -660,7 +675,6 @@ try {
     }
   })().catch((e) => { if (!done) throw e; });
 
-  await page.mouse.move(cur.x, cur.y);
   if (spec.grab) {
     await sleep(500);
     const first = firstFrameMs(page, await gestureStamp(page));
