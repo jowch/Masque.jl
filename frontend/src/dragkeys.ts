@@ -1,14 +1,14 @@
 import { invertAxis, matrixLimits, panLimits3, projectAxis } from "./geometry"
 import { hideTip, hideViewReadout, showViewReadout, placeTip, setMarkAccent, setTipText, setTipVisible } from "./hover"
 import { scheduleAnnounce } from "./keyboard"
-import { resetView, settleCurrentPan } from "./bond"
+import { photoHeldByOther, resetView, settleCurrentPan } from "./bond"
 import { fmtCoord } from "./template"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as spanDrag from "./drag/span"
 import * as viewDrag from "./drag/view"
-import { mapPoint, unmapPoint, wheelScale, zoomAt } from "./photo"
+import { mapPoint, unmapPoint, wheelScale, zoomAt, ZOOM_NOTCH } from "./photo"
 import type { HitLayer, Limits3, SpanGeometry, ThresholdGeometry, ViewGeometry } from "./types"
 
 // Keyboard path for the drag kinds (#169). Each drag layer gets its own tab stop after
@@ -20,7 +20,6 @@ import type { HitLayer, Limits3, SpanGeometry, ThresholdGeometry, ViewGeometry }
 const STEP_CSS = 1
 const PAGE_CSS = 10
 const VIEW_STEP = 0.1 // fraction of the axis viewport per arrow press, pan and orbit alike
-const ZOOM_NOTCH = 100 // one wheel notch, in wheelScale's pixel units
 
 const NUDGE_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", "+", "=", "-", "_", "0"])
 
@@ -222,10 +221,10 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                 if (a === b && e.shiftKey) return true
                 const edge = far === g.lo ? "lo" : "hi"
                 d = spanDrag.begin(id, band, { edge }, 0, -1) as typeof d
-                text = spanDrag.move(d, at(far + (e.shiftKey ? -dp : dp)), ctx.tipDigits_)
+                text = spanDrag.move(d, at(far + (e.shiftKey ? -dp : dp)), ctx.tipDigits_, ctx.tipExplicit_)
             } else {
                 d = spanDrag.begin(id, band, { move: true }, 0, -1) as typeof d
-                text = spanDrag.move(d, at(dp), ctx.tipDigits_)
+                text = spanDrag.move(d, at(dp), ctx.tipDigits_, ctx.tipExplicit_)
             }
             place()
             showReadout(text)
@@ -326,6 +325,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                 pending = () => { state.keyView_ = false; ctx.gesture_.settle({ ...input, settle: true }) }
                 return true
             }
+            if (photoHeldByOther(state, id)) return true
             const d = viewDrag.begin(id, g, t, g.x + g.w / 2, g.y + g.h / 2, -1) as Extract<Drag, { kind: "view" }>
             // A live wheel-idle timer was that notch's only settle. The keyup settle below
             // covers the current photo, so the timer can go.

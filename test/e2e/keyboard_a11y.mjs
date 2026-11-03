@@ -232,6 +232,7 @@ try {
     return t;
   };
 
+  let firstValue = true;
   for (const key of ["scatter", "barplot", "poly"]) {
     const layers = await layersOf(key);
     const layer = layers[0];
@@ -302,10 +303,17 @@ try {
     const delta = target - landed;
     const stepKey = delta >= 0 ? "ArrowRight" : "ArrowLeft";
     for (let i = 0; i < Math.abs(delta); i++) await page.keyboard.press(stepKey);
+    const t0 = Date.now();
     await page.keyboard.press("Enter");
+    // The session's first value is the slow one: on CI it came back after 1.3 s (:cairo) and
+    // 6.1 s (:webgl), every later one in about 0.1 s (#567). It does arrive, so it gets 15 s;
+    // the rest keep 4 s. Every round trip is logged, so a growing first one stays visible.
+    const budget = firstValue ? 150 : 40;
+    firstValue = false;
     let after = before;
-    for (let i = 0; i < 40 && after === before; i++) { await page.waitForTimeout(100); after = await textOf(`#out_${key}`); }
-    if (after === before) throw new Error(`${key}: Enter never updated #out_${key} (wire index ${target}, was ${beforeWire})`);
+    for (let i = 0; i < budget && after === before; i++) { await page.waitForTimeout(100); after = await textOf(`#out_${key}`); }
+    console.error(`${key}: Enter round trip ${Date.now() - t0} ms`);
+    if (after === before) throw new Error(`${key}: Enter never updated #out_${key} in ${budget / 10} s (wire index ${target}, was ${beforeWire})`);
     const idRe = new RegExp(`:${layer.id}|${layer.id}`, "i");
     if (!idRe.test(after)) throw new Error(`${key}: Enter bond value missing layer id: ${after.slice(0, 200)}`);
     if (!new RegExp(`:${layer.id},\\s*${target + 1}\\b`).test(after)) {

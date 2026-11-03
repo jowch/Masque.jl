@@ -255,7 +255,7 @@ function _shift_data_markers(ax, i::PointInteractable, mo)
         Point3f(d[1], d[2], ax isa Makie.Axis3 ? d[3] : x[3])
     end
     return PointInteractable(
-        i.ax, pts, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.billboard, i.select,
+        i.ax, pts, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.billboard, i.select, i.touch_radius,
     )
 end
 function _marker_offset_vec(mo, n)
@@ -272,10 +272,10 @@ function _warn_no_inverse(id)
     return nothing
 end
 _with_offset(i::PointInteractable, o) = PointInteractable(
-    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, o, i.stroke, i.billboard, i.select,
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, o, i.stroke, i.billboard, i.select, i.touch_radius,
 )
 _with_billboard(i::PointInteractable) = PointInteractable(
-    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke, true, i.select,
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke, true, i.select, i.touch_radius,
 )
 # On an Axis3, Makie adds a `markerspace = :data` scatter's `marker_offset` after the scene's
 # model, in the axis box's units, so where a marker lands in data depends on the current
@@ -290,7 +290,7 @@ function _check_billboard_offset(p, n)
     )
 end
 _with_marker_stroke(i::PointInteractable, s) = PointInteractable(
-    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, s, i.billboard, i.select,
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, s, i.billboard, i.select, i.touch_radius,
 )
 
 # A `markerspace = :data` scatter on an Axis3 draws camera-facing markers `markersize` wide in
@@ -480,6 +480,11 @@ function _bar_rects(p)
     error("BarPlot introspection: no laid-out rectangles found in child plots (Makie internals changed?)")
 end
 # Value-axis extent is keyed by bar `direction` (:y default runs along y, :x along x).
+# A bar's, box's or span's default fields are measured along one axis (#543): the value axis
+# of a bar, hist, waterfall, box or crossbar, the bin axis for a hist's `low`/`high`.
+_value_dim(vertical::Bool) = vertical ? :y : :x
+_along(dim, ks::Symbol...) = NamedTuple{ks}(ntuple(_ -> dim, length(ks)))
+
 function _bar_payloads(rects, direction)
     vert = direction === :y
     return Any[
@@ -492,7 +497,7 @@ function _bar_payloads(rects, direction)
 end
 function RectInteractable(ax, p::Makie.BarPlot; id = :bars, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     rs = _bar_rects(p)
-    pl = _merge_payloads(_bar_payloads(rs, p.direction[]), payloads, "RectInteractable")
+    pl = _merge_payloads(_bar_payloads(rs, p.direction[]), payloads, "RectInteractable"; dims = _along(_value_dim(p.direction[] === :y), :low, :high, :value))
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 
@@ -783,7 +788,8 @@ function _boxplot_interactable(ax, p; id = :boxplot, payloads = nothing, kw...)
     boxpoly = _childof(node, Makie.Poly)
     geom = _conv(boxpoly)[1]
     who = eltype(geom) <: _GB.HyperRectangle ? "RectInteractable" : "PolygonInteractable"
-    pl = _merge_payloads(_boxplot_payloads(_conv(node)), payloads, who)
+    dim = _value_dim(p.orientation[] !== :horizontal)
+    pl = _merge_payloads(_boxplot_payloads(_conv(node)), payloads, who; dims = _along(dim, :q1, :median, :q3))
     if eltype(geom) <: _GB.HyperRectangle
         rects = [(r.origin[1] + r.widths[1] / 2, r.origin[2] + r.widths[2] / 2, r.widths[1], r.widths[2]) for r in geom]
         return RectInteractable(ax, rects; id, payloads = pl, kw...)
@@ -822,11 +828,11 @@ function SegmentInteractable(ax, p::Makie.Stairs; id = :stairs, payloads = nothi
     return _with_linewidth(_with_samples(i, p.step[], [[_pt3d(v) for v in _converted(p)[1]]]), p)
 end
 _with_samples(i::SegmentInteractable, step, paths) = SegmentInteractable(
-    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, (step, paths), i.select, i.linewidth,
+    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, (step, paths), i.select, i.linewidth, i.touch_radius,
 )
 # The plot's drawn line width, carried for the overlay's line fade.
 _with_linewidth(i::SegmentInteractable, p) = SegmentInteractable(
-    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, i.samples, i.select, _line_width(p),
+    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, i.samples, i.select, _line_width(p), i.touch_radius,
 )
 
 # Each child line (or a ScatterLines child's line, when markers are on) is one element.
@@ -988,13 +994,16 @@ end
 function RectInteractable(ax, p::Makie.Hist; id = :hist, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     bar = _childof(p, Makie.BarPlot)
     rs = _bar_rects(bar)
-    pl = _merge_payloads(_hist_payloads(rs, bar.direction[]), payloads, "RectInteractable")
+    vert = bar.direction[] === :y
+    dims = (; value = _value_dim(vert), _along(_value_dim(!vert), :low, :high)...)
+    pl = _merge_payloads(_hist_payloads(rs, bar.direction[]), payloads, "RectInteractable"; dims)
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 function RectInteractable(ax, p::Makie.Waterfall; id = :waterfall, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     bar = _childof(p, Makie.BarPlot)
     rs = _bar_rects(bar)
-    pl = _merge_payloads(_waterfall_payloads(p, rs), payloads, "RectInteractable")
+    # Waterfall has no `direction`: its bars always stand on y.
+    pl = _merge_payloads(_waterfall_payloads(p, rs), payloads, "RectInteractable"; dims = _along(:y, :low, :high, :value))
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 
@@ -1023,12 +1032,12 @@ function _span_rects(ax, p, full::Symbol)
 end
 function RectInteractable(ax, p::Makie.HSpan; id = :hspan, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     rs = _span_rects(ax, p, :x)
-    pl = _merge_payloads(_span_payloads(p), payloads, "RectInteractable")
+    pl = _merge_payloads(_span_payloads(p), payloads, "RectInteractable"; dims = _along(:y, :low, :high))
     return _rect_with_resolve(ax, rs, id, pl, true, _ax -> _span_rects(_ax, p, :x); tooltip, label)
 end
 function RectInteractable(ax, p::Makie.VSpan; id = :vspan, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     rs = _span_rects(ax, p, :y)
-    pl = _merge_payloads(_span_payloads(p), payloads, "RectInteractable")
+    pl = _merge_payloads(_span_payloads(p), payloads, "RectInteractable"; dims = _along(:x, :low, :high))
     return _rect_with_resolve(ax, rs, id, pl, true, _ax -> _span_rects(_ax, p, :y); tooltip, label)
 end
 
@@ -1038,7 +1047,8 @@ function _crossbar_payloads(p)
 end
 function RectInteractable(ax, p::Makie.CrossBar; id = :crossbar, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     rs = _bar_rects(p)
-    pl = _merge_payloads(_crossbar_payloads(p), payloads, "RectInteractable")
+    dims = _along(_value_dim(p.orientation[] !== :horizontal), :midpoint, :low, :high)
+    pl = _merge_payloads(_crossbar_payloads(p), payloads, "RectInteractable"; dims)
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 
@@ -1309,7 +1319,7 @@ function _place(i::PointInteractable, f)
         [f.place(i.points[k], offs[k]) for k in eachindex(i.points)]
     end
     return PointInteractable(
-        i.ax, pts, i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.billboard, i.select,
+        i.ax, pts, i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.billboard, i.select, i.touch_radius,
     )
 end
 function _place(i::SegmentInteractable, f)

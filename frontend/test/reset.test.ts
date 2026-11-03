@@ -197,3 +197,29 @@ describe("reset a moved view (#524)", () => {
         expect(calls.filter((i) => i.settle === true && i.reset !== true)).toHaveLength(0)
     })
 })
+
+describe("reset with nested views (#559)", () => {
+    it("a double-click over the inset resets the inset only, and beside it the parent", async () => {
+        const inset = {
+            ...ax1, xlims: [0, 1] as [number, number], ylims: [0, 1] as [number, number],
+            viewport: [500, 300, 300, 200] as [number, number, number, number],
+        }
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: { ax1, inset },
+            layers: [
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan", moved: true } as never },
+                { id: "vin", kind: "view", axis: "inset", events: ["drag"], payloads: [],
+                    geometry: { x: 500, y: 300, w: 300, h: 200, mode: "pan", moved: true } as never },
+            ],
+        }
+        // Both views stay moved in every frame, so each double-click has something to reset.
+        const { surface, requestFrame } = setup(m, () => m)
+        doubleClick(surface, 300, 200) // image (600, 400), inside the inset
+        await tick()
+        expect(resets(requestFrame).map((i) => i.id)).toEqual(["vin"])
+        doubleClick(surface, 100, 100) // image (200, 200), beside it
+        await tick()
+        expect(resets(requestFrame).map((i) => i.id)).toEqual(["vin", "view"])
+    })
+})

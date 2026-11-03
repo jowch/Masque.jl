@@ -1,4 +1,4 @@
-import { axisPoint, findBin, hitTestAt, layerPoint, lineReadout, matrixLimits, resolvePayload, slopScale } from "./geometry"
+import { axisPoint, findBin, hitTestAt, innermostView, layerPoint, lineReadout, matrixLimits, resolvePayload, slopScale } from "./geometry"
 import { drawHover, renderSelection } from "./highlight"
 import { onMove, hideTip, hideViewReadout, showViewReadout, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent, updateLinkForHit } from "./hover"
 import { hideCross } from "./cross"
@@ -7,14 +7,14 @@ import { emptyMask, encodeMask, maskCount, maskHit, setBlock } from "./gridmask"
 import { hasRegions, regionCells, regionOf, setRegionsOf } from "./regions"
 import { clickRows, groupEnvelope, groupOf, groupSelection, legendEntryHeld, rowOf, rowsOfMarks } from "./linked"
 import type { GridMask, MaskEnvelope } from "./gridmask"
-import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
+import { layoutImagePx, touchReach, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, FieldPick, FieldSelection, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as spanDrag from "./drag/span"
 import * as viewDrag from "./drag/view"
 import * as marquee from "./drag/marquee"
-import { panTo, unmapPoint } from "./photo"
+import { isIdentity, panTo, unmapPoint } from "./photo"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Limits3, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 
 // setPointerCapture throws InvalidPointerId if the UA doesn't consider this pointerId active
@@ -42,6 +42,13 @@ function clearWheelTimer(state: OverlayState): boolean {
     clearTimeout(state.wheelTimer_)
     state.wheelTimer_ = null
     return true
+}
+
+// One photograph previews one view's pan or zoom at a time. Until that view's frame lands, a
+// pan or zoom on another view would start from the first view's matrix and jump, so it waits
+// (#559: an inset is grabbed right after its parent is panned).
+export function photoHeldByOther(state: OverlayState, id: string): boolean {
+    return state.photoViewId_ !== null && state.photoViewId_ !== id && !isIdentity(state.photo_)
 }
 
 function armPan(ctx: OverlayCtx, state: OverlayState, e: PointerEvent, viewId: string): void {
@@ -112,7 +119,7 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
         text = thresholdDrag.move(d, content, ctx.tipDigits_, ctx.tipExplicit_)
         if (liveDrag(ctx, d.id_)) requestState(ctx, { [d.id_]: thresholdDrag.envelopeAt(d, content) })
     } else if (d.kind === "span") {
-        text = spanDrag.move(d, content, ctx.tipDigits_)
+        text = spanDrag.move(d, content, ctx.tipDigits_, ctx.tipExplicit_)
         if (liveDrag(ctx, d.id_)) requestState(ctx, { [d.id_]: spanDrag.envelope(d) })
     } else if (d.kind === "view") {
         if (d.g_.mode === "orbit") {
@@ -260,12 +267,11 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
     const slop = slopScale(ctx.manifest_, ctx.base_.getBoundingClientRect().width)
     // Shift+drag forces view (arbitration vs box-select / ROI / threshold).
     if (e.shiftKey) {
-        const viewLayer = ctx.manifest_.layers.find((l) => {
-            if (l.kind !== "view" || !l.events.includes("drag")) return false
-            return hitTestAt({ ...ctx.manifest_, layers: [l] }, layout.x, layout.y, state.photo_, "drag", state.photoViewId_, slop) !== null
-        })
+        // The innermost view under the press, as for a plain drag (#559).
+        const viewLayer = innermostView(ctx.manifest_, layout.x, layout.y)
         if (viewLayer) {
             const g = viewLayer.geometry as ViewGeometry
+            if (g.mode === "pan" && photoHeldByOther(state, viewLayer.id)) { e.preventDefault(); return }
             // On an Axis3, Shift+drag pans the limits instead of orbiting (#321).
             const base = g.mode === "orbit" && g.limits ? viewDrag.view3Base(state, viewLayer.id, g.limits) : undefined
             state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], layout.x, layout.y, e.pointerId, true, base)
@@ -331,6 +337,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         }
     } else if (hit.layer.kind === "view") {
         const g = hit.layer.geometry as ViewGeometry
+        if (g.mode === "pan" && photoHeldByOther(state, hit.layer.id)) { e.preventDefault(); return }
         state.drag_ = viewDrag.begin(hit.layer.id, g, ctx.manifest_.transforms[hit.layer.axis], layout.x, layout.y, e.pointerId)
         if (g.mode === "pan") armPan(ctx, state, e, hit.layer.id)
     } else return
@@ -342,7 +349,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
 
 export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): void {
     cancelPendingMove(state)
-    state.lastUp_ = e.button === 0 ? { x: e.clientX, y: e.clientY } : null
+    state.lastUp_ = e.button === 0 ? { x: e.clientX, y: e.clientY, type_: e.pointerType } : null
     const d = state.drag_
     // Ignore a pointer that isn't the one that owns this drag (e.g. a second touch lifting
     // first) — without this, any pointer's up committed and ended whichever drag happened
@@ -772,11 +779,12 @@ function axesAt(ctx: OverlayCtx, x: number, y: number): string[] {
 // Where a click landed. Chromium rounds a click's clientX/Y to whole px, while the pointer
 // events hover reads keep the fraction, so a readout click off its pointerup would commit up to
 // half a px from the value the tooltip shows (#448). The pointerup this click follows keeps it.
-function clickPoint(state: OverlayState, e: MouseEvent): { x: number, y: number } {
+// Its pointer type comes from that pointerup too: not every browser's click says it.
+function clickPoint(state: OverlayState, e: MouseEvent): { x: number, y: number, type_: string } {
     const up = state.lastUp_
     state.lastUp_ = null
     if (up && Math.abs(up.x - e.clientX) < 1 && Math.abs(up.y - e.clientY) < 1) return up
-    return { x: e.clientX, y: e.clientY }
+    return { x: e.clientX, y: e.clientY, type_: (e as PointerEvent).pointerType ?? up?.type_ ?? "mouse" }
 }
 
 export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {
@@ -787,14 +795,16 @@ export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): vo
     state.plainClicks_ += 1
     const layout = layoutImagePx(ctx.base_, ctx.manifest_, at.x, at.y)
     const slop = slopScale(ctx.manifest_, ctx.base_.getBoundingClientRect().width)
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_, slop)
+    // A finger picks the nearest mark within its reach (#528).
+    const touch = touchReach(ctx.base_, ctx.manifest_, at.type_)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_, slop, touch)
     if (!hit) {
         // A click on an empty part of a plot clears the one-pick fields there; a `many` field
         // keeps its picks, since a near miss among many small marks is the likeliest slip and
         // Escape clears them (#384). A mark that only shows a tooltip isn't empty space, and a
         // Cmd/Ctrl-click that misses keeps the picks, as a modified miss does in a file browser.
         if (isToggleClick(e)) return
-        if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_, slop)) return
+        if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_, slop, touch)) return
         // A click inside an opaque legend that takes no clicks is on the legend too (#472).
         if (ctx.manifest_.occluders?.some(([bx, by, bw, bh]) => layout.x >= bx && layout.x <= bx + bw && layout.y >= by && layout.y <= by + bh)) return
         const axes = axesAt(ctx, layout.x, layout.y)

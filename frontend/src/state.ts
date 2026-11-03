@@ -1,5 +1,5 @@
 import type { GridMask } from "./gridmask"
-import type { Anchor } from "./geometry"
+import type { Anchor, TouchReach } from "./geometry"
 import type { CrossEls } from "./cross"
 import type { Fade } from "./fade"
 import type { GestureChannel } from "./gesture"
@@ -37,6 +37,15 @@ export const imgPx = (base: HTMLElement, manifest: Manifest, e: MouseEvent): { x
     const r = base.getBoundingClientRect()
     const s = manifest.width / r.width // image-px per CSS-px (manifest renderWidth ÷ live rect; never the base's intrinsic size)
     return { x: (e.clientX - r.left) * s, y: (e.clientY - r.top) * s }
+}
+
+// A finger's hit test for an event from a touch (`pointerType`), with the image px per CSS px
+// of the base's layout box (the width layoutImagePx measures in); null for a mouse or a pen,
+// which keep the tight rule (geometry.ts's hitTestAt).
+export function touchReach(base: HTMLElement, manifest: Manifest, pointerType: string | undefined): TouchReach | null {
+    if (pointerType !== "touch") return null
+    const w = base.offsetWidth > 0 ? base.offsetWidth : base.getBoundingClientRect().width
+    return { pxPerCss_: w > 0 ? manifest.width / w : manifest.scaling }
 }
 
 // Image pixel under the cursor in the base's border box. `offsetWidth` cancels, so a
@@ -230,7 +239,7 @@ export interface OverlayState {
     justDragged_: boolean
     // The last primary pointerup, in client px. Chromium rounds a click's clientX/Y to whole
     // px but not a pointer event's, so onClick reads this to commit the value hover showed (#448).
-    lastUp_: { x: number, y: number } | null
+    lastUp_: { x: number, y: number, type_: string } | null
     // Hover chrome still in g.hi, live or mid-leave. Null once those nodes are gone.
     // drawSelection reads it to drop a ring whose key just entered the selection (#97).
     hiKey_: string | null
@@ -288,6 +297,9 @@ export interface OverlayState {
     photoAnchor_: { x: number; y: number } | null
     photoViewId_: string | null
     wheelTimer_: ReturnType<typeof setTimeout> | null
+    // The view a wheel gesture zooms, kept while `wheelTimer_` is live: a zoom that drifts
+    // across an inset's edge stays on the view it started on (#559).
+    wheelViewId_: string | null
     // A keyboard pan or orbit (dragkeys.ts) is between its first keydown and its keyup settle.
     // A frame that lands meanwhile keeps the readout, as it does for a pointer pan or a wheel.
     keyView_: boolean
@@ -345,6 +357,7 @@ export function createOverlayState(): OverlayState {
         photoAnchor_: null,
         photoViewId_: null,
         wheelTimer_: null,
+        wheelViewId_: null,
         keyView_: false,
         view3_: new Map(),
         view3Last_: null,

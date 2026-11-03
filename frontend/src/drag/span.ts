@@ -1,6 +1,6 @@
 import { invertAxis } from "../geometry"
 import { SVG_NS, DEFAULT_STYLE } from "../highlight"
-import { fmt } from "../state"
+import { fmtCoord } from "../template"
 import type { Drag, SpanBand } from "../state"
 import type { AxisTransform, Manifest, SpanGeometry } from "../types"
 import { HANDLE_RADIUS_CSS } from "./roi"
@@ -133,7 +133,8 @@ export function spanValues(band: SpanBand): { lo: number; hi: number } {
     return { lo: Math.min(a, b), hi: Math.max(a, b) }
 }
 
-export function move(d: Extract<Drag, { kind: "span" }>, p: { x: number; y: number }, digits: number): string {
+// The readout prints both edges in the format of the axis the band runs along (#543).
+export function move(d: Extract<Drag, { kind: "span" }>, p: { x: number; y: number }, digits: number, explicit = false): string {
     const band = d.band_, g = band.g_
     const along = g.orientation === "h" ? p.y : p.x
     const [e0, e1] = extent(band)
@@ -156,7 +157,8 @@ export function move(d: Extract<Drag, { kind: "span" }>, p: { x: number; y: numb
     if (g.lo !== d.lo0_ || g.hi !== d.hi0_) d.moved_ = true
     setSpan(band)
     const s = spanValues(band)
-    return `[${fmt(s.lo, digits)}, ${fmt(s.hi, digits)}]`
+    const f = g.orientation === "h" ? band.t_.yfmt : band.t_.xfmt
+    return `[${fmtCoord(s.lo, f, digits, explicit, true)}, ${fmtCoord(s.hi, f, digits, explicit, true)}]`
 }
 
 // The field a release here would set: what an in-drag `onchange` frame is sent, and the commit.
