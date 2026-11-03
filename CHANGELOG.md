@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-03
+
 ### Breaking
 - Scrolling over a plot with a `ViewInteractable` scrolls the page, as it does everywhere else
   on the page. To zoom, hold Ctrl (Cmd on a Mac) while scrolling; a trackpad pinch zooms
@@ -893,7 +895,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.5...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/jowch/Masque.jl/compare/v0.4.5...v0.5.0
 [0.4.5]: https://github.com/jowch/Masque.jl/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/jowch/Masque.jl/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/jowch/Masque.jl/compare/v0.4.2...v0.4.3
