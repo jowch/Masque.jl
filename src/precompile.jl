@@ -31,12 +31,25 @@ function _precompile_figure()
     return (; fig, ax, sc, fit, ax2, ax3)
 end
 
+# Pluto prints a bond value, and each of its fields, as `text/plain`; `repr` is how a cell
+# interpolates one into a string.
+function _precompile_show(v)
+    repr(v)
+    repr(MIME"text/plain"(), v)
+    v isa NamedTuple && foreach(x -> (repr(x); repr(MIME"text/plain"(), x)), values(v))
+    return nothing
+end
+
 function _precompile_workload(backend::Symbol)
     # Zero-config: every plot auto-extracted.
     w = masque(_precompile_figure().fig; backend)
     repr(MIME"text/html"(), w)
     APD.Bonds.initial_value(w)
     _sync_view_warmup!(w.render_frame)
+    # A click on a zero-config scatter, and the value shown as a notebook cell shows it (#567).
+    env = Dict{String, Any}(mount_envelope(w.manifest))
+    sc_id = first(l["id"] for l in w.manifest["layers"] if l["kind"] == "circles")
+    _precompile_show(APD.Bonds.transform_value(w, merge(env, Dict{String, Any}(sc_id => Dict{String, Any}("layer" => sc_id, "index" => 2)))))
 
     # A pick, views on 2D and 3D axes, a threshold and a region, then their gestures. A fresh
     # figure: a WebGL widget's figure takes no new plots.
@@ -57,7 +70,7 @@ function _precompile_workload(backend::Symbol)
     _sync_view_warmup!(w.render_frame)
     start = Dict{String, Any}(mount_envelope(w.manifest))
     pick = merge(start, Dict{String, Any}("pts" => Dict{String, Any}("layer" => "pts", "index" => 2, "payload" => nothing)))
-    APD.Bonds.transform_value(w, pick)
+    _precompile_show(APD.Bonds.transform_value(w, pick))
     w.render_frame(Dict{String, Any}("id" => "pan", "xmin" => 2.0, "xmax" => 7.0, "ymin" => -1.0, "ymax" => 1.0, "settle" => true))
     w.render_frame(Dict{String, Any}("id" => "orbit", "azimuth" => 0.7, "elevation" => 0.3, "settle" => true))
     empty!(_VIEW_WARMUPS)

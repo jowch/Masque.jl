@@ -36,7 +36,9 @@ for (round_, seed) in (("cold", 0.0), ("warm", 1.0))
     w0 = @step "masque (pick only)" masque(fig, PointInteractable(ax, sc; id = :pts); backend = BK, auto = false)
     @step "show html (pick only)" repr(MIME"text/html"(), w0)
     env = Dict("pts" => Dict("layer" => "pts", "index" => 2, "payload" => nothing))
-    @step "bond value (pick)" APD.Bonds.transform_value(w0, env)
+    v = @step "bond value (pick)" APD.Bonds.transform_value(w0, env)
+    # How a notebook cell shows the value: the value, and each field, as `text/plain`.
+    @step "show value (pick)" (repr(MIME"text/plain"(), v); foreach(x -> repr(MIME"text/plain"(), x), values(v)))
     # Views on both axes: the deferred warm-up's work.
     fig, ax, sc, ax3, xs, ys = figs(seed)
     w = @step "masque (pan+orbit)" masque(fig, [PointInteractable(ax, sc; id = :pts), ViewInteractable(ax; id = :pan), ViewInteractable(ax3; id = :orbit)]; backend = BK, auto = false)
