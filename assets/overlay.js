@@ -157,8 +157,7 @@
        display: grid; place-items: center; cursor: pointer; color: inherit; }
 .masque-vb button + button { border-top: 1px solid var(--masque-tip-border-resolved); }
 .masque-vb.row button + button { border-top: none; border-left: 1px solid var(--masque-tip-border-resolved); }
-/* static: the overlay's own svg rule (mount.ts) pins every svg to the top-left of its host. */
-.masque-vb button svg { position: static; width: var(--masque-vb-icon, 14px); height: var(--masque-vb-icon, 14px); pointer-events: none; }
+.masque-vb button svg { width: var(--masque-vb-icon, 14px); height: var(--masque-vb-icon, 14px); pointer-events: none; }
 .masque-vb .masque-vb-reset { display: none; }
 .masque-vb.moved .masque-vb-reset { display: grid; animation: masque-vb-join ${He}ms ease-out; }
 @keyframes masque-vb-join { from { opacity: 0; } to { opacity: 1; } }
@@ -216,7 +215,7 @@
   .surface:focus-visible:not(.kbd-ring) { outline-color: Highlight; }
   .drag-stop:focus-visible { outline-color: Highlight; }
 }
-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+svg.masque-fill, svg.masque-edge, svg.masque-plain { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
        clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .masque-enter { animation: masque-in ${He}ms ease-out; }

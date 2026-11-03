@@ -186,8 +186,7 @@ export const VIEW_BUTTONS_STYLE = `
        display: grid; place-items: center; cursor: pointer; color: inherit; }
 .masque-vb button + button { border-top: 1px solid var(--masque-tip-border-resolved); }
 .masque-vb.row button + button { border-top: none; border-left: 1px solid var(--masque-tip-border-resolved); }
-/* static: the overlay's own svg rule (mount.ts) pins every svg to the top-left of its host. */
-.masque-vb button svg { position: static; width: var(--masque-vb-icon, 14px); height: var(--masque-vb-icon, 14px); pointer-events: none; }
+.masque-vb button svg { width: var(--masque-vb-icon, 14px); height: var(--masque-vb-icon, 14px); pointer-events: none; }
 .masque-vb .masque-vb-reset { display: none; }
 .masque-vb.moved .masque-vb-reset { display: grid; animation: masque-vb-join ${MOTION_MS}ms ease-out; }
 @keyframes masque-vb-join { from { opacity: 0; } to { opacity: 1; } }
