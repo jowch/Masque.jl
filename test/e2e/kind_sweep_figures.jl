@@ -60,6 +60,14 @@ kind_sweep_meta() = [
         "hoverFields" => ["labelalpha", "x1", "y1"],
     ),
     Dict(
+        # `scatter` at half its density: `max_width = 240` puts the 480-wide figure at
+        # `px_per_unit` 1 on both backends (#548), where the rest of the sweep runs near 2.
+        "key" => "scatter_low", "layerId" => "scatter", "layerKind" => "circles",
+        "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "beta", "hoverIndex" => 0, "hoverTip" => "alpha", "mode" => "element",
+        "hoverFields" => ["labelalpha", "x1", "y1"],
+    ),
+    Dict(
         # A bound line picks a data point (#335): `selected = [1]` rings its first point, and the
         # click lands on its third.
         "key" => "lines", "layerId" => "lines", "layerKind" => "lines",
@@ -150,9 +158,11 @@ kind_sweep_meta() = [
         "anchorKey" => "polar", "anchorIndex" => 1, "theta" => π / 2, "r" => 2.0, "rmax" => 2.5,
     ),
     Dict(
-        # Default tooltips follow the axis's tick format (#510): one auto widget, three axes.
+        # Default tooltips follow the axis's tick format (#510): one auto widget, seven axes.
         # Each scatter's first point is hovered; the driver picks the expectation by the axis's
-        # transform (polar, a `"{:.1f} mV"` format, a function format left plain).
+        # transform (polar, a `"{:.1f} mV"` format, a function format left plain). A bar, a hist
+        # bin, a horizontal box and a vspan are hovered too: their fields follow the axis each
+        # is measured along (#543).
         "key" => "tick_units", "layerId" => "", "layerKind" => "circles",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "tick_units",
@@ -248,6 +258,14 @@ kind_sweep_meta() = [
         "orbitSuspends" => true,
     ),
     Dict(
+        # `surface3d` at `px_per_unit` 1 (`max_width = 240`, #548): hover, click, and an orbit
+        # whose release frame brings the selection back at the lower density.
+        "key" => "surface3d_low", "layerId" => "surface", "layerKind" => "surface",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 13,
+        "tip" => "i4j3", "hoverIndex" => 12, "hoverTip" => "i3j3", "mode" => "element",
+        "orbitSuspends" => true,
+    ),
+    Dict(
         # `surface!` on a PolarAxis, Makie's polar heatmap (#514): the same `:surface` layer as
         # on Axis3, projected through the polar transform. Point k is (a, b) = (k % 9, k ÷ 9) of
         # the 9 × 4 θ × r grid; 11 is θ = π/2, r = 1 and 22 is θ = π, r = 1.5 (Julia's (3, 2) and
@@ -329,6 +347,13 @@ kind_sweep_meta() = [
         "key" => "violin", "layerId" => "violin", "layerKind" => "polygons",
         "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
         "tip" => "x 1", "hoverIndex" => 1, "hoverTip" => "x 2", "mode" => "element",
+    ),
+    Dict(
+        # A horizontal `violin!` reads its category along y (#558): the values sit near 10, so
+        # reading the outline's x extent would name category 2 for both.
+        "key" => "violin_h", "layerId" => "violin", "layerKind" => "polygons",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "y 1", "hoverIndex" => 1, "hoverTip" => "y 2", "mode" => "element",
     ),
     Dict(
         # `stairs!`: one stepped line is one element; hover reads out the nearest step (#262).
@@ -421,6 +446,8 @@ kind_sweep_meta() = [
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "span",
         "start" => [3.0, 6.0], "markInside" => "scatter",
+        # The drag readout prints both edges in the axis's format (#543).
+        "dragReadout" => raw"^\[\d+\.\d s, \d+\.\d s\]$",
     ),
     Dict(
         # A band of a vertical colorbar (#500): the colorbar's own readout still answers inside it.
@@ -561,6 +588,14 @@ kind_sweep_meta() = [
         "inside" => 2, "outside" => 0,
     ),
     Dict(
+        # Corner view buttons (#525): a dark figure with its legend in the top-right corner.
+        # kind_sweep.mjs drives the buttons and polish_verify.mjs checks their look.
+        "key" => "view_dark", "layerId" => "view", "layerKind" => "view",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "view_buttons",
+        "corner" => "tl",
+    ),
+    Dict(
         # Two Axis3 panels linked by `linkcameras!(...; limits = true)` (#362), a view on each.
         # Orbiting the left one must turn the right panel's picture and move its hit areas, and
         # wheel zooms that alternate between the panels must each start from the shared limits.
@@ -584,6 +619,14 @@ kind_sweep_meta() = [
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
         "resizeAfterDisplay" => true,
+    ),
+    Dict(
+        # An inset axis with its own view inside its parent's (#559). Over the inset, the wheel
+        # and a drag move the inset's view; outside it, the parent's. The driver tells which
+        # moved by the corner readout's range: the inset spans 0–1, the parent 0–10.
+        "key" => "view_nested", "layerId" => "view", "layerKind" => "view",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "nested",
     ),
     Dict(
         "key" => "legend", "layerId" => "legend", "layerKind" => "rects",
@@ -834,6 +877,18 @@ function build_kind_sweep()
         )
     end
 
+    scatter_low = let
+        pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 1.2)]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "scatter_low")
+        sc = scatter!(ax, first.(pts), last.(pts); color = :gray, markersize = 22)
+        masque(
+            fig,
+            interactables(sc; payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")]);
+            selected = Dict(:scatter => [2]), max_width = 240,
+        )
+    end
+
     lines = let
         verts = [(0.0, 0.0), (1.0, 1.5), (2.0, 0.4), (3.0, 1.8)]
         fig = Figure(size = (480, 260))
@@ -993,13 +1048,23 @@ function build_kind_sweep()
     end
 
     tick_units = let
-        fig = Figure(size = (720, 260))
+        fig = Figure(size = (720, 700))
         ax_mv = Axis(fig[1, 1]; title = "mV", ytickformat = "{:.1f} mV", limits = (0, 3, 0, 5))
         scatter!(ax_mv, [1.0, 2.0], [3.4721, 1.5]; color = :gray, markersize = 22)
         ax_fn = Axis(fig[1, 2]; title = "function", ytickformat = vs -> string.(vs) .* "!", limits = (0, 3, 0, 5))
         scatter!(ax_fn, [1.0, 2.0], [3.4721, 1.5]; color = :gray, markersize = 22)
         ax_p = PolarAxis(fig[1, 3])
         scatter!(ax_p, [π / 2, π], [2.0, 1.0]; color = :gray, markersize = 22)
+        # A bar's low/high/value follow its value axis, a hist's low/high its bin axis (#543).
+        ax_bar = Axis(fig[2, 1]; title = "bars", ytickformat = "{:.1f} mV", limits = (0, 3, 0, 5))
+        barplot!(ax_bar, [1, 2], [3.4721, 1.5]; color = :gray)
+        ax_hist = Axis(fig[2, 2]; title = "hist", xtickformat = "{:.1f} s", ytickformat = "{:.0f} n")
+        hist!(ax_hist, [0.2, 0.4, 0.6, 1.5]; bins = [0.0, 1.0, 2.0], color = :gray)
+        # A horizontal box plot (its axes carry `NoDimConversion`) and a vspan read along x.
+        ax_box = Axis(fig[3, 1]; xtickformat = "{:.1f} kg")
+        boxplot!(ax_box, fill(1, 5), [1.0, 2.0, 3.0, 4.0, 5.0]; orientation = :horizontal, color = :gray)
+        ax_vs = Axis(fig[3, 2]; xtickformat = "{:.1f} s", limits = (0, 3, 0, 1))
+        vspan!(ax_vs, [1.0], [2.0]; color = (:gray, 0.5))
         masque(fig)
     end
 
@@ -1088,6 +1153,47 @@ function build_kind_sweep()
             interactables(seen; id = :seen, tooltip = false);
             auto = false,
         )
+    end
+
+    # A `Box` over marks (#547): Makie draws the opaque top-left box over hid 0 and hid 1, and
+    # the top-right one (made before the axis, but `z = 1`) over hid 5, so the pointer there
+    # finds the box, not the points. The bottom-left box was made before the axis and the
+    # bottom-right one has `z = -1`, so the plot draws over both: hid 2 and hid 3 show and take
+    # the pointer, and two occluders ship. hid 4 is in the open. Not in kind_sweep_meta();
+    # polish_verify.mjs checks it.
+    box_hidden = let
+        fig = Figure(size = (480, 260))
+        boxed(h, v; kw...) = Box(fig[1, 1]; width = 70, height = 50, halign = h, valign = v, color = :white, tellwidth = false, tellheight = false, kw...)
+        boxed(0.03, 0.03)
+        boxed(0.97, 0.97; z = 1)
+        ax = Axis(fig[1, 1]; title = "box-hidden", limits = (0, 10, 0, 10))
+        hid = scatter!(ax, [0.8, 1.6, 1.0, 9.0, 5.0, 9.0], [9.0, 8.3, 1.2, 1.2, 5.0, 8.8]; color = :orange, markersize = 18)
+        boxed(0.02, 0.98; width = 110, height = 70)
+        boxed(0.97, 0.03; z = -1)
+        masque(fig, interactables(hid; id = :hid); auto = false)
+    end
+
+    # A `Box` over each kind of axis (#547), where the backends draw it differently. Each panel
+    # has a white Box over the mark at its centre and a mark in the open. The Box hides the
+    # centre mark on both backends in panel 1 (made after the axis), on neither in panels 2
+    # (made before), 3 (the plot raised to z 5) and 6 (an Axis3 with the Box at z -50), on
+    # Cairo only in panel 4 (a PolarAxis made after a z 1 Box) and on WebGL only in panel 5 (an
+    # Axis3 made after a z 0 Box). Not in kind_sweep_meta(); polish_verify.mjs checks that a mark
+    # hides on screen exactly where an occluder ships, and takes the pointer everywhere else.
+    box_axes = let
+        fig = Figure(size = (690, 440))
+        boxed(pos; kw...) = Box(pos; width = 56, height = 44, color = :white, tellwidth = false, tellheight = false, kw...)
+        pts2 = ([0.0, 0.8], [0.0, 0.8])
+        pts3 = ([0.0, 1.0, -1.0], [0.0, 1.0, -1.0], [0.0, 1.0, -1.0])
+        mark(ax, pts...; kw...) = scatter!(ax, pts...; color = :orange, markersize = 18, kw...)
+        lim = (-1, 1, -1, 1)
+        ax1 = Axis(fig[1, 1]; title = "after", limits = lim); p1 = mark(ax1, pts2...); boxed(fig[1, 1])
+        boxed(fig[1, 2]); ax2 = Axis(fig[1, 2]; title = "before", limits = lim); p2 = mark(ax2, pts2...)
+        ax3 = Axis(fig[1, 3]; title = "raised", limits = lim); p3 = mark(ax3, pts2...); translate!(p3, 0, 0, 5); boxed(fig[1, 3])
+        boxed(fig[2, 1]; z = 1); ax4 = PolarAxis(fig[2, 1]; title = "polar"); p4 = mark(ax4, [0.0, 1.6], [0.0, 0.9]); rlims!(ax4, 0, 1)
+        boxed(fig[2, 2]); ax5 = Axis3(fig[2, 2]; title = "3D"); p5 = mark(ax5, pts3...)
+        ax6 = Axis3(fig[2, 3]; title = "3D z -50"); p6 = mark(ax6, pts3...); boxed(fig[2, 3]; z = -50)
+        masque(fig, (interactables(p; id = Symbol(:p, i)) for (i, p) in enumerate((p1, p2, p3, p4, p5, p6)))...; auto = false)
     end
 
     # A plot drawn with `visible = false` (#484): picking a legend entry fades the shown lines and
@@ -1207,6 +1313,16 @@ function build_kind_sweep()
         surface!(ax, xs, xs, zs; colormap = [:steelblue, :lightblue], shading = NoShading)
         wireframe!(ax, xs, xs, zs; color = :black, linewidth = 0.5)
         masque(fig, ViewInteractable(ax))
+    end
+
+    surface3d_low = let
+        fig = Figure(size = (480, 320))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "surface3d_low")
+        xs = [0.0, 1.0, 2.0, 3.0, 4.0]
+        zs = [4.0 - ((x - 2)^2 + (y - 2)^2) / 2 for x in xs, y in xs]
+        surface!(ax, xs, xs, zs; colormap = [:steelblue, :lightblue], shading = NoShading)
+        wireframe!(ax, xs, xs, zs; color = :black, linewidth = 0.5)
+        masque(fig, ViewInteractable(ax); max_width = 240)
     end
 
     # A polar heatmap drawn with `surface!` (#514), coarse so each point's cell is large enough
@@ -1342,6 +1458,16 @@ function build_kind_sweep()
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "violin")
         violin!(ax, xs, ys; color = (:steelblue, 0.6))
+        masque(fig; selected = Dict(:violin => [1]))
+    end
+
+    violin_h = let
+        q = [log(p / (1 - p)) / 1.7 for p in range(0.0025, 0.9975; length = 200)]
+        xs = repeat([1, 2]; inner = 200)
+        ys = vcat(q, q .* 0.6 .+ 1) .+ 10
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "violin, horizontal")
+        violin!(ax, xs, ys; orientation = :horizontal, color = (:steelblue, 0.6))
         masque(fig; selected = Dict(:violin => [1]))
     end
 
@@ -1481,7 +1607,7 @@ function build_kind_sweep()
 
     span_axis = let
         fig = Figure(size = (480, 260))
-        ax = Axis(fig[1, 1]; title = "span on an axis", limits = (0, 10, 0, 10))
+        ax = Axis(fig[1, 1]; title = "span on an axis", limits = (0, 10, 0, 10), xtickformat = "{:.1f} s")
         scatter!(ax, [1.0, 4.5, 8.0], [5.0, 5.0, 5.0]; markersize = 16)
         masque(fig, SpanInteractable(ax; span = (3.0, 6.0)))
     end
@@ -1648,6 +1774,19 @@ function build_kind_sweep()
         masque(fig, interactables(sc; id = :pts), interactables(ln; id = :line), ViewInteractable(ax; id = :view))
     end
 
+    # Corner view buttons (#525) on a dark figure whose legend takes the top-right corner: the
+    # buttons go top left, in the dark tooltip theme.
+    view_dark = let
+        fig = Figure(size = (480, 300); backgroundcolor = :gray12)
+        ax = Axis(
+            fig[1, 1]; title = "view-dark", limits = (0, 8, 0, 8), backgroundcolor = :gray20,
+            titlecolor = :gray90, xtickcolor = :gray80, ytickcolor = :gray80,
+        )
+        sc = scatter!(ax, [1.0, 4.0, 2.0], [1.0, 4.0, 6.0]; markersize = 14, color = :orange, label = "pts")
+        axislegend(ax)
+        masque(fig, interactables(sc; id = :pts), ViewInteractable(ax; id = :view))
+    end
+
     view3d_linked = let
         pts = Makie.Point3f[(0, 0, 0), (4, 4, 4), (4, 0, 0)]
         fig = Figure(size = (640, 320))
@@ -1670,6 +1809,18 @@ function build_kind_sweep()
         lower = scatter!(ax2, 21:23, [1, 2.46, 4.17]; color = :gray, markersize = 14)
         VIEW_RESIZED[] = (fig, ax2)
         masque(fig, ViewInteractable(ax), interactables(lower; id = :lower); auto = false)
+    end
+
+    view_nested = let
+        fig = Figure(size = (480, 320))
+        ax = Axis(fig[1, 1]; title = "view with an inset view", limits = (0, 10, 0, 10))
+        scatter!(ax, [1, 3, 8], [8, 2, 1]; color = :gray, markersize = 14)
+        inset = Axis(
+            fig[1, 1]; width = Relative(0.42), height = Relative(0.42),
+            halign = 0.92, valign = 0.9, limits = (0, 1, 0, 1),
+        )
+        scatter!(inset, [0.2, 0.5, 0.8], [0.3, 0.7, 0.4]; color = :teal, markersize = 10)
+        masque(fig, ViewInteractable(ax; id = :view), ViewInteractable(inset; id = :inset); auto = false)
     end
 
     legend = let
@@ -1961,9 +2112,9 @@ function build_kind_sweep()
     end
 
     return (;
-        scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_resized, legend, series_legend,
+        scatter, scatter_low, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
+        polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, box_hidden, box_axes, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, violin_h, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_resized, view_nested, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

@@ -254,7 +254,9 @@ end
 # converted dimension (categories, dates, units) give nothing. `label` renames the table key
 # (`θ`, `r` on a PolarAxis) and is sent even when the number is plain.
 function _coord_format(ticks, format; scale = identity, conv = nothing, label = nothing)
-    f = (scale === identity && conv === nothing) ? _tick_format(ticks, format) : nothing
+    # A plot such as `boxplot!` sets `NoDimConversion` on its axes: plain numbers, as with none.
+    plain = conv === nothing || conv isa Makie.NoDimConversion
+    f = (scale === identity && plain) ? _tick_format(ticks, format) : nothing
     label === nothing && return f
     f = something(f, Dict{String, Any}())
     f["label"] = label
@@ -436,4 +438,52 @@ function _legend_occluder(leg, scaling, out_h)
     w, h = bb.widths[1] - l - r + 2half, bb.widths[2] - b - t + 2half
     (w > 0 && h > 0) || return nothing
     return [x0 * scaling, out_h - (y0 + h) * scaling, w * scaling, h * scaling]
+end
+
+# The image-px box [x, y, w, h] a `Box` block paints, or `nothing` when what is under it shows
+# through: hidden, or a fill less than half opaque (#547). Makie fills the block's bbox and
+# centres a visible stroke on its edge. A rounded corner leaves a sliver of the plot showing,
+# too small to point at, so the box stays square.
+function _box_occluder(box, scaling, out_h)
+    box.visible[] || return nothing
+    c = Makie.to_color(box.color[])
+    # a pattern or other non-colour fill: leave the marks under it alone
+    c isa Makie.Colorant || return nothing
+    Makie.alpha(c) >= 0.5 || return nothing
+    bb = box.layoutobservables.computedbbox[]
+    half = box.strokevisible[] ? box.strokewidth[] / 2 : 0.0
+    x0, y0 = bb.origin[1] - half, bb.origin[2] - half
+    w, h = bb.widths[1] + 2half, bb.widths[2] + 2half
+    (w > 0 && h > 0) || return nothing
+    return [x0 * scaling, out_h - (y0 + h) * scaling, w * scaling, h * scaling]
+end
+
+# Whether Makie draws Box `box` over every plot of axis `ax`, as each backend renders it (#547).
+# Probed on both backends over an Axis, Axis3 and PolarAxis, with the Box made before and after
+# the axis, Box `z` from -200 to 6, and plots raised with `translate!`. `gl` is the WebGL
+# backend (`ctx.depth_test`).
+# - CairoMakie sorts every plot by its 2D z (`Makie.zvalue2d`), ties in the order the blocks
+#   were made: the Box covers the plots when its `z` is above the highest of theirs, or level
+#   with it and the Box was made after the axis. An Axis3's plots count as z 0.
+# - WebGL does the same over an Axis, and over a PolarAxis made before the Box. A PolarAxis
+#   made after the Box draws its background over it whatever its `z`, so the Box hides nothing.
+#   Over an Axis3 the depth test decides: a Box with `z` 0 or more covers the plots whatever
+#   the order; below 0 it depends on the marks' depth (-20 covers, -50 doesn't), so it counts
+#   as not covering, which keeps every mark that might show under the pointer.
+function _box_over_plots(fig, box, ax, gl::Bool)
+    gl && ax isa Makie.Axis3 && return box.z[] >= 0
+    after = _made_after(fig, box, ax)
+    gl && ax isa Makie.PolarAxis && !after && return false
+    z = box.z[]
+    pz = ax isa Makie.Axis3 ? 0.0f0 : maximum(Makie.zvalue2d, ax.scene.plots; init = 0.0f0)
+    return z > pz || (z == pz && after)
+end
+
+# Whether block `top` was made after block `under`: each block's scene hangs off the figure's
+# scene in the order the blocks were made.
+function _made_after(fig, top, under)
+    kids = fig.scene.children
+    i = findfirst(s -> s === top.blockscene, kids)
+    j = findfirst(s -> s === under.blockscene, kids)
+    return i !== nothing && j !== nothing && i > j
 end

@@ -40,6 +40,9 @@ export interface Controls {
     remove_: () => void
 }
 
+// The finger target's size across, CSS px: Apple's 44 pt, WCAG 2.5.5's 44 px.
+export const REACH_PX = 44
+
 export const CONTROLS_STYLE = `
 .masque-controls { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
 .masque-control { position: absolute; box-sizing: border-box; pointer-events: auto; container-type: size;
@@ -158,7 +161,63 @@ export const CONTROLS_STYLE = `
 .masque-menu-list [role="option"].act { background: var(--c0, #f0f0f0); color: var(--o0, var(--masque-ctl-text, #000000)); }
 .masque-menu-list [role="option"][aria-selected="true"] { background: var(--c1, #4e7fb4); color: var(--o1, #ffffff); }
 @media (prefers-reduced-motion: reduce) { .masque-toggle-track, .masque-toggle-knob { transition: none; } }
+/* A finger (#531): where any input is coarse, a slider, toggle or checkbox takes the pointer up
+   to ${REACH_PX}px across, past its drawn size; nothing drawn changes. --rt, --rb, --rl and
+   --rr are how far it reaches past each edge: what a ${REACH_PX}px target needs, at most half
+   the gap to the next control or axis on that side (--ct, --cb, --cl, --cr, set by reach()).
+   --eh and --ew are the hit element's own size, a checkbox's square in its box. A slider's
+   thumb grows with its input, since a range input on a phone may move only from its thumb. */
+@media (any-pointer: coarse) {
+  .masque-control { --eh: 100cqh; --ew: 100cqw;
+    --rt: max(0px, min((${REACH_PX}px - var(--eh)) / 2, var(--ct, ${REACH_PX}px)));
+    --rb: max(0px, min((${REACH_PX}px - var(--eh)) / 2, var(--cb, ${REACH_PX}px)));
+    --rl: max(0px, min((${REACH_PX}px - var(--ew)) / 2, var(--cl, ${REACH_PX}px)));
+    --rr: max(0px, min((${REACH_PX}px - var(--ew)) / 2, var(--cr, ${REACH_PX}px))); }
+  .masque-range.h { top: calc(-1 * var(--rt)); bottom: calc(-1 * var(--rb)); height: auto; }
+  .masque-range.v { left: calc(-1 * var(--rl)); right: calc(-1 * var(--rr)); width: auto; }
+  .masque-range.h::-webkit-slider-thumb { height: calc(100cqh + var(--rt) + var(--rb)); }
+  .masque-range.h::-moz-range-thumb { height: calc(100cqh + var(--rt) + var(--rb)); }
+  .masque-range.v::-webkit-slider-thumb { width: calc(100cqw + var(--rl) + var(--rr)); }
+  .masque-range.v::-moz-range-thumb { width: calc(100cqw + var(--rl) + var(--rr)); }
+  /* An interval slider's inputs take the pointer on their thumbs alone; the box answers a
+     press on the bar, so it reaches as far. */
+  .masque-interval::before { content: ""; position: absolute; left: 0; right: 0; top: calc(-1 * var(--rt)); bottom: calc(-1 * var(--rb)); }
+  .masque-interval:has(.masque-range.v)::before { top: 0; bottom: 0; left: calc(-1 * var(--rl)); right: calc(-1 * var(--rr)); }
+  .masque-control .masque-toggle, .masque-control .masque-check { box-sizing: content-box; padding: var(--rt) var(--rr) var(--rb) var(--rl);
+    margin: calc(-1 * var(--rt)) 0 0 calc(-1 * var(--rl)); }
+}
 `
+
+
+type Rect = [number, number, number, number]
+
+// How far a control's hit area at `r` may reach past each edge before it meets another
+// control's or an axis's: half the gap on that side, image px, so two neighbours split it. The
+// figure's own edge (`size`, its width and height) caps it at the whole distance, since nothing
+// past it shares the gap: a finger off the picture is on the page. A neighbour counts on a side
+// when it lies past that edge and overlaps `r` across it. Two cases are left alone on purpose:
+// a neighbour that overlaps `r` itself (a toggle laid over an axis) doesn't cap it, so the
+// control takes the plot's touches right around it, as a finger that close most likely means
+// the control; and one that only meets a corner doesn't either, so two toggles offset
+// diagonally can share a corner of their reach.
+export function reachCaps(r: Rect, others: Rect[], size?: [number, number]): { t: number; b: number; l: number; r: number } {
+    const [x, y, w, h] = r
+    const caps = size
+        ? { t: Math.max(0, y), b: Math.max(0, size[1] - y - h), l: Math.max(0, x), r: Math.max(0, size[0] - x - w) }
+        : { t: Infinity, b: Infinity, l: Infinity, r: Infinity }
+    for (const [ox, oy, ow, oh] of others) {
+        const across = ox < x + w && ox + ow > x
+        const along = oy < y + h && oy + oh > y
+        if (across && !along) {
+            if (oy + oh <= y) caps.t = Math.min(caps.t, (y - oy - oh) / 2)
+            else caps.b = Math.min(caps.b, (oy - y - h) / 2)
+        } else if (along && !across) {
+            if (ox + ow <= x) caps.l = Math.min(caps.l, (x - ox - ow) / 2)
+            else caps.r = Math.min(caps.r, (ox - x - w) / 2)
+        }
+    }
+    return caps
+}
 
 function envelope(id: string, payload: unknown): ControlEnvelope {
     return { layer: id, index: 0, payload }
@@ -866,6 +925,52 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
     }
 }
 
+// The controls a finger reaches past their drawn size (#531).
+const REACHES = new Set(["slider", "intervalslider", "toggle", "checkbox"])
+
+// Sets each slider's, toggle's and checkbox's room on every side (--ct, --cb, --cl, --cr) from
+// the other controls and the axes, as shares of its box, so the CSS can turn them into CSS px.
+function reach(m: Manifest, els: Map<string, ControlEl>): void {
+    const leaves: [HTMLElement, ControlGeometry][] = []
+    for (const l of m.layers) {
+        const c = l.kind === "control" ? els.get(l.id) : undefined
+        if (!c) continue
+        const g = l.geometry as ControlGeometry
+        if (g.control !== "slidergrid") {
+            leaves.push([c.box_, g])
+            continue
+        }
+        // A grid's sliders, in figure px, in the order the grid built them.
+        const kids = c.box_.querySelectorAll<HTMLElement>(":scope > .masque-control")
+        ;(g.sliders ?? []).forEach((cg, i) => { if (kids[i]) leaves.push([kids[i], cg]) })
+    }
+    // A checkbox answers on its square alone, centred in its box.
+    const hit = (g: ControlGeometry): Rect => {
+        if (g.control !== "checkbox") return [g.x, g.y, g.w, g.h]
+        const s = g.size ?? Math.min(g.w, g.h)
+        return [g.x + (g.w - s) / 2, g.y + (g.h - s) / 2, s, s]
+    }
+    const rects = leaves.map(([, g]) => hit(g))
+    const axes = Object.values(m.transforms ?? {}).map((t) => t.viewport).filter((v): v is Rect => Array.isArray(v) && v.length === 4)
+    leaves.forEach(([box, g], i) => {
+        if (!REACHES.has(g.control)) return
+        const r = rects[i]
+        const caps = reachCaps(r, [...rects.filter((_, j) => j !== i), ...axes], [m.width, m.height])
+        const set = (name: string, v: number, along: number, unit: string) => {
+            if (Number.isFinite(v) && along > 0) box.style.setProperty(name, `${(100 * v) / along}${unit}`)
+            else box.style.removeProperty(name)
+        }
+        set("--ct", caps.t, g.h, "cqh")
+        set("--cb", caps.b, g.h, "cqh")
+        set("--cl", caps.l, g.w, "cqw")
+        set("--cr", caps.r, g.w, "cqw")
+        if (g.control === "checkbox") {
+            set("--eh", r[3], g.h, "cqh")
+            set("--ew", r[2], g.w, "cqw")
+        }
+    })
+}
+
 export function buildControls(parent: ShadowRoot | HTMLElement, manifest: Manifest, hooks: ControlHooks): Controls {
     const layer = document.createElement("div")
     layer.className = "masque-controls"
@@ -893,6 +998,7 @@ export function buildControls(parent: ShadowRoot | HTMLElement, manifest: Manife
         layer.append(c.box_)
     }
     if (els.size) parent.append(layer)
+    reach(manifest, els)
     return {
         update_(m, sent) {
             for (const l of m.layers) {
@@ -927,6 +1033,8 @@ export function buildControls(parent: ShadowRoot | HTMLElement, manifest: Manife
                     hooks.adopt_(l.id, envelope(l.id, g.value))
                 }
             }
+            // Boxes may have moved: each control's room to its neighbours with them.
+            reach(m, els)
         },
         set_(id, env) {
             const c = els.get(id)

@@ -4,7 +4,7 @@ import { emptyMask, maskHit } from "./gridmask"
 import { touchDown, touchMove, touchUp, touchCancel, keepOnLeave, unpinOnScroll, onTouchMove, onContextMenu, disposeTouch } from "./touch"
 import { applyMove, onLeave, hideTip, hideViewReadout, showViewReadout, syncFocusTip, replaceTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
-import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onDoubleClick, onPointerMove } from "./bond"
+import { isApplePlatform, photoHeldByOther, onDown, onUp, onCancel, onLostCapture, onClick, onDoubleClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import { buildDragStops } from "./dragkeys"
 import { fieldSelection, recordPicks } from "./history"
@@ -17,6 +17,8 @@ import { limitsTip } from "./drag/view"
 import * as viewDrag from "./drag/view"
 import { createGestureChannel } from "./gesture"
 import { buildControls, CONTROLS_STYLE } from "./controls"
+import { buildViewButtons, VIEW_BUTTONS_STYLE } from "./viewbuttons"
+import type { ViewButtons } from "./viewbuttons"
 import { DEFAULT_SIGDIGITS } from "./template"
 import type { GestureChannel } from "./gesture"
 import type { FrameResponse, RenderFrame } from "./gesture"
@@ -24,8 +26,8 @@ import { isLightBackground } from "./color"
 import { createFade } from "./fade"
 import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, oneHome, MOTION_MS, NOTE_MS } from "./state"
 import type { HiGroups, HiSet, OverlayCtx } from "./state"
-import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
-import { axisFrame, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
+import type { Hit, HitLayer, Limits3, Manifest, ViewGeometry } from "./types"
+import { axisFrame, innermostView, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
 import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_HINT_MS, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
 
@@ -276,6 +278,14 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-halo-ink, var(--ma
 }
 `
 
+// Safari's GestureEvent (#541), which the DOM typings leave out: `scale` is cumulative since
+// gesturestart, 1 at the start.
+interface SafariGestureEvent extends UIEvent {
+    readonly scale: number
+    readonly clientX: number
+    readonly clientY: number
+}
+
 interface Mounted {
     cleanup: () => void
 }
@@ -335,7 +345,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const shadowHost = document.createElement("div")
     const shadow = shadowHost.attachShadow({ mode: "open" })
     const style = document.createElement("style")
-    style.textContent = STYLE + CONTROLS_STYLE
+    style.textContent = STYLE + CONTROLS_STYLE + VIEW_BUTTONS_STYLE
 
     // Three coordinate-identical top-level <svg>s. The fill svg carries color-dodge (Firefox
     // only honours mix-blend-mode on a top-level svg). The edge svg paints the flat chrome
@@ -605,7 +615,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // Where the pointer last moved over the plot, so an \`onchange\` frame can redraw its hover.
     let lastMove: PointerEvent | null = null
     const onchangeSettle = (): Record<string, unknown> => ({ onchange: true, state: currentState(), settle: true })
-    const rawChannel = createGestureChannel(requestFrame ?? null, applyFrame, () => { clearPhoto() })
+    // The corner view buttons (#525), built once the ctx exists, on a live channel only.
+    let viewButtons: ViewButtons | null = null
+    const rawChannel = createGestureChannel(requestFrame ?? null, applyFrame, () => { clearPhoto(); viewButtons?.dead_() })
     // A docs player answers `onchange` from frames it harvested at build time, where a live
     // kernel would (docs/pluto_html_export.jl). View gestures still have no kernel there.
     const replay = (window as unknown as { masqueReplayFrame?: RenderFrame }).masqueReplayFrame
@@ -625,16 +637,18 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         if (typeof input.id === "string" && input.reset !== true && input.onchange !== true) state.viewMoved_.add(input.id)
     }
     const channel: GestureChannel = {
-        request(input) { builtAt.set(input, photoFrames); noteMoved(input); route(input.onchange === true).request(input) },
+        request(input) { builtAt.set(input, photoFrames); noteMoved(input); viewButtons?.sync_(); route(input.onchange === true).request(input) },
         settle(input, slot) {
             const ch = route(slot === "onchange")
             // A built-when-sent input is relative to the frame on screen when it is sent.
             if (typeof input === "function") return ch.settle(() => { const o = input(); builtAt.set(o, photoFrames); return o }, slot)
             builtAt.set(input, photoFrames)
             noteMoved(input)
+            viewButtons?.sync_()
             return ch.settle(input, slot)
         },
         dispose() { rawChannel.dispose(); replayChannel?.dispose() },
+        alive: () => rawChannel.alive(),
     }
 
     const fade = createFade({
@@ -868,6 +882,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         newManifest.background ??= ctx.manifest_.background
         newManifest.overlayStyle ??= ctx.manifest_.overlayStyle
         newManifest.tipStyle ??= ctx.manifest_.tipStyle
+        newManifest.touch ??= ctx.manifest_.touch
         const onchangeFrame = input.onchange === true
         // An in-drag \`onchange\` frame trails the pointer by a round trip. Its lines and boxes
         // would pull the control back to where it was then, so the ones on screen stay, with
@@ -991,6 +1006,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             paintPhoto(IDENTITY)
         } else adoptPhoto(input)
         dragStops?.sync_()
+        viewButtons?.layout_()
         if (focused && !state.drag_) {
             const k = ctx.focusable_.findIndex((f) => f.layer_.id === focused.id && f.index_ === focused.index)
             if (k >= 0) focusTo(ctx, state, k)
@@ -1093,6 +1109,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ctx.fade_.refresh_()
         state.surfaceSized_ = false
         replaceTip(ctx, state)
+        viewButtons?.layout_()
     }
     // The axis frame (spines, ticks, labels) stays on the untransformed base. A copy of the
     // same pixels, clipped to the pan view's viewport, carries the matrix, so only the data
@@ -1252,8 +1269,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(overlayTick)
 
-    const down = (e: PointerEvent) => { onDown(ctx, state, e); touchDown(ctx, state, e) }
-    const move = (e: PointerEvent) => { lastMove = e; touchMove(ctx, state, e); onPointerMove(ctx, state, e) }
+    // Where a pointer is over the figure, for the corner view buttons (#525).
+    const atButtons = (e: PointerEvent) => viewButtons?.pointer_(layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY), e.pointerType === "touch")
+    const down = (e: PointerEvent) => { if (e.pointerType === "touch") atButtons(e); onDown(ctx, state, e); touchDown(ctx, state, e) }
+    const move = (e: PointerEvent) => { lastMove = e; if (e.pointerType !== "touch") atButtons(e); touchMove(ctx, state, e); onPointerMove(ctx, state, e) }
     const releaseChrome = (kind: string | undefined) => {
         if ((kind === "roi" || kind === "threshold" || kind === "span") && !state.drag_) flushPendingChrome()
     }
@@ -1272,6 +1291,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         releaseChrome(kind)
     }
     const leave = (e: PointerEvent) => {
+        if (e.pointerType !== "touch" && !viewButtons?.owns_(e.relatedTarget)) viewButtons?.pointer_(null, false)
         // onLeave nulls an uncaptured drag. Capture the kind first or the deferred
         // ROI/threshold frame stays pending with the old nodes still on screen.
         const kind = state.drag_?.kind
@@ -1311,50 +1331,48 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const wheelHint = `${isApplePlatform() ? "Cmd" : "Ctrl"} + scroll to zoom`
     const showWheelHint = () => showNote(wheelHint, "hint", WHEEL_HINT_MS)
 
-    const onWheel = (e: WheelEvent) => {
-        if (state.drag_) return
+    // The view under a client point, and what its wheel policy is, or null off every view.
+    const viewAt = (clientX: number, clientY: number) => {
         // The axis viewport is in layout pixels. The zoom anchor is the content pixel
         // under the cursor, or a second notch walks off it.
-        const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
-        let id = ""
-        let axis = ""
-        let limits3: Limits3 | null = null // an Axis3 view's limits, on screen now
-        let wheel: ViewGeometry["wheel"] = "modifier"
-        for (const layer of ctx.manifest_.layers) {
-            if (layer.kind !== "view" || !layer.events.includes("drag")) continue
-            const g = layer.geometry as ViewGeometry
-            if (layout.x < g.x || layout.x > g.x + g.w || layout.y < g.y || layout.y > g.y + g.h) continue
-            if (g.mode === "orbit") {
-                if (!g.limits) continue
-                id = layer.id
-                limits3 = g.limits
-                wheel = g.wheel ?? "modifier"
-                break
-            }
-            if (!ctx.manifest_.transforms[layer.axis]) continue
-            id = layer.id
-            axis = layer.axis
-            wheel = g.wheel ?? "modifier"
-            break
+        const layout = layoutImagePx(ctx.base_, ctx.manifest_, clientX, clientY)
+        // A new gesture zooms the innermost view under the pointer: an inset's own, not its
+        // parent's (#559). Later notches keep that view, as a drag does, so a zoom that drifts
+        // across the inset's edge doesn't hand the parent's photograph to the inset.
+        // `zoomable` lets the wheel over an inset that can't zoom fall through to its parent.
+        // A drag there still goes to the inset (yieldsToInnerView has no such filter); every
+        // view Julia ships today has its transform or limits, so the two never differ.
+        const zoomable = (l: HitLayer) => {
+            const g = l.geometry as ViewGeometry
+            return g.mode === "orbit" ? !!g.limits : !!ctx.manifest_.transforms[l.axis]
         }
-        if (!id) return
-        // #526: a plain wheel scrolls the page unless the view asked for `wheel = :always`.
-        // A trackpad pinch arrives as Ctrl+wheel in Chrome and Firefox, so it still zooms.
-        if (wheel === "none") return
-        if (wheel === "modifier" && !e.ctrlKey && !e.metaKey) {
-            if (e.deltaY !== 0) showWheelHint() // a sideways scroll is no attempt to zoom
-            return
-        }
-        e.preventDefault()
+        const live = state.wheelTimer_ !== null && state.wheelViewId_ !== null
+            ? ctx.manifest_.layers.find((l) => l.id === state.wheelViewId_ && l.kind === "view" && zoomable(l))
+            : undefined
+        const layer = live ?? innermostView(ctx.manifest_, layout.x, layout.y, "drag", zoomable)
+        if (!layer) return null
+        const g = layer.geometry as ViewGeometry
+        const wheel: NonNullable<ViewGeometry["wheel"]> = g.wheel ?? "modifier"
+        // An Axis3 view's limits, on screen now.
+        if (g.mode === "orbit") return { id: layer.id, axis: "", limits3: (g.limits ?? null) as Limits3 | null, wheel, layout }
+        return { id: layer.id, axis: layer.axis, limits3: null as Limits3 | null, wheel, layout }
+    }
+
+    // Zoom a view by `k` (above 1 zooms in) about the point `viewAt` found, through the
+    // photograph and the idle settle a wheel notch uses. A Safari pinch comes here too (#541).
+    const zoomView = (hit: NonNullable<ReturnType<typeof viewAt>>, k: number) => {
+        const { id, axis, limits3, layout } = hit
+        if (!limits3 && photoHeldByOther(state, id)) return
         if (limits3) {
             const shown = limits3
             // Axis3 (#321): no photograph to scale. Each notch asks for limits scaled about
             // their center; the idle timer settles the last ones at full resolution.
-            const lim = viewDrag.zoom3(state, id, shown, wheelScale(e.deltaY, e.deltaMode))
+            const lim = viewDrag.zoom3(state, id, shown, k)
             ctx.gesture_.request({ id, limits: lim, settle: false })
             showViewReadout(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
             if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
             const wheelId = id
+            state.wheelViewId_ = id
             state.wheelTimer_ = setTimeout(() => {
                 state.wheelTimer_ = null
                 hideViewReadout(ctx)
@@ -1364,7 +1382,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         state.photoViewId_ = id
         const local = unmapPoint(state.photo_, layout)
-        const next = zoomAt(state.photo_, local, wheelScale(e.deltaY, e.deltaMode))
+        const next = zoomAt(state.photo_, local, k)
         state.photo_ = next
         paintPhoto(next)
         const lim = matrixLimits(ctx.manifest_.transforms[axis], next)
@@ -1374,6 +1392,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
         const wheelId = id
+        state.wheelViewId_ = id
         const wheelAxis = axis
         state.wheelTimer_ = setTimeout(() => {
             state.wheelTimer_ = null
@@ -1386,8 +1405,83 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }, WHEEL_IDLE_MS)
     }
 
+    // The scale of the Safari pinch in progress at its last change, or null when none is (#541).
+    let pinchScale: number | null = null
+
+    const onWheel = (e: WheelEvent) => {
+        if (state.drag_) return
+        const hit = viewAt(e.clientX, e.clientY)
+        if (!hit) return
+        // #526: a plain wheel scrolls the page unless the view asked for `wheel = :always`.
+        // A trackpad pinch arrives as Ctrl+wheel in Chrome and Firefox, so it still zooms.
+        if (hit.wheel === "none") return
+        if (hit.wheel === "modifier" && !e.ctrlKey && !e.metaKey) {
+            if (e.deltaY !== 0) showWheelHint() // a sideways scroll is no attempt to zoom
+            return
+        }
+        e.preventDefault()
+        // A Safari pinch already zooms through its gesture events; a wheel it sends alongside
+        // must not zoom a second time.
+        if (pinchScale !== null) return
+        zoomView(hit, wheelScale(e.deltaY, e.deltaMode))
+    }
+
+    // #541: Safari sends a trackpad pinch as gesturestart / gesturechange / gestureend with a
+    // cumulative `scale`, not as Ctrl+wheel. Over a view that takes the wheel (`:modifier` or
+    // `:always`) each change zooms by the ratio to the last one, about the gesture's point,
+    // and Safari does not zoom the page. `wheel = :none` leaves the pinch to Safari.
+    //
+    // iOS and iPadOS Safari fire the same events for a two-finger touch pinch. That one is a
+    // touch gesture, and #537 owns touch, so a gesture that starts with fingers on the plot is
+    // left alone. Touch events count the fingers: unlike pointers, the browser doesn't cancel
+    // them when it takes the gesture over.
+    let touchesDown = 0
+    const countTouches = (e: TouchEvent) => {
+        touchesDown = e.touches.length
+    }
+    const pinchView = (e: Event) => {
+        const g = e as SafariGestureEvent
+        if (state.drag_) return null
+        const hit = viewAt(g.clientX, g.clientY)
+        return hit && hit.wheel !== "none" ? hit : null
+    }
+    const onGestureStart = (e: Event) => {
+        // A gesturestart always ends whatever pinch came before, even one whose gestureend
+        // never arrived.
+        pinchScale = null
+        if (touchesDown > 0 || !pinchView(e)) return
+        e.preventDefault()
+        pinchScale = 1
+    }
+    const onGestureChange = (e: Event) => {
+        if (pinchScale === null) return
+        e.preventDefault()
+        const scale = (e as SafariGestureEvent).scale
+        if (!(scale > 0)) return
+        const k = scale / pinchScale
+        pinchScale = scale // off the view mid-pinch, the next change still zooms by its own step
+        const hit = pinchView(e)
+        if (hit && k !== 1) zoomView(hit, k)
+    }
+    const onGestureEnd = (e: Event) => {
+        if (pinchScale === null) return
+        e.preventDefault()
+        pinchScale = null // the wheel's idle timer settles the last change
+    }
+    // A pinch whose gestureend was lost (the window lost focus mid-pinch) must not leave every
+    // later Ctrl+wheel swallowed.
+    const endPinch = () => {
+        pinchScale = null
+    }
+
     surface.addEventListener("pointerdown", down)
     surface.addEventListener("wheel", onWheel, { passive: false })
+    surface.addEventListener("gesturestart", onGestureStart)
+    surface.addEventListener("gesturechange", onGestureChange)
+    surface.addEventListener("gestureend", onGestureEnd)
+    surface.addEventListener("pointerdown", endPinch)
+    window.addEventListener("blur", endPinch)
+    for (const t of ["touchstart", "touchend", "touchcancel"] as const) surface.addEventListener(t, countTouches, { passive: true })
     surface.addEventListener("pointermove", move)
     surface.addEventListener("pointerup", up)
     surface.addEventListener("pointercancel", cancel)
@@ -1401,6 +1495,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     surface.addEventListener("focusout", focusout)
     // After the surface in the shadow root, so Tab reaches the plot first, then each drag layer.
     dragStops = buildDragStops(ctx, state, shadow)
+    if (channel.alive()) viewButtons = buildViewButtons(ctx, state, shadow, () => {
+        const w = ctx.base_.getBoundingClientRect().width
+        return w > 0 ? ctx.manifest_.width / w : ctx.manifest_.scaling || 1
+    })
 
     // Drawn into g.sel, not g.hi: it must survive hovers (onMove clears g.hi on every miss)
     // and support multiple selected indices (drawHi keeps only the last).
@@ -1414,8 +1512,15 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         cleaned = true
         loadToken += 1
         controls.remove_()
+        viewButtons?.remove_()
         surface.removeEventListener("pointerdown", down)
         surface.removeEventListener("wheel", onWheel)
+        surface.removeEventListener("gesturestart", onGestureStart)
+        surface.removeEventListener("gesturechange", onGestureChange)
+        surface.removeEventListener("gestureend", onGestureEnd)
+        surface.removeEventListener("pointerdown", endPinch)
+        window.removeEventListener("blur", endPinch)
+        for (const t of ["touchstart", "touchend", "touchcancel"] as const) surface.removeEventListener(t, countTouches)
         surface.removeEventListener("pointermove", move)
         surface.removeEventListener("pointerup", up)
         surface.removeEventListener("pointercancel", cancel)

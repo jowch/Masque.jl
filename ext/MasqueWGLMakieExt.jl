@@ -23,13 +23,18 @@ is loaded: serializes `fig`'s scene and renders it in a WebGL `<canvas>` on the 
 Masque's usual JS overlay layered on top — same `masque`/`@bind`/`InteractionEvent` contract as
 the `:cairo` backend, for animation, large/live data, and live 3D. Needs `backend = :webgl` if
 both `CairoMakie` and `WGLMakie` are loaded (`masque` otherwise defaults to `:cairo`). Its
-density is `masque`'s `px_per_unit`, `2` by default; `WGLMakie.activate!` settings never apply
+density follows `masque`'s `max_width` as `CairoBackend`'s does (canvas ≈ 2× `min(figure width,
+max_width)`) unless `masque`'s `px_per_unit` sets it; `WGLMakie.activate!` settings never apply
 to the widget.
 """
 struct WebGLBackend <: AbstractBackend end
 Masque._builtin_backend(::Val{:webgl}) = WebGLBackend()
 
-Masque._ppu(::WebGLBackend, _fig, _max_width) = 2.0
+# Same rule as CairoBackend's: about twice the width the canvas shows at (#548).
+function Masque._ppu(::WebGLBackend, fig, max_width)
+    sw = size(fig.scene)[1]
+    return 2 * min(sw, max_width) / sw
+end
 
 # Every non-public WGLMakie/Bonito surface goes through one of these three (this extension is
 # the only place WGLMakie/Bonito are in scope); see test/webgl_ext_tests.jl's version-coupling guard.

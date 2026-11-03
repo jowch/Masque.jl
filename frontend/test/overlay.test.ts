@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { CONTROLS_STYLE } from "../src/controls"
+import { CONTROLS_STYLE, reachCaps } from "../src/controls"
 import { afterEach, describe, it, expect, vi } from "vitest"
 import { mount as mountOverlay } from "../src/overlay"
 
@@ -4668,8 +4668,9 @@ describe("photographic pan / wheel zoom", () => {
         // ax3 has no transform: its canvases cover the whole image, unclipped
         expect(canvasT("ax3")).toBe("")
         expect(fade("ax3").style.clipPath).toBe("")
-        // every axis's g.sel paints below every axis's g.link, and that below every g.hi
-        for (const svg of shadow.querySelectorAll("svg")) {
+        // every axis's g.sel paints below every axis's g.link, and that below every g.hi, in
+        // each overlay svg (not a corner button's icon, #525)
+        for (const svg of shadow.querySelectorAll("svg.masque-fill, svg.masque-edge, svg.masque-plain")) {
             const order = [...svg.querySelectorAll("g.masque-photo > g.sel, g.masque-photo > g.link, g.masque-photo > g.hi")].map((el) => el.getAttribute("class"))
             expect(order).toEqual(["sel", "sel", "sel", "link", "link", "link", "hi", "hi", "hi"])
         }
@@ -5029,6 +5030,173 @@ describe("photographic pan / wheel zoom", () => {
                 await Promise.resolve()
                 expect(requestFrame).not.toHaveBeenCalled()
             }
+        })
+    }
+
+    // #541: Safari sends a trackpad pinch as gesture* events with a cumulative `scale`.
+    const gesture = (surface: HTMLElement, type: string, scale: number, x = 100, y = 200) => {
+        const ev = new Event(type, { bubbles: true, cancelable: true })
+        Object.defineProperty(ev, "scale", { value: scale })
+        Object.defineProperty(ev, "clientX", { value: x })
+        Object.defineProperty(ev, "clientY", { value: y })
+        surface.dispatchEvent(ev)
+        return ev
+    }
+    const photoOf = (host: HTMLElement) => {
+        const p = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+        return { s: p[0], tx: p[1], ty: p[2] }
+    }
+
+    for (const wheel of ["modifier", "always", undefined] as const) {
+        it(`pan: with wheel = ${wheel ?? "default"}, a Safari pinch zooms about its point and settles when idle`, async () => {
+            vi.useFakeTimers()
+            try {
+                const { host, script } = setup()
+                const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+                mount(script, withWheel("pan", wheel), undefined, requestFrame)
+                const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+                // Client (100, 200) on the 600x400 image is layout pixel (200, 400).
+                const at = { x: 100 / 600 * 1200, y: 200 / 400 * 800 }
+                expect(gesture(surface, "gesturestart", 1).defaultPrevented).toBe(true)
+                expect(gesture(surface, "gesturechange", 1.5).defaultPrevented).toBe(true)
+                let photo = photoOf(host)
+                expect(photo.s).toBeCloseTo(1.5)
+                expect(mapPoint(photo, at).x).toBeCloseTo(at.x)
+                expect(mapPoint(photo, at).y).toBeCloseTo(at.y)
+                // `scale` is cumulative: 2 after 1.5 zooms by 4/3 more, still about the point.
+                gesture(surface, "gesturechange", 2)
+                photo = photoOf(host)
+                expect(photo.s).toBeCloseTo(2)
+                expect(mapPoint(photo, at).x).toBeCloseTo(at.x)
+                expect(mapPoint(photo, at).y).toBeCloseTo(at.y)
+                await Promise.resolve()
+                expect(requestFrame).toHaveBeenCalled()
+                expect((requestFrame.mock.calls as unknown as [Record<string, unknown>][])[0][0]).toMatchObject({ id: "view", settle: false })
+                expect(gesture(surface, "gestureend", 2).defaultPrevented).toBe(true)
+                await vi.advanceTimersByTimeAsync(200)
+                const calls = requestFrame.mock.calls as unknown as [Record<string, unknown>][]
+                expect(calls[calls.length - 1][0]).toMatchObject({ id: "view", settle: true })
+            } finally {
+                vi.useRealTimers()
+            }
+        })
+    }
+
+    it("pan: a pinch-in zooms out, and a Ctrl+wheel Safari sends during a pinch does not zoom twice", () => {
+        const { host, script } = setup()
+        mount(script, withWheel("pan", "modifier"), undefined, vi.fn(async () => ({ png: new Uint8Array([1]) })))
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        gesture(surface, "gesturestart", 1)
+        gesture(surface, "gesturechange", 0.5)
+        expect(photoOf(host).s).toBeCloseTo(0.5)
+        const ev = plainWheel(surface, { ctrlKey: true })
+        expect(ev.defaultPrevented).toBe(true)
+        expect(photoOf(host).s).toBeCloseTo(0.5)
+        gesture(surface, "gestureend", 0.5)
+        plainWheel(surface, { ctrlKey: true }) // after the pinch, a Ctrl+wheel zooms again
+        expect(photoOf(host).s).toBeGreaterThan(0.5)
+    })
+
+    it("orbit: a Safari pinch asks for zoomed Axis3 limits", async () => {
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+        mount(script, withWheel("orbit", "modifier"), undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        expect(gesture(surface, "gesturestart", 1).defaultPrevented).toBe(true)
+        expect(gesture(surface, "gesturechange", 2).defaultPrevented).toBe(true)
+        await Promise.resolve()
+        expect(requestFrame).toHaveBeenCalled()
+        const calls = requestFrame.mock.calls as unknown as [{ id: string; limits: number[]; settle: boolean }][]
+        const { limits, settle } = calls[0][0]
+        expect(settle).toBe(false)
+        // Twice as close: each axis spans half its 10 units, about the center.
+        expect(limits[1] - limits[0]).toBeCloseTo(5)
+        expect((limits[0] + limits[1]) / 2).toBeCloseTo(5)
+        gesture(surface, "gestureend", 2)
+    })
+
+    // iOS / iPadOS Safari fire gesture events for a two-finger touch pinch too. That is #537's.
+    const touches = (surface: HTMLElement, type: string, n: number) => {
+        const ev = new Event(type, { bubbles: true, cancelable: true })
+        Object.defineProperty(ev, "touches", { value: { length: n } })
+        surface.dispatchEvent(ev)
+    }
+    it("pan: a gesture that starts with fingers on the plot (an iOS touch pinch) is left alone", () => {
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+        mount(script, withWheel("pan", "modifier"), undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        touches(surface, "touchstart", 1)
+        touches(surface, "touchstart", 2)
+        for (const [type, scale] of [["gesturestart", 1], ["gesturechange", 1.5], ["gestureend", 1.5]] as const) {
+            expect(gesture(surface, type, scale).defaultPrevented).toBe(false)
+        }
+        expect(host.dataset.masquePhoto ?? "").toBe("")
+        expect(requestFrame).not.toHaveBeenCalled()
+        // Once the fingers lift, a trackpad pinch zooms again.
+        touches(surface, "touchend", 1)
+        touches(surface, "touchend", 0)
+        expect(gesture(surface, "gesturestart", 1).defaultPrevented).toBe(true)
+        gesture(surface, "gesturechange", 1.5)
+        expect(photoOf(host).s).toBeCloseTo(1.5)
+        gesture(surface, "gestureend", 1.5)
+    })
+
+    it("pan: a pinch off every view is left to Safari's page zoom", () => {
+        const { host, script } = setup()
+        const m = withWheel("pan", "modifier")
+        Object.assign(m.layers[0].geometry as unknown as Record<string, unknown>, { x: 0, y: 0, w: 600, h: 400 })
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        // Client (500, 300) is layout pixel (1000, 600), outside the view's top-left quarter.
+        for (const [type, scale] of [["gesturestart", 1], ["gesturechange", 1.5], ["gestureend", 1.5]] as const) {
+            expect(gesture(surface, type, scale, 500, 300).defaultPrevented).toBe(false)
+        }
+        expect(host.dataset.masquePhoto ?? "").toBe("")
+        expect(requestFrame).not.toHaveBeenCalled()
+    })
+
+    it("pan: a pinch whose gestureend never comes does not keep swallowing Ctrl+wheel", async () => {
+        vi.useFakeTimers()
+        try {
+            for (const end of ["blur", "pointerdown", "gesturestart"] as const) {
+                const { host, script } = setup()
+                mount(script, withWheel("pan", "modifier"), undefined, vi.fn(async () => ({ png: new Uint8Array([1]) })))
+                const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+                gesture(surface, "gesturestart", 1)
+                gesture(surface, "gesturechange", 0.5)
+                if (end === "blur") window.dispatchEvent(new Event("blur"))
+                // A pointerdown off every view, so it starts no pan.
+                else if (end === "pointerdown") surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 5000, clientY: 5000, bubbles: true }))
+                else {
+                    // A new pinch that starts off the view: not taken, but it ends the stale
+                    // one. Past the idle settle, so the zoom no longer holds on to its view
+                    // (#559) and the new pinch really is off every view.
+                    await vi.advanceTimersByTimeAsync(200)
+                    gesture(surface, "gesturestart", 1, 5000, 5000)
+                }
+                const before = photoOf(host).s
+                plainWheel(surface, { ctrlKey: true })
+                expect(photoOf(host).s).toBeGreaterThan(before)
+            }
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    for (const mode of ["pan", "orbit"] as const) {
+        it(`${mode}: with wheel = none a Safari pinch is left to the page`, async () => {
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+            mount(script, withWheel(mode, "none"), undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            for (const [type, scale] of [["gesturestart", 1], ["gesturechange", 1.5], ["gestureend", 1.5]] as const) {
+                expect(gesture(surface, type, scale).defaultPrevented).toBe(false)
+            }
+            expect(host.dataset.masquePhoto ?? "").toBe("")
+            await Promise.resolve()
+            expect(requestFrame).not.toHaveBeenCalled()
         })
     }
 
@@ -7475,6 +7643,68 @@ describe("block controls (#345)", () => {
         expect(sent).toBe(1)
     })
 
+    it("a finger's reach past each control stops halfway to the next control or axis (#531)", () => {
+        // An axis above the slider, 100 image px up.
+        const m = controlsManifest({ transforms: { ax: { viewport: [100, 100, 400, 500] } as unknown as Manifest["transforms"][string] } })
+        m.layers.push({ id: "fine", kind: "control", axis: "", events: ["change"], payloads: [], label: "fine",
+            geometry: { control: "checkbox", x: 950, y: 700, w: 40, h: 30, value: false, size: 20 } })
+        m.fields = [...(m.fields ?? []), "fine"]
+        m.initial!.fine = { layer: "fine", index: 0, payload: false }
+        const { host, script } = setup()
+        mount(script, m)
+        const v = (id: string, name: string) => ctl(host, id).style.getPropertyValue(name)
+        // The slider: the axis 100 px above, the interval slider 20 px below, the toggle 100 px
+        // to the right. Room is half each gap, as a share of the slider's own box.
+        expect(v("deg", "--ct")).toBe(`${(100 * 50) / 20}cqh`)
+        expect(v("deg", "--cb")).toBe(`${(100 * 10) / 20}cqh`)
+        expect(v("deg", "--cr")).toBe(`${(100 * 50) / 400}cqw`)
+        // Left, nothing but the figure's edge 100 px away: the whole distance, not half.
+        expect(v("deg", "--cl")).toBe(`${(100 * 100) / 400}cqw`)
+        expect(v("span", "--ct")).toBe(`${(100 * 10) / 20}cqh`)
+        // Below, the figure's bottom edge 40 px away.
+        expect(v("span", "--cb")).toBe(`${(100 * 40) / 20}cqh`)
+        // The toggle sits between the slider and the menu; nothing above or below it.
+        expect(v("show", "--cl")).toBe(`${(100 * 50) / 60}cqw`)
+        expect(v("show", "--cr")).toBe(`${(100 * 20) / 60}cqw`)
+        expect(v("show", "--ct")).toBe(`${(100 * 700) / 30}cqh`)
+        // A menu is a neighbour but doesn't reach itself.
+        expect(v("pick", "--cl")).toBe("")
+        // A checkbox reaches from its square, 10 px in from its box: 60 px from the menu.
+        expect(v("fine", "--ew")).toBe(`${(100 * 20) / 40}cqw`)
+        expect(v("fine", "--eh")).toBe(`${(100 * 20) / 30}cqh`)
+        expect(v("fine", "--cl")).toBe(`${(100 * 30) / 40}cqw`)
+        // Only where some input is coarse, and nothing drawn grows.
+        expect(CONTROLS_STYLE).toContain("@media (any-pointer: coarse)")
+        expect(reachCaps([0, 0, 10, 10], [[0, 30, 10, 10], [20, 0, 10, 10], [20, 30, 10, 10], [2, 2, 4, 4]])).toEqual({ t: Infinity, b: 10, l: Infinity, r: 5 })
+        // A control at the figure's edge reaches no further than the picture.
+        expect(reachCaps([0, 5, 10, 10], [], [100, 20])).toEqual({ t: 5, b: 5, l: 0, r: 90 })
+    })
+
+    it("a slider grid's rows split the gap between them, and a new frame moves the room with the boxes (#531)", async () => {
+        const grid = (dy: number): Manifest["layers"][number] => ({ id: "grid", kind: "control", axis: "", events: ["change"], payloads: [], label: "grid",
+            geometry: { control: "slidergrid", x: 100, y: 500, w: 600, h: 100, value: [2, 1], sliders: [
+                { control: "slider", x: 200, y: 500, w: 400, h: 20, value: 2, n: 5, horizontal: true },
+                { control: "slider", x: 200, y: 530 + dy, w: 400, h: 20, value: 1, n: 5, horizontal: true },
+            ] } })
+        const m = controlsManifest({ onchange: true })
+        m.layers.push(grid(0))
+        m.fields = [...(m.fields ?? []), "grid"]
+        m.initial!.grid = { layer: "grid", index: 0, payload: [2, 1] }
+        const next = controlsManifest({ onchange: true })
+        next.layers.push(grid(20))
+        const { host, script } = setup()
+        mount(script, m, undefined, vi.fn(frame(next)))
+        const kids = () => [...ctl(host, "grid").querySelectorAll(".masque-control")] as HTMLElement[]
+        expect(kids()[0].style.getPropertyValue("--cb")).toBe(`${(100 * 5) / 20}cqh`)
+        expect(kids()[1].style.getPropertyValue("--ct")).toBe(`${(100 * 5) / 20}cqh`)
+        const range = kids()[0].querySelector("input") as HTMLInputElement
+        range.value = "3"
+        range.dispatchEvent(new Event("change", { bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+        host.querySelector("img")!.dispatchEvent(new Event("load"))
+        expect(kids()[1].style.getPropertyValue("--ct")).toBe(`${(100 * 15) / 20}cqh`)
+    })
+
     it("a slider grid draws each slider and its value label, and commits all its values together (#430)", () => {
         const m = controlsManifest()
         m.layers.push({ id: "grid", kind: "control", axis: "", events: ["change"], payloads: [], label: "grid",
@@ -7746,5 +7976,126 @@ describe("a grid pick is inset or centred by its own size, not the grid's smalle
         const xedges = [0, 2, ...Array.from({ length: n - 1 }, (_, k) => 2 + w * (k + 1))]
         expect(align(grid([1, 5, 3, 2, 5, 3], xedges))).toBe("in")
         expect(align(grid([1, 0, 1, 2, 0, 1], xedges))).toBe("mid") // the thin column itself
+    })
+})
+
+// #559: an inset axis with its own view sits inside its parent's. The pointer over the inset
+// drives the inset's view, by wheel, by drag and by Shift+drag; outside it, the parent's.
+describe("nested views", () => {
+    const nested = (): Manifest => ({
+        width: 1200, height: 800, scaling: 2,
+        transforms: {
+            outer: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false },
+            inset: { xlims: [0, 1], ylims: [0, 1], xscale: "identity", yscale: "identity",
+                viewport: [500, 300, 300, 200], xreversed: false, yreversed: false },
+        },
+        // The parent is listed first, as Makie lists the axes it was given.
+        layers: [
+            { id: "vout", kind: "view", axis: "outer", events: ["drag"], payloads: [],
+                geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            { id: "vin", kind: "view", axis: "inset", events: ["drag"], payloads: [],
+                geometry: { x: 500, y: 300, w: 300, h: 200, mode: "pan" } },
+        ],
+    })
+    const wheel = (surface: HTMLElement, x: number, y: number) => {
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -120 })
+        Object.defineProperty(ev, "ctrlKey", { value: true })
+        Object.defineProperty(ev, "clientX", { value: x })
+        Object.defineProperty(ev, "clientY", { value: y })
+        surface.dispatchEvent(ev)
+    }
+    const drag = (surface: HTMLElement, x: number, y: number, shiftKey = false) => {
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: x, clientY: y, shiftKey, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: x + 20, clientY: y + 10, shiftKey, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: x + 20, clientY: y + 10, shiftKey, bubbles: true }))
+    }
+    // Each frame's picture loads (happy-dom never fires the load itself).
+    const landFrames = async (a: { host: HTMLElement; img: HTMLImageElement }) => {
+        for (let i = 0; i < 10 && a.host.dataset.masquePhoto; i++) {
+            a.img.dispatchEvent(new Event("load"))
+            for (let k = 0; k < 10; k++) await Promise.resolve()
+        }
+    }
+    const mounted = () => {
+        const { host, img, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]), manifest: nested() }))
+        mount(script, nested(), undefined, requestFrame)
+        // display scale 1200/600 = 2: client (300, 200) is image (600, 400), inside the inset
+        img.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        const calls = () => requestFrame.mock.calls.map((c) => (c as unknown[])[0] as { id: string; settle?: boolean })
+        const ids = () => calls().map((c) => c.id)
+        return { surface, ids, calls, host, img }
+    }
+
+    it("a wheel over the inset zooms the inset, and outside it the parent", async () => {
+        const a = mounted()
+        wheel(a.surface, 300, 200)
+        await Promise.resolve()
+        expect(a.ids()[0]).toBe("vin")
+        const b = mounted()
+        wheel(b.surface, 100, 100)
+        await Promise.resolve()
+        expect(b.ids()[0]).toBe("vout")
+    })
+
+    it("a wheel gesture that drifts onto the inset keeps zooming the parent", async () => {
+        vi.useFakeTimers()
+        try {
+            const a = mounted()
+            wheel(a.surface, 100, 100)
+            wheel(a.surface, 100, 100)
+            wheel(a.surface, 300, 200) // over the inset, inside the idle window
+            await vi.advanceTimersByTimeAsync(2000)
+            expect(a.ids().length).toBeGreaterThan(0)
+            expect(new Set(a.ids())).toEqual(new Set(["vout"]))
+            const settles = a.calls().filter((i) => i.settle === true)
+            expect(settles).toHaveLength(1)
+            await landFrames(a)
+            // Once that gesture has settled, a new one over the inset is the inset's.
+            wheel(a.surface, 300, 200)
+            await vi.advanceTimersByTimeAsync(2000)
+            expect(a.ids()[a.ids().length - 1]).toBe("vin")
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it("a pan on the inset waits while the parent's preview is still on screen", async () => {
+        const a = mounted()
+        drag(a.surface, 100, 100) // the parent: its frame arrives but its picture hasn't loaded
+        for (let i = 0; i < 20; i++) await Promise.resolve()
+        expect(a.host.dataset.masquePhoto).not.toBe("")
+        drag(a.surface, 300, 200) // the inset, still under the parent's photograph
+        wheel(a.surface, 300, 200) // nor does a zoom start there
+        for (let i = 0; i < 20; i++) await Promise.resolve()
+        expect(new Set(a.ids())).toEqual(new Set(["vout"]))
+        // Once the parent's picture is in, the inset pans from its own place.
+        await landFrames(a)
+        expect(a.host.dataset.masquePhoto).toBe("")
+        drag(a.surface, 300, 200)
+        for (let i = 0; i < 20; i++) await Promise.resolve()
+        const pan = a.calls().filter((c) => c.id === "vin")
+        expect(pan.length).toBeGreaterThan(0)
+        // A 20 px drag across the inset's 300 px, a third of a unit wide... in image px: 40 of 300.
+        const last = pan[pan.length - 1] as unknown as { xmin: number; xmax: number }
+        expect(last.xmax - last.xmin).toBeCloseTo(1)
+        expect(last.xmin).toBeCloseTo(-40 / 300)
+    })
+
+    it("a drag over the inset pans the inset, and outside it the parent", async () => {
+        for (const shift of [false, true]) {
+            const a = mounted()
+            drag(a.surface, 300, 200, shift)
+            await Promise.resolve()
+            expect(a.ids().length).toBeGreaterThan(0)
+            expect(new Set(a.ids())).toEqual(new Set(["vin"]))
+            const b = mounted()
+            drag(b.surface, 100, 100, shift)
+            await Promise.resolve()
+            expect(new Set(b.ids())).toEqual(new Set(["vout"]))
+        }
     })
 })

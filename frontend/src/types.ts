@@ -220,10 +220,10 @@ export interface ViewGeometry {
     fill?: string
     // pan only: axes tied to this one by Makie's `linkaxes!` (#363), whose data slides too.
     links?: ViewLink[]
-    // What a wheel over the axis does (#526). "modifier": Ctrl/Cmd+wheel (and a trackpad pinch,
-    // which Chrome and Firefox send as Ctrl+wheel) zooms, a plain wheel scrolls the page and
-    // shows a hint. "always": any wheel zooms. "none": the wheel never zooms. Absent means
-    // "modifier", the Julia default.
+    // What a wheel over the axis does (#526). "modifier": Ctrl/Cmd+wheel zooms, and so does a
+    // trackpad pinch (Ctrl+wheel in Chrome and Firefox, gesture events in Safari, #541); a plain
+    // wheel scrolls the page and shows a hint. "always": any wheel or pinch zooms. "none":
+    // neither zooms. Absent means "modifier", the Julia default.
     wheel?: "modifier" | "always" | "none"
     azimuth?: number    // radians; orbit only (current Axis3 camera)
     elevation?: number  // radians; orbit only
@@ -236,6 +236,8 @@ export interface ViewGeometry {
     // The view, or an axis linked to it, is away from where it started (#524), so a reset has
     // somewhere to go. Left out when it is at home.
     moved?: boolean
+    // The corner buttons (#525): `ViewInteractable(ax; controls)`. Left out for `:hover`, the default.
+    controls?: "always" | "none"
 }
 
 export type Limits3 = [number, number, number, number, number, number]
@@ -304,10 +306,15 @@ export interface HitLayer {
     events: string[] // "click" | "hover" | "drag" | "change" (a control)
     style?: LayerStyle
     tol?: number // hit-test slack, image px: :segments/:polyline/:lines (absent → geometry.ts's SEG_TOL fallback); :rects/:polygons reach past the shape's edge (absent → none)
+    // :circles/:segments/:polyline/:lines: how far a finger reaches to this layer's marks, CSS px
+    // (`touch_radius`). Absent → the manifest's `touch` radius.
+    touch?: number
     linewidth?: number // :segments/:polyline/:lines: the drawn line width, image px (absent → Makie's default, 1.5 logical px); fade.ts covers a line with it
     template?: TemplateSegment[] // masque"..." parsed once per layer; $() fields fill from payloads[]
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table
-    coords?: string[]            // the payload fields Masque filled in ("x", "y", "z"): they print in the axis's CoordFormat
+    // The payload fields Masque filled in that are measured along an axis, each with that axis
+    // ({ x: "x", y: "y" }; a bar's { low: "y", high: "y", value: "y" }): they print in its CoordFormat.
+    coords?: Record<string, "x" | "y" | "z">
     brush?: "elements" | "grid" // a `selects` box's target: its field holds what the box holds
     many?: true // a `select = :many` field: it holds { items: [...] }, and a click toggles one in or out
     group?: string // the `linked(...)` group this layer is a member of: its clicks edit the group's field
@@ -380,8 +387,11 @@ export interface Manifest {
     tipStyle?: Record<string, string> // figure-level --masque-tip-* custom properties
     overlayStyle?: Record<string, string> // figure-level overlay chrome custom properties (overlaystyle)
     tipDigits?: number // tooltip_sigdigits; absent means the frontend default (4)
+    // `masque(...; touch)`: a finger picks the nearest mark within `radius` CSS px (geometry.ts's
+    // touch rule); `false` gives a finger the mouse's rule. Absent → radius TOUCH_RADIUS.
+    touch?: { radius: number } | false
     background?: string // the figure's background colour (CSS string) — drives the tooltip's light/dark theme
-    // Image-px boxes [x, y, w, h] Makie draws over the axes' plots (an opaque legend). A data
+    // Image-px boxes [x, y, w, h] Makie draws over the axes' plots (an opaque legend or `Box`). A data
     // mark's highlight and fade leave them out, as the picture hides the marks under them (#437),
     // and so does its hit test: the pointer there reaches only the legend and Masque's tools (#472).
     occluders?: Array<[number, number, number, number]>
