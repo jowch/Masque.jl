@@ -153,16 +153,12 @@ jobs:
   webgl-bind-e2e:
     # THROUGH-Pluto `@bind` E2E: a live headless Pluto kernel + real Chromium, with the notebook
     # in a worker process, as users run it. The kind sweep runs its notebooks in the server
-    # process (see test/e2e/serve.jl), so the Pluto 1 leg is CI's one check that published data
-    # crosses the worker boundary to the page and a bound value comes back. The 0.20 leg is the
-    # one remaining 0.20 check; drop it at 0.5.0. Both cover the WebGL round-trip; the Pluto 1
-    # leg also runs the two WebGL page checks that need no Pluto (click.mjs, standalone_webgl.mjs).
-    name: WGLMakie bind E2E (Pluto ${{ matrix.pluto }})
+    # process (see test/e2e/serve.jl), so this is CI's one check that published data crosses the
+    # worker boundary to the page and a bound value comes back. It also runs the two WebGL page
+    # checks that need no Pluto (click.mjs, standalone_webgl.mjs). Pluto 1 is the only series
+    # tested.
+    name: WGLMakie bind E2E (Pluto 1)
     needs: setup-lts
-    strategy:
-      fail-fast: false
-      matrix:
-        pluto: ['1', '0.20']
     runs-on: ubuntu-latest
     # Worst case inside "Through-Pluto bind round-trip": 25min mount + 2×5min PLUTO_MS attempts
     # ≈ 35min, plus the port-readiness loop (≤4min) and setup steps before it — 45min leaves
@@ -188,13 +184,12 @@ jobs:
         run: |
           npm install
           npx playwright install --with-deps chromium
-      # These two WebGL pages need no Pluto session. They ride the Pluto 1 bind job, which is
-      # short, instead of the WebGL kind sweep, the slowest job in the run (#492).
+      # These two WebGL pages need no Pluto session. They ride the bind job, which is short,
+      # instead of the WebGL kind sweep, the slowest job in the run (#492).
       # A self-contained :webgl widget page (no Pluto): click scatter marker 0 in Chromium, assert
       # the overlay emits the right bond value, then feed that exact emission through
       # transform_value.
       - name: WebGL widget page click
-        if: matrix.pluto == '1'
         run: |
           julia --color=yes test/e2e/make_page.jl "$RUNNER_TEMP/e2e"
           (cd test/e2e && node click.mjs "$RUNNER_TEMP/e2e")
@@ -202,7 +197,6 @@ jobs:
       # A WebGL widget outside Pluto fetches WGLMakie's script from Makie's release tag; the
       # driver serves the installed copy at those URLs (#300).
       - name: WebGL page outside Pluto
-        if: matrix.pluto == '1'
         run: |
           julia --color=yes --project="$MASQUE_DEV_ENV" test/e2e/standalone_webgl.jl "$RUNNER_TEMP/standalone-webgl"
           cd test/e2e && node standalone_webgl.mjs "$RUNNER_TEMP/standalone-webgl"
@@ -210,12 +204,7 @@ jobs:
         # Runs even when a page check above failed, so the two results stay independent.
         if: ${{ !cancelled() }}
         working-directory: test/e2e
-        env:
-          PLUTO: ${{ matrix.pluto }}
         run: |
-          # Pluto 1 runs from MASQUE_DEV_ENV. Another series gets its own env from serve.jl,
-          # which reads PLUTO_VERSION; the notebook runs on MASQUE_DEV_ENV either way.
-          [ "$PLUTO" = "1" ] || export PLUTO_VERSION="$PLUTO"
           julia serve.jl 1234 > pluto.log 2>&1 &
           SERVER=$!
           trap 'kill $SERVER 2>/dev/null || true' EXIT
@@ -238,7 +227,7 @@ jobs:
         if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
-          name: bind-e2e-failure-pluto-${{ matrix.pluto }}
+          name: bind-e2e-failure
           path: |
             ${{ runner.temp }}/bind-e2e-artifacts/
             test/e2e/pluto.log

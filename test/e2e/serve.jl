@@ -5,7 +5,7 @@
 #
 #   julia test/e2e/serve.jl [port]
 #
-# PLUTO_VERSION picks the Pluto series (default "1"); CI also runs the bind round-trip on "0.20".
+# PLUTO_VERSION picks the Pluto series (default "1"); CI tests only Pluto 1.
 #
 # It also serves the kind sweep. MASQUE_PLUTO_IN_PROCESS=1 (CI's kind-sweep step) runs notebooks
 # in this process; leave it unset for local live verification

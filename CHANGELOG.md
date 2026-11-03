@@ -91,6 +91,12 @@ All notable changes to this project are documented here. The format is based on
 - The first click after Julia starts shows its value sooner. A cell that shows the `@bind`
   value took 0.2–0.4 s to print the first one, and now takes about 0.1 s (part of #567).
 
+### Removed
+- A call to `masque` with one of the `tooltip_*` keywords removed in 0.4, such as
+  `tooltip_bg`, no longer prints the extra line under the error that says the keyword was
+  removed in 0.4 and gives its `tooltipstyle` form. The call has failed since 0.4; write
+  `tooltipstyle = (; bg = …)` instead (#401).
+
 ### Fixed
 - The violin of a `rainclouds!` plot names its category in its tooltip and payload, `1`
   rather than `0.9775`. Before, it gave the position the violin is nudged to, beside the box
@@ -111,8 +117,6 @@ All notable changes to this project are documented here. The format is based on
 - With WebGLMakie, on a page with many plots, the first pan or zoom of a view after scrolling
   back to it redraws the plot while the key or the mouse button is down. Before, that redraw
   was dropped, and the plot showed the old picture shifted until the gesture ended.
-
-### Fixed
 - An opaque `Box` drawn over an axis hides the marks under it from the pointer too, as a
   legend does: hovering or clicking the box no longer shows a tooltip or ring for a mark you
   can't see (#547).
