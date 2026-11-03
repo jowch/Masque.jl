@@ -41,6 +41,11 @@ All notable changes to this project are documented here. The format is based on
   and heatmap cells still take a tap inside them. `masque(fig; touch = (; radius = 8))` sets
   the reach for the figure, `touch_radius` sets it for one plot or layer, and `touch = false`
   turns it off. A mouse or a pen keeps its precision, also on a touchscreen laptop (#528).
+- Sliders, toggles and checkboxes are easier to hit with a finger. On a touch screen each
+  one answers a touch a little past its drawn edge, up to 44 px across, but never more than
+  halfway to the next control or axis, so the rows of a `SliderGrid` don't take each other's
+  touches. Nothing drawn changes, and on a computer without a touch screen they answer
+  exactly where they did (#531).
 
 ### Changed
 - Default tooltips and readouts show a coordinate the way its axis labels it. On a
