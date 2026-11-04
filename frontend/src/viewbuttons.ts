@@ -8,7 +8,7 @@
 // settled request, like a released key, and never reaches the plot's own click handling.
 
 import { resetView } from "./bond"
-import { innermostView, matrixLimits } from "./geometry"
+import { hitLayer, innermostView, layoutSpaceLayer, matrixLimits } from "./geometry"
 import { hideTip } from "./hover"
 import { unmapPoint, wheelScale, zoomAt, ZOOM_NOTCH } from "./photo"
 import * as viewDrag from "./drag/view"
@@ -92,12 +92,39 @@ function boxAt(vp: Rect, corner: Corner, w: number, h: number, k: number): Rect 
     return [left, top, bw, bh]
 }
 
+// How much of the axis's data a box at `box` would sit on: the share of sample points across
+// it, every few CSS px, that land on a mark of this axis (or a twin on the same viewport), as
+// the hover test sees marks. A layer that answers everywhere (a heatmap filling the axis, a
+// brush) costs every corner the same, so it changes nothing. Views, legends and colorbars are
+// not data. A plot left out of the overlay is invisible here.
+const DATA_STEP = 4 // CSS px between samples
+export function dataUnder(m: Manifest, view: HitLayer, box: Rect, k: number): number {
+    const g = view.geometry as ViewGeometry
+    const own: Rect = [g.x, g.y, g.w, g.h]
+    const layers = m.layers.filter((l) => !layoutSpaceLayer(l) && (l.axis === view.axis ||
+        (m.transforms[l.axis] && sameRect(m.transforms[l.axis].viewport as Rect, own))))
+    if (!layers.length) return 0
+    const step = DATA_STEP * k
+    const nx = Math.max(2, Math.round(box[2] / step) + 1), ny = Math.max(2, Math.round(box[3] / step) + 1)
+    let on = 0
+    for (let i = 0; i < nx; i++) {
+        for (let j = 0; j < ny; j++) {
+            const px = box[0] + (box[2] * i) / (nx - 1), py = box[1] + (box[3] * j) / (ny - 1)
+            if (layers.some((l) => hitLayer(l, px, py, m.transforms[l.axis]) !== null)) on++
+        }
+    }
+    return on / (nx * ny)
+}
+
 // Where a view's buttons go, or null when they don't fit. `k` is image px per CSS px. The box
 // may take at most half the axis along its long side: a stack at most half the height, else a
 // row at most half the width, and its short side plus both insets must fit across. On a coarse
-// pointer the 44 px size is tried first, then 24 px. The corner is the first in preference
-// order that nothing covers, else the least covered.
-export function placeButtons(m: Manifest, layer: HitLayer, k: number, coarse: boolean): Placement | null {
+// pointer the 44 px size is tried first, then 24 px. The corner is the one least covered by a
+// legend or another axis; of those equally covered, the one with the least data under it
+// (`dataUnder`); of those, the first in preference order. `keep` (a corner chosen earlier, at
+// the view's home) stands in for the data once the view has moved, so panning never sends the
+// box to another corner.
+export function placeButtons(m: Manifest, layer: HitLayer, k: number, coarse: boolean, keep?: Corner): Placement | null {
     const g = layer.geometry as ViewGeometry
     const vp = visibleViewport(m, g)
     if (!vp || !(k > 0)) return null
@@ -109,11 +136,14 @@ export function placeButtons(m: Manifest, layer: HitLayer, k: number, coarse: bo
         const fitsRow = !fitsStack && len <= vw / 2 && br + 2 * INSET <= vh
         if (!fitsStack && !fitsRow) continue
         const [w, h] = fitsStack ? [br, len] : [len, br]
-        let best: Corner = CORNERS[0], least = Infinity
+        let best: Corner = CORNERS[0], least = Infinity, leastData = Infinity
         for (const c of CORNERS) {
-            const a = coverage(boxAt(vp, c, w, h, k), covers)
-            if (a < least) { least = a; best = c }
-            if (a === 0) break
+            const box = boxAt(vp, c, w, h, k)
+            const a = coverage(box, covers)
+            if (a > least) continue
+            const d = keep ? (c === keep ? 0 : 1) : dataUnder(m, layer, box, k)
+            if (a < least || d < leastData) { least = a; leastData = d; best = c }
+            if (a === 0 && d === 0) break
         }
         return { corner: best, row: fitsRow, size }
     }
@@ -229,6 +259,7 @@ interface Box {
     el: HTMLDivElement
     vp: [number, number, number, number] | null
     always: boolean
+    home?: Corner // the corner picked at the view's home, kept while it is moved
 }
 
 export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: ShadowRoot, pxPerCss: () => number): ViewButtons {
@@ -316,7 +347,10 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
             boxes.set(l.id, b)
             const g = l.geometry as ViewGeometry
             b.always = g.controls === "always"
-            const p = placeButtons(m, l, k, coarse)
+            // At home the data picks the corner; once the view has moved, the home pick holds.
+            const moved = state.viewMoved_.has(l.id)
+            const p = placeButtons(m, l, k, coarse, moved ? b.home : undefined)
+            if (p && !moved) b.home = p.corner
             const vp = p ? visibleViewport(m, g) : null
             b.vp = vp
             b.el.hidden = !p

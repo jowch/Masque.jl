@@ -149,7 +149,11 @@ tooltip. Buttons are 24 CSS px square with 14 px icons, stroke 1.75 in a 24-unit
 tooltip text colour; 44 px buttons with 24 px icons under `any-pointer: coarse`. Top to bottom:
 zoom in (+), zoom out (−), reset (a counter-clockwise arrow), and reset joins only once the view
 has moved. The box sits 8 px in from the corner, the same as `.masque-note`, preferring top
-right, then top left, then bottom right: the first one nothing covers, else the least covered.
+right, then top left, then bottom right: the least covered one, then of those the one with the
+least data under it (the share of points every 4 CSS px across the box that land on a mark of
+this axis, as hover sees marks; a heatmap filling the axis costs every corner the same), then
+the first in that order (Jonathan's ask, 2026-11-04). The data is read at the view's home;
+once the view has moved, the corner picked at home holds, so a pan never moves the box.
 A legend or other box in `occluders` covers a corner, and so does any other axis or colorbar
 viewport overlapping this one, except one that holds this axis whole (an inset covers its
 parent's corner, not the other way round). Bottom left is never used: it holds the

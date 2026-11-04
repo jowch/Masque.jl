@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
-import { placeButtons, viewsWithButtons, boxLength, boxBreadth, CORNERS, VIEW_BUTTONS_STYLE, VB_IDLE_OPACITY } from "../src/viewbuttons"
+import { dataUnder, placeButtons, viewsWithButtons, boxLength, boxBreadth, CORNERS, VIEW_BUTTONS_STYLE, VB_IDLE_OPACITY } from "../src/viewbuttons"
 import type { AxisTransform, HitLayer, Manifest } from "../src/types"
 import { withFields } from "./fields"
 
@@ -42,6 +42,35 @@ describe("where the buttons go", () => {
         const p = placeButtons(m, m.layers[0], K, false)
         expect(p?.corner).toBe("tr")
         expect(CORNERS).not.toContain("bl")
+    })
+
+    it("data under a corner sends them to one with less, in preference order", () => {
+        // The top-right box spans x 1032–1084, y 116–268; the top-left one x 116–168.
+        const pts = (xy: number[][]): HitLayer => ({ id: "pts", kind: "circles", axis: "ax1", events: ["hover"], payloads: [], geometry: xy.flatMap(([x, y]) => [x, y, 10]) as never })
+        const withData = (xy: number[][], occluders?: Array<[number, number, number, number]>): Manifest => {
+            const m = one({ occluders }); m.layers.unshift(pts(xy)); return m
+        }
+        const v = (m: Manifest) => m.layers.find((l) => l.kind === "view")!
+        let m = withData([[1058, 190]])
+        expect(placeButtons(m, v(m), K, false)?.corner).toBe("tl")
+        m = withData([[1058, 190], [142, 190]])
+        expect(placeButtons(m, v(m), K, false)?.corner).toBe("br")
+        // Everywhere has some: the least wins, then preference order.
+        m = withData([[1058, 140], [1058, 240], [142, 190], [1058, 650], [1058, 600]])
+        expect(placeButtons(m, v(m), K, false)?.corner).toBe("tl")
+        // Data far from every corner leaves the first choice.
+        m = withData([[600, 400]])
+        expect(placeButtons(m, v(m), K, false)?.corner).toBe("tr")
+        // A legend still outranks data: covered top left loses to top right with data.
+        m = withData([[1058, 190], [1058, 650]], [[116, 116, 184, 160]])
+        expect(placeButtons(m, v(m), K, false)?.corner).toBe("tr")
+        // A heatmap filling the axis costs every corner the same.
+        m = one(); m.layers.unshift({ id: "hm", kind: "rects", axis: "ax1", events: ["hover"], payloads: [], geometry: [600, 400, 1000, 600] as never })
+        expect(dataUnder(m, v(m), [1032, 116, 52, 152], K)).toBe(1)
+        expect(placeButtons(m, v(m), K, false)?.corner).toBe("tr")
+        // Once the view has moved, the home corner holds whatever the data under it now.
+        m = withData([[142, 190]])
+        expect(placeButtons(m, v(m), K, false, "tl")?.corner).toBe("tl")
     })
 
     it("a short axis gets a row, a tiny one none", () => {
