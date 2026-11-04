@@ -1,4 +1,4 @@
-import { invertAxis } from "../geometry"
+import { invertAxis, projectAxis } from "../geometry"
 import { computeSelection } from "../selection"
 import { SVG_NS, DEFAULT_STYLE, renderSelection } from "../highlight"
 import { clampX, clampY } from "../state"
@@ -61,6 +61,23 @@ export function roiBounds(box: ROIBox): { xmin: number; xmax: number; ymin: numb
     const a = invertAxis(box.t_, box.g_.x, box.g_.y), b = invertAxis(box.t_, box.g_.x + box.g_.w, box.g_.y + box.g_.h)
     const ax = a.x as number, bx = b.x as number, ay = a.y as number, by = b.y as number
     return { xmin: Math.min(ax, bx), xmax: Math.max(ax, bx), ymin: Math.min(ay, by), ymax: Math.max(ay, by) }
+}
+
+// Moves the box to restored bounds, `{xmin, xmax, ymin, ymax}` in data space (#576). `g_` is
+// the manifest geometry, so hit-testing follows. False leaves the box where it was.
+export function placeBounds(box: ROIBox, env: unknown): boolean {
+    const p = env && typeof env === "object" ? (env as { payload?: unknown }).payload : null
+    const t = box.t_
+    if (!t || t.polar || !p || typeof p !== "object") return false
+    const { xmin, xmax, ymin, ymax } = p as Record<string, unknown>
+    const ok = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v)
+    if (!ok(xmin) || !ok(xmax) || !ok(ymin) || !ok(ymax)) return false
+    const a = projectAxis(t, xmin, ymin), b = projectAxis(t, xmax, ymax)
+    if (![a.x, a.y, b.x, b.y].every(Number.isFinite)) return false
+    box.g_.x = Math.min(a.x, b.x); box.g_.y = Math.min(a.y, b.y)
+    box.g_.w = Math.abs(b.x - a.x); box.g_.h = Math.abs(b.y - a.y)
+    setROI(box)
+    return true
 }
 
 // Each box goes in `parentFor(axis)`, the chrome group of the axis it belongs to.

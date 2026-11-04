@@ -37,6 +37,30 @@ export function buildThresholdLines(manifest: Manifest, parentFor: (axis: string
     return thresholdLines
 }
 
+// A data value's image-px position along a line's axis: a number, or on a categorical
+// dimension a category's label (Makie places category k, 1-based, at data k). Null for a value
+// this axis can't place, or a polar axis.
+export function valuePos(t: AxisTransform, h: boolean, v: unknown): number | null {
+    if (t.polar) return null
+    const cats = h ? t.ycats : t.xcats
+    const d = typeof v === "string" ? (cats?.indexOf(v) ?? -1) + 1 : v
+    if (typeof d !== "number" || !Number.isFinite(d) || (typeof v === "string" && d === 0)) return null
+    const at = h ? projectAxis(t, t.xlims[0], d) : projectAxis(t, d, t.ylims[0])
+    const pos = h ? at.y : at.x
+    return Number.isFinite(pos) ? pos : null
+}
+
+// Moves the line to a restored field value (#576): the manifest drew the starting one. Writes
+// `tg.pos` too, as a drag does, so hit-testing follows. False leaves the line where it was.
+export function placeValue(line: SVGLineElement, tg: ThresholdGeometry, t: AxisTransform | undefined, env: unknown): boolean {
+    if (!t || !env || typeof env !== "object" || !("payload" in env)) return false
+    const pos = valuePos(t, tg.orientation === "h", (env as { payload: unknown }).payload)
+    if (pos === null) return false
+    tg.pos = pos
+    setLine(line, tg, pos)
+    return true
+}
+
 export function begin(id: string, line: SVGLineElement, tg: ThresholdGeometry, t: AxisTransform, pointerId: number): Drag {
     return { kind: "threshold", id_: id, line_: line, tg_: tg, t_: t, pointerId_: pointerId }
 }
