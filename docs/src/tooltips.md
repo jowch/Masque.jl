@@ -77,6 +77,21 @@ show more or fewer figures, pass `tooltip_sigdigits` to `masque`:
 
 The `@bind` value keeps every digit; only the tooltip is rounded.
 
+### Axis labels
+
+When an axis has a label, the default tooltip uses it in place of `x`,
+`y` or `z`. With `xlabel = "Time (s)"` and `ylabel = "Voltage (mV)"`, a
+point shows `Time (s) 2.35` and `Voltage (mV) -61.2`. This also holds
+for a line's nearest sample, an [`AxisInteractable`](@ref) readout, a
+slice, and what the keyboard announces. An axis linked to others with
+`linkxaxes!` and no label of its own uses theirs, when they agree. A
+label you hid, as `hidexdecorations!` does, still counts.
+
+Only the name in the tooltip changes. The clicked mark's event, the
+`@bind` value and `$(x)` in a template still say `x`. A field you set
+yourself keeps its own name. A label written with `L"..."` or `rich`,
+or one that matches the name of another row, leaves the name as `x`.
+
 ### Axis units
 
 A coordinate in the default tooltip reads the way its axis labels it. On

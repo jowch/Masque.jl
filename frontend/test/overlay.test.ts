@@ -3627,6 +3627,43 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         expect(tip.innerHTML).toContain("x=a")
     })
 
+    it("plain axis hover names x and y by the axis labels, unless the two clash", () => {
+        const readout = (xfmt: object, yfmt: object) => {
+            const m: Manifest = {
+                width: 1200, height: 800, scaling: 2,
+                transforms: { ax1: { xlims: [0, 10], ylims: [0, 5], xscale: "identity", yscale: "identity",
+                    viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false, xfmt, yfmt } as Manifest["transforms"][string] },
+                layers: [{ id: "axis", kind: "axis", geometry: null, payloads: [], axis: "ax1", events: ["hover"] }],
+            }
+            const { host, script } = setup()
+            mount(script, m)
+            const shadow = shadowOf(host)
+            ;(shadow.querySelector(".surface") as HTMLElement)
+                .dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
+            return (shadow.querySelector(".masque-tip") as HTMLElement).textContent
+        }
+        expect(readout({ label: "Time (s)" }, { label: "Voltage" })).toMatch(/^Time \(s\)=.*, Voltage=/)
+        expect(readout({ label: "Position" }, { label: "Position" })).toMatch(/^x=.*, y=/)
+    })
+
+    it("a slice names its probe by the axis label", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity", viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false, xfmt: { label: "Time (s)" } } as Manifest["transforms"][string] },
+            layers: [{
+                id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                geometry: { orientation: "v", covers: [], series: [{ id: "wide", xy: [0, 0, 10, 10] }] },
+            }],
+        })
+        const shadow = shadowOf(host)
+        ;(shadow.querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
+        const tip = (shadow.querySelector(".masque-tip") as HTMLElement).innerHTML
+        expect(tip).toContain(">Time (s)<")
+        expect(tip).toContain(">wide<")
+    })
+
     it("a selects-ROI targeting an unsupported kind emits an empty selection (computeSelection fallback)", () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2,

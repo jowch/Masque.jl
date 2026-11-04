@@ -112,16 +112,34 @@ export function renderTemplate(segments: TemplateSegment[], payload: unknown, di
     return html
 }
 
+// The name each field shows under: a coordinate's axis label (θ, r, or the axis's own label
+// such as "Time (s)") in place of its key. A label that would read the same as another row's
+// name, another field's key or another label (`xlabel == ylabel`), is dropped for the key, as
+// two rows of one name can't be told apart.
+export function rowNames(keys: readonly string[], coords?: CoordFields): Record<string, string> {
+    const out: Record<string, string> = {}
+    const label = (k: string) => coords?.[k]?.label
+    for (const k of keys) {
+        const l = label(k)
+        out[k] = l !== undefined && l !== k && !keys.some((o) => o !== k && (o === l || label(o) === l)) ? l : k
+    }
+    return out
+}
+
 // Auto name/value table from a payload object (the zero-config default). All values escaped.
 // `coords` prints the listed coordinate fields in their axis's format, under its key label.
 export function renderAutoTable(payload: unknown, digits: number = DEFAULT_SIGDIGITS, coords?: CoordFields, explicit = false): string {
     if (payload == null) return ""
     if (typeof payload !== "object") return esc(fmtNum(payload, digits))
-    return Object.entries(payload as Record<string, unknown>)
+    const entries = Object.entries(payload as Record<string, unknown>)
+    const names = rowNames(entries.map(([k]) => k), coords)
+    return entries
         .map(([k, v]) => {
             const f = coords?.[k]
             const val = f ? fmtCoord(v, f, digits, explicit) : fmtNum(v, digits)
-            return `<div class="masque-tip-row"><span class="masque-tip-key">${esc(f?.label ?? k)}</span><span class="masque-tip-val">${esc(val)}</span></div>`
+            // A number with its unit stays on one line beside a key that wraps; text may wrap.
+            const cls = typeof v === "number" ? "masque-tip-val masque-tip-num" : "masque-tip-val"
+            return `<div class="masque-tip-row"><span class="masque-tip-key">${esc(names[k])}</span><span class="${cls}">${esc(val)}</span></div>`
         })
         .join("")
 }
@@ -133,10 +151,12 @@ export function renderAutoTable(payload: unknown, digits: number = DEFAULT_SIGDI
 export function renderAutoTablePlain(payload: unknown, digits: number = DEFAULT_SIGDIGITS, coords?: CoordFields, explicit = false): string {
     if (payload == null) return ""
     if (typeof payload !== "object") return fmtNum(payload, digits)
-    return Object.entries(payload as Record<string, unknown>)
+    const entries = Object.entries(payload as Record<string, unknown>)
+    const names = rowNames(entries.map(([k]) => k), coords)
+    return entries
         .map(([k, v]) => {
             const f = coords?.[k]
-            return f ? `${f.label ?? k} ${fmtCoord(v, f, digits, explicit)}` : `${k} ${fmtNum(v, digits)}`
+            return f ? `${names[k]} ${fmtCoord(v, f, digits, explicit)}` : `${k} ${fmtNum(v, digits)}`
         })
         .join(", ")
 }

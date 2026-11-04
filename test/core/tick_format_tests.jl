@@ -93,6 +93,52 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test !any(haskey(d0, k) for k in ("xfmt", "yfmt", "zfmt"))
     end
 
+    @testset "axis labels name the coordinates" begin
+        fig = Figure(size = (900, 900))
+        td(ctx, a) = IP._transform_dict(ctx.transforms[IP.axis_id(ctx, a)])
+        ax = Axis(fig[1, 1]; xlabel = "Time (s)", ylabel = "Voltage (mV)", ytickformat = "{:.1f} mV")
+        scatter!(ax, [1.0], [1.0])
+        # rich and LaTeX text keep `x`/`y`; whitespace counts as no label
+        axr = Axis(fig[1, 2]; xlabel = L"\omega_0", ylabel = rich("x", superscript("2")))
+        scatter!(axr, [1.0], [1.0])
+        axw = Axis(fig[1, 3]; xlabel = "  ", ylabel = " Depth ")
+        scatter!(axw, [1.0], [1.0])
+        # stacked panels: the top one borrows the bottom one's x label, and only an agreed one
+        top = Axis(fig[2, 1]; ylabel = "Voltage (mV)")
+        bot = Axis(fig[3, 1]; xlabel = "Time (s)", ylabel = "Current (nA)")
+        linkxaxes!(top, bot)
+        hidexdecorations!(top)
+        scatter!(top, [1.0], [1.0]); scatter!(bot, [1.0], [1.0])
+        a, b, c = Axis(fig[2, 2]), Axis(fig[2, 3]; xlabel = "Time (s)"), Axis(fig[3, 2]; xlabel = "Time (ms)")
+        linkxaxes!(a, b, c)
+        foreach(x -> scatter!(x, [1.0], [1.0]), (a, b, c))
+        # a hidden label still counts
+        hid = Axis(fig[3, 3]; xlabel = "Mass (kg)", xlabelvisible = false)
+        scatter!(hid, [1.0], [1.0])
+        a3 = Axis3(fig[4, 1]; zlabel = "Depth (m)")
+        scatter!(a3, [1.0], [2.0], [3.0])
+        pax = PolarAxis(fig[4, 2])
+        scatter!(pax, [π / 2], [2.0])
+        _, _, ctx = ctx_for(fig)
+
+        d = td(ctx, ax)
+        @test d["xfmt"] == Dict("label" => "Time (s)")
+        @test d["yfmt"] == Dict("suffix" => " mV", "spec" => ".1f", "label" => "Voltage (mV)")
+        @test !any(haskey(td(ctx, axr), k) for k in ("xfmt", "yfmt"))
+        dw = td(ctx, axw)
+        @test !haskey(dw, "xfmt") && dw["yfmt"] == Dict("label" => "Depth")
+        @test td(ctx, top)["xfmt"] == Dict("label" => "Time (s)")
+        @test !haskey(td(ctx, a), "xfmt")                                   # linked labels disagree
+        @test td(ctx, hid)["xfmt"] == Dict("label" => "Mass (kg)")
+        d3 = td(ctx, a3)                                                    # Axis3's default "x"/"y" add nothing
+        @test !haskey(d3, "xfmt") && !haskey(d3, "yfmt") && d3["zfmt"] == Dict("label" => "Depth (m)")
+        @test td(ctx, pax)["yfmt"] == Dict("label" => "r")
+        # a label on a categorical axis is sent though the values stay text
+        fc = Figure(); axc = Axis(fc[1, 1]; xlabel = "Fruit"); scatter!(axc, Makie.Categorical(["a", "b"]), [1.0, 2.0])
+        _, _, ctxc = ctx_for(fc)
+        @test td(ctxc, axc)["xfmt"] == Dict("label" => "Fruit")
+    end
+
     @testset "the coordinate fields Masque fills in are listed" begin
         fig = Figure(); ax = Axis(fig[1, 1]; ytickformat = "{:.1f} mV")
         sc = scatter!(ax, [1.0, 2.0], [3.47, 4.1])
