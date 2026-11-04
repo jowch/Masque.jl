@@ -5211,9 +5211,16 @@ try {
         const boxes = [...sr.querySelectorAll("rect.masque-roi")].map((r) => num(r, ["x", "y", "width", "height"]));
         if (!lines.length && !boxes.length) continue;
         const layers = JSON.parse(span.textContent);
+        // A control the bond leaves out (`bind`, with `onchange`) is state Pluto doesn't keep: a
+        // reload starts it again, by design.
+        const bound = Object.keys(host.value ?? {});
+        if (layers.some((l) => ["threshold", "span", "roi"].includes(l.kind) && !bound.includes(l.id))) continue;
         // The starting geometry, from the published manifest: a line's pos, a band's two edges.
         const start = layers.flatMap((l) => l.kind === "threshold" ? [l.geometry.pos] : l.kind === "span" ? [l.geometry.lo, l.geometry.hi] : []);
-        out[k] = { lines, boxes, start, value: JSON.stringify(host.value ?? null) };
+        // Key order is whatever wrote the value last (our commit, or Pluto's restore).
+        const canon = (v) => Array.isArray(v) ? v.map(canon) : v && typeof v === "object"
+          ? Object.fromEntries(Object.keys(v).sort().map((key) => [key, canon(v[key])])) : v;
+        out[k] = { lines, boxes, start, value: JSON.stringify(canon(host.value ?? null)) };
       }
       return out;
     }, meta.map((m) => m.key));
@@ -5235,10 +5242,16 @@ try {
       if (keys.every((k) => after[k]?.value === before[k].value)) break;
       await new Promise((r) => setTimeout(r, 500));
     }
-    // A frame (`onchange`) or a WebGL remount can still be landing: give the drawing a moment.
-    await new Promise((r) => setTimeout(r, 1500));
-    after = await chromeOf();
+    // With `onchange` the restore asks Julia for a frame, and the frame's manifest (a colorbar
+    // whose range moved, say) redraws the controls; on WebGL that can take a while. Poll until
+    // every control is back, then report the ones that aren't.
     const close = (a, b) => a.length === b.length && a.every((row, i) => row.every((v, j) => Math.abs(v - b[i][j]) < 1));
+    const same = (k) => after[k] && close(after[k].lines, before[k].lines) && close(after[k].boxes, before[k].boxes);
+    const drawnBy = Date.now() + 30000;
+    while (Date.now() < drawnBy && !keys.every(same)) {
+      await new Promise((r) => setTimeout(r, 500));
+      after = await chromeOf();
+    }
     for (const k of keys) {
       const b = before[k], a = after[k];
       if (!a) throw new Error(`reload/${k}: the widget's controls are gone after the reload`);
