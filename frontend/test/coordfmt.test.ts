@@ -141,6 +141,11 @@ describe("axis labels as row names", () => {
         const L = layerOf([{ site: "B4", x: 0.812, y: 2 }], { coords: { y: "y" } })
         expect(renderAutoTablePlain(L.payloads[0], 4, coordFields(LAB, L, L.payloads[0], []))).toBe("site B4, x 0.812, Voltage 2.0 mV")
     })
+    it("keeps a number on one line, but lets text wrap", () => {
+        const html = renderAutoTable({ text: "a note", y: 3.5 }, 4, { y: { suffix: " mV", label: "A long label" } })
+        expect(html).toContain('<span class="masque-tip-val masque-tip-num">3.5 mV</span>')
+        expect(html).toContain('<span class="masque-tip-val">a note</span>')
+    })
     it("drops a label that clashes with another row", () => {
         expect(rowNames(["value", "x"], { x: { label: "value" } })).toEqual({ value: "value", x: "x" })
         expect(rowNames(["x", "y"], { x: { label: "Position" }, y: { label: "Position" } })).toEqual({ x: "x", y: "y" })

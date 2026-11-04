@@ -335,7 +335,8 @@ end
 # read once like the tick format. A label hidden with `xlabelvisible = false` (as
 # `hidexdecorations!` sets) still names the data. An axis with no label of its own takes the
 # one its linked axes (`linkxaxes!`) carry, when all of those that have one agree; stacked
-# panels often label only the bottom axis. `nothing` (keep `x`) for no label, a label equal to
+# panels often label only the bottom axis. A linked axis with a LaTeX or `rich` label is
+# passed over rather than counted as a disagreement; once those labels render, they count. `nothing` (keep `x`) for no label, a label equal to
 # the dimension's own name (an Axis3's default "x"), and rich or LaTeX text, which a tooltip
 # would show as markup. Display only: payload keys and the `@bind` value keep `x`.
 function _axis_label(ax, dim::Symbol)

@@ -3639,7 +3639,7 @@ try {
         if (!L.coords) throw new Error(`${key}/${L.id}: a scatter's default payloads should be flagged coords`);
         const which = t.ispolar ? "polar" : t.xfmt?.label === "Time (s)" ? "labels" : t.yfmt?.suffix === " mV" ? "mV" : "function";
         // The card's text is its rows run together: "index 1 x 1 y 3.5 mV".
-        const want = { polar: [/(^| )θ 90°( |$)/, /\br 2\b/], mV: [/\bx 1\b/, /\by 3\.5 mV\b/], function: [/\bx 1\b/, /\by 3\.472\b/], labels: [/Time \(s\) 1\b/, /Voltage \(mV\) 3\.5 mV\b/] }[which];
+        const want = { polar: [/(^| )θ 90°( |$)/, /\br 2\b/], mV: [/\bx 1\b/, /\by 3\.5 mV\b/], function: [/\bx 1\b/, /\by 3\.472\b/], labels: [/Time \(s\) 1\b/, /the cell \(mV\) 3\.5 mV\b/] }[which];
         const never = { polar: [/\bx \d/, /\by \d/, /1\.571/], mV: [/3\.472/], function: [/mV/, /!/], labels: [/\bx \d/, /\by \d/, /3\.472/] }[which];
         let tip = null;
         for (let a = 0; a < 6; a++) {
@@ -3649,6 +3649,20 @@ try {
         }
         for (const w of want) if (!w.test(tip?.text ?? "")) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip?.text)} should match ${w}`);
         for (const w of never) if (w.test(tip.text)) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip.text)} should not match ${w}`);
+        if (which === "labels") {
+          // A long label wraps, and the number beside it stays on one line with its unit.
+          const lines = await page.evaluate((k) => {
+            const span = document.querySelector(`#coords_${k}`);
+            const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+            let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+            const lineCount = (el) => { const r = document.createRange(); r.selectNodeContents(el); return new Set([...r.getClientRects()].map((q) => Math.round(q.top))).size; };
+            const rows = [...sr.querySelectorAll(".masque-tip .masque-tip-row")];
+            const long = rows.find((row) => /the cell/.test(row.textContent));
+            return long ? { key: lineCount(long.querySelector(".masque-tip-key")), val: lineCount(long.querySelector(".masque-tip-val")) } : null;
+          }, key);
+          if (!lines || lines.key < 2 || lines.val !== 1) throw new Error(`${key}/labels: want the long key wrapped and its value on one line, got ${JSON.stringify(lines)}`);
+          passed.push(`${key}/labels-wrap`);
+        }
         seen.add(which);
         passed.push(`${key}/${which}`);
         console.error(`OK  ${key}/${which} — ${tip.text}`);

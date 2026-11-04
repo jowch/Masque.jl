@@ -137,7 +137,9 @@ export function renderAutoTable(payload: unknown, digits: number = DEFAULT_SIGDI
         .map(([k, v]) => {
             const f = coords?.[k]
             const val = f ? fmtCoord(v, f, digits, explicit) : fmtNum(v, digits)
-            return `<div class="masque-tip-row"><span class="masque-tip-key">${esc(names[k])}</span><span class="masque-tip-val">${esc(val)}</span></div>`
+            // A number with its unit stays on one line beside a key that wraps; text may wrap.
+            const cls = typeof v === "number" ? "masque-tip-val masque-tip-num" : "masque-tip-val"
+            return `<div class="masque-tip-row"><span class="masque-tip-key">${esc(names[k])}</span><span class="${cls}">${esc(val)}</span></div>`
         })
         .join("")
 }
