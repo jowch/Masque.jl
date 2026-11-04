@@ -1,6 +1,7 @@
 import { anchorFor, axisPoint, computeAnchoredPlacement, hitTestAt, layerPoint, resolvePayload, invertAxis, sampleSlice, slopScale, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layerFrame } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
-import { renderTemplate, renderAutoTable, esc, fmtNum, fmtCoord, coordFields, readoutKeys, withReadout, rowNames } from "./template"
+import { renderTemplate, renderAutoTable, esc, fmtNum, fmtCoord, coordFields, readoutKeys, withReadout, rowNames, nameHtml } from "./template"
+import { typesetTex } from "./tex"
 import { drawHover, clearHover, drawLegendLink, drawPartners, clearLegendLink, markColorFor } from "./highlight"
 import { groupOf, partnerHits } from "./linked"
 import { hideCross, syncCross } from "./cross"
@@ -297,8 +298,8 @@ export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): 
         const t = ctx.manifest_.transforms[layer.axis]
         if ("value" in v) return esc(fmtCoord(v.value, t?.valueaxis === "x" ? t.xfmt : t?.yfmt, d, ex, true))
         const n = rowNames(["x", "y"], { ...(t?.xfmt && { x: t.xfmt }), ...(t?.yfmt && { y: t.yfmt }) })
-        const kx = n.x, ky = n.y
-        return `${esc(kx)}=${esc(fmtCoord(v.x, t?.xfmt, d, ex, true))}, ${esc(ky)}=${esc(fmtCoord(v.y, t?.yfmt, d, ex, true))}`
+        const kx = nameHtml("x", n.x, t?.xfmt), ky = nameHtml("y", n.y, t?.yfmt)
+        return `${kx}=${esc(fmtCoord(v.x, t?.xfmt, d, ex, true))}, ${ky}=${esc(fmtCoord(v.y, t?.yfmt, d, ex, true))}`
     }
     const t = ctx.manifest_.transforms[layer.axis]
     const payload = hit.layer.payloads[hit.index]
@@ -311,6 +312,8 @@ export function applyTipHtml(ctx: OverlayCtx, state: OverlayState, html: string,
         ctx.tip_.innerHTML = html
         state.tipHtml_ = html
         state.tipSized_ = false
+        // A LaTeX key changes size once typeset: measure and place the tooltip again.
+        typesetTex(ctx.tip_, ctx.shadowRoot_, () => { state.tipSized_ = false; replaceTip(ctx, state) })
     }
     setTipVisible(ctx, true)
 }
@@ -426,12 +429,12 @@ function sliceTipHtml(layer: HitLayer, payload: Record<string, number>, probe: "
     if (layer.template) return renderTemplate(layer.template, payload, digits)
     const pf = probe === "x" ? t?.xfmt : t?.yfmt, vf = probe === "x" ? t?.yfmt : t?.xfmt
     const shown: Record<string, string> = {}
-    const name = rowNames(Object.keys(payload), pf ? { [probe]: pf } : undefined)[probe] ?? probe
     for (const [k, v] of Object.entries(payload)) {
-        if (k === probe) shown[name] = fmtCoord(v, pf, digits, explicit, true)
-        else shown[k] = fmtCoord(v, vf, digits, explicit, true)
+        shown[k] = fmtCoord(v, k === probe ? pf : vf, digits, explicit, true)
     }
-    return renderAutoTable(shown)
+    // The probe's row takes the axis label (plain, rich or LaTeX); its value is already printed.
+    const name = pf?.label !== undefined ? { label: pf.label, html: pf.html, tex: pf.tex } : undefined
+    return renderAutoTable(shown, digits, name ? { [probe]: name } : undefined)
 }
 
 export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {

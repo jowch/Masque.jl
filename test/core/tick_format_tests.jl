@@ -98,8 +98,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         td(ctx, a) = IP._transform_dict(ctx.transforms[IP.axis_id(ctx, a)])
         ax = Axis(fig[1, 1]; xlabel = "Time (s)", ylabel = "Voltage (mV)", ytickformat = "{:.1f} mV")
         scatter!(ax, [1.0], [1.0])
-        # rich and LaTeX text keep `x`/`y`; whitespace counts as no label
-        axr = Axis(fig[1, 2]; xlabel = L"\omega_0", ylabel = rich("x", superscript("2")))
+        # LaTeX sends its source and rich text its markup, each with a plain twin; whitespace
+        # counts as no label
+        axr = Axis(fig[1, 2]; xlabel = L"\omega_0\ (\mathrm{rad/s})", ylabel = rich("T", subscript("e"; color = :red), " <K>"))
         scatter!(axr, [1.0], [1.0])
         axw = Axis(fig[1, 3]; xlabel = "  ", ylabel = " Depth ")
         scatter!(axw, [1.0], [1.0])
@@ -112,6 +113,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         a, b, c = Axis(fig[2, 2]), Axis(fig[2, 3]; xlabel = "Time (s)"), Axis(fig[3, 2]; xlabel = "Time (ms)")
         linkxaxes!(a, b, c)
         foreach(x -> scatter!(x, [1.0], [1.0]), (a, b, c))
+        ltop = Axis(fig[4, 3]); lbot = Axis(fig[5, 3]; xlabel = L"t")
+        linkxaxes!(ltop, lbot)
+        scatter!(ltop, [1.0], [1.0]); scatter!(lbot, [1.0], [1.0])
         # a hidden label still counts
         hid = Axis(fig[3, 3]; xlabel = "Mass (kg)", xlabelvisible = false)
         scatter!(hid, [1.0], [1.0])
@@ -124,11 +128,17 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         d = td(ctx, ax)
         @test d["xfmt"] == Dict("label" => "Time (s)")
         @test d["yfmt"] == Dict("suffix" => " mV", "spec" => ".1f", "label" => "Voltage (mV)")
-        @test !any(haskey(td(ctx, axr), k) for k in ("xfmt", "yfmt"))
+        dr = td(ctx, axr)
+        @test dr["xfmt"] == Dict("label" => "omega_0 (rad/s)", "tex" => "\$\\omega_0\\ (\\mathrm{rad/s})\$")
+        @test dr["yfmt"]["label"] == "T_e <K>"
+        # Pluto shares only plain `String`s with the page, never a `SubString` from `strip`
+        @test all(v isa String for f in values(dr) if f isa AbstractDict for v in values(f))
+        @test dr["yfmt"]["html"] == "T<span style=\"color:rgba(255,0,0,1.0)\"><sub>e</sub></span> &lt;K&gt;"
         dw = td(ctx, axw)
         @test !haskey(dw, "xfmt") && dw["yfmt"] == Dict("label" => "Depth")
         @test td(ctx, top)["xfmt"] == Dict("label" => "Time (s)")
         @test !haskey(td(ctx, a), "xfmt")                                   # linked labels disagree
+        @test td(ctx, ltop)["xfmt"]["tex"] == "\$t\$"                        # a borrowed LaTeX label
         @test td(ctx, hid)["xfmt"] == Dict("label" => "Mass (kg)")
         d3 = td(ctx, a3)                                                    # Axis3's default "x"/"y" add nothing
         @test !haskey(d3, "xfmt") && !haskey(d3, "yfmt") && d3["zfmt"] == Dict("label" => "Depth (m)")

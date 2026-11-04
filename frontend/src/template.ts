@@ -126,6 +126,16 @@ export function rowNames(keys: readonly string[], coords?: CoordFields): Record<
     return out
 }
 
+// A row's name as markup: the key, escaped, or, where the axis label names it, the label. A
+// rich label brings its own markup (escaped by Julia); a LaTeX label is written as its plain
+// text in a `.masque-tex` span for tex.ts to typeset.
+export function nameHtml(k: string, name: string, f: CoordFormat | undefined): string {
+    if (name === k || !f) return esc(name)
+    if (f.html !== undefined) return f.html
+    if (f.tex !== undefined) return `<span class="masque-tex" data-tex="${esc(f.tex)}">${esc(name)}</span>`
+    return esc(name)
+}
+
 // Auto name/value table from a payload object (the zero-config default). All values escaped.
 // `coords` prints the listed coordinate fields in their axis's format, under its key label.
 export function renderAutoTable(payload: unknown, digits: number = DEFAULT_SIGDIGITS, coords?: CoordFields, explicit = false): string {
@@ -139,7 +149,7 @@ export function renderAutoTable(payload: unknown, digits: number = DEFAULT_SIGDI
             const val = f ? fmtCoord(v, f, digits, explicit) : fmtNum(v, digits)
             // A number with its unit stays on one line beside a key that wraps; text may wrap.
             const cls = typeof v === "number" ? "masque-tip-val masque-tip-num" : "masque-tip-val"
-            return `<div class="masque-tip-row"><span class="masque-tip-key">${esc(names[k])}</span><span class="${cls}">${esc(val)}</span></div>`
+            return `<div class="masque-tip-row"><span class="masque-tip-key">${nameHtml(k, names[k], f)}</span><span class="${cls}">${esc(val)}</span></div>`
         })
         .join("")
 }

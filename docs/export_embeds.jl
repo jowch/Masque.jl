@@ -419,6 +419,15 @@ const PARENT_IS_DOC_DARK_JS = raw"""function isDocDark() {
   return /(^|\s)theme--/.test(c);
 }"""
 
+# The same MathJax build and settings Pluto loads on every notebook page
+# (`frontend/common/SetupMathJax.js`), so a LaTeX axis label typesets in a docs player's tooltip
+# as it does in Pluto. The page itself has no TeX to typeset, hence `typeset: false`.
+const MATHJAX_HEAD = raw"""
+<script>
+window.MathJax = { startup: { typeset: false }, svg: { fontCache: "global" } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js"></script>"""
+
 const BOOT_PLUTO_DARK_JS = """
 <script>
 {
@@ -617,6 +626,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <title>$title</title>
+      $MATHJAX_HEAD
       <script src="$(html_escape(overlay_src))"></script>
       $BOOT_PLUTO_DARK_JS
       <style>

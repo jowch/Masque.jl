@@ -273,6 +273,8 @@ export interface CoordFormat {
     exp?: boolean    // scientific notation
     spec?: string    // d3-format spec from the precision a Makie format string states
     label?: string   // the table key in place of x/y/z: "θ" or "r" on a PolarAxis, else the axis label ("Time (s)")
+    html?: string    // a `rich(...)` axis label as markup Julia escaped: shown for the key in place of `label`
+    tex?: string     // a LaTeX axis label's source (with its `$` delimiters), typeset by the page's MathJax (tex.ts)
 }
 
 // The resolved Makie.Polar fields of one PolarAxis. invertAxis maps a pixel to the Cartesian

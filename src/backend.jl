@@ -259,7 +259,7 @@ function _coord_format(ticks, format; scale = identity, conv = nothing, label = 
     f = (scale === identity && plain) ? _tick_format(ticks, format) : nothing
     label === nothing && return f
     f = something(f, Dict{String, Any}())
-    f["label"] = label
+    label isa AbstractDict ? merge!(f, label) : (f["label"] = label)
     return f
 end
 
@@ -335,20 +335,109 @@ end
 # read once like the tick format. A label hidden with `xlabelvisible = false` (as
 # `hidexdecorations!` sets) still names the data. An axis with no label of its own takes the
 # one its linked axes (`linkxaxes!`) carry, when all of those that have one agree; stacked
-# panels often label only the bottom axis. A linked axis with a LaTeX or `rich` label is
-# passed over rather than counted as a disagreement; once those labels render, they count. `nothing` (keep `x`) for no label, a label equal to
-# the dimension's own name (an Axis3's default "x"), and rich or LaTeX text, which a tooltip
-# would show as markup. Display only: payload keys and the `@bind` value keep `x`.
+# panels often label only the bottom axis. `nothing` (keep `x`) for no label and for a label
+# equal to the dimension's own name (an Axis3's default "x"). Display only: payload keys and
+# the `@bind` value keep `x`.
+#
+# The name is a `Dict` merged into the dimension's `CoordFormat`: `label` is always plain text,
+# what the screen reader announces and what shows until a typeset form is ready. A `rich(...)`
+# label adds `html`, its sub- and superscripts, colours and weights as escaped markup. A
+# LaTeX label (`L"..."`) adds `tex`, its source with the `$` delimiters Makie reads it by, which
+# the browser typesets with the page's MathJax.
 function _axis_label(ax, dim::Symbol)
-    own = _plain_label(getproperty(ax, Symbol(dim, :label))[])
-    own === nothing || return own == string(dim) ? nothing : own
+    own = _label_name(getproperty(ax, Symbol(dim, :label))[])
+    own === nothing || return own["label"] == string(dim) ? nothing : own
     links = dim === :x ? _linked_axes(ax, :xaxislinks) : dim === :y ? _linked_axes(ax, :yaxislinks) : ()
-    found = unique!(filter!(!isnothing, Any[_plain_label(getproperty(a, Symbol(dim, :label))[]) for a in links]))
+    found = unique!(filter!(!isnothing, Any[_label_name(getproperty(a, Symbol(dim, :label))[]) for a in links]))
     length(found) == 1 || return nothing
-    return found[1] == string(dim) ? nothing : found[1]
+    return found[1]["label"] == string(dim) ? nothing : found[1]
 end
 _linked_axes(ax, f) = hasfield(typeof(ax), f) ? getfield(ax, f) : ()
-_plain_label(l) = _label_text(l isa AbstractString && !(l isa Makie.LaTeXString) ? strip(l) : l)
+
+# Every string here is a plain `String`: Pluto's `published_to_js` refuses a `SubString`.
+function _label_name(l)
+    if l isa Makie.LaTeXString
+        tex = String(strip(String(l)))
+        plain = _tex_plain(tex)
+        isempty(plain) && return nothing
+        return Dict{String, Any}("label" => plain, "tex" => tex)
+    elseif l isa Makie.RichText
+        plain = String(strip(_rich_plain(l)))
+        isempty(plain) && return nothing
+        return Dict{String, Any}("label" => plain, "html" => String(_rich_html(l)))
+    elseif l isa AbstractString
+        t = _label_text(strip(l))
+        return t === nothing ? nothing : Dict{String, Any}("label" => t)
+    end
+    return nothing
+end
+
+# LaTeX source as text to read aloud and to show before MathJax is ready: the `$` delimiters,
+# backslashes, braces and spacing commands dropped, so `\omega_0\ (\mathrm{rad/s})` reads
+# `omega_0 (rad/s)`.
+function _tex_plain(tex::AbstractString)
+    s = replace(tex, r"(?<!\\)\$" => "")
+    s = replace(s, r"\\(?:[,;:! ]|quad|qquad)" => " ")
+    s = replace(s, r"\\(?:mathrm|text|textrm|mathit|mathbf|operatorname|mathsf|mathtt)\b" => "")
+    s = replace(s, r"\\([A-Za-z]+)" => s"\1")
+    s = replace(s, r"\\(.)" => s"\1")
+    s = replace(s, r"[{}]" => "")
+    return String(strip(replace(s, r"\s+" => " ")))
+end
+
+# Rich text read aloud: a superscript after `^` and a subscript after `_`.
+function _rich_plain(r)
+    r isa AbstractString && return String(r)
+    inner = join(_rich_plain(c) for c in r.children)
+    r.type === :sup && return "^" * inner
+    r.type === :sub && return "_" * inner
+    if r.type in (:subsup, :leftsubsup) && length(r.children) == 2
+        return "_" * _rich_plain(r.children[1]) * "^" * _rich_plain(r.children[2])
+    end
+    return inner
+end
+
+# Rich text as markup for the tooltip's key. Every text piece is escaped; the only tags are the
+# ones written here, and the only style values come from Makie's own colour and font parsing.
+function _rich_html(r)
+    r isa AbstractString && return _esc_html(r)
+    inner(c) = join(_rich_html(x) for x in c)
+    style = _rich_style(r.attributes)
+    open = isempty(style) ? "" : "<span style=\"$(style)\">"
+    close = isempty(style) ? "" : "</span>"
+    body = if r.type === :sup
+        "<sup>" * inner(r.children) * "</sup>"
+    elseif r.type === :sub
+        "<sub>" * inner(r.children) * "</sub>"
+    elseif r.type in (:subsup, :leftsubsup) && length(r.children) == 2
+        "<span class=\"masque-subsup\"><sup>" * _rich_html(r.children[2]) * "</sup><sub>" * _rich_html(r.children[1]) * "</sub></span>"
+    else
+        inner(r.children)
+    end
+    return open * body * close
+end
+
+function _rich_style(attrs)
+    out = String[]
+    if haskey(attrs, :color)
+        c = try
+            Makie.to_color(attrs[:color])
+        catch
+            nothing
+        end
+        if c !== nothing
+            rgb = Makie.RGBA{Float32}(c)
+            push!(out, "color:rgba($(round(Int, 255 * rgb.r)),$(round(Int, 255 * rgb.g)),$(round(Int, 255 * rgb.b)),$(round(rgb.alpha; digits = 3)))")
+        end
+    end
+    if haskey(attrs, :font)
+        f = lowercase(string(attrs[:font]))
+        occursin("bold", f) && push!(out, "font-weight:bold")
+        (occursin("italic", f) || occursin("oblique", f)) && push!(out, "font-style:italic")
+    end
+    return join(out, ";")
+end
+_esc_html(s) = replace(String(s), "&" => "&amp;", "<" => "&lt;", ">" => "&gt;", "\"" => "&quot;", "'" => "&#39;")
 
 function _axis_transform(id, ax, scaling, out_h)
     vp = _scene_viewport(ax); o = vp.origin; wv = vp.widths

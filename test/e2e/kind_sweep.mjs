@@ -3629,18 +3629,19 @@ try {
     if (spec.mode === "tick_units") {
       // #510: each scatter's first point reads the way its axis labels it. The expectation is
       // picked by the axis's transform: a `"{:.1f} mV"` format, a function format (plain), a
-      // PolarAxis (θ in degrees, r), or an axis with labels, which name the coordinates.
+      // PolarAxis (θ in degrees, r), an axis with labels, which name the coordinates, or one with
+      // a LaTeX x label and a rich y label.
       const axes = await transformsOf(key);
       const circles = layers.filter((l) => l.kind === "circles");
-      if (circles.length !== 4) throw new Error(`${key}: expected 4 scatter layers, got ${circles.length}`);
+      if (circles.length !== 5) throw new Error(`${key}: expected 5 scatter layers, got ${circles.length}`);
       const seen = new Set();
       for (const L of circles) {
         const t = axes[L.axis];
         if (!L.coords) throw new Error(`${key}/${L.id}: a scatter's default payloads should be flagged coords`);
-        const which = t.ispolar ? "polar" : t.xfmt?.label === "Time (s)" ? "labels" : t.yfmt?.suffix === " mV" ? "mV" : "function";
+        const which = t.ispolar ? "polar" : t.xfmt?.tex ? "tex" : t.xfmt?.label === "Time (s)" ? "labels" : t.yfmt?.suffix === " mV" ? "mV" : "function";
         // The card's text is its rows run together: "index 1 x 1 y 3.5 mV".
-        const want = { polar: [/(^| )θ 90°( |$)/, /\br 2\b/], mV: [/\bx 1\b/, /\by 3\.5 mV\b/], function: [/\bx 1\b/, /\by 3\.472\b/], labels: [/Time \(s\) 1\b/, /the cell \(mV\) 3\.5 mV\b/] }[which];
-        const never = { polar: [/\bx \d/, /\by \d/, /1\.571/], mV: [/3\.472/], function: [/mV/, /!/], labels: [/\bx \d/, /\by \d/, /3\.472/] }[which];
+        const want = { polar: [/(^| )θ 90°( |$)/, /\br 2\b/], mV: [/\bx 1\b/, /\by 3\.5 mV\b/], function: [/\bx 1\b/, /\by 3\.472\b/], labels: [/Time \(s\) 1\b/, /the cell \(mV\) 3\.5 mV\b/], tex: [/Te \(K\) 3\.472\b/] }[which];
+        const never = { polar: [/\bx \d/, /\by \d/, /1\.571/], mV: [/3\.472/], function: [/mV/, /!/], labels: [/\bx \d/, /\by \d/, /3\.472/], tex: [/\bx \d/, /\by \d/, /\$/, /\\omega/] }[which];
         let tip = null;
         for (let a = 0; a < 6; a++) {
           tip = await dispatchAt(key, L.geometry[0], L.geometry[1], "pointermove");
@@ -3649,6 +3650,36 @@ try {
         }
         for (const w of want) if (!w.test(tip?.text ?? "")) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip?.text)} should match ${w}`);
         for (const w of never) if (w.test(tip.text)) throw new Error(`${key}/${which}: tooltip ${JSON.stringify(tip.text)} should not match ${w}`);
+        if (which === "tex") {
+          // MathJax loads at idle after the notebook opens, so the key starts as its plain text
+          // and swaps to the typeset label. Each glyph must resolve inside the shadow root
+          // (Pluto's global glyph cache sits outside it), so the label has a real width.
+          let got = null;
+          for (let a = 0; a < 30; a++) {
+            await dispatchAt(key, L.geometry[0], L.geometry[1], "pointermove");
+            got = await page.evaluate((k) => {
+              const span = document.querySelector(`#coords_${k}`);
+              const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+              let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+              const tex = sr.querySelector(".masque-tip .masque-tex");
+              const svg = tex?.querySelector("svg");
+              const uses = svg ? [...svg.querySelectorAll("use")] : [];
+              const sub = sr.querySelector(".masque-tip .masque-tip-key sub");
+              return {
+                svg: !!svg, aria: tex?.getAttribute("aria-label") ?? null, uses: uses.length,
+                resolved: uses.filter((u) => sr.getElementById((u.getAttribute("href") ?? u.getAttribute("xlink:href") ?? "").slice(1))).length,
+                width: uses.length ? Math.max(...uses.map((u) => u.getBoundingClientRect().width)) : 0,
+                sub: sub?.textContent ?? null,
+              };
+            }, key);
+            if (got.svg && got.width > 0) break;
+            await new Promise((r) => setTimeout(r, 500));
+          }
+          if (!got?.svg || got.uses === 0 || got.resolved !== got.uses || !(got.width > 0)) throw new Error(`${key}/tex: want the LaTeX label typeset with every glyph resolved, got ${JSON.stringify(got)}`);
+          if (got.aria !== "omega_0 (rad/s)") throw new Error(`${key}/tex: the typeset label should read "omega_0 (rad/s)" aloud, got ${JSON.stringify(got.aria)}`);
+          if (got.sub !== "e") throw new Error(`${key}/tex: the rich label should draw its subscript, got ${JSON.stringify(got.sub)}`);
+          passed.push(`${key}/tex-typeset`);
+        }
         if (which === "labels") {
           // A long label wraps, and the number beside it stays on one line with its unit.
           const lines = await page.evaluate((k) => {
@@ -3667,7 +3698,7 @@ try {
         passed.push(`${key}/${which}`);
         console.error(`OK  ${key}/${which} — ${tip.text}`);
       }
-      if (seen.size !== 4) throw new Error(`${key}: expected the polar, mV, function and labelled axes, saw ${[...seen]}`);
+      if (seen.size !== 5) throw new Error(`${key}: expected the polar, mV, function, labelled and LaTeX-labelled axes, saw ${[...seen]}`);
       // #543: a bar's low/high/value print in its value axis's format, a hist's value in its
       // value axis's and its low/high (the bin edges) in the bin axis's.
       const rectWant = {

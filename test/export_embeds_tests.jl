@@ -132,6 +132,15 @@ end
     @test occursin("if (!nb) return;", src)
 end
 
+@testset "a cell-series player loads the MathJax Pluto loads" begin
+    # A LaTeX axis label typesets in the tooltip with the page's MathJax. A Pluto export has
+    # Pluto's own; the hand-built player page has to load the same build.
+    src = read(joinpath(@__DIR__, "..", "docs", "export_embeds.jl"), String)
+    @test occursin("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js", src)
+    @test occursin("fontCache: \"global\"", src)
+    @test occursin(r"<head>.*\$MATHJAX_HEAD.*</head>"s, src)
+end
+
 @testset "player_states: idle, every click, then hand-listed drags" begin
     man = Dict{String, Any}(
         "layers" => Any[
