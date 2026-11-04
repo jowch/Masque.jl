@@ -1474,6 +1474,33 @@ try {
       return [...c.getImageData(0, 0, 1, 1).data.slice(0, 3)];
     }, st.bg);
     if (![0, 1, 2].every((c) => Math.abs(png.data[c] - want[c]) <= 12)) fail(`screen reads ${[...png.data.slice(0, 3)]} inside the box, not ${want}`);
+    // Held down, zoom out takes the 20% tint; released, it zooms out (reset joins), never a pan
+    // of the plot under it. Reset then takes the view home for the checks after this one.
+    const vb = (fn) => page.evaluate(([k, f]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const box = sr.querySelector(".masque-vb");
+      const rgb = (css) => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = css; c.fillRect(0, 0, 1, 1); return [...c.getImageData(0, 0, 1, 1).data]; };
+      return new Function("box", "rgb", `return (${f})(box, rgb)`)(box, rgb);
+    }, [key, fn.toString()]);
+    await page.mouse.down();
+    await new Promise((r) => setTimeout(r, 300));
+    const pressed = await vb((box, rgb) => rgb(getComputedStyle(box.querySelector(".masque-vb-out")).backgroundColor));
+    const press = [0, 1, 2].map((c) => on.bg[c] * 0.8 + on.ink[c] * 0.2);
+    if (![0, 1, 2].every((c) => Math.abs(pressed[c] - press[c]) <= 3)) fail(`the pressed button reads ${pressed}, not the 20% tint ${press.map(Math.round)}`);
+    await page.mouse.up();
+    const waitMoved = async (want) => {
+      for (let i = 0; i < 50; i++) {
+        if (await vb((box) => box.classList.contains("moved")) === want) return;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      fail(want ? "zoom out did not move the view (reset never joined)" : "reset did not take the view home");
+    };
+    await waitMoved(true);
+    const reset = await vb((box) => { const r = box.querySelector(".masque-vb-reset").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+    await page.mouse.click(reset.x, reset.y);
+    await waitMoved(false);
     await page.mouse.move(1, 1);
     passed.push(`${key}/view-buttons-look`);
   }

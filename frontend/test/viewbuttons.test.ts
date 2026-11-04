@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
-import { dataUnder, placeButtons, viewsWithButtons, boxLength, boxBreadth, CORNERS, VIEW_BUTTONS_STYLE, VB_IDLE_OPACITY } from "../src/viewbuttons"
+import { cropLayer, dataUnder, placeButtons, viewsWithButtons, boxLength, boxBreadth, CORNERS, VIEW_BUTTONS_STYLE, VB_IDLE_OPACITY } from "../src/viewbuttons"
 import type { AxisTransform, HitLayer, Manifest } from "../src/types"
 import { withFields } from "./fields"
 
@@ -71,6 +71,33 @@ describe("where the buttons go", () => {
         // Once the view has moved, the home corner holds whatever the data under it now.
         m = withData([[142, 190]])
         expect(placeButtons(m, v(m), K, false, "tl")?.corner).toBe("tl")
+    })
+
+    it("scoring the corners crops each layer first: a 200 000-point scatter places fast", () => {
+        // Points in the middle, as usual: no corner has data, so all three are scored. Before the
+        // crop this took ~1.35 s (a full scan per sample); the crop makes it one pass per corner.
+        const n = 200_000, a = new Array<number>(3 * n)
+        for (let i = 0; i < n; i++) { a[3 * i] = 300 + (i % 600); a[3 * i + 1] = 250 + ((i * 7) % 300); a[3 * i + 2] = 6 }
+        const m = one(); m.layers.unshift({ id: "pts", kind: "circles", axis: "ax1", events: ["hover"], payloads: [], geometry: a as never })
+        const v = m.layers.find((l) => l.kind === "view")!
+        placeButtons(m, v, K, false)
+        const t0 = performance.now()
+        expect(placeButtons(m, v, K, false)?.corner).toBe("tr")
+        expect(performance.now() - t0).toBeLessThan(150)
+    })
+
+    it("cropping keeps what can reach the box, as hit-testing sees it", () => {
+        const box: [number, number, number, number] = [100, 100, 50, 50]
+        const c = cropLayer({ id: "c", kind: "circles", axis: "ax1", events: [], payloads: [], geometry: [90, 90, 6, 300, 300, 6, 160, 125, 6] as never, order: [2, 1, 0] }, box)
+        expect(c?.geometry).toEqual([90, 90, 6, 160, 125, 6])
+        expect(c?.order).toBeUndefined()
+        const l = cropLayer({ id: "l", kind: "polyline", axis: "ax1", events: [], payloads: [], geometry: [0, 0, 50, 50, 120, 120, NaN, NaN, 400, 400] as never }, box)
+        expect(l?.kind).toBe("segments")
+        expect(l?.geometry).toEqual([50, 50, 120, 120])
+        expect(cropLayer({ id: "r", kind: "rects", axis: "ax1", events: [], payloads: [], geometry: [500, 500, 10, 10] as never }, box)).toBeNull()
+        // A polygon around the box keeps it, though no vertex is near.
+        const p = cropLayer({ id: "p", kind: "polygons", axis: "ax1", events: [], payloads: [], geometry: [[0, 0, 400, 0, 400, 400, 0, 400]] as never }, box)
+        expect(p?.geometry).toHaveLength(1)
     })
 
     it("a short axis gets a row, a tiny one none", () => {

@@ -8,7 +8,7 @@
 // settled request, like a released key, and never reaches the plot's own click handling.
 
 import { resetView } from "./bond"
-import { hitLayer, innermostView, layoutSpaceLayer, matrixLimits } from "./geometry"
+import { hitLayer, innermostView, layoutSpaceLayer, matrixLimits, polygonRings, SEG_TOL } from "./geometry"
 import { hideTip } from "./hover"
 import { unmapPoint, wheelScale, zoomAt, ZOOM_NOTCH } from "./photo"
 import * as viewDrag from "./drag/view"
@@ -98,11 +98,18 @@ function boxAt(vp: Rect, corner: Corner, w: number, h: number, k: number): Rect 
 // brush) costs every corner the same, so it changes nothing. Views, legends and colorbars are
 // not data. A plot left out of the overlay is invisible here.
 const DATA_STEP = 4 // CSS px between samples
+const CIRCLE_TOL = 4 // geometry.ts HIT_TOL: a circle's reach past its radius
 export function dataUnder(m: Manifest, view: HitLayer, box: Rect, k: number): number {
     const g = view.geometry as ViewGeometry
     const own: Rect = [g.x, g.y, g.w, g.h]
-    const layers = m.layers.filter((l) => !layoutSpaceLayer(l) && (l.axis === view.axis ||
-        (m.transforms[l.axis] && sameRect(m.transforms[l.axis].viewport as Rect, own))))
+    // Each layer cropped to the elements that can reach the box first, one pass each, so the
+    // samples test a handful of elements, not the whole plot (200 000 points would otherwise
+    // cost a full scan per sample).
+    const layers = m.layers
+        .filter((l) => !layoutSpaceLayer(l) && (l.axis === view.axis ||
+            (m.transforms[l.axis] && sameRect(m.transforms[l.axis].viewport as Rect, own))))
+        .map((l) => cropLayer(l, box))
+        .filter((l): l is HitLayer => l !== null)
     if (!layers.length) return 0
     const step = DATA_STEP * k
     const nx = Math.max(2, Math.round(box[2] / step) + 1), ny = Math.max(2, Math.round(box[3] / step) + 1)
@@ -114,6 +121,68 @@ export function dataUnder(m: Manifest, view: HitLayer, box: Rect, k: number): nu
         }
     }
     return on / (nx * ny)
+}
+
+// `layer` with only the elements whose reach meets `box`, or null when none does. Only for
+// asking whether a point hits anything: element indices, draw order and sphere outlines are
+// dropped (a circle's hit reaches past its sphere's outline, so this only grows the hit).
+// Paths become disjoint segments. Kinds with no list to crop pass through whole.
+export function cropLayer(layer: HitLayer, box: Rect): HitLayer | null {
+    const [bx, by, bw, bh] = box
+    const meets = (x0: number, y0: number, x1: number, y1: number, pad: number) =>
+        Math.max(x0, x1) + pad >= bx && Math.min(x0, x1) - pad <= bx + bw &&
+        Math.max(y0, y1) + pad >= by && Math.min(y0, y1) - pad <= by + bh
+    const g = layer.geometry
+    const base = { ...layer, order: undefined, ellipses: undefined }
+    const segs = (out: number[], v: number[], pad: number) => {
+        for (let i = 0; i + 3 < v.length; i += 2) {
+            const x0 = v[i], y0 = v[i + 1], x1 = v[i + 2], y1 = v[i + 3]
+            if (Number.isNaN(x0) || Number.isNaN(x1)) continue
+            if (meets(x0, y0, x1, y1, pad)) out.push(x0, y0, x1, y1)
+        }
+    }
+    switch (layer.kind) {
+        case "circles": {
+            const a = g as number[], out: number[] = []
+            for (let i = 0; i < a.length; i += 3) {
+                if (meets(a[i], a[i + 1], a[i], a[i + 1], a[i + 2] + CIRCLE_TOL + 1)) out.push(a[i], a[i + 1], a[i + 2])
+            }
+            return out.length ? { ...base, geometry: out as never } : null
+        }
+        case "rects": {
+            const a = g as number[], out: number[] = [], pad = (layer.tol ?? 0) + 1
+            for (let i = 0; i < a.length; i += 4) {
+                const hw = a[i + 2] / 2, hh = a[i + 3] / 2
+                if (meets(a[i] - hw, a[i + 1] - hh, a[i] + hw, a[i + 1] + hh, pad)) out.push(a[i], a[i + 1], a[i + 2], a[i + 3])
+            }
+            return out.length ? { ...base, geometry: out as never } : null
+        }
+        case "segments": {
+            const a = g as number[], out: number[] = [], pad = (layer.tol ?? SEG_TOL) + 1
+            for (let i = 0; i < a.length; i += 4) if (meets(a[i], a[i + 1], a[i + 2], a[i + 3], pad)) out.push(a[i], a[i + 1], a[i + 2], a[i + 3])
+            return out.length ? { ...base, geometry: out as never } : null
+        }
+        case "polyline":
+        case "lines": {
+            const out: number[] = [], pad = (layer.tol ?? SEG_TOL) + 1
+            const paths = layer.kind === "polyline" ? [g as number[]] : (g as number[][])
+            for (const v of paths) segs(out, v, pad)
+            return out.length ? { ...base, kind: "segments", tol: layer.tol ?? SEG_TOL, geometry: out as never } : null
+        }
+        case "polygons": {
+            const elems = g as (number[] | number[][])[], pad = (layer.tol ?? 0) + 1
+            const out = elems.filter((e) => polygonRings(e).some((r) => {
+                let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+                for (let i = 0; i + 1 < r.length; i += 2) {
+                    x0 = Math.min(x0, r[i]); x1 = Math.max(x1, r[i]); y0 = Math.min(y0, r[i + 1]); y1 = Math.max(y1, r[i + 1])
+                }
+                return x0 <= x1 && meets(x0, y0, x1, y1, pad)
+            }))
+            return out.length ? { ...base, geometry: out as never } : null
+        }
+        default:
+            return layer
+    }
 }
 
 // Where a view's buttons go, or null when they don't fit. `k` is image px per CSS px. The box
