@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- The zoom and reset buttons in a plot's corner sit back at 60% opacity while the pointer is
+  elsewhere on the plot, and come up to full when the pointer reaches them. The button under
+  the pointer is shaded, a little more while it is pressed. On a touch screen, or from the
+  keyboard, they show at full as before.
+- The same buttons now take the corner with the least data in it, among those a legend leaves
+  free, so they no longer sit on top of points bunched in the top right. They pick it when the
+  plot is first shown and stay there while you pan or zoom.
+
 ## [0.5.0] - 2026-11-03
 
 ### Breaking

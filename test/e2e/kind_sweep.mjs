@@ -519,9 +519,10 @@ try {
     for (let i = 0; i < 15; i++) {
       await new Promise((r) => setTimeout(r, 200));
       p = await probe();
-      if (p.box.show && p.box.opacity >= 0.99) break;
+      // At rest on the plot the box sits at the idle opacity (VB_IDLE_OPACITY, 0.6).
+      if (p.box.show && Math.abs(p.box.opacity - 0.6) < 0.01) break;
     }
-    if (!p.box.show || p.box.opacity < 0.99) throw new Error(`${key}-buttons: hover did not show the box (${JSON.stringify(p.box)})`);
+    if (!p.box.show || Math.abs(p.box.opacity - 0.6) >= 0.01) throw new Error(`${key}-buttons: hover did not show the box at the idle opacity (${JSON.stringify(p.box)})`);
     if (p.box.corner !== corner) throw new Error(`${key}-buttons: box in corner ${p.box.corner}, expected ${corner}`);
     const r = p.box.r, near = (a, b) => Math.abs(a - b) <= 1.5;
     const xOk = corner === "tl" ? near(r.x, vp.x + 8) : near(r.x + r.w, vp.x + vp.w - 8);

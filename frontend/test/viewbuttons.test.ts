@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
-import { placeButtons, viewsWithButtons, boxLength, boxBreadth, CORNERS } from "../src/viewbuttons"
+import { cropLayer, dataUnder, placeButtons, viewsWithButtons, boxLength, boxBreadth, CORNERS, VIEW_BUTTONS_STYLE, VB_IDLE_OPACITY } from "../src/viewbuttons"
 import type { AxisTransform, HitLayer, Manifest } from "../src/types"
 import { withFields } from "./fields"
 
@@ -42,6 +42,62 @@ describe("where the buttons go", () => {
         const p = placeButtons(m, m.layers[0], K, false)
         expect(p?.corner).toBe("tr")
         expect(CORNERS).not.toContain("bl")
+    })
+
+    it("data under a corner sends them to one with less, in preference order", () => {
+        // The top-right box spans x 1032–1084, y 116–268; the top-left one x 116–168.
+        const pts = (xy: number[][]): HitLayer => ({ id: "pts", kind: "circles", axis: "ax1", events: ["hover"], payloads: [], geometry: xy.flatMap(([x, y]) => [x, y, 10]) as never })
+        const withData = (xy: number[][], occluders?: Array<[number, number, number, number]>): Manifest => {
+            const m = one({ occluders }); m.layers.unshift(pts(xy)); return m
+        }
+        const v = (m: Manifest) => m.layers.find((l) => l.kind === "view")!
+        let m = withData([[1058, 190]])
+        expect(placeButtons(m, v(m), K, false)?.corner).toBe("tl")
+        m = withData([[1058, 190], [142, 190]])
+        expect(placeButtons(m, v(m), K, false)?.corner).toBe("br")
+        // Everywhere has some: the least wins, then preference order.
+        m = withData([[1058, 140], [1058, 240], [142, 190], [1058, 650], [1058, 600]])
+        expect(placeButtons(m, v(m), K, false)?.corner).toBe("tl")
+        // Data far from every corner leaves the first choice.
+        m = withData([[600, 400]])
+        expect(placeButtons(m, v(m), K, false)?.corner).toBe("tr")
+        // A legend still outranks data: covered top left loses to top right with data.
+        m = withData([[1058, 190], [1058, 650]], [[116, 116, 184, 160]])
+        expect(placeButtons(m, v(m), K, false)?.corner).toBe("tr")
+        // A heatmap filling the axis costs every corner the same.
+        m = one(); m.layers.unshift({ id: "hm", kind: "rects", axis: "ax1", events: ["hover"], payloads: [], geometry: [600, 400, 1000, 600] as never })
+        expect(dataUnder(m, v(m), [1032, 116, 52, 152], K)).toBe(1)
+        expect(placeButtons(m, v(m), K, false)?.corner).toBe("tr")
+        // Once the view has moved, the home corner holds whatever the data under it now.
+        m = withData([[142, 190]])
+        expect(placeButtons(m, v(m), K, false, "tl")?.corner).toBe("tl")
+    })
+
+    it("scoring the corners crops each layer first: a 200 000-point scatter places fast", () => {
+        // Points in the middle, as usual: no corner has data, so all three are scored. Before the
+        // crop this took ~1.35 s (a full scan per sample); the crop makes it one pass per corner.
+        const n = 200_000, a = new Array<number>(3 * n)
+        for (let i = 0; i < n; i++) { a[3 * i] = 300 + (i % 600); a[3 * i + 1] = 250 + ((i * 7) % 300); a[3 * i + 2] = 6 }
+        const m = one(); m.layers.unshift({ id: "pts", kind: "circles", axis: "ax1", events: ["hover"], payloads: [], geometry: a as never })
+        const v = m.layers.find((l) => l.kind === "view")!
+        placeButtons(m, v, K, false)
+        const t0 = performance.now()
+        expect(placeButtons(m, v, K, false)?.corner).toBe("tr")
+        expect(performance.now() - t0).toBeLessThan(150)
+    })
+
+    it("cropping keeps what can reach the box, as hit-testing sees it", () => {
+        const box: [number, number, number, number] = [100, 100, 50, 50]
+        const c = cropLayer({ id: "c", kind: "circles", axis: "ax1", events: [], payloads: [], geometry: [90, 90, 6, 300, 300, 6, 160, 125, 6] as never, order: [2, 1, 0] }, box)
+        expect(c?.geometry).toEqual([90, 90, 6, 160, 125, 6])
+        expect(c?.order).toBeUndefined()
+        const l = cropLayer({ id: "l", kind: "polyline", axis: "ax1", events: [], payloads: [], geometry: [0, 0, 50, 50, 120, 120, NaN, NaN, 400, 400] as never }, box)
+        expect(l?.kind).toBe("segments")
+        expect(l?.geometry).toEqual([50, 50, 120, 120])
+        expect(cropLayer({ id: "r", kind: "rects", axis: "ax1", events: [], payloads: [], geometry: [500, 500, 10, 10] as never }, box)).toBeNull()
+        // A polygon around the box keeps it, though no vertex is near.
+        const p = cropLayer({ id: "p", kind: "polygons", axis: "ax1", events: [], payloads: [], geometry: [[0, 0, 400, 0, 400, 400, 0, 400]] as never }, box)
+        expect(p?.geometry).toHaveLength(1)
     })
 
     it("a short axis gets a row, a tiny one none", () => {
@@ -167,6 +223,29 @@ describe("the corner buttons on a live widget", () => {
         pointer(surface, "pointerup", 300, 200, "touch")
         pointer(surface, "pointerleave", 300, 200, "touch")
         expect(box!.classList.contains("show")).toBe(true)
+    })
+
+    it("a mouse on the plot shows the box at the idle level; touch and the keyboard stop show it full", () => {
+        const { surface, stop, box } = setup(manifestOf())
+        pointer(surface, "pointermove", 300, 200)
+        expect(box!.classList.contains("show")).toBe(true)
+        expect(box!.classList.contains("full")).toBe(false)
+        pointer(surface, "pointerleave", 700, 200)
+        stop.dispatchEvent(new FocusEvent("focusin", { bubbles: true, composed: true }))
+        expect(box!.classList.contains("full")).toBe(true)
+        stop.dispatchEvent(new FocusEvent("focusout", { bubbles: true, composed: true }))
+        expect(box!.classList.contains("full")).toBe(false)
+        pointer(surface, "pointerdown", 300, 200, "touch")
+        pointer(surface, "pointerup", 300, 200, "touch")
+        expect(box!.classList.contains("full")).toBe(true)
+    })
+
+    it("the stylesheet: idle opacity, full under the pointer, a tint on the hovered and pressed button", () => {
+        expect(VB_IDLE_OPACITY).toBe(0.6)
+        expect(VIEW_BUTTONS_STYLE).toContain(`.masque-vb.show { opacity: ${VB_IDLE_OPACITY};`)
+        expect(VIEW_BUTTONS_STYLE).toContain(".masque-vb.show:hover, .masque-vb.show.full { opacity: 1; }")
+        expect(VIEW_BUTTONS_STYLE).toMatch(/@media \(hover: hover\) \{\s*\.masque-vb button:hover \{ background: color-mix\(in srgb, var\(--masque-tip-bg-resolved\), var\(--masque-tip-color-resolved\) 12%\); \}/)
+        expect(VIEW_BUTTONS_STYLE).toContain(".masque-vb button:active { background: color-mix(in srgb, var(--masque-tip-bg-resolved), var(--masque-tip-color-resolved) 20%); }")
     })
 
     it("reset joins only once the view has moved, and leaves after a reset", async () => {

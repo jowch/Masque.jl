@@ -149,7 +149,13 @@ tooltip. Buttons are 24 CSS px square with 14 px icons, stroke 1.75 in a 24-unit
 tooltip text colour; 44 px buttons with 24 px icons under `any-pointer: coarse`. Top to bottom:
 zoom in (+), zoom out (−), reset (a counter-clockwise arrow), and reset joins only once the view
 has moved. The box sits 8 px in from the corner, the same as `.masque-note`, preferring top
-right, then top left, then bottom right: the first one nothing covers, else the least covered.
+right, then top left, then bottom right: the least covered one, then of those the one with the
+least data under it (the share of points every 4 CSS px across the box that land on a mark of
+this axis, as hover sees marks; a heatmap filling the axis costs every corner the same), then
+the first in that order (Jonathan's ask, 2026-11-04). The data is read at the view's home;
+once the view has moved, the corner picked at home holds, so a pan never moves the box. A
+widget mounted while its view is already moved (a re-render after a pan) has no home pick and
+picks from the data on screen.
 A legend or other box in `occluders` covers a corner, and so does any other axis or colorbar
 viewport overlapping this one, except one that holds this axis whole (an inset covers its
 parent's corner, not the other way round). Bottom left is never used: it holds the
@@ -159,9 +165,16 @@ an axis too small for either gets none. Twin axes on one viewport share one box,
 first view there (the one the wheel drives). On an `Axis3` the corner is the layout cell's, not
 the drawn cube's. Shown while the pointer is over the axis, while the view's keyboard stop has
 focus, and after a touch on the axis (`controls = :hover`); always (`:always`); never (`:none`);
-never once the gesture channel is dead (a static export). The box fades in and out over the
-tooltip's 80–120 ms, and reset fades in the same way when it joins; no pulse, no slide. A press
-never reaches the plot: no pick, no clear, no pan.
+never once the gesture channel is dead (a static export). With the pointer on the plot but not
+on the box, the box rests at 60% opacity (`VB_IDLE_OPACITY`), so it sits back over the data
+while the icon keeps about 4:1 against its own box; the pointer on the box, a touch, or focus
+on the keyboard stop brings it to 100% (Jonathan's ask, 2026-11-04). The button under a mouse
+or pen takes a tint, 12% of the text colour mixed into the box colour (darker on a light
+figure, lighter on a dark one), and 20% while pressed; hover tints only under
+`(hover: hover)`, so a tap leaves no sticky tint. The box fades in and out over the tooltip's
+80–120 ms, the idle-to-full change and the tint use the same timing, and reset fades in the
+same way when it joins; no pulse, no slide. A press never reaches the plot: no pick, no clear,
+no pan.
 
 Band chrome (`SpanInteractable`, #500, Jonathan picked look D on 2026-11-02): two edges drawn
 as threshold lines (same class, width and hover thickening), the area outside the band filled

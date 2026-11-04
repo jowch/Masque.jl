@@ -8,7 +8,7 @@
 // settled request, like a released key, and never reaches the plot's own click handling.
 
 import { resetView } from "./bond"
-import { innermostView, matrixLimits } from "./geometry"
+import { hitLayer, innermostView, layoutSpaceLayer, matrixLimits, polygonRings, SEG_TOL } from "./geometry"
 import { hideTip } from "./hover"
 import { unmapPoint, wheelScale, zoomAt, ZOOM_NOTCH } from "./photo"
 import * as viewDrag from "./drag/view"
@@ -92,12 +92,108 @@ function boxAt(vp: Rect, corner: Corner, w: number, h: number, k: number): Rect 
     return [left, top, bw, bh]
 }
 
+// How much of the axis's data a box at `box` would sit on: the share of sample points across
+// it, every few CSS px, that land on a mark of this axis (or a twin on the same viewport), as
+// the hover test sees marks. A layer that answers everywhere (a heatmap filling the axis, a
+// brush) costs every corner the same, so it changes nothing. Views, legends and colorbars are
+// not data. A plot left out of the overlay is invisible here.
+const DATA_STEP = 4 // CSS px between samples
+const CIRCLE_TOL = 4 // geometry.ts HIT_TOL: a circle's reach past its radius
+export function dataUnder(m: Manifest, view: HitLayer, box: Rect, k: number): number {
+    const g = view.geometry as ViewGeometry
+    const own: Rect = [g.x, g.y, g.w, g.h]
+    // Each layer cropped to the elements that can reach the box first, one pass each, so the
+    // samples test a handful of elements, not the whole plot (200 000 points would otherwise
+    // cost a full scan per sample).
+    const layers = m.layers
+        .filter((l) => !layoutSpaceLayer(l) && (l.axis === view.axis ||
+            (m.transforms[l.axis] && sameRect(m.transforms[l.axis].viewport as Rect, own))))
+        .map((l) => cropLayer(l, box))
+        .filter((l): l is HitLayer => l !== null)
+    if (!layers.length) return 0
+    const step = DATA_STEP * k
+    const nx = Math.max(2, Math.round(box[2] / step) + 1), ny = Math.max(2, Math.round(box[3] / step) + 1)
+    let on = 0
+    for (let i = 0; i < nx; i++) {
+        for (let j = 0; j < ny; j++) {
+            const px = box[0] + (box[2] * i) / (nx - 1), py = box[1] + (box[3] * j) / (ny - 1)
+            if (layers.some((l) => hitLayer(l, px, py, m.transforms[l.axis]) !== null)) on++
+        }
+    }
+    return on / (nx * ny)
+}
+
+// `layer` with only the elements whose reach meets `box`, or null when none does. Only for
+// asking whether a point hits anything: element indices, draw order and sphere outlines are
+// dropped (a circle's hit reaches past its sphere's outline, so this only grows the hit).
+// Paths become disjoint segments. Kinds with no list to crop pass through whole.
+export function cropLayer(layer: HitLayer, box: Rect): HitLayer | null {
+    const [bx, by, bw, bh] = box
+    const meets = (x0: number, y0: number, x1: number, y1: number, pad: number) =>
+        Math.max(x0, x1) + pad >= bx && Math.min(x0, x1) - pad <= bx + bw &&
+        Math.max(y0, y1) + pad >= by && Math.min(y0, y1) - pad <= by + bh
+    const g = layer.geometry
+    const base = { ...layer, order: undefined, ellipses: undefined }
+    const segs = (out: number[], v: number[], pad: number) => {
+        for (let i = 0; i + 3 < v.length; i += 2) {
+            const x0 = v[i], y0 = v[i + 1], x1 = v[i + 2], y1 = v[i + 3]
+            if (Number.isNaN(x0) || Number.isNaN(x1)) continue
+            if (meets(x0, y0, x1, y1, pad)) out.push(x0, y0, x1, y1)
+        }
+    }
+    switch (layer.kind) {
+        case "circles": {
+            const a = g as number[], out: number[] = []
+            for (let i = 0; i < a.length; i += 3) {
+                if (meets(a[i], a[i + 1], a[i], a[i + 1], a[i + 2] + CIRCLE_TOL + 1)) out.push(a[i], a[i + 1], a[i + 2])
+            }
+            return out.length ? { ...base, geometry: out as never } : null
+        }
+        case "rects": {
+            const a = g as number[], out: number[] = [], pad = (layer.tol ?? 0) + 1
+            for (let i = 0; i < a.length; i += 4) {
+                const hw = a[i + 2] / 2, hh = a[i + 3] / 2
+                if (meets(a[i] - hw, a[i + 1] - hh, a[i] + hw, a[i + 1] + hh, pad)) out.push(a[i], a[i + 1], a[i + 2], a[i + 3])
+            }
+            return out.length ? { ...base, geometry: out as never } : null
+        }
+        case "segments": {
+            const a = g as number[], out: number[] = [], pad = (layer.tol ?? SEG_TOL) + 1
+            for (let i = 0; i < a.length; i += 4) if (meets(a[i], a[i + 1], a[i + 2], a[i + 3], pad)) out.push(a[i], a[i + 1], a[i + 2], a[i + 3])
+            return out.length ? { ...base, geometry: out as never } : null
+        }
+        case "polyline":
+        case "lines": {
+            const out: number[] = [], pad = (layer.tol ?? SEG_TOL) + 1
+            const paths = layer.kind === "polyline" ? [g as number[]] : (g as number[][])
+            for (const v of paths) segs(out, v, pad)
+            return out.length ? { ...base, kind: "segments", tol: layer.tol ?? SEG_TOL, geometry: out as never } : null
+        }
+        case "polygons": {
+            const elems = g as (number[] | number[][])[], pad = (layer.tol ?? 0) + 1
+            const out = elems.filter((e) => polygonRings(e).some((r) => {
+                let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+                for (let i = 0; i + 1 < r.length; i += 2) {
+                    x0 = Math.min(x0, r[i]); x1 = Math.max(x1, r[i]); y0 = Math.min(y0, r[i + 1]); y1 = Math.max(y1, r[i + 1])
+                }
+                return x0 <= x1 && meets(x0, y0, x1, y1, pad)
+            }))
+            return out.length ? { ...base, geometry: out as never } : null
+        }
+        default:
+            return layer
+    }
+}
+
 // Where a view's buttons go, or null when they don't fit. `k` is image px per CSS px. The box
 // may take at most half the axis along its long side: a stack at most half the height, else a
 // row at most half the width, and its short side plus both insets must fit across. On a coarse
-// pointer the 44 px size is tried first, then 24 px. The corner is the first in preference
-// order that nothing covers, else the least covered.
-export function placeButtons(m: Manifest, layer: HitLayer, k: number, coarse: boolean): Placement | null {
+// pointer the 44 px size is tried first, then 24 px. The corner is the one least covered by a
+// legend or another axis; of those equally covered, the one with the least data under it
+// (`dataUnder`); of those, the first in preference order. `keep` (a corner chosen earlier, at
+// the view's home) stands in for the data once the view has moved, so panning never sends the
+// box to another corner.
+export function placeButtons(m: Manifest, layer: HitLayer, k: number, coarse: boolean, keep?: Corner): Placement | null {
     const g = layer.geometry as ViewGeometry
     const vp = visibleViewport(m, g)
     if (!vp || !(k > 0)) return null
@@ -109,11 +205,14 @@ export function placeButtons(m: Manifest, layer: HitLayer, k: number, coarse: bo
         const fitsRow = !fitsStack && len <= vw / 2 && br + 2 * INSET <= vh
         if (!fitsStack && !fitsRow) continue
         const [w, h] = fitsStack ? [br, len] : [len, br]
-        let best: Corner = CORNERS[0], least = Infinity
+        let best: Corner = CORNERS[0], least = Infinity, leastData = Infinity
         for (const c of CORNERS) {
-            const a = coverage(boxAt(vp, c, w, h, k), covers)
-            if (a < least) { least = a; best = c }
-            if (a === 0) break
+            const box = boxAt(vp, c, w, h, k)
+            const a = coverage(box, covers)
+            if (a > least) continue
+            const d = keep ? (c === keep ? 0 : 1) : dataUnder(m, layer, box, k)
+            if (a < least || d < leastData) { least = a; leastData = d; best = c }
+            if (a === 0 && d === 0) break
         }
         return { corner: best, row: fitsRow, size }
     }
@@ -170,6 +269,10 @@ const ICONS = {
     reset: '<path d="M5.5 9.5A7 7 0 1 1 5 13.5"/><path d="M5 5v4.5h4.5"/>',
 }
 const LABELS = { in: "Zoom in", out: "Zoom out", reset: "Reset view" }
+// The box's opacity while the pointer is on the plot but not on the box: quiet over the data,
+// with the icon still about 4:1 against its own box on a white backdrop (3:1 is the floor for a
+// control). The pointer on the box, a touch or the keyboard stop brings it to full.
+export const VB_IDLE_OPACITY = 0.6
 
 export const VIEW_BUTTONS_STYLE = `
 .masque-vb { position: absolute; display: flex; flex-direction: column; box-sizing: border-box;
@@ -181,9 +284,15 @@ export const VIEW_BUTTONS_STYLE = `
 .masque-vb { touch-action: manipulation; }
 .masque-vb.row { flex-direction: row; }
 .masque-vb[hidden] { display: none; }
-.masque-vb.show { opacity: 1; pointer-events: auto; }
+.masque-vb.show { opacity: ${VB_IDLE_OPACITY}; pointer-events: auto; }
+.masque-vb.show:hover, .masque-vb.show.full { opacity: 1; }
 .masque-vb button { all: unset; box-sizing: border-box; width: var(--masque-vb-size, 24px); height: var(--masque-vb-size, 24px);
-       display: grid; place-items: center; cursor: pointer; color: inherit; }
+       display: grid; place-items: center; cursor: pointer; color: inherit;
+       transition: background-color ${MOTION_MS}ms ease-out; }
+@media (hover: hover) {
+  .masque-vb button:hover { background: color-mix(in srgb, var(--masque-tip-bg-resolved), var(--masque-tip-color-resolved) 12%); }
+}
+.masque-vb button:active { background: color-mix(in srgb, var(--masque-tip-bg-resolved), var(--masque-tip-color-resolved) 20%); }
 .masque-vb button + button { border-top: 1px solid var(--masque-tip-border-resolved); }
 .masque-vb.row button + button { border-top: none; border-left: 1px solid var(--masque-tip-border-resolved); }
 .masque-vb button svg { width: var(--masque-vb-icon, 14px); height: var(--masque-vb-icon, 14px); pointer-events: none; }
@@ -194,7 +303,7 @@ export const VIEW_BUTTONS_STYLE = `
   .masque-vb { box-shadow: var(--masque-tip-shadow, 0 2px 4px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.3)); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .masque-vb { transition: none; }
+  .masque-vb, .masque-vb button { transition: none; }
   .masque-vb.moved .masque-vb-reset { animation: none; }
 }
 `
@@ -219,6 +328,7 @@ interface Box {
     el: HTMLDivElement
     vp: [number, number, number, number] | null
     always: boolean
+    home?: Corner // the corner picked at the view's home, kept while it is moved
 }
 
 export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: ShadowRoot, pxPerCss: () => number): ViewButtons {
@@ -234,6 +344,8 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
     const paint = () => {
         for (const b of boxes.values()) {
             b.el.classList.toggle("show", shown(b) && b.vp !== null)
+            // A finger has no hover and the keyboard stop means use: neither waits at the idle level.
+            b.el.classList.toggle("full", b.id === touched || b.id === focused)
             b.el.classList.toggle("moved", state.viewMoved_.has(b.id))
         }
     }
@@ -304,7 +416,10 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
             boxes.set(l.id, b)
             const g = l.geometry as ViewGeometry
             b.always = g.controls === "always"
-            const p = placeButtons(m, l, k, coarse)
+            // At home the data picks the corner; once the view has moved, the home pick holds.
+            const moved = state.viewMoved_.has(l.id)
+            const p = placeButtons(m, l, k, coarse, moved ? b.home : undefined)
+            if (p && !moved) b.home = p.corner
             const vp = p ? visibleViewport(m, g) : null
             b.vp = vp
             b.el.hidden = !p
