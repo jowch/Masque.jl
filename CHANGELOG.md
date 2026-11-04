@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- The default tooltip names a coordinate by its axis label: with `xlabel = "Time (s)"`, a
+  point shows `Time (s) 2.35` instead of `x 2.35`. So do a line's readout, an
+  `AxisInteractable` readout, a slice and the keyboard announcement. An unlabelled axis takes
+  the label of the axes it is linked to when they agree. Event fields, the `@bind` value and
+  template fields keep `x`. LaTeX and rich-text labels keep `x` for now.
 - The zoom and reset buttons in a plot's corner sit back at 60% opacity while the pointer is
   elsewhere on the plot, and come up to full when the pointer reaches them. The button under
   the pointer is shaded, a little more while it is pressed. On a touch screen, or from the

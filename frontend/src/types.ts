@@ -272,7 +272,7 @@ export interface CoordFormat {
     group?: boolean  // thousands separators
     exp?: boolean    // scientific notation
     spec?: string    // d3-format spec from the precision a Makie format string states
-    label?: string   // the table key in place of x/y/z: "θ" or "r" on a PolarAxis
+    label?: string   // the table key in place of x/y/z: "θ" or "r" on a PolarAxis, else the axis label ("Time (s)")
 }
 
 // The resolved Makie.Polar fields of one PolarAxis. invertAxis maps a pixel to the Cartesian

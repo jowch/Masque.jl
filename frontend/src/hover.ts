@@ -1,6 +1,6 @@
 import { anchorFor, axisPoint, computeAnchoredPlacement, hitTestAt, layerPoint, resolvePayload, invertAxis, sampleSlice, slopScale, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layerFrame } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
-import { renderTemplate, renderAutoTable, esc, fmtNum, fmtCoord, coordFields, readoutKeys, withReadout } from "./template"
+import { renderTemplate, renderAutoTable, esc, fmtNum, fmtCoord, coordFields, readoutKeys, withReadout, rowNames } from "./template"
 import { drawHover, clearHover, drawLegendLink, drawPartners, clearLegendLink, markColorFor } from "./highlight"
 import { groupOf, partnerHits } from "./linked"
 import { hideCross, syncCross } from "./cross"
@@ -296,7 +296,8 @@ export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): 
         const d = ctx.tipDigits_, ex = ctx.tipExplicit_
         const t = ctx.manifest_.transforms[layer.axis]
         if ("value" in v) return esc(fmtCoord(v.value, t?.valueaxis === "x" ? t.xfmt : t?.yfmt, d, ex, true))
-        const kx = t?.xfmt?.label ?? "x", ky = t?.yfmt?.label ?? "y"
+        const n = rowNames(["x", "y"], { ...(t?.xfmt && { x: t.xfmt }), ...(t?.yfmt && { y: t.yfmt }) })
+        const kx = n.x, ky = n.y
         return `${esc(kx)}=${esc(fmtCoord(v.x, t?.xfmt, d, ex, true))}, ${esc(ky)}=${esc(fmtCoord(v.y, t?.yfmt, d, ex, true))}`
     }
     const t = ctx.manifest_.transforms[layer.axis]
@@ -425,8 +426,9 @@ function sliceTipHtml(layer: HitLayer, payload: Record<string, number>, probe: "
     if (layer.template) return renderTemplate(layer.template, payload, digits)
     const pf = probe === "x" ? t?.xfmt : t?.yfmt, vf = probe === "x" ? t?.yfmt : t?.xfmt
     const shown: Record<string, string> = {}
+    const name = rowNames(Object.keys(payload), pf ? { [probe]: pf } : undefined)[probe] ?? probe
     for (const [k, v] of Object.entries(payload)) {
-        if (k === probe) shown[pf?.label ?? k] = fmtCoord(v, pf, digits, explicit, true)
+        if (k === probe) shown[name] = fmtCoord(v, pf, digits, explicit, true)
         else shown[k] = fmtCoord(v, vf, digits, explicit, true)
     }
     return renderAutoTable(shown)

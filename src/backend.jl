@@ -331,6 +331,24 @@ function _format_string(str::AbstractString)
     return isempty(f) ? nothing : f
 end
 
+# The name a tooltip gives an axis's coordinate in place of `x`, `y` or `z`: the axis label,
+# read once like the tick format. A label hidden with `xlabelvisible = false` (as
+# `hidexdecorations!` sets) still names the data. An axis with no label of its own takes the
+# one its linked axes (`linkxaxes!`) carry, when all of those that have one agree; stacked
+# panels often label only the bottom axis. `nothing` (keep `x`) for no label, a label equal to
+# the dimension's own name (an Axis3's default "x"), and rich or LaTeX text, which a tooltip
+# would show as markup. Display only: payload keys and the `@bind` value keep `x`.
+function _axis_label(ax, dim::Symbol)
+    own = _plain_label(getproperty(ax, Symbol(dim, :label))[])
+    own === nothing || return own == string(dim) ? nothing : own
+    links = dim === :x ? _linked_axes(ax, :xaxislinks) : dim === :y ? _linked_axes(ax, :yaxislinks) : ()
+    found = unique!(filter!(!isnothing, Any[_plain_label(getproperty(a, Symbol(dim, :label))[]) for a in links]))
+    length(found) == 1 || return nothing
+    return found[1] == string(dim) ? nothing : found[1]
+end
+_linked_axes(ax, f) = hasfield(typeof(ax), f) ? getfield(ax, f) : ()
+_plain_label(l) = _label_text(l isa AbstractString && !(l isa Makie.LaTeXString) ? strip(l) : l)
+
 function _axis_transform(id, ax, scaling, out_h)
     vp = _scene_viewport(ax); o = vp.origin; wv = vp.widths
     vpx = (o[1] * scaling, out_h - (o[2] + wv[2]) * scaling, wv[1] * scaling, wv[2] * scaling)
@@ -341,8 +359,8 @@ function _axis_transform(id, ax, scaling, out_h)
         _scalesym(ax.xscale[]), _scalesym(ax.yscale[]),
         vpx, ax.xreversed[], ax.yreversed[],
         _cats(ax.dim1_conversion[]), _cats(ax.dim2_conversion[]), nothing, false, false, nothing,
-        _coord_format(ax.xticks[], ax.xtickformat[]; scale = ax.xscale[], conv = ax.dim1_conversion[]),
-        _coord_format(ax.yticks[], ax.ytickformat[]; scale = ax.yscale[], conv = ax.dim2_conversion[]),
+        _coord_format(ax.xticks[], ax.xtickformat[]; scale = ax.xscale[], conv = ax.dim1_conversion[], label = _axis_label(ax, :x)),
+        _coord_format(ax.yticks[], ax.ytickformat[]; scale = ax.yscale[], conv = ax.dim2_conversion[], label = _axis_label(ax, :y)),
         nothing,
     )
 end
@@ -356,9 +374,9 @@ function _axis3_transform(id, ax, scaling, out_h)
     return AxisTransform(
         id, (0.0, 1.0), (0.0, 1.0), :identity, :identity,
         vpx, false, false, nothing, nothing, nothing, true, false, nothing,
-        _coord_format(ax.xticks[], ax.xtickformat[], conv = ax.dim1_conversion[]),
-        _coord_format(ax.yticks[], ax.ytickformat[], conv = ax.dim2_conversion[]),
-        _coord_format(ax.zticks[], ax.ztickformat[], conv = ax.dim3_conversion[]),
+        _coord_format(ax.xticks[], ax.xtickformat[], conv = ax.dim1_conversion[], label = _axis_label(ax, :x)),
+        _coord_format(ax.yticks[], ax.ytickformat[], conv = ax.dim2_conversion[], label = _axis_label(ax, :y)),
+        _coord_format(ax.zticks[], ax.ztickformat[], conv = ax.dim3_conversion[], label = _axis_label(ax, :z)),
     )
 end
 

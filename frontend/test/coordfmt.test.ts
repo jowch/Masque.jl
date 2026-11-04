@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { coordFields, fmtCoord, plainTextForHit, renderAutoTable, renderAutoTablePlain } from "../src/template"
+import { coordFields, fmtCoord, plainTextForHit, renderAutoTable, renderAutoTablePlain, rowNames } from "../src/template"
 import { tipHtmlForHit } from "../src/hover"
 import type { OverlayCtx } from "../src/state"
 import type { AxisTransform, CoordFormat, Hit, HitLayer } from "../src/types"
@@ -122,5 +122,28 @@ describe("coordinate fields in the default table", () => {
     it("leaves a template's fields raw", () => {
         const L = layerOf([{ index: 1, x: Math.PI / 2, y: 2 }], { coords: { x: "x", y: "y" }, template: ["x=", { f: "x" }] } as Partial<HitLayer>)
         expect(plainTextForHit({ layer: L, index: 0 } as Hit, 4, POLAR)).toBe("x=1.571")
+    })
+})
+
+describe("axis labels as row names", () => {
+    const LAB = { xfmt: { label: "Time (s)" }, yfmt: { suffix: " mV", spec: ".1f", label: "Voltage" } } as unknown as AxisTransform
+    it("names Masque's x/y by the axis labels, plain or formatted", () => {
+        const L = layerOf([{ index: 1, x: 2.345, y: 3.4721 }], { coords: { x: "x", y: "y" } })
+        const c = coordFields(LAB, L, L.payloads[0], [])
+        expect(renderAutoTablePlain(L.payloads[0], 4, c)).toBe("index 1, Time (s) 2.345, Voltage 3.5 mV")
+        expect(renderAutoTable(L.payloads[0], 4, c)).toContain(">Time (s)<")
+    })
+    it("names a line readout's nearest sample by the labels", () => {
+        const L = layerOf([{ index: 1 }], { kind: "lines" } as Partial<HitLayer>)
+        expect(plainTextForHit({ layer: L, index: 0, pt_: [0, 1, 2] } as unknown as Hit, 4, LAB)).toBe("index 1, Time (s) 1, Voltage 2.0 mV")
+    })
+    it("keeps a user's own x, labelling only the y Masque filled in", () => {
+        const L = layerOf([{ site: "B4", x: 0.812, y: 2 }], { coords: { y: "y" } })
+        expect(renderAutoTablePlain(L.payloads[0], 4, coordFields(LAB, L, L.payloads[0], []))).toBe("site B4, x 0.812, Voltage 2.0 mV")
+    })
+    it("drops a label that clashes with another row", () => {
+        expect(rowNames(["value", "x"], { x: { label: "value" } })).toEqual({ value: "value", x: "x" })
+        expect(rowNames(["x", "y"], { x: { label: "Position" }, y: { label: "Position" } })).toEqual({ x: "x", y: "y" })
+        expect(rowNames(["x", "y"], { x: { label: "Position" }, y: { label: "Height" } })).toEqual({ x: "Position", y: "Height" })
     })
 })

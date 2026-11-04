@@ -1081,6 +1081,9 @@ function build_kind_sweep()
         boxplot!(ax_box, fill(1, 5), [1.0, 2.0, 3.0, 4.0, 5.0]; orientation = :horizontal, color = :gray)
         ax_vs = Axis(fig[3, 2]; xtickformat = "{:.1f} s", limits = (0, 3, 0, 1))
         vspan!(ax_vs, [1.0], [2.0]; color = (:gray, 0.5))
+        # Axis labels name the coordinates in place of x and y.
+        ax_lab = Axis(fig[3, 3]; xlabel = "Time (s)", ylabel = "Voltage (mV)", ytickformat = "{:.1f} mV", limits = (0, 3, 0, 5))
+        scatter!(ax_lab, [1.0, 2.0], [3.4721, 1.5]; color = :gray, markersize = 22)
         masque(fig)
     end
 

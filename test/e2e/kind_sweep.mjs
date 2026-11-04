@@ -3628,19 +3628,19 @@ try {
 
     if (spec.mode === "tick_units") {
       // #510: each scatter's first point reads the way its axis labels it. The expectation is
-      // picked by the axis's transform: a `"{:.1f} mV"` format, a function format (plain), or a
-      // PolarAxis (θ in degrees, r).
+      // picked by the axis's transform: a `"{:.1f} mV"` format, a function format (plain), a
+      // PolarAxis (θ in degrees, r), or an axis with labels, which name the coordinates.
       const axes = await transformsOf(key);
       const circles = layers.filter((l) => l.kind === "circles");
-      if (circles.length !== 3) throw new Error(`${key}: expected 3 scatter layers, got ${circles.length}`);
+      if (circles.length !== 4) throw new Error(`${key}: expected 4 scatter layers, got ${circles.length}`);
       const seen = new Set();
       for (const L of circles) {
         const t = axes[L.axis];
         if (!L.coords) throw new Error(`${key}/${L.id}: a scatter's default payloads should be flagged coords`);
-        const which = t.ispolar ? "polar" : t.yfmt?.suffix === " mV" ? "mV" : "function";
+        const which = t.ispolar ? "polar" : t.xfmt?.label === "Time (s)" ? "labels" : t.yfmt?.suffix === " mV" ? "mV" : "function";
         // The card's text is its rows run together: "index 1 x 1 y 3.5 mV".
-        const want = { polar: [/(^| )θ 90°( |$)/, /\br 2\b/], mV: [/\bx 1\b/, /\by 3\.5 mV\b/], function: [/\bx 1\b/, /\by 3\.472\b/] }[which];
-        const never = { polar: [/\bx \d/, /\by \d/, /1\.571/], mV: [/3\.472/], function: [/mV/, /!/] }[which];
+        const want = { polar: [/(^| )θ 90°( |$)/, /\br 2\b/], mV: [/\bx 1\b/, /\by 3\.5 mV\b/], function: [/\bx 1\b/, /\by 3\.472\b/], labels: [/Time \(s\) 1\b/, /Voltage \(mV\) 3\.5 mV\b/] }[which];
+        const never = { polar: [/\bx \d/, /\by \d/, /1\.571/], mV: [/3\.472/], function: [/mV/, /!/], labels: [/\bx \d/, /\by \d/, /3\.472/] }[which];
         let tip = null;
         for (let a = 0; a < 6; a++) {
           tip = await dispatchAt(key, L.geometry[0], L.geometry[1], "pointermove");
@@ -3653,7 +3653,7 @@ try {
         passed.push(`${key}/${which}`);
         console.error(`OK  ${key}/${which} — ${tip.text}`);
       }
-      if (seen.size !== 3) throw new Error(`${key}: expected the polar, mV and function axes, saw ${[...seen]}`);
+      if (seen.size !== 4) throw new Error(`${key}: expected the polar, mV, function and labelled axes, saw ${[...seen]}`);
       // #543: a bar's low/high/value print in its value axis's format, a hist's value in its
       // value axis's and its low/high (the bin edges) in the bin axis's.
       const rectWant = {
