@@ -1882,6 +1882,28 @@ describe("tooltips (mount/showTip)", () => {
             expect(attrs(shadow.querySelector("rect.masque-roi")!, ["x", "y"])).toEqual([120, 160])
         })
 
+        it("holds a restored band edge and a colorbar line to the plot, as Julia does", () => {
+            const { host, script } = setup()
+            const m = controls()
+            m.transforms.bar = { ...ax, viewport: [1100, 100, 40, 600], valueaxis: "y" }
+            m.layers.push({ id: "cut", kind: "threshold", axis: "bar", events: ["drag"], payloads: [],
+                geometry: { orientation: "h", pos: 400, span: [1100, 1140] } })
+            m.fields = [...m.fields!, "cut"]
+            m.initial = { ...m.initial, cut: { layer: "cut", index: 0, payload: 50 } }
+            mount(script, m)
+            hostValue(host).value = { ...restored,
+                band: { layer: "band", index: 0, payload: { lo: -5, hi: 6 } },
+                thr: { layer: "thr", index: 0, payload: 150 },
+                cut: { layer: "cut", index: 0, payload: 150 } }
+            const lines = [...shadowOf(host).querySelectorAll("line.masque-threshold-line")]
+            // the band's lo edge waits at x 0, the start of the plot; its hi edge is at 6 → 720
+            expect(attrs(lines[1], ["x1"])).toEqual([0])
+            expect(attrs(lines[2], ["x1"])).toEqual([720])
+            // the colorbar line waits at the top of the bar; an axis line goes where its value is
+            expect(attrs(lines[3], ["y1"])).toEqual([100])
+            expect(attrs(lines[0], ["y1"])).toEqual([-400])
+        })
+
         it("a restored category moves a line on a categorical axis to that category", () => {
             const { host, script } = setup()
             const m = controls()

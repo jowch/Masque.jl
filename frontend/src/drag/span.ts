@@ -116,7 +116,8 @@ export function placeValues(band: SpanBand, env: unknown): boolean {
     const p = env && typeof env === "object" ? (env as { payload?: unknown }).payload : null
     if (!p || typeof p !== "object") return false
     const h = band.g_.orientation === "h"
-    const lo = valuePos(band.t_, h, (p as { lo?: unknown }).lo), hi = valuePos(band.t_, h, (p as { hi?: unknown }).hi)
+    // Each edge is held to the plot area or the bar, as Julia's `hitlayers` holds it.
+    const lo = valuePos(band.t_, h, (p as { lo?: unknown }).lo, true), hi = valuePos(band.t_, h, (p as { hi?: unknown }).hi, true)
     if (lo === null || hi === null) return false
     band.g_.lo = lo
     band.g_.hi = hi
