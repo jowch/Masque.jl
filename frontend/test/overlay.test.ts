@@ -22,7 +22,7 @@ import { mapPoint, unmapPoint } from "../src/photo"
 import { clearHi, drawHi, drawSelection } from "../src/highlight"
 import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
 import { createOverlayState, oneHome, MOTION_MS, type HiGroups, type HiSet } from "../src/state"
-import type { ControlGeometry, GridGeometry, Hit, HitLayer, Manifest, ViewGeometry } from "../src/types"
+import type { AxisTransform, ControlGeometry, GridGeometry, Hit, HitLayer, Manifest, ViewGeometry } from "../src/types"
 
 // build a light-DOM host (img + script) like the Julia widget emits, with layout mocked
 function setup() {
@@ -1808,6 +1808,114 @@ describe("tooltips (mount/showTip)", () => {
             expect(hostValue(host).value).toEqual({ pts: { layer: "pts", index: 2 }, bars: null })
             expect(selectedCx(host)).toEqual(["900"])
             expect(fadeKept(shadowOf(host)).filter((k) => k.startsWith("bars:"))).toEqual([])
+        })
+
+        // #576: the lines, bands and boxes were drawn at the manifest's start. A restored value
+        // moves each to where the bond says, and a grab there takes it.
+        const ax: AxisTransform = { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false }
+        const controls = (): Manifest => ({
+            width: 1200, height: 800, scaling: 2, transforms: { ax1: ax },
+            layers: [
+                { id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { orientation: "h", pos: 400, span: [0, 1200] } },
+                { id: "band", kind: "span", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { orientation: "v", lo: 360, hi: 720, span: [0, 800] } },
+                { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 120, y: 160, w: 240, h: 320, handle: 16 } },
+            ],
+            fields: ["thr", "band", "roi"],
+            initial: {
+                thr: { layer: "thr", index: 0, payload: 50 },
+                band: { layer: "band", index: 0, payload: { lo: 3, hi: 6 } },
+                roi: { layer: "roi", index: 0, payload: { xmin: 1, xmax: 3, ymin: 40, ymax: 80 } },
+            },
+        })
+        const restored = {
+            thr: { layer: "thr", index: 0, payload: 25 },
+            band: { layer: "band", index: 0, payload: { lo: 1, hi: 8 } },
+            roi: { layer: "roi", index: 0, payload: { xmin: 5, xmax: 9, ymin: 10, ymax: 30 } },
+        }
+        const attrs = (el: Element, ks: string[]) => ks.map((k) => Number(el.getAttribute(k)))
+
+        it("draws a restored threshold, band and box at the restored value, without sending it back", () => {
+            const { host, script } = setup()
+            mount(script, controls())
+            const shadow = shadowOf(host)
+            let fired = false
+            host.addEventListener("input", () => { fired = true })
+            hostValue(host).value = restored
+            const lines = [...shadow.querySelectorAll("line.masque-threshold-line")]
+            // y 25 → image y 600; band x 1 and 8 → image x 120 and 960
+            expect(attrs(lines[0], ["x1", "y1", "x2", "y2"])).toEqual([0, 600, 1200, 600])
+            expect(attrs(lines[1], ["x1", "x2"])).toEqual([120, 120])
+            expect(attrs(lines[2], ["x1", "x2"])).toEqual([960, 960])
+            // box x [5, 9] → [600, 1080], y [10, 30] → [720, 560]
+            const box = shadow.querySelector("rect.masque-roi")!
+            expect(attrs(box, ["x", "y", "width", "height"])).toEqual([600, 560, 480, 160])
+            expect(hostValue(host).value).toEqual(restored)
+            expect(fired).toBe(false)
+        })
+
+        it("a drag after the restore grabs the line where it is drawn", () => {
+            const { host, script } = setup()
+            mount(script, controls())
+            hostValue(host).value = restored
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            // display scale 2: the restored line is at client y 300; the start one was at 200
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 450, clientY: 300, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 450, clientY: 320, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 450, clientY: 320, bubbles: true }))
+            const thr = (hostValue(host).value as Record<string, { payload: number }>).thr
+            // image y 640: fy = 0.2 → 20
+            expect(thr.payload).toBeCloseTo(20)
+        })
+
+        it("a value a control can't place leaves it where it was", () => {
+            const { host, script } = setup()
+            mount(script, controls())
+            const shadow = shadowOf(host)
+            hostValue(host).value = { thr: null, band: { layer: "band", index: 0, payload: { lo: "a", hi: 2 } }, roi: { payload: 3 } }
+            const lines = [...shadow.querySelectorAll("line.masque-threshold-line")]
+            expect(attrs(lines[0], ["y1"])).toEqual([400])
+            expect(attrs(lines[1], ["x1"])).toEqual([360])
+            expect(attrs(shadow.querySelector("rect.masque-roi")!, ["x", "y"])).toEqual([120, 160])
+        })
+
+        it("holds a restored band edge and a colorbar line to the plot, as Julia does", () => {
+            const { host, script } = setup()
+            const m = controls()
+            m.transforms.bar = { ...ax, viewport: [1100, 100, 40, 600], valueaxis: "y" }
+            m.layers.push({ id: "cut", kind: "threshold", axis: "bar", events: ["drag"], payloads: [],
+                geometry: { orientation: "h", pos: 400, span: [1100, 1140] } })
+            m.fields = [...m.fields!, "cut"]
+            m.initial = { ...m.initial, cut: { layer: "cut", index: 0, payload: 50 } }
+            mount(script, m)
+            hostValue(host).value = { ...restored,
+                band: { layer: "band", index: 0, payload: { lo: -5, hi: 6 } },
+                thr: { layer: "thr", index: 0, payload: 150 },
+                cut: { layer: "cut", index: 0, payload: 150 } }
+            const lines = [...shadowOf(host).querySelectorAll("line.masque-threshold-line")]
+            // the band's lo edge waits at x 0, the start of the plot; its hi edge is at 6 → 720
+            expect(attrs(lines[1], ["x1"])).toEqual([0])
+            expect(attrs(lines[2], ["x1"])).toEqual([720])
+            // the colorbar line waits at the top of the bar; an axis line goes where its value is
+            expect(attrs(lines[3], ["y1"])).toEqual([100])
+            expect(attrs(lines[0], ["y1"])).toEqual([-400])
+        })
+
+        it("a restored category moves a line on a categorical axis to that category", () => {
+            const { host, script } = setup()
+            const m = controls()
+            m.transforms.ax1 = { ...ax, ylims: [0.5, 3.5], ycats: ["lo", "mid", "hi"] }
+            m.layers = [m.layers[0]]
+            m.fields = ["thr"]
+            m.initial = { thr: { layer: "thr", index: 0, payload: "mid" } }
+            mount(script, m)
+            hostValue(host).value = { thr: { layer: "thr", index: 0, payload: "hi" } }
+            // category 3 of [0.5, 3.5] → fy 5/6 → image y 133.3
+            const line = shadowOf(host).querySelector("line.masque-threshold-line")!
+            expect(Number(line.getAttribute("y1"))).toBeCloseTo(800 / 6)
         })
 
         it("a page that wraps host.value after mount still sees every click", () => {

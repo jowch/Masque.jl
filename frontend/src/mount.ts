@@ -27,7 +27,7 @@ import { isLightBackground } from "./color"
 import { createFade } from "./fade"
 import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, oneHome, MOTION_MS, NOTE_MS } from "./state"
 import type { HiGroups, HiSet, OverlayCtx } from "./state"
-import type { Hit, HitLayer, Limits3, Manifest, ViewGeometry } from "./types"
+import type { Hit, HitLayer, Limits3, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 import { axisFrame, innermostView, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
 import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_HINT_MS, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
@@ -716,6 +716,27 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
     }
     restoreSelection(hostValue)
+    // The lines, bands and boxes were drawn at the manifest's starting geometry. A restored
+    // value moves each to where the bond says it is (#576), and its keyboard stop with it.
+    const restoreChrome = (v: Record<string, unknown>) => {
+        const tr = ctx.manifest_.transforms
+        let moved = false
+        for (const layer of ctx.manifest_.layers) {
+            if (!(layer.id in v)) continue
+            const env = v[layer.id]
+            if (layer.kind === "threshold") {
+                const line = ctx.thresholdLines_.get(layer.id)
+                if (line) moved = thresholdDrag.placeValue(line, layer.geometry as ThresholdGeometry, tr[layer.axis], env) || moved
+            } else if (layer.kind === "span") {
+                const band = ctx.spanBands_.get(layer.id)
+                if (band) moved = spanDrag.placeValues(band, env) || moved
+            } else if (layer.kind === "roi") {
+                const box = ctx.roiBoxes_.get(layer.id)
+                if (box) moved = roiDrag.placeBounds(box, env) || moved
+            }
+        }
+        if (moved) dragStops?.sync_()
+    }
 
     // `host.value` is the bond. Pluto writes it after mount: on a page reload it restores the
     // kernel's value, which can be a click made since the `selected=` seed. Until a gesture of
@@ -739,6 +760,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             if (committing) restoring = false
             else if (restoring && !sameValue(v, bondValue) && v && typeof v === "object") {
                 restoreSelection(v as Record<string, unknown>)
+                restoreChrome(v as Record<string, unknown>)
                 for (const [f, env] of Object.entries(v as Record<string, unknown>)) controls.set_(f, env)
                 renderSelection(ctx, state)
                 stateValue = { ...stateValue, ...(v as Record<string, unknown>) }

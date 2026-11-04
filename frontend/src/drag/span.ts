@@ -4,6 +4,7 @@ import { fmtCoord } from "../template"
 import type { Drag, SpanBand } from "../state"
 import type { AxisTransform, Manifest, SpanGeometry } from "../types"
 import { HANDLE_RADIUS_CSS } from "./roi"
+import { valuePos } from "./threshold"
 
 // --- draggable bands (#500): two edges, the picture outside them faded, a grip on each edge ---
 // The edges are threshold lines (same class, width and hover thickening). Outside the band
@@ -107,6 +108,21 @@ export function buildSpanBands(manifest: Manifest, parentFor: (axis: string) => 
         bands.set(layer.id, band)
     }
     return bands
+}
+
+// Moves the band to a restored field value, `{lo, hi}` in data space (#576). `g_` is the
+// manifest geometry, so hit-testing follows. False leaves the band where it was.
+export function placeValues(band: SpanBand, env: unknown): boolean {
+    const p = env && typeof env === "object" ? (env as { payload?: unknown }).payload : null
+    if (!p || typeof p !== "object") return false
+    const h = band.g_.orientation === "h"
+    // Each edge is held to the plot area or the bar, as Julia's `hitlayers` holds it.
+    const lo = valuePos(band.t_, h, (p as { lo?: unknown }).lo, true), hi = valuePos(band.t_, h, (p as { hi?: unknown }).hi, true)
+    if (lo === null || hi === null) return false
+    band.g_.lo = lo
+    band.g_.hi = hi
+    setSpan(band)
+    return true
 }
 
 export function removeSpanBand(band: SpanBand): void {

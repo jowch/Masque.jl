@@ -255,46 +255,50 @@ try {
 
   await shutdownOpenSession(base, notebook);
   await page.goto(`${base}/open?path=${encodeURIComponent(notebook)}`, { waitUntil: "domcontentloaded", timeout: 60000 });
-  const deadline = Date.now() + 1500000;
-  let ready = false, tick = 0;
-  while (Date.now() < deadline) {
-    const st = await page.evaluate(() => {
-      // Click the "Run notebook code" safe-preview banner exactly once per page: it can stay
-      // in the DOM (just visually superseded) for the whole first-open precompile, and a
-      // repeated click on an already-running notebook re-triggers Pluto's reactive run,
-      // interrupting the in-flight cell (surfaces as InterruptException under slow/contended
-      // precompilation — seen when Cairo and WGL open concurrently on a loaded box).
-      const runBtn = [...document.querySelectorAll("button, a")].find((b) => /run notebook code/i.test(b.innerText || b.title || ""));
-      if (runBtn && !window.__masqueClickedRun) { runBtn.click(); window.__masqueClickedRun = true; }
-      const hosts = [...document.querySelectorAll(".ip-host")];
-      let surfaces = 0;
-      for (const h of hosts) {
-        let sr = null; h.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-        if (sr && sr.querySelector(".surface")) surfaces++;
+  // Waits until every kind-sweep widget has mounted. Run again after the reload check's reload.
+  const waitForWidgets = async (timeoutMs) => {
+    const deadline = Date.now() + timeoutMs;
+    let ready = false, tick = 0;
+    while (Date.now() < deadline) {
+      const st = await page.evaluate(() => {
+        // Click the "Run notebook code" safe-preview banner exactly once per page: it can stay
+        // in the DOM (just visually superseded) for the whole first-open precompile, and a
+        // repeated click on an already-running notebook re-triggers Pluto's reactive run,
+        // interrupting the in-flight cell (surfaces as InterruptException under slow/contended
+        // precompilation — seen when Cairo and WGL open concurrently on a loaded box).
+        const runBtn = [...document.querySelectorAll("button, a")].find((b) => /run notebook code/i.test(b.innerText || b.title || ""));
+        if (runBtn && !window.__masqueClickedRun) { runBtn.click(); window.__masqueClickedRun = true; }
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        let surfaces = 0;
+        for (const h of hosts) {
+          let sr = null; h.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          if (sr && sr.querySelector(".surface")) surfaces++;
+        }
+        let meta = null;
+        try { meta = JSON.parse(document.querySelector("#kind_meta")?.textContent || ""); } catch { meta = null; }
+        return {
+          busy: document.querySelectorAll("pluto-cell.running, pluto-cell.queued").length,
+          errored: document.querySelectorAll("pluto-cell.errored").length,
+          hosts: hosts.length, surfaces,
+          metaN: Array.isArray(meta) ? meta.length : 0,
+          backend: document.querySelector("#kind_backend")?.textContent?.trim() || "",
+          errText: [...document.querySelectorAll("pluto-cell.errored")].map((c) => c.innerText).slice(0, 1).join(""),
+          title: document.title,
+          url: location.href,
+        };
+      });
+      if (st.errored) throw new Error(`${backend} errored: ${st.errText.slice(0, 500)}`);
+      const wglQuiet = !lastWglChurnAt || (Date.now() - lastWglChurnAt) > WGL_QUIET_MS;
+      if (!st.busy && st.metaN >= 14 && st.surfaces >= st.metaN && wglQuiet) { ready = true; break; }
+      if (tick % 20 === 0) {
+        console.error(`  …${backend} [${tick}s] busy=${st.busy} hosts=${st.hosts} surfaces=${st.surfaces} meta=${st.metaN} wglQuiet=${wglQuiet} title=${JSON.stringify(st.title || "")} url=${st.url || ""}`);
       }
-      let meta = null;
-      try { meta = JSON.parse(document.querySelector("#kind_meta")?.textContent || ""); } catch { meta = null; }
-      return {
-        busy: document.querySelectorAll("pluto-cell.running, pluto-cell.queued").length,
-        errored: document.querySelectorAll("pluto-cell.errored").length,
-        hosts: hosts.length, surfaces,
-        metaN: Array.isArray(meta) ? meta.length : 0,
-        backend: document.querySelector("#kind_backend")?.textContent?.trim() || "",
-        errText: [...document.querySelectorAll("pluto-cell.errored")].map((c) => c.innerText).slice(0, 1).join(""),
-        title: document.title,
-        url: location.href,
-      };
-    });
-    if (st.errored) throw new Error(`${backend} errored: ${st.errText.slice(0, 500)}`);
-    const wglQuiet = !lastWglChurnAt || (Date.now() - lastWglChurnAt) > WGL_QUIET_MS;
-    if (!st.busy && st.metaN >= 14 && st.surfaces >= st.metaN && wglQuiet) { ready = true; break; }
-    if (tick % 20 === 0) {
-      console.error(`  …${backend} [${tick}s] busy=${st.busy} hosts=${st.hosts} surfaces=${st.surfaces} meta=${st.metaN} wglQuiet=${wglQuiet} title=${JSON.stringify(st.title || "")} url=${st.url || ""}`);
+      tick++;
+      await new Promise((r) => setTimeout(r, 1000));
     }
-    tick++;
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  if (!ready) throw new Error(`${backend} timed out waiting for kind-sweep widgets`);
+    if (!ready) throw new Error(`${backend} timed out waiting for kind-sweep widgets`);
+  };
+  await waitForWidgets(1500000);
   passed.mark("notebook ran");
   console.error(`phase: widgets mounted (${backend})`);
   // Diagnostic only (not an assertion): reports whether MASQUE_DEV_ENV propagated from serve.jl
@@ -5186,6 +5190,79 @@ try {
       console.error("OK  barplot — a tap picks a bar only inside it");
     }
     await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+  }
+
+  // #576: a reload keeps every drag control where the sweep left it. Pluto writes each bond's
+  // kernel value into the widget after mount, and the overlay draws each threshold line, band
+  // edge and box at that value, not at the manifest's starting geometry. Read every widget's
+  // drawn chrome and value, reload, wait for the same values to come back, and compare.
+  {
+    const chromeOf = () => page.evaluate((keys) => {
+      const out = {};
+      const hosts = [...document.querySelectorAll(".ip-host")];
+      const num = (el, ks) => ks.map((k) => Number(el.getAttribute(k)));
+      for (const k of keys) {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = span && hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        if (!host) continue;
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        if (!sr) continue;
+        const lines = [...sr.querySelectorAll("line.masque-threshold-line")].map((l) => num(l, ["x1", "y1", "x2", "y2"]));
+        const boxes = [...sr.querySelectorAll("rect.masque-roi")].map((r) => num(r, ["x", "y", "width", "height"]));
+        if (!lines.length && !boxes.length) continue;
+        const layers = JSON.parse(span.textContent);
+        // A control the bond leaves out (`bind`, with `onchange`) is state Pluto doesn't keep: a
+        // reload starts it again, by design.
+        const bound = Object.keys(host.value ?? {});
+        if (layers.some((l) => ["threshold", "span", "roi"].includes(l.kind) && !bound.includes(l.id))) continue;
+        // The starting geometry, from the published manifest: a line's pos, a band's two edges.
+        const start = layers.flatMap((l) => l.kind === "threshold" ? [l.geometry.pos] : l.kind === "span" ? [l.geometry.lo, l.geometry.hi] : []);
+        const startBoxes = layers.filter((l) => l.kind === "roi").map((l) => [l.geometry.x, l.geometry.y, l.geometry.w, l.geometry.h]);
+        // Key order is whatever wrote the value last (our commit, or Pluto's restore).
+        const canon = (v) => Array.isArray(v) ? v.map(canon) : v && typeof v === "object"
+          ? Object.fromEntries(Object.keys(v).sort().map((key) => [key, canon(v[key])])) : v;
+        out[k] = { lines, boxes, start, startBoxes, value: JSON.stringify(canon(host.value ?? null)) };
+      }
+      return out;
+    }, meta.map((m) => m.key));
+    const before = await chromeOf();
+    const keys = Object.keys(before);
+    if (!keys.length) throw new Error("reload: no widget draws a threshold line, band or box");
+    // Vacuous unless the sweep moved one: a dragged line or box sits off its manifest position.
+    const moved = keys.filter((k) => {
+      const at = before[k].lines.flatMap(([x1, y1, x2, y2]) => (y1 === y2 ? [y1] : [x1]));
+      const offBox = before[k].boxes.some((b) => !before[k].startBoxes.some((q) => q.every((v, j) => Math.abs(v - b[j]) < 0.5)));
+      return offBox || at.some((p) => !before[k].start.some((q) => Math.abs(p - q) < 0.5));
+    });
+    if (!moved.length) throw new Error(`reload: no control in ${keys.join(", ")} sits off its starting value; the check would prove nothing`);
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+    await waitForWidgets(300000);
+    let after = null;
+    const until = Date.now() + 30000;
+    while (Date.now() < until) {
+      after = await chromeOf();
+      if (keys.every((k) => after[k]?.value === before[k].value)) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    // With `onchange` the restore asks Julia for a frame, and the frame's manifest (a colorbar
+    // whose range moved, say) redraws the controls; on WebGL that can take a while. Poll until
+    // every control is back, then report the ones that aren't.
+    const close = (a, b) => a.length === b.length && a.every((row, i) => row.every((v, j) => Math.abs(v - b[i][j]) < 1));
+    const same = (k) => after[k] && close(after[k].lines, before[k].lines) && close(after[k].boxes, before[k].boxes);
+    const drawnBy = Date.now() + 30000;
+    while (Date.now() < drawnBy && !keys.every(same)) {
+      await new Promise((r) => setTimeout(r, 500));
+      after = await chromeOf();
+    }
+    for (const k of keys) {
+      const b = before[k], a = after[k];
+      if (!a) throw new Error(`reload/${k}: the widget's controls are gone after the reload`);
+      if (a.value !== b.value) throw new Error(`reload/${k}: value ${a.value} after the reload, want ${b.value}`);
+      if (!close(a.lines, b.lines)) throw new Error(`reload/${k}: lines ${JSON.stringify(a.lines)} after the reload, were ${JSON.stringify(b.lines)}`);
+      if (!close(a.boxes, b.boxes)) throw new Error(`reload/${k}: boxes ${JSON.stringify(a.boxes)} after the reload, were ${JSON.stringify(b.boxes)}`);
+      passed.push(`${k}/reload-keeps-controls`);
+    }
+    console.error(`OK  reload — ${keys.length} widgets draw their controls at the restored value (moved before the reload: ${moved.join(", ")})`);
   }
 
   if (unexpected.length) throw new Error(`page errors: ${unexpected.join(" | ")}`);

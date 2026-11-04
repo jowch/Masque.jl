@@ -15,6 +15,11 @@ All notable changes to this project are documented here. The format is based on
   free, so they no longer sit on top of points bunched in the top right. They pick it when the
   plot is first shown and stay there while you pan or zoom.
 
+### Fixed
+- After a page reload, a threshold line, a band or a box you dragged is drawn where you left
+  it. Before, the `@bind` value came back but the control was drawn at its starting value,
+  and the next drag started from there (#576).
+
 ## [0.5.0] - 2026-11-03
 
 ### Breaking
