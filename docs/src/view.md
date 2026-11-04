@@ -113,7 +113,8 @@ a single pick, as any click there does.
 
 While the pointer is over a plot you can pan or orbit, small buttons
 show in a corner: zoom in, zoom out, and, once you have moved the view,
-reset. On an `Axis3` they zoom only.
+reset. On an `Axis3` they zoom only. They stay faint until the pointer
+reaches them, so the data under them still shows.
 They also show while the view has keyboard focus, and after you touch
 the plot on a touch screen. They take the corner a legend leaves free,
 and a plot too small for them goes without (drag, the wheel, the keys

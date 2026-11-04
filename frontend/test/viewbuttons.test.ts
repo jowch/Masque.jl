@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
-import { placeButtons, viewsWithButtons, boxLength, boxBreadth, CORNERS } from "../src/viewbuttons"
+import { placeButtons, viewsWithButtons, boxLength, boxBreadth, CORNERS, VIEW_BUTTONS_STYLE, VB_IDLE_OPACITY } from "../src/viewbuttons"
 import type { AxisTransform, HitLayer, Manifest } from "../src/types"
 import { withFields } from "./fields"
 
@@ -167,6 +167,29 @@ describe("the corner buttons on a live widget", () => {
         pointer(surface, "pointerup", 300, 200, "touch")
         pointer(surface, "pointerleave", 300, 200, "touch")
         expect(box!.classList.contains("show")).toBe(true)
+    })
+
+    it("a mouse on the plot shows the box at the idle level; touch and the keyboard stop show it full", () => {
+        const { surface, stop, box } = setup(manifestOf())
+        pointer(surface, "pointermove", 300, 200)
+        expect(box!.classList.contains("show")).toBe(true)
+        expect(box!.classList.contains("full")).toBe(false)
+        pointer(surface, "pointerleave", 700, 200)
+        stop.dispatchEvent(new FocusEvent("focusin", { bubbles: true, composed: true }))
+        expect(box!.classList.contains("full")).toBe(true)
+        stop.dispatchEvent(new FocusEvent("focusout", { bubbles: true, composed: true }))
+        expect(box!.classList.contains("full")).toBe(false)
+        pointer(surface, "pointerdown", 300, 200, "touch")
+        pointer(surface, "pointerup", 300, 200, "touch")
+        expect(box!.classList.contains("full")).toBe(true)
+    })
+
+    it("the stylesheet: idle opacity, full under the pointer, a tint on the hovered and pressed button", () => {
+        expect(VB_IDLE_OPACITY).toBe(0.6)
+        expect(VIEW_BUTTONS_STYLE).toContain(`.masque-vb.show { opacity: ${VB_IDLE_OPACITY};`)
+        expect(VIEW_BUTTONS_STYLE).toContain(".masque-vb.show:hover, .masque-vb.show.full { opacity: 1; }")
+        expect(VIEW_BUTTONS_STYLE).toMatch(/@media \(hover: hover\) \{\s*\.masque-vb button:hover \{ background: color-mix\(in srgb, var\(--masque-tip-bg-resolved\), var\(--masque-tip-color-resolved\) 12%\); \}/)
+        expect(VIEW_BUTTONS_STYLE).toContain(".masque-vb button:active { background: color-mix(in srgb, var(--masque-tip-bg-resolved), var(--masque-tip-color-resolved) 20%); }")
     })
 
     it("reset joins only once the view has moved, and leaves after a reset", async () => {

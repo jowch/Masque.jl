@@ -170,6 +170,10 @@ const ICONS = {
     reset: '<path d="M5.5 9.5A7 7 0 1 1 5 13.5"/><path d="M5 5v4.5h4.5"/>',
 }
 const LABELS = { in: "Zoom in", out: "Zoom out", reset: "Reset view" }
+// The box's opacity while the pointer is on the plot but not on the box: quiet over the data,
+// with the icon still about 4:1 against its own box on a white backdrop (3:1 is the floor for a
+// control). The pointer on the box, a touch or the keyboard stop brings it to full.
+export const VB_IDLE_OPACITY = 0.6
 
 export const VIEW_BUTTONS_STYLE = `
 .masque-vb { position: absolute; display: flex; flex-direction: column; box-sizing: border-box;
@@ -181,9 +185,15 @@ export const VIEW_BUTTONS_STYLE = `
 .masque-vb { touch-action: manipulation; }
 .masque-vb.row { flex-direction: row; }
 .masque-vb[hidden] { display: none; }
-.masque-vb.show { opacity: 1; pointer-events: auto; }
+.masque-vb.show { opacity: ${VB_IDLE_OPACITY}; pointer-events: auto; }
+.masque-vb.show:hover, .masque-vb.show.full { opacity: 1; }
 .masque-vb button { all: unset; box-sizing: border-box; width: var(--masque-vb-size, 24px); height: var(--masque-vb-size, 24px);
-       display: grid; place-items: center; cursor: pointer; color: inherit; }
+       display: grid; place-items: center; cursor: pointer; color: inherit;
+       transition: background-color ${MOTION_MS}ms ease-out; }
+@media (hover: hover) {
+  .masque-vb button:hover { background: color-mix(in srgb, var(--masque-tip-bg-resolved), var(--masque-tip-color-resolved) 12%); }
+}
+.masque-vb button:active { background: color-mix(in srgb, var(--masque-tip-bg-resolved), var(--masque-tip-color-resolved) 20%); }
 .masque-vb button + button { border-top: 1px solid var(--masque-tip-border-resolved); }
 .masque-vb.row button + button { border-top: none; border-left: 1px solid var(--masque-tip-border-resolved); }
 .masque-vb button svg { width: var(--masque-vb-icon, 14px); height: var(--masque-vb-icon, 14px); pointer-events: none; }
@@ -194,7 +204,7 @@ export const VIEW_BUTTONS_STYLE = `
   .masque-vb { box-shadow: var(--masque-tip-shadow, 0 2px 4px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.3)); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .masque-vb { transition: none; }
+  .masque-vb, .masque-vb button { transition: none; }
   .masque-vb.moved .masque-vb-reset { animation: none; }
 }
 `
@@ -234,6 +244,8 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
     const paint = () => {
         for (const b of boxes.values()) {
             b.el.classList.toggle("show", shown(b) && b.vp !== null)
+            // A finger has no hover and the keyboard stop means use: neither waits at the idle level.
+            b.el.classList.toggle("full", b.id === touched || b.id === focused)
             b.el.classList.toggle("moved", state.viewMoved_.has(b.id))
         }
     }

@@ -159,9 +159,16 @@ an axis too small for either gets none. Twin axes on one viewport share one box,
 first view there (the one the wheel drives). On an `Axis3` the corner is the layout cell's, not
 the drawn cube's. Shown while the pointer is over the axis, while the view's keyboard stop has
 focus, and after a touch on the axis (`controls = :hover`); always (`:always`); never (`:none`);
-never once the gesture channel is dead (a static export). The box fades in and out over the
-tooltip's 80–120 ms, and reset fades in the same way when it joins; no pulse, no slide. A press
-never reaches the plot: no pick, no clear, no pan.
+never once the gesture channel is dead (a static export). With the pointer on the plot but not
+on the box, the box rests at 60% opacity (`VB_IDLE_OPACITY`), so it sits back over the data
+while the icon keeps about 4:1 against its own box; the pointer on the box, a touch, or focus
+on the keyboard stop brings it to 100% (Jonathan's ask, 2026-11-04). The button under a mouse
+or pen takes a tint, 12% of the text colour mixed into the box colour (darker on a light
+figure, lighter on a dark one), and 20% while pressed; hover tints only under
+`(hover: hover)`, so a tap leaves no sticky tint. The box fades in and out over the tooltip's
+80–120 ms, the idle-to-full change and the tint use the same timing, and reset fades in the
+same way when it joins; no pulse, no slide. A press never reaches the plot: no pick, no clear,
+no pan.
 
 Band chrome (`SpanInteractable`, #500, Jonathan picked look D on 2026-11-02): two edges drawn
 as threshold lines (same class, width and hover thickening), the area outside the band filled

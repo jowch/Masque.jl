@@ -1769,7 +1769,9 @@ try {
   // mouse on a light figure (`view`) and a dark one whose legend takes the top-right corner
   // (`view_dark`): the box wears the tooltip's background, text and border colours, light or
   // dark after the figure; 4 px radius; 24 px buttons with 14 px icons at stroke 1.75; the
-  // tooltip's fade; reset out until the view moves; the pixels on screen are the box's.
+  // tooltip's fade; reset out until the view moves; the idle opacity on the plot, full on the
+  // box with a tint on the button under the pointer; the pixels on screen are the box's.
+  const IDLE = 0.6; // VB_IDLE_OPACITY in frontend/src/viewbuttons.ts
   for (const [key, corner, dark] of [["view", "tr", false], ["view_dark", "tl", true]]) {
     const vp = await page.evaluate((k) => {
       const span = document.querySelector(`#coords_${k}`);
@@ -1812,10 +1814,11 @@ try {
         rect: { x: r.left, y: r.top, w: r.width, h: r.height },
       };
       }, key);
-      if (st.show && st.opacity >= 0.99) break;
+      if (st.show && Math.abs(st.opacity - IDLE) < 0.01) break;
     }
     const fail = (m) => { throw new Error(`${key}-view-buttons: ${m} (${JSON.stringify(st)})`); };
-    if (!st.show || st.opacity < 0.99) fail("hover did not show the box");
+    // The pointer on the plot, not on the box: the box rests at the idle opacity.
+    if (!st.show || Math.abs(st.opacity - IDLE) >= 0.01) fail(`hover on the plot did not show the box at the idle ${IDLE}`);
     if (st.corner !== corner) fail(`corner ${st.corner}, expected ${corner}`);
     if (st.bg !== st.tipBg || st.color !== st.tipColor || st.border !== st.tipBorder || st.divider !== st.tipBorder) fail("box colours are not the tooltip's");
     if (st.shadow !== st.tipShadow) fail("box shadow is not the tooltip's");
@@ -1827,6 +1830,28 @@ try {
     // 0..1 lightness: the L of an lch() colour, else the luminance of an rgb() one.
     const lum = (c) => { const v = c.match(/[\d.]+/g).map(Number); return c.startsWith("lch") ? v[0] / 100 : (0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]) / 255; };
     if (dark ? !(lum(st.bg) < 0.3) : !(lum(st.bg) > 0.8)) fail(`a ${dark ? "dark" : "light"} figure's box is not ${dark ? "dark" : "light"}`);
+    // The pointer on the box: full opacity, and the button under it (zoom out) takes the tint,
+    // 12% of the text colour into the box colour; zoom in keeps the box colour.
+    await page.mouse.move(st.rect.x + st.rect.w / 2, st.rect.y + st.rect.h * 0.75); // the lower button of two: zoom out
+    let on = null;
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      on = await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const box = sr.querySelector(".masque-vb");
+        const rgb = (css) => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = css; c.fillRect(0, 0, 1, 1); return [...c.getImageData(0, 0, 1, 1).data]; };
+        const cs = getComputedStyle(box);
+        return { opacity: Number(cs.opacity), out: rgb(getComputedStyle(box.querySelector(".masque-vb-out")).backgroundColor),
+          in: getComputedStyle(box.querySelector(".masque-vb-in")).backgroundColor, bg: rgb(cs.backgroundColor), ink: rgb(cs.color) };
+      }, key);
+      if (on.opacity >= 0.99 && on.out[3] === 255) break;
+    }
+    if (on.opacity < 0.99) fail(`the box stayed at ${on.opacity} with the pointer on it`);
+    const tint = [0, 1, 2].map((c) => on.bg[c] * 0.88 + on.ink[c] * 0.12);
+    if (![0, 1, 2].every((c) => Math.abs(on.out[c] - tint[c]) <= 3)) fail(`the hovered button reads ${on.out}, not the 12% tint ${tint.map(Math.round)}`);
+    if (on.in !== "rgba(0, 0, 0, 0)") fail(`a button not under the pointer is tinted (${on.in})`);
     // On screen: a spot inside the box, between the icon and the edge, reads the box's colour.
     const png = PNG.sync.read(await page.screenshot({ clip: { x: st.rect.x + 3, y: st.rect.y + 3, width: 2, height: 2 } }));
     // The browser resolves the box's colour (lch or rgb) to sRGB through a canvas.
