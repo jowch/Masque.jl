@@ -1,0 +1,4 @@
+image = "recipes_dumbbell.png"
+
+[outputs]
+c5d1e7a0-0001-4000-8000-000000000006 = "click a row"
