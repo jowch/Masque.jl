@@ -1099,8 +1099,24 @@ describe("right-click passes through to the base image", () => {
 
     const flushMenu = async () => {
         window.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }))
-        await Promise.resolve()
+        await new Promise((r) => setTimeout(r, 0))
     }
+
+    // WebKit builds the native menu from a hit test made after the contextmenu dispatch and
+    // its microtasks, so the surface must still let the press through then.
+    it("keeps the surface click-through until a task after the contextmenu event", async () => {
+        const spec = dragManifests()[0]
+        const { script } = setup()
+        mount(script, spec.manifest)
+        const surface = shadowOf(script.parentElement as HTMLElement).querySelector(".surface") as HTMLElement
+        rightDown(surface, spec.x, spec.y)
+        window.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }))
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(surface.classList.contains("passthrough")).toBe(true)
+        await new Promise((r) => setTimeout(r, 0))
+        expect(surface.classList.contains("passthrough")).toBe(false)
+    })
 
     it("styles .passthrough as pointer-events none", () => {
         const { host, script } = setup()
