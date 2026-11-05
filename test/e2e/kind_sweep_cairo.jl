@@ -993,6 +993,16 @@ HTML(
         "<span id=\"count_controls\" style=\"display:none\">$(runs_controls[] += 1)</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000590
+@bind ev_menu_view sweep.menu_view
+
+# ╔═╡ c1000000-0000-0000-0000-000000000591
+HTML(
+    "<span id=\"out_menu_view\">MENU_VIEW=$(sweep_field("menu_view", ev_menu_view))</span>" *
+        "<span id=\"bond_menu_view\" style=\"display:none\">$(repr(ev_menu_view))</span>" *
+        "<span id=\"coords_menu_view\" style=\"display:none\">$(JSON3.write(sweep.menu_view.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000129
 @bind ev_many sweep.many
 
@@ -1315,6 +1325,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000535
 # ╠═c1000000-0000-0000-0000-000000000170
 # ╠═c1000000-0000-0000-0000-000000000171
+# ╠═c1000000-0000-0000-0000-000000000590
+# ╟─c1000000-0000-0000-0000-000000000591
 # ╠═c1000000-0000-0000-0000-000000000129
 # ╠═c1000000-0000-0000-0000-000000000130
 # ╠═c1000000-0000-0000-0000-000000000131

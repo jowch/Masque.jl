@@ -548,7 +548,9 @@ function buildMenu(layer: HitLayer, g: ControlGeometry, m: Manifest, box: HTMLEl
     }
     // A press anywhere outside the open menu closes it. Blur alone misses a press on something
     // that keeps the focus where it is, such as the plot's view buttons; this listener sees
-    // every press first, whatever the element under it does with the event.
+    // every press first, whatever the element under it does with the event. A menu removed
+    // while open (the widget remounted) leaves this listener until the next press anywhere,
+    // which takes it off.
     const doc = box.ownerDocument
     const outside = (e: Event) => {
         if (!box.isConnected) doc.removeEventListener("pointerdown", outside, true)
