@@ -1,6 +1,5 @@
-// @vitest-environment happy-dom
 import { describe, it, expect } from "vitest"
-import { dequantize } from "../src/mount"
+import { dequantize } from "../src/wire"
 import type { Manifest } from "../src/types"
 
 // Julia ships a circles layer's centres and radii in quarters of an image px (#588).
