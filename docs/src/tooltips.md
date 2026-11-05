@@ -87,10 +87,9 @@ slice, and what the keyboard announces. An axis linked to others with
 `linkxaxes!` and no label of its own uses theirs, when they agree. A
 label you hid, as `hidexdecorations!` does, still counts.
 
-A label written with `L"..."` shows as typeset math, using the MathJax
-Pluto already loads for Markdown. Until MathJax is ready, a moment after
-the notebook opens, the tooltip shows the label as plain text, as
-`omega_0 (rad/s)`. It does the same for a command MathJax doesn't know.
+A label written with `L"..."` shows as typeset math. For a moment after
+the notebook opens, and for a command Pluto's Markdown math doesn't
+know, it shows as plain text instead, as `omega_0 (rad/s)`.
 A label written with `rich(...)` keeps its subscripts, superscripts,
 color and weight.
 

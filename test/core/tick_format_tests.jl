@@ -149,6 +149,23 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test td(ctxc, axc)["xfmt"] == Dict("label" => "Fruit")
     end
 
+    @testset "rich labels as markup and as plain text" begin
+        h(r) = IP._rich_html(r)
+        pl(r) = IP._rich_plain(r)
+        ss = rich("A", subsup("i", "2"))
+        @test h(ss) == "A<span class=\"masque-subsup\"><sup>2</sup><sub>i</sub></span>"
+        @test pl(ss) == "A_i^2"
+        ls = rich(left_subsup("92", "238"), "U")
+        @test h(ls) == "<span class=\"masque-subsup\"><sup>238</sup><sub>92</sub></span>U"
+        @test pl(ls) == "_92^238U"
+        @test h(rich("B"; font = :bold)) == "<span style=\"font-weight:bold\">B</span>"
+        @test h(rich("I"; font = :bold_italic)) == "<span style=\"font-weight:bold;font-style:italic\">I</span>"
+        @test h(rich("C"; color = :not_a_colour)) == "C"                   # a colour Makie can't read is left out
+        nested = rich("x", superscript("a", subscript("<b>"; color = :blue)))
+        @test h(nested) == "x<sup>a<span style=\"color:rgba(0,0,255,1.0)\"><sub>&lt;b&gt;</sub></span></sup>"
+        @test pl(nested) == "x^a_<b>"
+    end
+
     @testset "the coordinate fields Masque fills in are listed" begin
         fig = Figure(); ax = Axis(fig[1, 1]; ytickformat = "{:.1f} mV")
         sc = scatter!(ax, [1.0, 2.0], [3.47, 4.1])

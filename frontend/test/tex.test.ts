@@ -1,30 +1,31 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest"
-import { adoptGlyphs, splitTex, texFailed, typesetTex } from "../src/tex"
+import { adoptGlyphs, splitTex, texFailed, texText, typesetTex } from "../src/tex"
 import { nameHtml, renderAutoTable, renderAutoTablePlain } from "../src/template"
 
 const NS = "http://www.w3.org/2000/svg"
 
 // A stand-in for the page's MathJax with Pluto's `fontCache: "global"`: each formula's SVG points
-// at a glyph drawn once in the document.
-function fakeMathJax(opts: { fail?: RegExp } = {}) {
-    let defs = document.getElementById("MJX-cache")
-    if (!defs) {
+// at a glyph drawn once in MathJax's cache. That cache reaches the page only once MathJax
+// typesets the page (`offPage` leaves it off, as on a page with nothing to typeset); `noGlyph`
+// loses the glyph altogether.
+function fakeMathJax(opts: { fail?: RegExp; offPage?: boolean; noGlyph?: boolean } = {}) {
+    const defs = document.createElementNS(NS, "defs")
+    defs.id = "MJX-cache"
+    if (!opts.offPage) {
         const svg = document.createElementNS(NS, "svg")
-        defs = document.createElementNS(NS, "defs") as unknown as HTMLElement
-        defs.id = "MJX-cache"
         svg.appendChild(defs)
         document.body.appendChild(svg)
     }
     const calls: string[] = []
     const mj = {
-        startup: { promise: Promise.resolve() },
+        startup: { promise: Promise.resolve(), output: { fontCache: { defs } } },
         tex2mml: (tex: string) => (opts.fail?.test(tex) ? `<math><merror><mtext>${tex}</mtext></merror></math>` : "<math><mi>x</mi></math>"),
         tex2svgPromise: async (tex: string) => {
             calls.push(tex)
             const id = `MJX-G-${[...tex].map((c) => c.charCodeAt(0)).join("-")}`
-            if (!document.getElementById(id)) {
-                const p = document.createElementNS(NS, "path"); p.id = id; defs!.appendChild(p)
+            if (!opts.noGlyph && ![...defs.children].some((c) => c.id === id)) {
+                const p = document.createElementNS(NS, "path"); p.id = id; defs.appendChild(p)
             }
             const c = document.createElement("mjx-container")
             const svg = document.createElementNS(NS, "svg")
@@ -53,6 +54,9 @@ describe("LaTeX keys", () => {
         expect(texFailed("<math><merror></merror></math>")).toBe(true)
         expect(texFailed('<math><mtext mathcolor="red">\\nope</mtext></math>')).toBe(true)
         expect(texFailed("<math><mi>x</mi></math>")).toBe(false)
+        // a colour the author asked for is not an error
+        expect(texFailed('<math><mstyle mathcolor="red"><mi>T</mi></mstyle></math>')).toBe(false)
+        expect(texFailed('<math><mtext mathcolor="red">hot</mtext></math>')).toBe(false)
     })
     it("writes a LaTeX label as its plain text, marked for typesetting", () => {
         const f = { label: "omega (rad/s)", tex: "$\\omega$ (rad/s)" }
@@ -90,6 +94,46 @@ describe("LaTeX keys", () => {
         expect(calls).toEqual(["\\omega"])
         expect(root.getElementById("masque-glyphs")!.children.length).toBe(1)
     })
+    it("writes text outside $…$ the way the plain label does", () => {
+        expect(texText("Cost \\$ ")).toBe("Cost $ ")
+        expect(texText("a \\% b \\_c")).toBe("a % b _c")
+    })
+    it("finds glyphs in MathJax's own cache when the page has none", async () => {
+        fakeMathJax({ offPage: true })
+        const host = document.createElement("div"); document.body.appendChild(host)
+        const root = host.attachShadow({ mode: "open" })
+        const tip = document.createElement("div"); root.appendChild(tip)
+        tip.innerHTML = nameHtml("x", "alpha", { label: "alpha", tex: "$\\alpha$" })
+        typesetTex(tip, root)
+        await flush(); await flush()
+        const use = tip.querySelector(".masque-tex svg use")!
+        expect(root.getElementById(use.getAttribute("href")!.slice(1))).not.toBeNull()
+    })
+    it("keeps the plain text when a glyph can't be found", async () => {
+        fakeMathJax({ noGlyph: true })
+        const host = document.createElement("div"); document.body.appendChild(host)
+        const root = host.attachShadow({ mode: "open" })
+        const tip = document.createElement("div"); root.appendChild(tip)
+        tip.innerHTML = nameHtml("x", "Cost beta", { label: "Cost beta", tex: "Cost $\\beta$" })
+        typesetTex(tip, root)
+        await flush(); await flush()
+        expect(tip.querySelector(".masque-tex svg")).toBeNull()
+        expect(tip.querySelector(".masque-tex")!.textContent).toBe("Cost beta")
+    })
+    it("typesets once MathJax arrives after the tooltip", async () => {
+        const host = document.createElement("div"); document.body.appendChild(host)
+        const root = host.attachShadow({ mode: "open" })
+        const tip = document.createElement("div"); root.appendChild(tip)
+        tip.innerHTML = nameHtml("x", "gamma", { label: "gamma", tex: "$\\gamma$" })
+        let done = 0
+        typesetTex(tip, root, () => done++)
+        await flush()
+        expect(tip.querySelector(".masque-tex svg")).toBeNull()
+        fakeMathJax()
+        await new Promise((r) => setTimeout(r, 400))
+        expect(tip.querySelector(".masque-tex svg")).not.toBeNull()
+        expect(done).toBe(1)
+    })
     it("keeps the plain text when MathJax reports an error or isn't on the page", async () => {
         const tip = document.createElement("div"); document.body.appendChild(tip)
         tip.innerHTML = nameHtml("x", "nope", { label: "nope", tex: "$\\nope$" })
@@ -105,7 +149,7 @@ describe("LaTeX keys", () => {
     it("leaves glyphs alone outside a shadow root", () => {
         const svg = document.createElementNS(NS, "svg") as SVGElement
         svg.appendChild(document.createElementNS(NS, "use"))
-        adoptGlyphs(svg, document)
+        expect(adoptGlyphs(svg, document)).toBe(true)
         expect(document.getElementById("masque-glyphs")).toBeNull()
     })
 })

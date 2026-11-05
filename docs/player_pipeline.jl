@@ -909,3 +909,27 @@ function externalize_table(table::AbstractDict, dir::AbstractString; overlay::Ab
     ]
     return merge(table, Dict{String, Any}("snaps" => snaps))
 end
+
+# The same MathJax build and settings Pluto loads on every notebook page
+# (`frontend/common/SetupMathJax.js`), so a LaTeX axis label typesets in a docs player's tooltip
+# as it does in Pluto. Loaded only on a player whose widget has such a label (`needs_mathjax`).
+# Keep the page typeset on: with `fontCache: "global"`, MathJax puts its glyphs on the page only
+# when it typesets the page.
+const MATHJAX_HEAD = raw"""
+<script>
+window.MathJax = {
+  options: { ignoreHtmlClass: "no-MαθJax", processHtmlClass: "tex" },
+  tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]] },
+  svg: { fontCache: "global" },
+};
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js"></script>"""
+
+# Whether a widget's manifest names a coordinate with LaTeX (`CoordFormat.tex`).
+function needs_mathjax(manifest::AbstractDict)
+    ts = get(manifest, "transforms", nothing)
+    ts === nothing && return false
+    return any(values(ts isa AbstractDict ? ts : Dict(enumerate(ts)))) do t
+        t isa AbstractDict && any(get(t, k, nothing) isa AbstractDict && haskey(t[k], "tex") for k in ("xfmt", "yfmt", "zfmt"))
+    end
+end
