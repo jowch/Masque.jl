@@ -8,8 +8,8 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 - Right-clicking or Control-clicking a figure in Safari, or in another browser built on
-  WebKit, shows the image's menu again, with Save Image As and Copy Image. Before, it showed
-  the page's menu (#584).
+  WebKit, now shows the image's menu, with Save Image As and Copy Image, as other browsers
+  do. Before, it showed the page's menu (#584).
 
 ## [0.5.1] - 2026-11-05
 
