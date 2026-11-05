@@ -119,6 +119,34 @@ describe("mount", () => {
         expect((host as unknown as { value: unknown }).value).toEqual({ pts: { layer: "pts", index: 0 } })
     })
 
+    it("drops the dodge blend over a canvas in Safari, where it paints black (#589)", () => {
+        const ua = vi.spyOn(navigator, "userAgent", "get")
+        const hostWith = (base: HTMLElement): { host: HTMLElement & { masqueRetargetBase?: (next: HTMLElement) => void } } => {
+            const host = document.createElement("div")
+            base.getBoundingClientRect = () =>
+                ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+            const script = document.createElement("script")
+            host.append(base, script)
+            document.body.append(host)
+            mount(script, manifest)
+            return { host }
+        }
+        const noblend = (host: HTMLElement) => (host.lastElementChild as HTMLElement).classList.contains("masque-noblend")
+        try {
+            ua.mockReturnValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15")
+            const { host } = hostWith(document.createElement("canvas"))
+            expect(noblend(host)).toBe(true)
+            // The WebGL scheduler's snapshot <img> blends fine: the dodge comes back.
+            host.masqueRetargetBase!(document.createElement("img"))
+            expect(noblend(host)).toBe(false)
+            expect(noblend(hostWith(document.createElement("img")).host)).toBe(false)
+            ua.mockReturnValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
+            expect(noblend(hostWith(document.createElement("canvas")).host)).toBe(false)
+        } finally {
+            ua.mockRestore()
+        }
+    })
+
     it("click on empty space is a no-op (no round-trip)", () => {
         const { host, script } = setup()
         mount(script, manifest)
