@@ -5085,6 +5085,49 @@ try {
     passed.push("tooltip-theme-follows-figure-bg");
   }
 
+  // --- Right-click reaches the plot image (#584) ---
+  // The surface lets a right press through to the <img>/<canvas> so the browser shows the
+  // image's menu. WebKit hit-tests that menu after the contextmenu dispatch and its microtasks,
+  // so the surface must still be click-through then. A headless browser shows no menu, so this
+  // checks what that hit test would find, from a microtask queued after the event's listeners.
+  {
+    const key = "scatter";
+    const at = await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+    }, key);
+    await page.evaluate(([k, x, y]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      // The plot's own picture: the still <img>, or on WebGL the live <canvas> it may wake to.
+      const isBase = (el) => !!el && host.contains(el) && (el.tagName === "IMG" || el.tagName === "CANVAS");
+      window.__masqueMenu = null;
+      window.addEventListener("contextmenu", (e) => {
+        const target = isBase(e.target);
+        queueMicrotask(() => queueMicrotask(() => {
+          const under = document.elementFromPoint(x, y);
+          window.__masqueMenu = { target, targetTag: e.target?.tagName, after: isBase(under), tag: under?.tagName };
+        }));
+      }, { once: true });
+    }, [key, at.x, at.y]);
+    await page.mouse.move(at.x, at.y);
+    await page.mouse.down({ button: "right" });
+    await page.mouse.up({ button: "right" });
+    await page.keyboard.press("Escape");
+    const menu = await page.waitForFunction(() => window.__masqueMenu, null, { timeout: 5000 }).then((h) => h.jsonValue());
+    if (!menu.target || !menu.after) {
+      throw new Error(`${key}/right-click: contextmenu on the image ${menu.target} (${menu.targetTag}), image under the press after dispatch ${menu.after} (found ${menu.tag})`);
+    }
+    // Hit-testing comes back for the next left press.
+    await page.waitForTimeout(50);
+    const back = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName, [at.x, at.y]);
+    if (back === "IMG" || back === "CANVAS") throw new Error(`${key}/right-click: surface still click-through after the menu (found ${back})`);
+    passed.push("right-click-reaches-image");
+  }
+
   // --- Touch (#528): a finger picks the nearest point or line within 16 CSS px of it ---
   // Real taps (CDP touch emulation, so the browser sends pointerType "touch" and its own
   // click), at a spot 8–14 CSS px off a mark's drawn edge: past a mouse's slack, inside a

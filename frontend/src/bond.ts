@@ -196,8 +196,9 @@ export function isToggleClick(e: { metaKey: boolean; ctrlKey: boolean }): boolea
 }
 
 // The menu is hit-tested after pointerdown returns, or after pointerup on Windows.
-// Restoring any sooner targets this surface again. The timer covers a press that never
-// produces either event.
+// Restoring any sooner targets this surface again. WebKit hit-tests the menu a second time
+// once the contextmenu event's dispatch returns, after its microtasks have run, so the
+// restore waits for a task. The timer covers a press that never produces either event.
 function passContextToBase(surface: HTMLElement, pointerId: number): void {
     surface.classList.add("passthrough")
     let restored = false
@@ -211,7 +212,7 @@ function passContextToBase(surface: HTMLElement, pointerId: number): void {
         window.removeEventListener("pointercancel", onPointerCancel, true)
         window.clearTimeout(timer)
     }
-    const onMenu = () => { queueMicrotask(restore) }
+    const onMenu = () => { window.setTimeout(restore, 0) }
     const onPointerUp = (ev: PointerEvent) => {
         if (ev.pointerId !== pointerId) return
         window.setTimeout(restore, 0)
