@@ -1084,6 +1084,9 @@ function build_kind_sweep()
         # Axis labels name the coordinates in place of x and y.
         ax_lab = Axis(fig[3, 3]; xlabel = "Time (s)", ylabel = "Membrane potential relative to the resting state of the cell (mV)", ytickformat = "{:.1f} mV", limits = (0, 3, 0, 5))
         scatter!(ax_lab, [1.0, 2.0], [3.4721, 1.5]; color = :gray, markersize = 22)
+        # A LaTeX label is typeset by Pluto's MathJax, a rich one drawn as HTML.
+        ax_tex = Axis(fig[2, 3]; xlabel = L"\omega_0\ (\mathrm{rad/s})", ylabel = rich("T", subscript("e"), " (K)"), limits = (0, 3, 0, 5))
+        scatter!(ax_tex, [1.0, 2.0], [3.4721, 1.5]; color = :gray, markersize = 22)
         masque(fig)
     end
 

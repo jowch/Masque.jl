@@ -132,6 +132,22 @@ end
     @test occursin("if (!nb) return;", src)
 end
 
+@testset "a cell-series player loads the MathJax Pluto loads, when it has LaTeX" begin
+    # A LaTeX axis label typesets in the tooltip with the page's MathJax. A Pluto export has
+    # Pluto's own; the hand-built player page loads the same build, with the page typeset left
+    # on: only that puts MathJax's glyphs on the page (`fontCache: "global"`).
+    @test occursin("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js", MATHJAX_HEAD)
+    @test occursin("fontCache: \"global\"", MATHJAX_HEAD)
+    @test !occursin("typeset", MATHJAX_HEAD)
+    src = read(joinpath(@__DIR__, "..", "docs", "export_embeds.jl"), String)
+    @test occursin(r"<head>.*needs_mathjax\(widget_manifest\(widget\)\) \? MATHJAX_HEAD.*</head>"s, src)
+    tex = Dict{String, Any}("transforms" => Dict("ax1" => Dict("xfmt" => Dict("label" => "omega", "tex" => "\$\\omega\$"))))
+    plain = Dict{String, Any}("transforms" => Dict("ax1" => Dict("xfmt" => Dict("label" => "Time (s)"), "ispolar" => false)))
+    @test needs_mathjax(tex)
+    @test !needs_mathjax(plain)
+    @test !needs_mathjax(Dict{String, Any}("layers" => Any[]))
+end
+
 @testset "player_states: idle, every click, then hand-listed drags" begin
     man = Dict{String, Any}(
         "layers" => Any[

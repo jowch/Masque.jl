@@ -271,6 +271,10 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-halo-ink, var(--ma
 .masque-tip-key { color: var(--masque-tip-accent, #6b7280); }
 .masque-tip-val { font-variant-numeric: tabular-nums; }
 .masque-tip-num { white-space: nowrap; flex-shrink: 0; }
+/* A rich axis label's scripts (Julia's _rich_html) keep the row's height; subsup stacks its pair. */
+.masque-tip-key sup, .masque-tip-key sub { line-height: 0; }
+.masque-subsup { display: inline-flex; flex-direction: column; vertical-align: middle; font-size: 0.75em; line-height: 1; }
+.masque-subsup sup, .masque-subsup sub { font-size: 1em; vertical-align: baseline; }
 @media (prefers-color-scheme: dark) {
   .masque-tip { box-shadow: var(--masque-tip-shadow, 0 2px 4px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.3)); }
 }

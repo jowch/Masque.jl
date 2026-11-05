@@ -617,6 +617,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <title>$title</title>
+      $(needs_mathjax(widget_manifest(widget)) ? MATHJAX_HEAD : "")
       <script src="$(html_escape(overlay_src))"></script>
       $BOOT_PLUTO_DARK_JS
       <style>
