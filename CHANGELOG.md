@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- A menu opens with the chosen option in view instead of at the top of the list. A search that
+  matches no option shows "No matches" instead of an empty list, and moving into a menu with
+  Tab no longer selects its text.
+
+### Fixed
+- A menu now closes on a press anywhere outside it. A press on the zoom and reset buttons in a
+  plot's corner used to leave it open, and those buttons sat on top of an open list, so a click
+  on an option under them zoomed the plot instead of picking it.
+- A press on the arrow of an open searchable menu closes it, as it does on a menu without
+  search. A press on its text still places the caret.
+
 ## [0.5.1] - 2026-11-05
 
 ### Changed

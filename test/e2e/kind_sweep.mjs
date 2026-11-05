@@ -1691,6 +1691,36 @@ try {
         r = await once("menu-pick", r);
         if (await list.isVisible()) throw new Error(`${key}/menu-search: list still open after Enter`);
         passed.push(`${key}/menu-search`);
+        // A press outside closes the list, also on an element that keeps the focus where it is
+        // (the plot's view buttons do), so the box never blurs.
+        await ctl("pick", "input").click();
+        await list.waitFor({ state: "visible" });
+        await page.evaluate(() => {
+          const d = document.createElement("div");
+          d.id = "masque-keep-focus";
+          d.style.cssText = "position:fixed;left:0;top:0;width:24px;height:24px;z-index:2147483647";
+          d.addEventListener("mousedown", (e) => e.preventDefault());
+          document.body.append(d);
+        });
+        await page.mouse.click(12, 12);
+        await page.evaluate(() => document.getElementById("masque-keep-focus")?.remove());
+        if (await list.isVisible()) throw new Error(`${key}/menu-outside: list still open after a press outside that kept the focus`);
+        passed.push(`${key}/menu-outside-press`);
+        // In a searchable menu a press on the open box's arrow closes the list.
+        await ctl("pick", "input").click();
+        await list.waitFor({ state: "visible" });
+        const ib = await ctl("pick", "input").boundingBox();
+        await page.mouse.click(ib.x + ib.width - 3, ib.y + ib.height / 2);
+        if (await list.isVisible()) throw new Error(`${key}/menu-arrow: list still open after a press on the arrow`);
+        passed.push(`${key}/menu-arrow-closes`);
+        // A search that keeps no option shows "No matches" in the open list.
+        await ctl("pick", "input").click();
+        await page.keyboard.type("qq");
+        const none = page.locator(`[data-masque-control="pick"] .masque-menu-empty`);
+        if (!(await list.isVisible()) || !(await none.isVisible())) throw new Error(`${key}/menu-no-match: want the list open with "No matches"`);
+        await page.keyboard.press("Escape");
+        if ((await ctl("pick", "input").inputValue()) !== "z") throw new Error(`${key}/menu-no-match: box shows ${await ctl("pick", "input").inputValue()} after Escape, want z`);
+        passed.push(`${key}/menu-no-match`);
         // A click on an option picks it.
         await ctl("pick", "input").click();
         await cells.nth(1).click();
