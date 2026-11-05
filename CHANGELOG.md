@@ -17,6 +17,10 @@ All notable changes to this project are documented here. The format is based on
   on an option under them zoomed the plot instead of picking it.
 - A press on the arrow of an open searchable menu closes it, as it does on a menu without
   search. A press on its text still places the caret.
+- Right-clicking or Control-clicking a CairoMakie figure in Safari, or in another browser
+  built on WebKit, now shows the image's menu, with Save Image As and Copy Image, as other
+  browsers do. Before, it showed the page's menu. Safari has no such menu for a live WGLMakie
+  plot (#584).
 
 ## [0.5.1] - 2026-11-05
 
