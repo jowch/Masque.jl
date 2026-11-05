@@ -215,8 +215,8 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-halo-ink, var(--ma
   svg.masque-fill .masque-hi.masque-fillshape { fill: var(--masque-chrome); fill-opacity: var(--masque-noblend-fill-opacity, 0.18); }
 }
 /* Safari paints a blend mode over a WebGL canvas without blending it, which turned the dodge
-   fill's dark source into a black mark (#589). There a faint white lifts the mark instead: close
-   to the dodge on mid tones, a little more on dark ones. */
+   fill's dark source into a black mark (#589). There a faint white lifts the mark instead
+   (measured on one mid blue: rgb(0,103,169) to rgb(24,115,172), near the dodge's lift). */
 :host(.masque-noblend) svg.masque-fill { mix-blend-mode: normal; }
 :host(.masque-noblend) svg.masque-fill .masque-hi.masque-fillshape { fill: #ffffff; fill-opacity: var(--masque-noblend-lift, 0.1); }
 /* The closed-mark selected look (fade.ts): the dim canvas covers a plot's unpicked marks in the
@@ -603,9 +603,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         dprQuery?.addEventListener?.("change", trackDensity)
     }
     trackDensity()
-    // Safari's engine (on iOS, every browser's) does not blend over a <canvas> (#589).
+    // Safari's engine (on iOS, every browser's) does not blend over a <canvas> (#589). Every
+    // Blink browser (desktop Edge and Opera too) names Chrome; iOS ones (CriOS, EdgiOS, FxiOS)
+    // don't, and they run on WebKit. Desktop Firefox has no AppleWebKit.
     const ua = typeof navigator === "undefined" ? "" : navigator.userAgent
-    const noCanvasBlend = /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(ua)
+    const noCanvasBlend = /AppleWebKit/.test(ua) && !/Chrome|Chromium/.test(ua)
     const syncBlend = (): void => { shadowHost.classList.toggle("masque-noblend", noCanvasBlend && base instanceof HTMLCanvasElement) }
     syncBlend()
 

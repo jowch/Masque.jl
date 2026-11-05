@@ -140,8 +140,26 @@ describe("mount", () => {
             host.masqueRetargetBase!(document.createElement("img"))
             expect(noblend(host)).toBe(false)
             expect(noblend(hostWith(document.createElement("img")).host)).toBe(false)
-            ua.mockReturnValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
-            expect(noblend(hostWith(document.createElement("canvas")).host)).toBe(false)
+            // Every iOS browser runs on WebKit, whatever its name.
+            for (const ios of [
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140.0.0.0 Mobile/15E148 Safari/604.1",
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) EdgiOS/140.0.0.0 Mobile/15E148 Safari/605.1.15",
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/140.0 Mobile/15E148 Safari/605.1.15",
+            ]) {
+                ua.mockReturnValue(ios)
+                expect(noblend(hostWith(document.createElement("canvas")).host)).toBe(true)
+            }
+            // Blink and Gecko blend over a canvas.
+            for (const other of [
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0",
+                "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:140.0) Gecko/20100101 Firefox/140.0",
+            ]) {
+                ua.mockReturnValue(other)
+                expect(noblend(hostWith(document.createElement("canvas")).host)).toBe(false)
+            }
         } finally {
             ua.mockRestore()
         }
