@@ -1453,6 +1453,60 @@ try {
       continue;
     }
 
+    // A long menu's list opens upward over the plot, above the view buttons: the element at the
+    // zoom-out button's centre is an option, and a click there picks it, not a zoom. The list
+    // then reopens with the chosen option in view.
+    if (spec.mode === "menu_view") {
+      const geom = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center", inline: "nearest" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const r = (el) => { const b = el?.getBoundingClientRect(); return b ? { x: b.x, y: b.y, w: b.width, h: b.height } : null; };
+        const box = sr.querySelector('[data-masque-control="choice"]');
+        const list = box.querySelector("[role=listbox]");
+        const vb = sr.querySelector(".masque-vb-out");
+        const v = r(vb);
+        const top = v ? sr.elementFromPoint(v.x + v.w / 2, v.y + v.h / 2) : null;
+        const cells = [...box.querySelectorAll("[role=option]")];
+        return {
+          box: r(box), list: list.hidden ? null : r(list), vb: v,
+          topOption: top?.closest?.("[role=option]")?.textContent ?? null,
+          topTag: top ? `${top.tagName}.${top.className?.baseVal ?? top.className}` : null,
+          last: r(cells.at(-1)),
+        };
+      }, key);
+      const clickBox = async () => {
+        const g = await geom();
+        await page.mouse.click(g.box.x + 12, g.box.y + g.box.h / 2);
+        await page.waitForTimeout(200);
+        return geom();
+      };
+      let g = await clickBox();
+      if (!g.list) throw new Error(`${key}/menu-over-buttons: the list did not open`);
+      if (!g.vb) throw new Error(`${key}/menu-over-buttons: no zoom-out button drawn`);
+      const inside = (a, b) => a.x >= b.x - 1 && a.y >= b.y - 1 && a.x + a.w <= b.x + b.w + 1 && a.y + a.h <= b.y + b.h + 1;
+      if (!inside(g.vb, g.list)) throw new Error(`${key}/menu-over-buttons: the list ${JSON.stringify(g.list)} doesn't cover the zoom-out button ${JSON.stringify(g.vb)}`);
+      if (!g.topOption) throw new Error(`${key}/menu-over-buttons: at the zoom-out button's centre the top element is ${g.topTag}, want an option`);
+      const before = await textOf(`#bond_${key}`);
+      await page.mouse.click(g.vb.x + g.vb.w / 2, g.vb.y + g.vb.h / 2);
+      const after = await waitChange(`#bond_${key}`, before, `${key}/menu-over-buttons`);
+      if (!after.includes(`"${g.topOption}"`)) throw new Error(`${key}/menu-over-buttons: bond ${JSON.stringify(after)}, want ${g.topOption}`);
+      passed.push(`${key}/menu-over-buttons`);
+      // Pick the last option, then reopen: it is inside the list's rect.
+      await clickBox();
+      await page.keyboard.type("option 30");
+      await page.keyboard.press("ArrowDown");
+      await page.keyboard.press("Enter");
+      const picked = await waitChange(`#bond_${key}`, after, `${key}/menu-reopen`);
+      if (!picked.includes(`"option 30"`)) throw new Error(`${key}/menu-reopen: bond ${JSON.stringify(picked)}, want option 30`);
+      g = await clickBox();
+      if (!g.list || !inside(g.last, g.list)) throw new Error(`${key}/menu-reopen: last option ${JSON.stringify(g.last)} not in the list ${JSON.stringify(g.list)}`);
+      await page.keyboard.press("Escape");
+      passed.push(`${key}/menu-reopen-in-view`);
+      console.error(`OK  ${key} — ${g.topOption} picked through the zoom-out button's spot; option 30 in view on reopen`);
+      continue;
+    }
     // Makie blocks as controls (#345): each named block is a native HTML control over the box
     // its layout cell gave it, and the picture under it is empty. The slider drives the red line
     // through `onchange` (keyboard and pointer), the toggle hides it, and the interval slider,
@@ -1691,12 +1745,49 @@ try {
         r = await once("menu-pick", r);
         if (await list.isVisible()) throw new Error(`${key}/menu-search: list still open after Enter`);
         passed.push(`${key}/menu-search`);
+        // A press outside closes the list, also on an element that keeps the focus where it is
+        // (the plot's view buttons do), so the box never blurs.
+        await ctl("pick", "input").click();
+        await list.waitFor({ state: "visible" });
+        await page.evaluate(() => {
+          const d = document.createElement("div");
+          d.id = "masque-keep-focus";
+          d.style.cssText = "position:fixed;left:0;top:0;width:24px;height:24px;z-index:2147483647";
+          d.addEventListener("mousedown", (e) => e.preventDefault());
+          document.body.append(d);
+        });
+        await page.mouse.click(12, 12);
+        await page.evaluate(() => document.getElementById("masque-keep-focus")?.remove());
+        if (await list.isVisible()) throw new Error(`${key}/menu-outside: list still open after a press outside that kept the focus`);
+        passed.push(`${key}/menu-outside-press`);
+        // In a searchable menu a press on the open box's arrow closes the list.
+        await ctl("pick", "input").click();
+        await list.waitFor({ state: "visible" });
+        const ib = await ctl("pick", "input").boundingBox();
+        await page.mouse.click(ib.x + ib.width - 3, ib.y + ib.height / 2);
+        if (await list.isVisible()) throw new Error(`${key}/menu-arrow: list still open after a press on the arrow`);
+        passed.push(`${key}/menu-arrow-closes`);
+        // A search that keeps no option shows "No matches" in the open list.
+        await ctl("pick", "input").click();
+        await page.keyboard.type("qq");
+        const none = page.locator(`[data-masque-control="pick"] .masque-menu-empty`);
+        if (!(await list.isVisible()) || !(await none.isVisible())) throw new Error(`${key}/menu-no-match: want the list open with "No matches"`);
+        await page.keyboard.press("Escape");
+        if ((await ctl("pick", "input").inputValue()) !== "z") throw new Error(`${key}/menu-no-match: box shows ${await ctl("pick", "input").inputValue()} after Escape, want z`);
+        passed.push(`${key}/menu-no-match`);
         // A click on an option picks it.
         await ctl("pick", "input").click();
         await cells.nth(1).click();
         v = await bondHas(/pick = "y"/, v, "menu-click");
         r = await once("menu-click", r);
         if ((await ctl("pick", "input").inputValue()) !== "y") throw new Error(`${key}/menu-click: box shows ${await ctl("pick", "input").inputValue()}, want y`);
+        // Tab into the box puts the caret at the end instead of selecting the text.
+        await ctl("pick", "input").focus();
+        await page.keyboard.press("Shift+Tab");
+        await page.keyboard.press("Tab");
+        const sel = await ctl("pick", "input").evaluate((el) => [el.matches(":focus"), el.selectionStart, el.selectionEnd, el.value.length]);
+        if (!sel[0] || sel[1] !== sel[2] || sel[2] !== sel[3]) throw new Error(`${key}/menu-tab: focus/selection ${JSON.stringify(sel)}, want focused with the caret at the end`);
+        passed.push(`${key}/menu-tab-caret`);
       }
       passed.push(`${key}/interval-checkbox-menu`);
       // The menu, button, text box and grid value label are in Makie's font, fetched once for the
