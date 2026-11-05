@@ -6,21 +6,24 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-05
+
 ### Changed
-- The default tooltip names a coordinate by its axis label: with `xlabel = "Time (s)"`, a
-  point shows `Time (s) 2.35` instead of `x 2.35`. So do a line's readout, an
+- Default tooltips read differently on a plot whose axes have labels, with no change to your
+  code: a coordinate is named by its axis label. With `xlabel = "Time (s)"`, a point shows
+  `Time (s) 2.35` instead of `x 2.35`. So do a line's readout, an
   `AxisInteractable` readout, a slice and the keyboard announcement. An unlabelled axis takes
   the label of the axes it is linked to when they agree. Event fields, the `@bind` value and
   template fields keep `x`. A label written with `L"..."` is typeset by the MathJax Pluto
   already loads, and the docs' interactive figures now load it too. A `rich(...)` label keeps
-  its subscripts, superscripts, color and weight.
+  its subscripts, superscripts, color and weight (#581, #582).
 - The zoom and reset buttons in a plot's corner sit back at 60% opacity while the pointer is
   elsewhere on the plot, and come up to full when the pointer reaches them. The button under
   the pointer is shaded, a little more while it is pressed. On a touch screen, or from the
-  keyboard, they show at full as before.
+  keyboard, they show at full as before (#578).
 - The same buttons now take the corner with the least data in it, among those a legend leaves
   free, so they no longer sit on top of points bunched in the top right. They pick it when the
-  plot is first shown and stay there while you pan or zoom.
+  plot is first shown and stay there while you pan or zoom (#578).
 
 ### Fixed
 - After a page reload, a threshold line, a band or a box you dragged is drawn where you left
@@ -917,7 +920,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/jowch/Masque.jl/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/jowch/Masque.jl/compare/v0.4.5...v0.5.0
 [0.4.5]: https://github.com/jowch/Masque.jl/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/jowch/Masque.jl/compare/v0.4.3...v0.4.4
