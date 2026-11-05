@@ -14,6 +14,12 @@ encoding levers were **de-speculated by a measurement experiment** (`bench/encod
   circles/segments/rects/polygons/regions + grid edges; on a whole realistic manifest the saving is
   smaller, since geometry is one term among the payload's Float64 `x`/`y`. `Float16` is *not* the
   way down: MsgPack has no float16 (it promotes to float32 → no saving) and is lossy above 2048px.
+  **Circles are the exception (#588):** a point's halo is a ring one device pixel off its marker,
+  and a whole-pixel centre leaves that gap visibly lopsided on a 2× screen. A `:circles` layer
+  keeps quarter pixels (`_qc`) and ships them as integer quarters with `q = 4` on the layer
+  (`_layer_dict`); `dequantize` in `frontend/src/wire.ts` divides it out once, as the manifest
+  lands. MsgPack packs a value up to 65 535 in 3 bytes, the same as a whole pixel past 255, so
+  the size barely moves (`perf-findings.md`).
 - **Container structure — typed-array fast-path (rejected by the experiment).** Lifting geometry to a
   top-level typed numeric vector to engage the binary fast-path measured only a few percent beyond
   int-quantization — because compact ints already sit near the 2-byte binary floor. The structural

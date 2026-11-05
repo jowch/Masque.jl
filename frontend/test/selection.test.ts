@@ -4,6 +4,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { cellRange, computeSelection, layerNElements, selectionFor, linkedHits, selectionForValue, sameValue, indicesInBox, linkedIndices, picksPoints, elementPicks } from "../src/selection"
 import type { Hit, HitLayer, Manifest } from "../src/types"
+import { dequantize } from "../src/wire"
 
 // layerNElements' other kind branches (circles/rects/polygons/segments/polyline) are exercised
 // indirectly via overlay.test.ts's starting-pick (`initial`) pre-highlight cases (through hitLayerByIndex,
@@ -197,7 +198,8 @@ describe("a selecting box's starting value matches computeSelection (Julia parit
     for (const name of ["roiselect", "roigrid", "roiedge", "roigridover"]) {
         for (const backend of ["cairo", "webgl"]) {
             it(`${name}.${backend}`, () => {
-                const m = JSON.parse(readFileSync(join(dir, `${name}.${backend}.json`), "utf8")) as Manifest
+                // The overlay reads a manifest once mount has turned circles from quarter px into image px (#588).
+                const m = dequantize(JSON.parse(readFileSync(join(dir, `${name}.${backend}.json`), "utf8")) as Manifest)
                 const roi = m.layers.find((l) => l.kind === "roi") as HitLayer
                 const target = m.layers.find((l) => l.id === roi.selects) as HitLayer
                 const box = roi.geometry as { x: number; y: number; w: number; h: number }

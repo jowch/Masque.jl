@@ -2198,6 +2198,17 @@ function resize_view_resized!(k; to = (640, 420))
     return (; marks, width = to[1])   # the CSS width the widget may grow to (under max_width)
 end
 
+# A widget's layers for the drivers' `coords_<key>` spans, in image px: a circles layer ships
+# its numbers in 1/q image px (#588), which the overlay divides out as the manifest lands.
+function coords_layers(w)
+    return map(w.manifest["layers"]) do l
+        haskey(l, "q") || return l
+        d = Dict{String, Any}(k => v for (k, v) in l if k != "q")
+        d["geometry"] = Masque._geometry_px(l)
+        return d
+    end
+end
+
 # The text a notebook prints for one sweep widget's `@bind` value `ev`: the field the case is
 # about (its `field`, else its `layerId`), or the whole value for `"*"`. A widget without that
 # field prints `nothing` while none of its fields holds a value (a slice or view case).

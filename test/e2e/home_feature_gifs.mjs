@@ -30,7 +30,7 @@ if (!spec) {
 
 function hitPoint(layer, index) {
   const k = layer.kind, g = layer.geometry;
-  if (k === "circles") return { x: g[3 * index], y: g[3 * index + 1] };
+  if (k === "circles") { const q = layer.q ?? 1; return { x: g[3 * index] / q, y: g[3 * index + 1] / q }; } // quarter px (#588)
   if (k === "rects") {
     return { x: g[4 * index] + g[4 * index + 2] / 2, y: g[4 * index + 1] + g[4 * index + 3] / 2 };
   }

@@ -23,6 +23,26 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test occursin("must be a Figure", err.msg)
     end
 
+    @testset "circles ship in quarter pixels, centred on the drawn marker (#588)" begin
+        f = Figure(size = (640, 320)); ax = Axis(f[1, 1])
+        xs, ys = [1.0, 2.0, 3.0, 1.37], [1.0, 4.0, 9.0, 6.21]
+        scatter!(ax, xs, ys; markersize = 20)
+        _, ppu, ctx = ctx_for(f)
+        w = masque(f)
+        l = only(l for l in w.manifest["layers"] if l["kind"] == "circles")
+        @test l["q"] == IP.CIRCLE_QUANTUM == 4 && all(v -> v isa Integer, l["geometry"])
+        g = IP._geometry_px(l)
+        # The overlay draws the ring from these numbers: within an eighth of an image px of
+        # the projected centre, where CairoMakie paints the marker.
+        for (k, p) in enumerate(zip(xs, ys))
+            q = ctx.project(ax, p)
+            @test abs(g[3k - 2] - q[1]) <= 1 / 8 && abs(g[3k - 1] - q[2]) <= 1 / 8
+        end
+        # A brush's starting value reads the shipped quarters as image px.
+        @test IP._contained_indices(Dict("x" => 0, "y" => 0, "w" => 1280, "h" => 640), g) == 0:3
+        @test isempty(IP._contained_indices(Dict("x" => 0, "y" => 0, "w" => 1, "h" => 1), g))
+    end
+
     @testset "backend = symbol, max_width and px_per_unit keywords (#236)" begin
         f = Figure(size = (600, 400)); scatter!(Axis(f[1, 1]), 1:3, 1:3)
         @test IP._resolve_backend(nothing) isa _CairoExt.CairoBackend      # the one loaded
@@ -175,10 +195,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         # Containers are Real[] (so non-finite coords can pass through), so assert the *values*, not eltype.
         (; ax, pts, ctx) = default_fixture()
         allint(g) = all(x -> !isfinite(x) || x isa Integer, g)   # finite coords are Int
+        # Circles keep quarter pixels (#588): the manifest ships them as Int quarters.
+        allquarter(g) = all(x -> !isfinite(x) || isinteger(4x), g)
         L = only(hitlayers(PointInteractable(ax, pts), ctx))
-        @test allint(L.geometry)
+        @test allquarter(L.geometry)
         q = data_to_image_px(ctx, ax, pts[1])
-        @test L.geometry[1] == round(Int, q[1]) && L.geometry[2] == round(Int, q[2])  # within ≤0.5px of the projection
+        @test L.geometry[1] == round(Int, 4q[1]) / 4 && L.geometry[2] == round(Int, 4q[2]) / 4  # within ≤⅛ px of the projection
         @test allint(only(hitlayers(SegmentInteractable(ax, pts), ctx)).geometry)
         @test allint(only(hitlayers(RectInteractable(ax, [(2.0, 5.0, 1.0, 2.0)]), ctx)).geometry)
         @test allint(only(hitlayers(PolygonInteractable(ax, [[(1.0, 1.0), (2.0, 4.0), (3.0, 1.0)]]), ctx)).geometry[1])
@@ -200,7 +222,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         _, _, clog = ctx_for(flog)
         L = only(hitlayers(PointInteractable(axlog, [(-5.0, 1.0), (1.0, 1.0)]), clog))  # x=-5 out of log domain
         @test length(L.geometry) == 6      # reaching here = no InexactError crash (the regression)
-        @test finite_int(L.geometry)       # the in-domain point still quantizes to Int
+        @test all(x -> !isfinite(x) || isinteger(4x), L.geometry)   # the in-domain point still quantizes (quarter px, #588)
         # :polyline NaN-gap sentinel (types.ts) survives quantization — stays NaN, doesn't crash/round
         seg = only(hitlayers(SegmentInteractable(ax, [(1.0, 1.0), (NaN, NaN), (3.0, 3.0)]), ctx))
         @test any(isnan, seg.geometry) && finite_int(seg.geometry)

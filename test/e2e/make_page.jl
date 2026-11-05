@@ -52,10 +52,10 @@ inner = sprint(
 page = "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>\n$inner\n</body></html>"
 write(joinpath(outdir, "page.html"), page)
 
-# Marker 0's click point: circles geometry is flat [cx, cy, r, …] in image px; the host is
+# Marker 0's click point: circles geometry is flat [cx, cy, r, …] in 1/q image px (#588); the host is
 # CSS-scaled by display_css/width, uniformly. So css = image_px × scale, host-relative.
 layer = only(w.manifest["layers"])
-g = layer["geometry"]
+g = Masque._geometry_px(layer)
 scale = w.display_css / w.manifest["width"]
 expected = Dict(
     "cssX" => g[1] * scale, "cssY" => g[2] * scale,
@@ -89,7 +89,7 @@ write(
 )
 
 layer3 = only(w3.manifest["layers"])
-g3 = layer3["geometry"]
+g3 = Masque._geometry_px(layer3)
 scale3 = w3.display_css / w3.manifest["width"]
 # All three projected marker centers (image px): [0] is click.mjs's click target; alignment.mjs
 # (the local GL canvas-alignment check) pixel-probes the rendered canvas at every one.
@@ -128,7 +128,7 @@ write(
 )
 
 layerp = only(wp.manifest["layers"])
-gp = layerp["geometry"]
+gp = Masque._geometry_px(layerp)
 scalep = wp.display_css / wp.manifest["width"]
 expectedp = Dict(
     "cssX" => gp[1] * scalep, "cssY" => gp[2] * scalep,

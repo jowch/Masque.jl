@@ -63,7 +63,7 @@ polar_ev
 # Live layer geometry for the Playwright driver (image px).
 HTML(
     "<span id=\"coords_polar\" style=\"display:none\">" *
-        JSON3.write(w.manifest["layers"]) * "</span>" *
+        JSON3.write([merge(filter(kv -> kv[1] != "q", l), Dict("geometry" => Masque._geometry_px(l))) for l in w.manifest["layers"]]) * "</span>" *
         "<span id=\"transforms_polar\" style=\"display:none\">" *
         JSON3.write(w.manifest["transforms"]) * "</span>",
 )

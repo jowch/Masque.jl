@@ -55,7 +55,7 @@ function _brush_start(target, built, seed, layers)
     if tl["kind"] != "grid"
         idxs = seed !== nothing ? seed : begin
                 box = first(d for (i, _, d) in built if selects(i) === target)["geometry"]
-                _contained_indices(box, tl["geometry"])
+                _contained_indices(box, _geometry_px(tl))
             end
         return Dict{String, Any}("items" => [Dict{String, Any}("layer" => string(target), "index" => k) for k in idxs])
     end

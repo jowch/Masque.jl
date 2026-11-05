@@ -58,7 +58,7 @@ end
 HTML(
     "<span id=\"out_scatter\">SCATTER=$(sweep_field("scatter", ev_scatter))</span>" *
         "<span id=\"bond_scatter\" style=\"display:none\">$(repr(ev_scatter))</span>" *
-        "<span id=\"coords_scatter\" style=\"display:none\">$(JSON3.write(sweep.scatter.manifest["layers"]))</span>",
+        "<span id=\"coords_scatter\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.scatter)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-00000000a548
@@ -68,7 +68,7 @@ HTML(
 HTML(
     "<span id=\"out_scatter_low\">SCATTER_LOW=$(sweep_field("scatter_low", ev_scatter_low))</span>" *
         "<span id=\"bond_scatter_low\" style=\"display:none\">$(repr(ev_scatter_low))</span>" *
-        "<span id=\"coords_scatter_low\" style=\"display:none\">$(JSON3.write(sweep.scatter_low.manifest["layers"]))</span>",
+        "<span id=\"coords_scatter_low\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.scatter_low)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000012
@@ -78,7 +78,7 @@ HTML(
 HTML(
     "<span id=\"out_lines\">LINES=$(sweep_field("lines", ev_lines))</span>" *
         "<span id=\"bond_lines\" style=\"display:none\">$(repr(ev_lines))</span>" *
-        "<span id=\"coords_lines\" style=\"display:none\">$(JSON3.write(sweep.lines.manifest["layers"]))</span>",
+        "<span id=\"coords_lines\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.lines)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000045
@@ -88,7 +88,7 @@ HTML(
 HTML(
     "<span id=\"out_series\">SERIES=$(sweep_field("series", ev_series))</span>" *
         "<span id=\"bond_series\" style=\"display:none\">$(repr(ev_series))</span>" *
-        "<span id=\"coords_series\" style=\"display:none\">$(JSON3.write(sweep.series.manifest["layers"]))</span>",
+        "<span id=\"coords_series\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.series)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000014
@@ -98,7 +98,7 @@ HTML(
 HTML(
     "<span id=\"out_segments\">SEGMENTS=$(sweep_field("segments", ev_segments))</span>" *
         "<span id=\"bond_segments\" style=\"display:none\">$(repr(ev_segments))</span>" *
-        "<span id=\"coords_segments\" style=\"display:none\">$(JSON3.write(sweep.segments.manifest["layers"]))</span>",
+        "<span id=\"coords_segments\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.segments)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000016
@@ -108,7 +108,7 @@ HTML(
 HTML(
     "<span id=\"out_heatmap\">HEATMAP=$(sweep_field("heatmap", ev_heatmap))</span>" *
         "<span id=\"bond_heatmap\" style=\"display:none\">$(repr(ev_heatmap))</span>" *
-        "<span id=\"coords_heatmap\" style=\"display:none\">$(JSON3.write(sweep.heatmap.manifest["layers"]))</span>",
+        "<span id=\"coords_heatmap\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.heatmap)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000018
@@ -118,7 +118,7 @@ HTML(
 HTML(
     "<span id=\"out_image\">IMAGE=$(sweep_field("image", ev_image))</span>" *
         "<span id=\"bond_image\" style=\"display:none\">$(repr(ev_image))</span>" *
-        "<span id=\"coords_image\" style=\"display:none\">$(JSON3.write(sweep.image.manifest["layers"]))</span>",
+        "<span id=\"coords_image\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.image)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000060
@@ -128,7 +128,7 @@ HTML(
 HTML(
     "<span id=\"out_image_rgb\">IMAGE_RGB=$(sweep_field("image_rgb", ev_image_rgb))</span>" *
         "<span id=\"bond_image_rgb\" style=\"display:none\">$(repr(ev_image_rgb))</span>" *
-        "<span id=\"coords_image_rgb\" style=\"display:none\">$(JSON3.write(sweep.image_rgb.manifest["layers"]))</span>",
+        "<span id=\"coords_image_rgb\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.image_rgb)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-0000000000e3
@@ -138,7 +138,7 @@ HTML(
 HTML(
     "<span id=\"out_heatmap_labels\">HEATMAP_LABELS=$(sweep_field("heatmap_labels", ev_heatmap_labels))</span>" *
         "<span id=\"bond_heatmap_labels\" style=\"display:none\">$(repr(ev_heatmap_labels))</span>" *
-        "<span id=\"coords_heatmap_labels\" style=\"display:none\">$(JSON3.write(sweep.heatmap_labels.manifest["layers"]))</span>",
+        "<span id=\"coords_heatmap_labels\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.heatmap_labels)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000020
@@ -148,7 +148,7 @@ HTML(
 HTML(
     "<span id=\"out_barplot\">BARPLOT=$(sweep_field("barplot", ev_barplot))</span>" *
         "<span id=\"bond_barplot\" style=\"display:none\">$(repr(ev_barplot))</span>" *
-        "<span id=\"coords_barplot\" style=\"display:none\">$(JSON3.write(sweep.barplot.manifest["layers"]))</span>",
+        "<span id=\"coords_barplot\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.barplot)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000022
@@ -158,7 +158,7 @@ HTML(
 HTML(
     "<span id=\"out_poly\">POLY=$(sweep_field("poly", ev_poly))</span>" *
         "<span id=\"bond_poly\" style=\"display:none\">$(repr(ev_poly))</span>" *
-        "<span id=\"coords_poly\" style=\"display:none\">$(JSON3.write(sweep.poly.manifest["layers"]))</span>",
+        "<span id=\"coords_poly\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.poly)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000066
@@ -168,7 +168,7 @@ HTML(
 HTML(
     "<span id=\"out_regions\">REGIONS=$(sweep_field("regions", ev_regions))</span>" *
         "<span id=\"bond_regions\" style=\"display:none\">$(repr(ev_regions))</span>" *
-        "<span id=\"coords_regions\" style=\"display:none\">$(JSON3.write(sweep.regions.manifest["layers"]))</span>",
+        "<span id=\"coords_regions\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.regions)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000024
@@ -178,7 +178,7 @@ HTML(
 HTML(
     "<span id=\"out_polar\">POLAR=$(sweep_field("polar", ev_polar))</span>" *
         "<span id=\"bond_polar\" style=\"display:none\">$(repr(ev_polar))</span>" *
-        "<span id=\"coords_polar\" style=\"display:none\">$(JSON3.write(sweep.polar.manifest["layers"]))</span>",
+        "<span id=\"coords_polar\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.polar)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000074
@@ -188,7 +188,7 @@ HTML(
 HTML(
     "<span id=\"out_axis_polar\">AXIS_POLAR=$(sweep_field("axis_polar", ev_axis_polar))</span>" *
         "<span id=\"bond_axis_polar\" style=\"display:none\">$(repr(ev_axis_polar))</span>" *
-        "<span id=\"coords_axis_polar\" style=\"display:none\">$(JSON3.write(sweep.axis_polar.manifest["layers"]))</span>" *
+        "<span id=\"coords_axis_polar\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.axis_polar)))</span>" *
         "<span id=\"axes_axis_polar\" style=\"display:none\">$(JSON3.write(sweep.axis_polar.manifest["transforms"]))</span>",
 )
 
@@ -199,7 +199,7 @@ HTML(
 HTML(
     "<span id=\"out_tick_units\">TICK_UNITS=$(sweep_field("tick_units", ev_tick_units))</span>" *
         "<span id=\"bond_tick_units\" style=\"display:none\">$(repr(ev_tick_units))</span>" *
-        "<span id=\"coords_tick_units\" style=\"display:none\">$(JSON3.write(sweep.tick_units.manifest["layers"]))</span>" *
+        "<span id=\"coords_tick_units\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.tick_units)))</span>" *
         "<span id=\"axes_tick_units\" style=\"display:none\">$(JSON3.write(sweep.tick_units.manifest["transforms"]))</span>",
 )
 
@@ -210,7 +210,7 @@ HTML(
 HTML(
     "<span id=\"out_scatter_dark\">SCATTER_DARK=$(sweep_field("scatter_dark", ev_scatter_dark))</span>" *
         "<span id=\"bond_scatter_dark\" style=\"display:none\">$(repr(ev_scatter_dark))</span>" *
-        "<span id=\"coords_scatter_dark\" style=\"display:none\">$(JSON3.write(sweep.scatter_dark.manifest["layers"]))</span>",
+        "<span id=\"coords_scatter_dark\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.scatter_dark)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000068
@@ -220,7 +220,7 @@ HTML(
 HTML(
     "<span id=\"out_scatter_sizes\">SCATTER_SIZES=$(sweep_field("scatter_sizes", ev_scatter_sizes))</span>" *
         "<span id=\"bond_scatter_sizes\" style=\"display:none\">$(repr(ev_scatter_sizes))</span>" *
-        "<span id=\"coords_scatter_sizes\" style=\"display:none\">$(JSON3.write(sweep.scatter_sizes.manifest["layers"]))</span>",
+        "<span id=\"coords_scatter_sizes\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.scatter_sizes)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000070
@@ -230,7 +230,7 @@ HTML(
 HTML(
     "<span id=\"out_scatter_styled\">SCATTER_STYLED=$(sweep_field("scatter_styled", ev_scatter_styled))</span>" *
         "<span id=\"bond_scatter_styled\" style=\"display:none\">$(repr(ev_scatter_styled))</span>" *
-        "<span id=\"coords_scatter_styled\" style=\"display:none\">$(JSON3.write(sweep.scatter_styled.manifest["layers"]))</span>",
+        "<span id=\"coords_scatter_styled\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.scatter_styled)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-0000000000e5
@@ -240,7 +240,7 @@ HTML(
 HTML(
     "<span id=\"out_fade_pan\">FADE_PAN=$(sweep_field("fade_pan", ev_fade_pan))</span>" *
         "<span id=\"bond_fade_pan\" style=\"display:none\">$(repr(ev_fade_pan))</span>" *
-        "<span id=\"coords_fade_pan\" style=\"display:none\">$(JSON3.write(sweep.fade_pan.manifest["layers"]))</span>",
+        "<span id=\"coords_fade_pan\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.fade_pan)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-0000000000e7
@@ -250,7 +250,7 @@ HTML(
 HTML(
     "<span id=\"out_legend_hidden\">LEGEND_HIDDEN=$(sweep_field("legend_hidden", ev_legend_hidden))</span>" *
         "<span id=\"bond_legend_hidden\" style=\"display:none\">$(repr(ev_legend_hidden))</span>" *
-        "<span id=\"coords_legend_hidden\" style=\"display:none\">$(JSON3.write(sweep.legend_hidden.manifest["layers"]))</span>" *
+        "<span id=\"coords_legend_hidden\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.legend_hidden)))</span>" *
         "<span id=\"occluders_legend_hidden\" style=\"display:none\">$(JSON3.write(get(sweep.legend_hidden.manifest, "occluders", [])))</span>",
 )
 
@@ -260,7 +260,7 @@ HTML(
 # ╔═╡ d1000000-0000-0000-0000-00000000019b
 HTML(
     "<span id=\"out_box_hidden\">BOX_HIDDEN=$(sweep_field("box_hidden", ev_box_hidden))</span>" *
-        "<span id=\"coords_box_hidden\" style=\"display:none\">$(JSON3.write(sweep.box_hidden.manifest["layers"]))</span>" *
+        "<span id=\"coords_box_hidden\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.box_hidden)))</span>" *
         "<span id=\"occluders_box_hidden\" style=\"display:none\">$(JSON3.write(get(sweep.box_hidden.manifest, "occluders", [])))</span>",
 )
 
@@ -270,7 +270,7 @@ HTML(
 # ╔═╡ d1000000-0000-0000-0000-00000000019d
 HTML(
     "<span id=\"out_box_axes\">BOX_AXES=$(sweep_field("box_axes", ev_box_axes))</span>" *
-        "<span id=\"coords_box_axes\" style=\"display:none\">$(JSON3.write(sweep.box_axes.manifest["layers"]))</span>" *
+        "<span id=\"coords_box_axes\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.box_axes)))</span>" *
         "<span id=\"occluders_box_axes\" style=\"display:none\">$(JSON3.write(get(sweep.box_axes.manifest, "occluders", [])))</span>",
 )
 
@@ -281,7 +281,7 @@ HTML(
 HTML(
     "<span id=\"out_hidden_plot\">HIDDEN_PLOT=$(sweep_field("hidden_plot", ev_hidden_plot))</span>" *
         "<span id=\"bond_hidden_plot\" style=\"display:none\">$(repr(ev_hidden_plot))</span>" *
-        "<span id=\"coords_hidden_plot\" style=\"display:none\">$(JSON3.write(sweep.hidden_plot.manifest["layers"]))</span>",
+        "<span id=\"coords_hidden_plot\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.hidden_plot)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000182
@@ -291,7 +291,7 @@ HTML(
 HTML(
     "<span id=\"out_added_plot\">ADDED_PLOT=$(sweep_field("added_plot", ev_added_plot))</span>" *
         "<span id=\"bond_added_plot\" style=\"display:none\">$(repr(ev_added_plot))</span>" *
-        "<span id=\"coords_added_plot\" style=\"display:none\">$(JSON3.write(sweep.added_plot.manifest["layers"]))</span>",
+        "<span id=\"coords_added_plot\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.added_plot)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000072
@@ -301,7 +301,7 @@ HTML(
 HTML(
     "<span id=\"out_poly_shapes\">POLY_SHAPES=$(sweep_field("poly_shapes", ev_poly_shapes))</span>" *
         "<span id=\"bond_poly_shapes\" style=\"display:none\">$(repr(ev_poly_shapes))</span>" *
-        "<span id=\"coords_poly_shapes\" style=\"display:none\">$(JSON3.write(sweep.poly_shapes.manifest["layers"]))</span>",
+        "<span id=\"coords_poly_shapes\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.poly_shapes)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000026
@@ -311,7 +311,7 @@ HTML(
 HTML(
     "<span id=\"out_arrows3d\">ARROWS3D=$(sweep_field("arrows3d", ev_arrows3d))</span>" *
         "<span id=\"bond_arrows3d\" style=\"display:none\">$(repr(ev_arrows3d))</span>" *
-        "<span id=\"coords_arrows3d\" style=\"display:none\">$(JSON3.write(sweep.arrows3d.manifest["layers"]))</span>",
+        "<span id=\"coords_arrows3d\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.arrows3d)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-00000000006c
@@ -321,7 +321,7 @@ HTML(
 HTML(
     "<span id=\"out_arrows3d_shared\">ARROWS3D_SHARED=$(sweep_field("arrows3d_shared", ev_arrows3d_shared))</span>" *
         "<span id=\"bond_arrows3d_shared\" style=\"display:none\">$(repr(ev_arrows3d_shared))</span>" *
-        "<span id=\"coords_arrows3d_shared\" style=\"display:none\">$(JSON3.write(sweep.arrows3d_shared.manifest["layers"]))</span>",
+        "<span id=\"coords_arrows3d_shared\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.arrows3d_shared)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-0000000000b3
@@ -331,7 +331,7 @@ HTML(
 HTML(
     "<span id=\"out_scatterlines3d\">SCATTERLINES3D=$(sweep_field("scatterlines3d", ev_scatterlines3d))</span>" *
         "<span id=\"bond_scatterlines3d\" style=\"display:none\">$(repr(ev_scatterlines3d))</span>" *
-        "<span id=\"coords_scatterlines3d\" style=\"display:none\">$(JSON3.write(sweep.scatterlines3d.manifest["layers"]))</span>",
+        "<span id=\"coords_scatterlines3d\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.scatterlines3d)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000101
@@ -341,7 +341,7 @@ HTML(
 HTML(
     "<span id=\"out_scatter3d\">SCATTER3D=$(sweep_field("scatter3d", ev_scatter3d))</span>" *
         "<span id=\"bond_scatter3d\" style=\"display:none\">$(repr(ev_scatter3d))</span>" *
-        "<span id=\"coords_scatter3d\" style=\"display:none\">$(JSON3.write(sweep.scatter3d.manifest["layers"]))</span>",
+        "<span id=\"coords_scatter3d\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.scatter3d)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000184
@@ -351,7 +351,7 @@ HTML(
 HTML(
     "<span id=\"out_scatter3d_data\">SCATTER3D_DATA=$(sweep_field("scatter3d_data", ev_scatter3d_data))</span>" *
         "<span id=\"bond_scatter3d_data\" style=\"display:none\">$(repr(ev_scatter3d_data))</span>" *
-        "<span id=\"coords_scatter3d_data\" style=\"display:none\">$(JSON3.write(sweep.scatter3d_data.manifest["layers"]))</span>",
+        "<span id=\"coords_scatter3d_data\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.scatter3d_data)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000103
@@ -361,7 +361,7 @@ HTML(
 HTML(
     "<span id=\"out_lines3d\">LINES3D=$(sweep_field("lines3d", ev_lines3d))</span>" *
         "<span id=\"bond_lines3d\" style=\"display:none\">$(repr(ev_lines3d))</span>" *
-        "<span id=\"coords_lines3d\" style=\"display:none\">$(JSON3.write(sweep.lines3d.manifest["layers"]))</span>",
+        "<span id=\"coords_lines3d\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.lines3d)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000105
@@ -371,7 +371,7 @@ HTML(
 HTML(
     "<span id=\"out_meshscatter3d\">MESHSCATTER3D=$(sweep_field("meshscatter3d", ev_meshscatter3d))</span>" *
         "<span id=\"bond_meshscatter3d\" style=\"display:none\">$(repr(ev_meshscatter3d))</span>" *
-        "<span id=\"coords_meshscatter3d\" style=\"display:none\">$(JSON3.write(sweep.meshscatter3d.manifest["layers"]))</span>",
+        "<span id=\"coords_meshscatter3d\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.meshscatter3d)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000107
@@ -381,7 +381,7 @@ HTML(
 HTML(
     "<span id=\"out_wireframe3d\">WIREFRAME3D=$(sweep_field("wireframe3d", ev_wireframe3d))</span>" *
         "<span id=\"bond_wireframe3d\" style=\"display:none\">$(repr(ev_wireframe3d))</span>" *
-        "<span id=\"coords_wireframe3d\" style=\"display:none\">$(JSON3.write(sweep.wireframe3d.manifest["layers"]))</span>",
+        "<span id=\"coords_wireframe3d\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.wireframe3d)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000109
@@ -391,7 +391,7 @@ HTML(
 HTML(
     "<span id=\"out_overlap3d\">OVERLAP3D=$(sweep_field("overlap3d", ev_overlap3d))</span>" *
         "<span id=\"bond_overlap3d\" style=\"display:none\">$(repr(ev_overlap3d))</span>" *
-        "<span id=\"coords_overlap3d\" style=\"display:none\">$(JSON3.write(sweep.overlap3d.manifest["layers"]))</span>",
+        "<span id=\"coords_overlap3d\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.overlap3d)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000123
@@ -401,7 +401,7 @@ HTML(
 HTML(
     "<span id=\"out_surface3d\">SURFACE3D=$(sweep_field("surface3d", ev_surface3d))</span>" *
         "<span id=\"bond_surface3d\" style=\"display:none\">$(repr(ev_surface3d))</span>" *
-        "<span id=\"coords_surface3d\" style=\"display:none\">$(JSON3.write(sweep.surface3d.manifest["layers"]))</span>",
+        "<span id=\"coords_surface3d\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.surface3d)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-00000000a550
@@ -411,7 +411,7 @@ HTML(
 HTML(
     "<span id=\"out_surface3d_low\">SURFACE3D_LOW=$(sweep_field("surface3d_low", ev_surface3d_low))</span>" *
         "<span id=\"bond_surface3d_low\" style=\"display:none\">$(repr(ev_surface3d_low))</span>" *
-        "<span id=\"coords_surface3d_low\" style=\"display:none\">$(JSON3.write(sweep.surface3d_low.manifest["layers"]))</span>",
+        "<span id=\"coords_surface3d_low\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.surface3d_low)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000200
@@ -421,7 +421,7 @@ HTML(
 HTML(
     "<span id=\"out_surface_polar\">SURFACE_POLAR=$(sweep_field("surface_polar", ev_surface_polar))</span>" *
         "<span id=\"bond_surface_polar\" style=\"display:none\">$(repr(ev_surface_polar))</span>" *
-        "<span id=\"coords_surface_polar\" style=\"display:none\">$(JSON3.write(sweep.surface_polar.manifest["layers"]))</span>",
+        "<span id=\"coords_surface_polar\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.surface_polar)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000188
@@ -431,7 +431,7 @@ HTML(
 HTML(
     "<span id=\"out_surface_sector\">SURFACE_SECTOR=$(sweep_field("surface_sector", ev_surface_sector))</span>" *
         "<span id=\"bond_surface_sector\" style=\"display:none\">$(repr(ev_surface_sector))</span>" *
-        "<span id=\"coords_surface_sector\" style=\"display:none\">$(JSON3.write(sweep.surface_sector.manifest["layers"]))</span>",
+        "<span id=\"coords_surface_sector\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.surface_sector)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000125
@@ -441,7 +441,7 @@ HTML(
 HTML(
     "<span id=\"out_text3d\">TEXT3D=$(sweep_field("text3d", ev_text3d))</span>" *
         "<span id=\"bond_text3d\" style=\"display:none\">$(repr(ev_text3d))</span>" *
-        "<span id=\"coords_text3d\" style=\"display:none\">$(JSON3.write(sweep.text3d.manifest["layers"]))</span>",
+        "<span id=\"coords_text3d\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.text3d)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-00000000010b
@@ -451,7 +451,7 @@ HTML(
 HTML(
     "<span id=\"out_text\">TEXT=$(sweep_field("text", ev_text))</span>" *
         "<span id=\"bond_text\" style=\"display:none\">$(repr(ev_text))</span>" *
-        "<span id=\"coords_text\" style=\"display:none\">$(JSON3.write(sweep.text.manifest["layers"]))</span>",
+        "<span id=\"coords_text\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.text)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-00000000014a
@@ -461,7 +461,7 @@ HTML(
 HTML(
     "<span id=\"out_scatter_overlap\">SCATTER_OVERLAP=$(sweep_field("scatter_overlap", ev_scatter_overlap))</span>" *
         "<span id=\"bond_scatter_overlap\" style=\"display:none\">$(repr(ev_scatter_overlap))</span>" *
-        "<span id=\"coords_scatter_overlap\" style=\"display:none\">$(JSON3.write(sweep.scatter_overlap.manifest["layers"]))</span>",
+        "<span id=\"coords_scatter_overlap\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.scatter_overlap)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-00000000014c
@@ -471,7 +471,7 @@ HTML(
 HTML(
     "<span id=\"out_text_overlap\">TEXT_OVERLAP=$(sweep_field("text_overlap", ev_text_overlap))</span>" *
         "<span id=\"bond_text_overlap\" style=\"display:none\">$(repr(ev_text_overlap))</span>" *
-        "<span id=\"coords_text_overlap\" style=\"display:none\">$(JSON3.write(sweep.text_overlap.manifest["layers"]))</span>",
+        "<span id=\"coords_text_overlap\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.text_overlap)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000150
@@ -481,7 +481,7 @@ HTML(
 HTML(
     "<span id=\"out_poly_overlap\">POLY_OVERLAP=$(sweep_field("poly_overlap", ev_poly_overlap))</span>" *
         "<span id=\"bond_poly_overlap\" style=\"display:none\">$(repr(ev_poly_overlap))</span>" *
-        "<span id=\"coords_poly_overlap\" style=\"display:none\">$(JSON3.write(sweep.poly_overlap.manifest["layers"]))</span>",
+        "<span id=\"coords_poly_overlap\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.poly_overlap)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-00000000014e
@@ -491,7 +491,7 @@ HTML(
 HTML(
     "<span id=\"out_spheres3d\">SPHERES3D=$(sweep_field("spheres3d", ev_spheres3d))</span>" *
         "<span id=\"bond_spheres3d\" style=\"display:none\">$(repr(ev_spheres3d))</span>" *
-        "<span id=\"coords_spheres3d\" style=\"display:none\">$(JSON3.write(sweep.spheres3d.manifest["layers"]))</span>",
+        "<span id=\"coords_spheres3d\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.spheres3d)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-00000000010d
@@ -501,7 +501,7 @@ HTML(
 HTML(
     "<span id=\"out_datashader\">DATASHADER=$(sweep_field("datashader", ev_datashader))</span>" *
         "<span id=\"bond_datashader\" style=\"display:none\">$(repr(ev_datashader))</span>" *
-        "<span id=\"coords_datashader\" style=\"display:none\">$(JSON3.write(sweep.datashader.manifest["layers"]))</span>",
+        "<span id=\"coords_datashader\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.datashader)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-00000000010f
@@ -511,7 +511,7 @@ HTML(
 HTML(
     "<span id=\"out_violin\">VIOLIN=$(sweep_field("violin", ev_violin))</span>" *
         "<span id=\"bond_violin\" style=\"display:none\">$(repr(ev_violin))</span>" *
-        "<span id=\"coords_violin\" style=\"display:none\">$(JSON3.write(sweep.violin.manifest["layers"]))</span>",
+        "<span id=\"coords_violin\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.violin)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000549
@@ -521,7 +521,7 @@ HTML(
 HTML(
     "<span id=\"out_violin_h\">VIOLIN_H=$(sweep_field("violin_h", ev_violin_h))</span>" *
         "<span id=\"bond_violin_h\" style=\"display:none\">$(repr(ev_violin_h))</span>" *
-        "<span id=\"coords_violin_h\" style=\"display:none\">$(JSON3.write(sweep.violin_h.manifest["layers"]))</span>",
+        "<span id=\"coords_violin_h\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.violin_h)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-00000000054b
@@ -531,7 +531,7 @@ HTML(
 HTML(
     "<span id=\"out_raincloud\">RAINCLOUD=$(sweep_field("raincloud", ev_raincloud))</span>" *
         "<span id=\"bond_raincloud\" style=\"display:none\">$(repr(ev_raincloud))</span>" *
-        "<span id=\"coords_raincloud\" style=\"display:none\">$(JSON3.write(sweep.raincloud.manifest["layers"]))</span>",
+        "<span id=\"coords_raincloud\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.raincloud)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000111
@@ -541,7 +541,7 @@ HTML(
 HTML(
     "<span id=\"out_stairs\">STAIRS=$(sweep_field("stairs", ev_stairs))</span>" *
         "<span id=\"bond_stairs\" style=\"display:none\">$(repr(ev_stairs))</span>" *
-        "<span id=\"coords_stairs\" style=\"display:none\">$(JSON3.write(sweep.stairs.manifest["layers"]))</span>",
+        "<span id=\"coords_stairs\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.stairs)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-0000000000b5
@@ -551,7 +551,7 @@ HTML(
 HTML(
     "<span id=\"out_arrows2d\">ARROWS2D=$(sweep_field("arrows2d", ev_arrows2d))</span>" *
         "<span id=\"bond_arrows2d\" style=\"display:none\">$(repr(ev_arrows2d))</span>" *
-        "<span id=\"coords_arrows2d\" style=\"display:none\">$(JSON3.write(sweep.arrows2d.manifest["layers"]))</span>",
+        "<span id=\"coords_arrows2d\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.arrows2d)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-00000000006a
@@ -561,7 +561,7 @@ HTML(
 HTML(
     "<span id=\"out_band_y\">BAND_Y=$(sweep_field("band_y", ev_band_y))</span>" *
         "<span id=\"bond_band_y\" style=\"display:none\">$(repr(ev_band_y))</span>" *
-        "<span id=\"coords_band_y\" style=\"display:none\">$(JSON3.write(sweep.band_y.manifest["layers"]))</span>",
+        "<span id=\"coords_band_y\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.band_y)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-0000000000a0
@@ -571,7 +571,7 @@ HTML(
 HTML(
     "<span id=\"out_hexbin\">HEXBIN=$(sweep_field("hexbin", ev_hexbin))</span>" *
         "<span id=\"bond_hexbin\" style=\"display:none\">$(repr(ev_hexbin))</span>" *
-        "<span id=\"coords_hexbin\" style=\"display:none\">$(JSON3.write(sweep.hexbin.manifest["layers"]))</span>",
+        "<span id=\"coords_hexbin\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.hexbin)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-0000000000e1
@@ -581,7 +581,7 @@ HTML(
 HTML(
     "<span id=\"out_scatter_data\">SCATTER_DATA=$(sweep_field("scatter_data", ev_scatter_data))</span>" *
         "<span id=\"bond_scatter_data\" style=\"display:none\">$(repr(ev_scatter_data))</span>" *
-        "<span id=\"coords_scatter_data\" style=\"display:none\">$(JSON3.write(sweep.scatter_data.manifest["layers"]))</span>",
+        "<span id=\"coords_scatter_data\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.scatter_data)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000076
@@ -591,7 +591,7 @@ HTML(
 HTML(
     "<span id=\"out_scatter_moved\">SCATTER_MOVED=$(sweep_field("scatter_moved", ev_scatter_moved))</span>" *
         "<span id=\"bond_scatter_moved\" style=\"display:none\">$(repr(ev_scatter_moved))</span>" *
-        "<span id=\"coords_scatter_moved\" style=\"display:none\">$(JSON3.write(sweep.scatter_moved.manifest["layers"]))</span>",
+        "<span id=\"coords_scatter_moved\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.scatter_moved)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000078
@@ -601,7 +601,7 @@ HTML(
 HTML(
     "<span id=\"out_bar_stroke\">BAR_STROKE=$(sweep_field("bar_stroke", ev_bar_stroke))</span>" *
         "<span id=\"bond_bar_stroke\" style=\"display:none\">$(repr(ev_bar_stroke))</span>" *
-        "<span id=\"coords_bar_stroke\" style=\"display:none\">$(JSON3.write(sweep.bar_stroke.manifest["layers"]))</span>",
+        "<span id=\"coords_bar_stroke\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.bar_stroke)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-00000000007a
@@ -611,7 +611,7 @@ HTML(
 HTML(
     "<span id=\"out_scatter_dates\">SCATTER_DATES=$(sweep_field("scatter_dates", ev_scatter_dates))</span>" *
         "<span id=\"bond_scatter_dates\" style=\"display:none\">$(repr(ev_scatter_dates))</span>" *
-        "<span id=\"coords_scatter_dates\" style=\"display:none\">$(JSON3.write(sweep.scatter_dates.manifest["layers"]))</span>",
+        "<span id=\"coords_scatter_dates\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.scatter_dates)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000028
@@ -621,7 +621,7 @@ HTML(
 HTML(
     "<span id=\"out_hlines\">HLINES=$(sweep_field("hlines", ev_hlines))</span>" *
         "<span id=\"bond_hlines\" style=\"display:none\">$(repr(ev_hlines))</span>" *
-        "<span id=\"coords_hlines\" style=\"display:none\">$(JSON3.write(sweep.hlines.manifest["layers"]))</span>",
+        "<span id=\"coords_hlines\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.hlines)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000030
@@ -631,7 +631,7 @@ HTML(
 HTML(
     "<span id=\"out_threshold\">THRESHOLD=$(sweep_field("threshold", ev_threshold))</span>" *
         "<span id=\"bond_threshold\" style=\"display:none\">$(repr(ev_threshold))</span>" *
-        "<span id=\"coords_threshold\" style=\"display:none\">$(JSON3.write(sweep.threshold.manifest["layers"]))</span>",
+        "<span id=\"coords_threshold\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.threshold)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000062
@@ -641,7 +641,7 @@ HTML(
 HTML(
     "<span id=\"out_threshold_cat\">THRESHOLD_CAT=$(sweep_field("threshold_cat", ev_threshold_cat))</span>" *
         "<span id=\"bond_threshold_cat\" style=\"display:none\">$(repr(ev_threshold_cat))</span>" *
-        "<span id=\"coords_threshold_cat\" style=\"display:none\">$(JSON3.write(sweep.threshold_cat.manifest["layers"]))</span>" *
+        "<span id=\"coords_threshold_cat\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.threshold_cat)))</span>" *
         "<span id=\"axes_threshold_cat\" style=\"display:none\">$(JSON3.write(sweep.threshold_cat.manifest["transforms"]))</span>",
 )
 
@@ -652,7 +652,7 @@ HTML(
 HTML(
     "<span id=\"out_threshold_colorbar\">THRESHOLD_COLORBAR=$(sweep_field("threshold_colorbar", ev_threshold_colorbar))</span>" *
         "<span id=\"bond_threshold_colorbar\" style=\"display:none\">$(repr(ev_threshold_colorbar))</span>" *
-        "<span id=\"coords_threshold_colorbar\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar.manifest["layers"]))</span>" *
+        "<span id=\"coords_threshold_colorbar\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.threshold_colorbar)))</span>" *
         "<span id=\"axes_threshold_colorbar\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar.manifest["transforms"]))</span>",
 )
 
@@ -663,7 +663,7 @@ HTML(
 HTML(
     "<span id=\"out_threshold_colorbar_h\">THRESHOLD_COLORBAR_H=$(sweep_field("threshold_colorbar_h", ev_threshold_colorbar_h))</span>" *
         "<span id=\"bond_threshold_colorbar_h\" style=\"display:none\">$(repr(ev_threshold_colorbar_h))</span>" *
-        "<span id=\"coords_threshold_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar_h.manifest["layers"]))</span>" *
+        "<span id=\"coords_threshold_colorbar_h\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.threshold_colorbar_h)))</span>" *
         "<span id=\"axes_threshold_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.threshold_colorbar_h.manifest["transforms"]))</span>",
 )
 
@@ -674,7 +674,7 @@ HTML(
 HTML(
     "<span id=\"out_span_axis\">SPAN_AXIS=$(sweep_field("span_axis", ev_span_axis))</span>" *
         "<span id=\"bond_span_axis\" style=\"display:none\">$(repr(ev_span_axis))</span>" *
-        "<span id=\"coords_span_axis\" style=\"display:none\">$(JSON3.write(sweep.span_axis.manifest["layers"]))</span>" *
+        "<span id=\"coords_span_axis\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.span_axis)))</span>" *
         "<span id=\"axes_span_axis\" style=\"display:none\">$(JSON3.write(sweep.span_axis.manifest["transforms"]))</span>",
 )
 
@@ -685,7 +685,7 @@ HTML(
 HTML(
     "<span id=\"out_span_colorbar\">SPAN_COLORBAR=$(sweep_field("span_colorbar", ev_span_colorbar))</span>" *
         "<span id=\"bond_span_colorbar\" style=\"display:none\">$(repr(ev_span_colorbar))</span>" *
-        "<span id=\"coords_span_colorbar\" style=\"display:none\">$(JSON3.write(sweep.span_colorbar.manifest["layers"]))</span>" *
+        "<span id=\"coords_span_colorbar\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.span_colorbar)))</span>" *
         "<span id=\"axes_span_colorbar\" style=\"display:none\">$(JSON3.write(sweep.span_colorbar.manifest["transforms"]))</span>",
 )
 
@@ -696,7 +696,7 @@ HTML(
 HTML(
     "<span id=\"out_span_colorbar_h\">SPAN_COLORBAR_H=$(sweep_field("span_colorbar_h", ev_span_colorbar_h))</span>" *
         "<span id=\"bond_span_colorbar_h\" style=\"display:none\">$(repr(ev_span_colorbar_h))</span>" *
-        "<span id=\"coords_span_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.span_colorbar_h.manifest["layers"]))</span>" *
+        "<span id=\"coords_span_colorbar_h\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.span_colorbar_h)))</span>" *
         "<span id=\"axes_span_colorbar_h\" style=\"display:none\">$(JSON3.write(sweep.span_colorbar_h.manifest["transforms"]))</span>",
 )
 
@@ -707,7 +707,7 @@ HTML(
 HTML(
     "<span id=\"out_onchange_colorbar\">ONCHANGE_COLORBAR=$(sweep_field("onchange_colorbar", ev_onchange_colorbar))</span>" *
         "<span id=\"bond_onchange_colorbar\" style=\"display:none\">$(repr(ev_onchange_colorbar))</span>" *
-        "<span id=\"coords_onchange_colorbar\" style=\"display:none\">$(JSON3.write(sweep.onchange_colorbar.manifest["layers"]))</span>" *
+        "<span id=\"coords_onchange_colorbar\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.onchange_colorbar)))</span>" *
         "<span id=\"axes_onchange_colorbar\" style=\"display:none\">$(JSON3.write(sweep.onchange_colorbar.manifest["transforms"]))</span>",
 )
 
@@ -718,7 +718,7 @@ HTML(
 HTML(
     "<span id=\"out_colorbar_owner\">COLORBAR_OWNER=$(sweep_field("colorbar_owner", ev_colorbar_owner))</span>" *
         "<span id=\"bond_colorbar_owner\" style=\"display:none\">$(repr(ev_colorbar_owner))</span>" *
-        "<span id=\"coords_colorbar_owner\" style=\"display:none\">$(JSON3.write(sweep.colorbar_owner.manifest["layers"]))</span>",
+        "<span id=\"coords_colorbar_owner\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.colorbar_owner)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000121
@@ -728,7 +728,7 @@ HTML(
 HTML(
     "<span id=\"out_roi_bounds\">ROI_BOUNDS=$(sweep_field("roi_bounds", ev_roi_bounds))</span>" *
         "<span id=\"bond_roi_bounds\" style=\"display:none\">$(repr(ev_roi_bounds))</span>" *
-        "<span id=\"coords_roi_bounds\" style=\"display:none\">$(JSON3.write(sweep.roi_bounds.manifest["layers"]))</span>",
+        "<span id=\"coords_roi_bounds\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.roi_bounds)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000196
@@ -738,7 +738,7 @@ HTML(
 HTML(
     "<span id=\"out_threshold_default\">THRESHOLD_DEFAULT=$(sweep_field("threshold_default", ev_threshold_default))</span>" *
         "<span id=\"bond_threshold_default\" style=\"display:none\">$(repr(ev_threshold_default))</span>" *
-        "<span id=\"coords_threshold_default\" style=\"display:none\">$(JSON3.write(sweep.threshold_default.manifest["layers"]))</span>",
+        "<span id=\"coords_threshold_default\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.threshold_default)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000198
@@ -748,7 +748,7 @@ HTML(
 HTML(
     "<span id=\"out_roi_default\">ROI_DEFAULT=$(sweep_field("roi_default", ev_roi_default))</span>" *
         "<span id=\"bond_roi_default\" style=\"display:none\">$(repr(ev_roi_default))</span>" *
-        "<span id=\"coords_roi_default\" style=\"display:none\">$(JSON3.write(sweep.roi_default.manifest["layers"]))</span>",
+        "<span id=\"coords_roi_default\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.roi_default)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000064
@@ -758,7 +758,7 @@ HTML(
 HTML(
     "<span id=\"out_axis_cat\">AXIS_CAT=$(sweep_field("axis_cat", ev_axis_cat))</span>" *
         "<span id=\"bond_axis_cat\" style=\"display:none\">$(repr(ev_axis_cat))</span>" *
-        "<span id=\"coords_axis_cat\" style=\"display:none\">$(JSON3.write(sweep.axis_cat.manifest["layers"]))</span>" *
+        "<span id=\"coords_axis_cat\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.axis_cat)))</span>" *
         "<span id=\"axes_axis_cat\" style=\"display:none\">$(JSON3.write(sweep.axis_cat.manifest["transforms"]))</span>",
 )
 
@@ -769,7 +769,7 @@ HTML(
 HTML(
     "<span id=\"out_roi\">ROI=$(sweep_field("roi", ev_roi))</span>" *
         "<span id=\"bond_roi\" style=\"display:none\">$(repr(ev_roi))</span>" *
-        "<span id=\"coords_roi\" style=\"display:none\">$(JSON3.write(sweep.roi.manifest["layers"]))</span>",
+        "<span id=\"coords_roi\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.roi)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-0000000000c0
@@ -779,7 +779,7 @@ HTML(
 HTML(
     "<span id=\"out_roi_grid\">ROI_GRID=$(sweep_field("roi_grid", ev_roi_grid))</span>" *
         "<span id=\"bond_roi_grid\" style=\"display:none\">$(repr(ev_roi_grid))</span>" *
-        "<span id=\"coords_roi_grid\" style=\"display:none\">$(JSON3.write(sweep.roi_grid.manifest["layers"]))</span>",
+        "<span id=\"coords_roi_grid\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.roi_grid)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000034
@@ -789,7 +789,7 @@ HTML(
 HTML(
     "<span id=\"out_view\">VIEW=$(sweep_field("view", ev_view))</span>" *
         "<span id=\"bond_view\" style=\"display:none\">$(repr(ev_view))</span>" *
-        "<span id=\"coords_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["layers"]))</span>" *
+        "<span id=\"coords_view\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.view)))</span>" *
         "<span id=\"axes_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["transforms"]))</span>",
 )
 
@@ -800,7 +800,7 @@ HTML(
 HTML(
     "<span id=\"out_view_linked\">VIEW_LINKED=$(sweep_field("view_linked", ev_view_linked))</span>" *
         "<span id=\"bond_view_linked\" style=\"display:none\">$(repr(ev_view_linked))</span>" *
-        "<span id=\"coords_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["layers"]))</span>" *
+        "<span id=\"coords_view_linked\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.view_linked)))</span>" *
         "<span id=\"axes_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["transforms"]))</span>",
 )
 
@@ -811,7 +811,7 @@ HTML(
 HTML(
     "<span id=\"out_view_twin\">VIEW_TWIN=$(sweep_field("view_twin", ev_view_twin))</span>" *
         "<span id=\"bond_view_twin\" style=\"display:none\">$(repr(ev_view_twin))</span>" *
-        "<span id=\"coords_view_twin\" style=\"display:none\">$(JSON3.write(sweep.view_twin.manifest["layers"]))</span>",
+        "<span id=\"coords_view_twin\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.view_twin)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000174
@@ -821,7 +821,7 @@ HTML(
 HTML(
     "<span id=\"out_view_twin_linked\">VIEW_TWIN_LINKED=$(sweep_field("view_twin_linked", ev_view_twin_linked))</span>" *
         "<span id=\"bond_view_twin_linked\" style=\"display:none\">$(repr(ev_view_twin_linked))</span>" *
-        "<span id=\"coords_view_twin_linked\" style=\"display:none\">$(JSON3.write(sweep.view_twin_linked.manifest["layers"]))</span>",
+        "<span id=\"coords_view_twin_linked\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.view_twin_linked)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000115
@@ -831,7 +831,7 @@ HTML(
 HTML(
     "<span id=\"out_view3d\">VIEW3D=$(sweep_field("view3d", ev_view3d))</span>" *
         "<span id=\"bond_view3d\" style=\"display:none\">$(repr(ev_view3d))</span>" *
-        "<span id=\"coords_view3d\" style=\"display:none\">$(JSON3.write(sweep.view3d.manifest["layers"]))</span>",
+        "<span id=\"coords_view3d\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.view3d)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000525
@@ -841,7 +841,7 @@ HTML(
 HTML(
     "<span id=\"out_view_dark\">VIEW_DARK=$(sweep_field("view_dark", ev_view_dark))</span>" *
         "<span id=\"bond_view_dark\" style=\"display:none\">$(repr(ev_view_dark))</span>" *
-        "<span id=\"coords_view_dark\" style=\"display:none\">$(JSON3.write(sweep.view_dark.manifest["layers"]))</span>",
+        "<span id=\"coords_view_dark\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.view_dark)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000580
@@ -851,7 +851,7 @@ HTML(
 HTML(
     "<span id=\"out_view_data_corner\">VIEW_DATA_CORNER=$(sweep_field("view_data_corner", ev_view_data_corner))</span>" *
         "<span id=\"bond_view_data_corner\" style=\"display:none\">$(repr(ev_view_data_corner))</span>" *
-        "<span id=\"coords_view_data_corner\" style=\"display:none\">$(JSON3.write(sweep.view_data_corner.manifest["layers"]))</span>",
+        "<span id=\"coords_view_data_corner\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.view_data_corner)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000152
@@ -861,7 +861,7 @@ HTML(
 HTML(
     "<span id=\"out_view3d_linked\">VIEW3D_LINKED=$(sweep_field("view3d_linked", ev_view3d_linked))</span>" *
         "<span id=\"bond_view3d_linked\" style=\"display:none\">$(repr(ev_view3d_linked))</span>" *
-        "<span id=\"coords_view3d_linked\" style=\"display:none\">$(JSON3.write(sweep.view3d_linked.manifest["layers"]))</span>",
+        "<span id=\"coords_view3d_linked\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.view3d_linked)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000202
@@ -871,7 +871,7 @@ HTML(
 HTML(
     "<span id=\"out_view_wheel\">VIEW_WHEEL=$(sweep_field("view_wheel", ev_view_wheel))</span>" *
         "<span id=\"bond_view_wheel\" style=\"display:none\">$(repr(ev_view_wheel))</span>" *
-        "<span id=\"coords_view_wheel\" style=\"display:none\">$(JSON3.write(sweep.view_wheel.manifest["layers"]))</span>",
+        "<span id=\"coords_view_wheel\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.view_wheel)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000559
@@ -881,7 +881,7 @@ HTML(
 HTML(
     "<span id=\"out_view_nested\">VIEW_NESTED=$(sweep_field("view_nested", ev_view_nested))</span>" *
         "<span id=\"bond_view_nested\" style=\"display:none\">$(repr(ev_view_nested))</span>" *
-        "<span id=\"coords_view_nested\" style=\"display:none\">$(JSON3.write(sweep.view_nested.manifest["layers"]))</span>",
+        "<span id=\"coords_view_nested\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.view_nested)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000546
@@ -891,7 +891,7 @@ HTML(
 HTML(
     "<span id=\"out_view_resized\">VIEW_RESIZED=$(sweep_field("view_resized", ev_view_resized))</span>" *
         "<span id=\"bond_view_resized\" style=\"display:none\">$(repr(ev_view_resized))</span>" *
-        "<span id=\"coords_view_resized\" style=\"display:none\">$(JSON3.write(sweep.view_resized.manifest["layers"]))</span>",
+        "<span id=\"coords_view_resized\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.view_resized)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000548
@@ -910,7 +910,7 @@ end
 HTML(
     "<span id=\"out_legend\">LEGEND=$(sweep_field("legend", ev_legend))</span>" *
         "<span id=\"bond_legend\" style=\"display:none\">$(repr(ev_legend))</span>" *
-        "<span id=\"coords_legend\" style=\"display:none\">$(JSON3.write(sweep.legend.manifest["layers"]))</span>",
+        "<span id=\"coords_legend\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.legend)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000047
@@ -920,7 +920,7 @@ HTML(
 HTML(
     "<span id=\"out_series_legend\">SERIES_LEGEND=$(sweep_field("series_legend", ev_series_legend))</span>" *
         "<span id=\"bond_series_legend\" style=\"display:none\">$(repr(ev_series_legend))</span>" *
-        "<span id=\"coords_series_legend\" style=\"display:none\">$(JSON3.write(sweep.series_legend.manifest["layers"]))</span>",
+        "<span id=\"coords_series_legend\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.series_legend)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000041
@@ -930,7 +930,7 @@ HTML(
 HTML(
     "<span id=\"out_legend_overlap\">LEGEND_OVERLAP=$(sweep_field("legend_overlap", ev_legend_overlap))</span>" *
         "<span id=\"bond_legend_overlap\" style=\"display:none\">$(repr(ev_legend_overlap))</span>" *
-        "<span id=\"coords_legend_overlap\" style=\"display:none\">$(JSON3.write(sweep.legend_overlap.manifest["layers"]))</span>",
+        "<span id=\"coords_legend_overlap\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.legend_overlap)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000049
@@ -940,7 +940,7 @@ HTML(
 HTML(
     "<span id=\"out_legend_template\">LEGEND_TEMPLATE=$(sweep_field("legend_template", ev_legend_template))</span>" *
         "<span id=\"bond_legend_template\" style=\"display:none\">$(repr(ev_legend_template))</span>" *
-        "<span id=\"coords_legend_template\" style=\"display:none\">$(JSON3.write(sweep.legend_template.manifest["layers"]))</span>",
+        "<span id=\"coords_legend_template\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.legend_template)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000043
@@ -950,7 +950,7 @@ HTML(
 HTML(
     "<span id=\"out_axis\">AXIS=$(sweep_field("axis", ev_axis))</span>" *
         "<span id=\"bond_axis\" style=\"display:none\">$(repr(ev_axis))</span>" *
-        "<span id=\"coords_axis\" style=\"display:none\">$(JSON3.write(sweep.axis.manifest["layers"]))</span>" *
+        "<span id=\"coords_axis\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.axis)))</span>" *
         "<span id=\"axes_axis\" style=\"display:none\">$(JSON3.write(sweep.axis.manifest["transforms"]))</span>",
 )
 
@@ -961,7 +961,7 @@ HTML(
 HTML(
     "<span id=\"out_composite\">COMPOSITE=$(sweep_field("composite", ev_composite))</span>" *
         "<span id=\"bond_composite\" style=\"display:none\">$(repr(ev_composite))</span>" *
-        "<span id=\"coords_composite\" style=\"display:none\">$(JSON3.write(sweep.composite.manifest["layers"]))</span>",
+        "<span id=\"coords_composite\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.composite)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000160
@@ -971,7 +971,7 @@ HTML(
 HTML(
     "<span id=\"out_onchange\">ONCHANGE=$(sweep_field("onchange", ev_onchange))</span>" *
         "<span id=\"bond_onchange\" style=\"display:none\">$(repr(ev_onchange))</span>" *
-        "<span id=\"coords_onchange\" style=\"display:none\">$(JSON3.write(sweep.onchange.manifest["layers"]))</span>" *
+        "<span id=\"coords_onchange\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.onchange)))</span>" *
         "<span id=\"axes_onchange\" style=\"display:none\">$(JSON3.write(sweep.onchange.manifest["transforms"]))</span>",
 )
 
@@ -988,7 +988,7 @@ runs_controls = Ref(0)
 HTML(
     "<span id=\"out_controls\">CONTROLS=$(sweep_field("controls", ev_controls))</span>" *
         "<span id=\"bond_controls\" style=\"display:none\">$(repr(ev_controls))</span>" *
-        "<span id=\"coords_controls\" style=\"display:none\">$(JSON3.write(sweep.controls.manifest["layers"]))</span>" *
+        "<span id=\"coords_controls\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.controls)))</span>" *
         "<span id=\"axes_controls\" style=\"display:none\">$(JSON3.write(sweep.controls.manifest["transforms"]))</span>" *
         "<span id=\"ran_controls\" style=\"display:none\">$(time_ns())</span>" *
         "<span id=\"count_controls\" style=\"display:none\">$(runs_controls[] += 1)</span>",
@@ -1011,7 +1011,7 @@ HTML(
 HTML(
     "<span id=\"out_many\">MANY=$(sweep_field("many", ev_many))</span>" *
         "<span id=\"bond_many\" style=\"display:none\">$(repr(ev_many))</span>" *
-        "<span id=\"coords_many\" style=\"display:none\">$(JSON3.write(sweep.many.manifest["layers"]))</span>",
+        "<span id=\"coords_many\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.many)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000131
@@ -1021,7 +1021,7 @@ HTML(
 HTML(
     "<span id=\"out_marquee\">MARQUEE=$(sweep_field("marquee", ev_marquee))</span>" *
         "<span id=\"bond_marquee\" style=\"display:none\">$(repr(ev_marquee))</span>" *
-        "<span id=\"coords_marquee\" style=\"display:none\">$(JSON3.write(sweep.marquee.manifest["layers"]))</span>" *
+        "<span id=\"coords_marquee\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.marquee)))</span>" *
         "<span id=\"axes_marquee\" style=\"display:none\">$(JSON3.write(sweep.marquee.manifest["transforms"]))</span>",
 )
 
@@ -1032,7 +1032,7 @@ HTML(
 HTML(
     "<span id=\"out_many_grid\">MANY_GRID=$(sweep_field("many_grid", ev_many_grid))</span>" *
         "<span id=\"bond_many_grid\" style=\"display:none\">$(repr(ev_many_grid))</span>" *
-        "<span id=\"coords_many_grid\" style=\"display:none\">$(JSON3.write(sweep.many_grid.manifest["layers"]))</span>",
+        "<span id=\"coords_many_grid\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.many_grid)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000142
@@ -1042,7 +1042,7 @@ HTML(
 HTML(
     "<span id=\"out_many_grid_seeded\">MANY_GRID_SEEDED=$(sweep_field("many_grid_seeded", ev_many_grid_seeded))</span>" *
         "<span id=\"bond_many_grid_seeded\" style=\"display:none\">$(repr(ev_many_grid_seeded))</span>" *
-        "<span id=\"coords_many_grid_seeded\" style=\"display:none\">$(JSON3.write(sweep.many_grid_seeded.manifest["layers"]))</span>",
+        "<span id=\"coords_many_grid_seeded\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.many_grid_seeded)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000144
@@ -1052,7 +1052,7 @@ HTML(
 HTML(
     "<span id=\"out_many_grid_regions\">MANY_GRID_REGIONS=$(sweep_field("many_grid_regions", ev_many_grid_regions))</span>" *
         "<span id=\"bond_many_grid_regions\" style=\"display:none\">$(repr(ev_many_grid_regions))</span>" *
-        "<span id=\"coords_many_grid_regions\" style=\"display:none\">$(JSON3.write(sweep.many_grid_regions.manifest["layers"]))</span>",
+        "<span id=\"coords_many_grid_regions\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.many_grid_regions)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000176
@@ -1062,7 +1062,7 @@ HTML(
 HTML(
     "<span id=\"out_linked_pos\">LINKED_POS=$(sweep_field("linked_pos", ev_linked_pos))</span>" *
         "<span id=\"bond_linked_pos\" style=\"display:none\">$(repr(ev_linked_pos))</span>" *
-        "<span id=\"coords_linked_pos\" style=\"display:none\">$(JSON3.write(sweep.linked_pos.manifest["layers"]))</span>",
+        "<span id=\"coords_linked_pos\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.linked_pos)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000178
@@ -1072,7 +1072,7 @@ HTML(
 HTML(
     "<span id=\"out_linked_keys\">LINKED_KEYS=$(sweep_field("linked_keys", ev_linked_keys))</span>" *
         "<span id=\"bond_linked_keys\" style=\"display:none\">$(repr(ev_linked_keys))</span>" *
-        "<span id=\"coords_linked_keys\" style=\"display:none\">$(JSON3.write(sweep.linked_keys.manifest["layers"]))</span>",
+        "<span id=\"coords_linked_keys\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.linked_keys)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000180
@@ -1082,7 +1082,7 @@ HTML(
 HTML(
     "<span id=\"out_linked_one\">LINKED_ONE=$(sweep_field("linked_one", ev_linked_one))</span>" *
         "<span id=\"bond_linked_one\" style=\"display:none\">$(repr(ev_linked_one))</span>" *
-        "<span id=\"coords_linked_one\" style=\"display:none\">$(JSON3.write(sweep.linked_one.manifest["layers"]))</span>",
+        "<span id=\"coords_linked_one\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.linked_one)))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000050
@@ -1092,7 +1092,7 @@ HTML(
 HTML(
     "<span id=\"out_slice_lines\">SLICE_LINES=$(sweep_field("slice_lines", ev_slice_lines))</span>" *
         "<span id=\"bond_slice_lines\" style=\"display:none\">$(repr(ev_slice_lines))</span>" *
-        "<span id=\"coords_slice_lines\" style=\"display:none\">$(JSON3.write(sweep.slice_lines.manifest["layers"]))</span>" *
+        "<span id=\"coords_slice_lines\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.slice_lines)))</span>" *
         "<span id=\"axes_slice_lines\" style=\"display:none\">$(JSON3.write(sweep.slice_lines.manifest["transforms"]))</span>",
 )
 
@@ -1103,7 +1103,7 @@ HTML(
 HTML(
     "<span id=\"out_slice_density\">SLICE_DENSITY=$(sweep_field("slice_density", ev_slice_density))</span>" *
         "<span id=\"bond_slice_density\" style=\"display:none\">$(repr(ev_slice_density))</span>" *
-        "<span id=\"coords_slice_density\" style=\"display:none\">$(JSON3.write(sweep.slice_density.manifest["layers"]))</span>" *
+        "<span id=\"coords_slice_density\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.slice_density)))</span>" *
         "<span id=\"axes_slice_density\" style=\"display:none\">$(JSON3.write(sweep.slice_density.manifest["transforms"]))</span>",
 )
 
@@ -1114,7 +1114,7 @@ HTML(
 HTML(
     "<span id=\"out_slice_auto\">SLICE_AUTO=$(sweep_field("slice_auto", ev_slice_auto))</span>" *
         "<span id=\"bond_slice_auto\" style=\"display:none\">$(repr(ev_slice_auto))</span>" *
-        "<span id=\"coords_slice_auto\" style=\"display:none\">$(JSON3.write(sweep.slice_auto.manifest["layers"]))</span>" *
+        "<span id=\"coords_slice_auto\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.slice_auto)))</span>" *
         "<span id=\"axes_slice_auto\" style=\"display:none\">$(JSON3.write(sweep.slice_auto.manifest["transforms"]))</span>",
 )
 

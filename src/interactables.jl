@@ -270,6 +270,13 @@ _pt3d(p) = Point3d(p[1], p[2], length(p) >= 3 ? p[3] : 0)
 # (geometry.ts). Geometry vectors use `Real[]`, not a concrete eltype, to allow this mix.
 _q(x) = isfinite(x) ? round(Int, x) : Float32(x)
 
+# A point's halo is a ring one device pixel from its marker, so a whole-pixel centre leaves
+# the gap visibly lopsided on a 2x screen (#588). Circles keep a quarter of an image px, and
+# the manifest ships them as integers in those quarters (`_layer_dict`): about 0.5% more
+# manifest (perf-findings.md), since only values under 64 px grow a byte.
+const CIRCLE_QUANTUM = 4
+_qc(x) = isfinite(x) ? round(Int, x * CIRCLE_QUANTUM) / CIRCLE_QUANTUM : Float32(x)
+
 # 0-based bin, or -1 outside. Matches `findBin` in `frontend/src/geometry.ts`, including the
 # smaller-index bin on an interior edge. `edges` is 1-based; the returned index is not.
 function _find_bin(edges, v)
@@ -698,7 +705,7 @@ function hitlayers(i::PointInteractable, ctx)
         end
         o = i.offset isa Vector ? i.offset[k] : i.offset
         cx, cy = q[1] + o[1] * ctx.scaling, q[2] - o[2] * ctx.scaling   # image px are y-down
-        append!(g, (_q(cx), _q(cy), _q(r)))
+        append!(g, (_qc(cx), _qc(cy), _qc(r)))
     end
     # With no `order` the overlay puts the last point listed on top, as CairoMakie paints a
     # `scatter!`. On an Axis3, WebGL depth-tests markers and CairoMakie paints a `meshscatter!`

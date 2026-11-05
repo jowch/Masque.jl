@@ -172,6 +172,10 @@ function _payload_keys(payloads)
     return ks
 end
 
+# A manifest layer's geometry in image px: a circles layer ships it in `q`ths (#588). Every
+# reader of a built or shipped manifest goes through this, not `l["geometry"]`.
+_geometry_px(l::AbstractDict) = haskey(l, "q") ? l["geometry"] ./ l["q"] : l["geometry"]
+
 function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     hs = hoverstyle(i)
     style = Dict{String, Any}("width" => hs.width)
@@ -182,6 +186,11 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         "events" => [string(e) for e in L.events],
         "style" => style,
     )
+    if L.kind === :circles
+        # Quarter-pixel integers (`_qc`); the overlay divides by `q` once, as the manifest lands.
+        d["geometry"] = Real[isfinite(v) ? round(Int, v * CIRCLE_QUANTUM) : v for v in L.geometry]
+        d["q"] = CIRCLE_QUANTUM
+    end
     # The fields Masque filled in that are measured along an axis (`_merge_payloads`), each
     # with that axis: the default tooltip prints them in the axis's format (#510, #543).
     ck = _coord_keys(L.payloads)

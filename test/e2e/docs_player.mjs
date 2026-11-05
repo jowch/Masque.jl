@@ -151,8 +151,8 @@ async function clickPoint(frame, index) {
     if (!man || !man.layers) throw new Error("quick start manifest missing");
     const layer = man.layers.find((l) => l.id === "scatter");
     if (!layer) throw new Error("no scatter layer on the quick start manifest");
-    const cx = layer.geometry[3 * idx];
-    const cy = layer.geometry[3 * idx + 1];
+    const cx = layer.geometry[3 * idx] / (layer.q ?? 1); // circles ship in quarter px (#588)
+    const cy = layer.geometry[3 * idx + 1] / (layer.q ?? 1);
     let sr = null;
     host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
     const surface = sr && sr.querySelector(".surface");
@@ -682,7 +682,8 @@ try {
       const layer = man.layers.find((l) => l.id === "scatter");
       const r = h.querySelector("img").getBoundingClientRect();
       const s = r.width / man.width;
-      return { x: r.x + layer.geometry[0] * s, y: r.y + layer.geometry[1] * s };
+      const q = layer.q ?? 1; // circles ship in quarter px (#588)
+      return { x: r.x + (layer.geometry[0] / q) * s, y: r.y + (layer.geometry[1] / q) * s };
     });
     let tip = "";
     for (let a = 0; a < 10 && !tip; a++) {

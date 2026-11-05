@@ -517,8 +517,8 @@ try {
   const c = {
     page, mf, px,
     circle(id, i) {
-      const g = layerOf(id).geometry;
-      return px(g[3 * i], g[3 * i + 1]);
+      const l = layerOf(id), g = l.geometry, q = l.q ?? 1; // circles ship in quarter px (#588)
+      return px(g[3 * i] / q, g[3 * i + 1] / q);
     },
     // A data coordinate on the axis of layer `id` (linear axes).
     data(id, x, y) {

@@ -411,7 +411,7 @@ function _brush_states(manifest::AbstractDict, L)
     t = manifest["transforms"][string(L["axis"])]
     out = Dict{String, Any}[Dict{String, Any}("items" => Any[])]
     if kind == "circles"
-        g = L["geometry"]
+        g = haskey(L, "q") ? L["geometry"] ./ L["q"] : L["geometry"]   # quarter px on the wire (#588)
         vx, vy, vw, vh = t["viewport"]
         pts = [(k - 1, Float64(g[3k - 2]), Float64(g[3k - 1])) for k in 1:(length(g) ÷ 3)]
         filter!(p -> vx <= p[2] <= vx + vw && vy <= p[3] <= vy + vh, pts)

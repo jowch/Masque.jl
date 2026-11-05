@@ -311,6 +311,7 @@ export interface HitLayer {
     // :circles/:segments/:polyline/:lines: how far a finger reaches to this layer's marks, CSS px
     // (`touch_radius`). Absent → the manifest's `touch` radius.
     touch?: number
+    q?: number // :circles: geometry arrives in 1/q image px (#588); mount divides it out and drops `q`
     linewidth?: number // :segments/:polyline/:lines: the drawn line width, image px (absent → Makie's default, 1.5 logical px); fade.ts covers a line with it
     template?: TemplateSegment[] // masque"..." parsed once per layer; $() fields fill from payloads[]
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table

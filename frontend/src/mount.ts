@@ -28,6 +28,7 @@ import { createFade } from "./fade"
 import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, oneHome, MOTION_MS, NOTE_MS } from "./state"
 import type { HiGroups, HiSet, OverlayCtx } from "./state"
 import type { Hit, HitLayer, Limits3, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
+import { dequantize } from "./wire"
 import { axisFrame, innermostView, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
 import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_HINT_MS, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
@@ -316,6 +317,7 @@ interface WebGLHost extends HTMLElement {
  * @param requestFrame  per-frame callback, or null when this widget has none
  */
 export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: Promise<unknown>, requestFrame?: RenderFrame | null): Mounted {
+    dequantize(manifest)
     const hostEl = scriptEl.parentElement as WebGLHost | null
     // Image-px scale comes from manifest.width, not the element's intrinsic size, so a
     // <canvas> needs no sizer shim. The host is assumed to hold exactly one base element.
@@ -907,6 +909,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     function revealFrame(input: Record<string, unknown>, r: FrameResponse): void {
         const newManifest = r.manifest as Manifest | undefined
         if (!newManifest) return
+        dequantize(newManifest)
         // A frame's manifest describes the new geometry only. The figure's colour and the
         // overlay and tooltip styles were set at mount; the fade and the outlines read them here.
         newManifest.background ??= ctx.manifest_.background
