@@ -55,7 +55,7 @@ function _brush_start(target, built, seed, layers)
     if tl["kind"] != "grid"
         idxs = seed !== nothing ? seed : begin
                 box = first(d for (i, _, d) in built if selects(i) === target)["geometry"]
-                _contained_indices(box, tl["geometry"], get(tl, "q", 1))
+                _contained_indices(box, _geometry_px(tl))
             end
         return Dict{String, Any}("items" => [Dict{String, Any}("layer" => string(target), "index" => k) for k in idxs])
     end
@@ -75,13 +75,13 @@ end
 # What a box at image-px `box` holds: the 0-based indices of the circles whose centres it
 # contains, or the grid cells it overlaps (`nothing` if none). The same comparisons as
 # `computeSelection` in frontend/src/selection.ts, on the same manifest numbers, so the starting
-# value and a release at the starting bounds agree. A circles layer ships `q`ths of an image px.
+# value and a release at the starting bounds agree.
 _box_span(box) = (Float64(box["x"]), Float64(box["x"]) + Float64(box["w"]), Float64(box["y"]), Float64(box["y"]) + Float64(box["h"]))
-function _contained_indices(box, a, q = 1)
+function _contained_indices(box, a)
     xlo, xhi, ylo, yhi = _box_span(box)
     return Int[
         k for k in 0:(length(a) ÷ 3 - 1)
-            if xlo <= Float64(a[3k + 1]) / q <= xhi && ylo <= Float64(a[3k + 2]) / q <= yhi
+            if xlo <= Float64(a[3k + 1]) <= xhi && ylo <= Float64(a[3k + 2]) <= yhi
     ]
 end
 function _contained_cells(box, g)

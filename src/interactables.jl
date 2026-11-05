@@ -271,9 +271,9 @@ _pt3d(p) = Point3d(p[1], p[2], length(p) >= 3 ? p[3] : 0)
 _q(x) = isfinite(x) ? round(Int, x) : Float32(x)
 
 # A point's halo is a ring one device pixel from its marker, so a whole-pixel centre leaves
-# the gap visibly lopsided on a 2x screen (#588). Circles keep a quarter of an image px; the
-# manifest ships them as integers in those quarters (`_layer_dict`), which MsgPack packs in as
-# few bytes as whole pixels up to 16 383 px.
+# the gap visibly lopsided on a 2x screen (#588). Circles keep a quarter of an image px, and
+# the manifest ships them as integers in those quarters (`_layer_dict`): about 0.5% more
+# manifest (perf-findings.md), since only values under 64 px grow a byte.
 const CIRCLE_QUANTUM = 4
 _qc(x) = isfinite(x) ? round(Int, x * CIRCLE_QUANTUM) / CIRCLE_QUANTUM : Float32(x)
 

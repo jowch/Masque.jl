@@ -6,7 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- A menu opens with the chosen option in view instead of at the top of the list. A search that
+  matches no option shows "No matches" instead of an empty list, and moving into a menu with
+  Tab no longer selects its text.
+
 ### Fixed
+- A menu now closes on a press anywhere outside it. A press on the zoom and reset buttons in a
+  plot's corner used to leave it open, and those buttons sat on top of an open list, so a click
+  on an option under them zoomed the plot instead of picking it.
+- A press on the arrow of an open searchable menu closes it, as it does on a menu without
+  search. A press on its text still places the caret.
 - Right-clicking or Control-clicking a CairoMakie figure in Safari, or in another browser
   built on WebKit, now shows the image's menu, with Save Image As and Copy Image, as other
   browsers do. Before, it showed the page's menu. Safari has no such menu for a live WGLMakie

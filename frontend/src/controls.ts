@@ -137,8 +137,11 @@ export const CONTROLS_STYLE = `
    --ch high, in the odd or even colour; the one under the pointer or the keys, and the chosen
    one, take their own cell and text colours. The list is as long as its cells and stops at the
    figure's edge (--lmax), scrolling past that. The box is an <input>: read-only, or with
-   with searchable the text that filters the list. An open menu sits over the other controls. */
+   with searchable the text that filters the list. An open menu sits over the other controls.
+   A search that keeps no option shows one inert "No matches" cell. */
 .masque-control.masque-ctl-menu.open { z-index: 1; }
+/* An open menu's list sits over the plot's view buttons too, so every option can be clicked. */
+.masque-controls.menu-open { z-index: 13; }
 .masque-control .masque-menu-box { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; border: none; border-radius: 0;
   ${FONT_CSS} font-size: var(--fs, 50cqh); line-height: 1; cursor: pointer;
   padding: 0 var(--pr, 0) 0 var(--pad, 0.5em); background: var(--masque-ctl-off, #f0f0f0); color: var(--masque-ctl-text, #000000);
@@ -160,6 +163,9 @@ export const CONTROLS_STYLE = `
 .masque-menu-list [role="option"].even { background: var(--c3, #f7f7f7); }
 .masque-menu-list [role="option"].act { background: var(--c0, #f0f0f0); color: var(--o0, var(--masque-ctl-text, #000000)); }
 .masque-menu-list [role="option"][aria-selected="true"] { background: var(--c1, #4e7fb4); color: var(--o1, #ffffff); }
+.masque-menu-list .masque-menu-empty { box-sizing: border-box; height: var(--ch, 2em); display: flex; align-items: center; white-space: nowrap; overflow: hidden;
+  padding-left: var(--pad, 0.5em); background: var(--c2, #f7f7f7); color: var(--ph, currentColor); cursor: default; }
+.masque-menu-list .masque-menu-empty[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .masque-toggle-track, .masque-toggle-knob { transition: none; } }
 /* A finger (#531): where any input is coarse, a slider, toggle or checkbox takes the pointer up
    to ${REACH_PX}px across, past its drawn size; nothing drawn changes. --rt, --rb, --rl and
@@ -492,6 +498,13 @@ function buildMenu(layer: HitLayer, g: ControlGeometry, m: Manifest, box: HTMLEl
         return o
     })
     list.append(...cells)
+    // What a search that keeps nothing shows, so the open list doesn't vanish.
+    const empty = document.createElement("div")
+    empty.className = "masque-menu-empty"
+    empty.setAttribute("aria-hidden", "true")
+    empty.textContent = "No matches"
+    empty.hidden = true
+    list.append(empty)
     const arrow = document.createElementNS(SVG, "svg")
     arrow.setAttribute("class", "masque-menu-arrow")
     arrow.setAttribute("viewBox", "-0.5 -0.5 1 1")
@@ -520,6 +533,7 @@ function buildMenu(layer: HitLayer, g: ControlGeometry, m: Manifest, box: HTMLEl
             o.hidden = !keep.has(i)
             if (!o.hidden) o.classList.toggle("even", k++ % 2 === 1)
         })
+        empty.hidden = shown.length > 0
     }
     const activate = (i: number, scroll: boolean) => {
         if (act >= 0) cells[act]?.classList.remove("act")
@@ -532,18 +546,33 @@ function buildMenu(layer: HitLayer, g: ControlGeometry, m: Manifest, box: HTMLEl
             input.removeAttribute("aria-activedescendant")
         }
     }
+    // A press anywhere outside the open menu closes it. Blur alone misses a press on something
+    // that keeps the focus where it is, such as the plot's view buttons; this listener sees
+    // every press first, whatever the element under it does with the event. A menu removed
+    // while open (the widget remounted) leaves this listener until the next press anywhere,
+    // which takes it off.
+    const doc = box.ownerDocument
+    const outside = (e: Event) => {
+        if (!box.isConnected) doc.removeEventListener("pointerdown", outside, true)
+        if (!e.composedPath().includes(box)) setOpen(false)
+    }
     const setOpen = (on: boolean) => {
         if (open === on) return
         open = on
+        if (on) doc.addEventListener("pointerdown", outside, true)
+        else doc.removeEventListener("pointerdown", outside, true)
         box.classList.toggle("open", on)
+        box.closest(".masque-controls")?.classList.toggle("menu-open", on)
         list.className = `masque-menu-list ${box.dataset.direction ?? "down"}`
         list.hidden = !on
         input.setAttribute("aria-expanded", String(on))
         if (on) {
             shown = labels.map((_, i) => i)
             layout()
-            // Makie opens its list at the top.
-            list.scrollTop = 0
+            // The chosen option in view, in the middle of the list where it can be; the top with
+            // none chosen.
+            const c = cells[chosen]
+            list.scrollTop = c ? Math.max(0, c.offsetTop - (list.clientHeight - c.offsetHeight) / 2) : 0
             if (searchable) {
                 input.value = ""
                 input.placeholder = g.search ?? ""
@@ -595,10 +624,12 @@ function buildMenu(layer: HitLayer, g: ControlGeometry, m: Manifest, box: HTMLEl
     input.addEventListener("pointerdown", (e) => {
         if (e.button !== 0) return
         input.classList.add("by-pointer")
-        // Makie's box opens the list and closes it again; with `searchable` a press in the open
-        // box places the caret.
+        // Makie's box opens the list and closes it again; with `searchable` a press on the open
+        // box's text places the caret, and one on its arrow (a square at the right end) closes it.
+        const r = input.getBoundingClientRect()
+        const onArrow = e.clientX >= r.right - Math.max(r.height, parseFloat(getComputedStyle(input).paddingRight) || 0)
         if (!open) setOpen(true)
-        else if (!searchable) {
+        else if (!searchable || onArrow) {
             e.preventDefault()
             setOpen(false)
         }
@@ -613,6 +644,12 @@ function buildMenu(layer: HitLayer, g: ControlGeometry, m: Manifest, box: HTMLEl
     // A box focused by a press shows no focus ring, as a clicked native control doesn't; one
     // reached with Tab does.
     input.addEventListener("blur", () => input.classList.remove("by-pointer"))
+    // Tab into the box puts the caret at the end, as a select shows its choice, instead of
+    // selecting the text as a field about to be replaced.
+    input.addEventListener("focus", () => {
+        const n = input.value.length
+        try { input.setSelectionRange(n, n) } catch { /* not a text field */ }
+    })
     input.addEventListener("keydown", (e) => {
         const key = e.key
         if (key === "ArrowDown" || key === "ArrowUp") {

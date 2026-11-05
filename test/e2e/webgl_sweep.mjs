@@ -54,7 +54,9 @@ try {
   console.error("phase: all widgets mounted");
 
   // ---------- in-page helpers ----------
-  const layersOf = (key) => page.evaluate((k) => JSON.parse(document.querySelector(`#coords_${k}`).innerText), key);
+  // In image px: a circles layer ships its geometry in quarter px (#588).
+  const layersOf = async (key) => (await page.evaluate((k) => JSON.parse(document.querySelector(`#coords_${k}`).innerText), key))
+    .map((l) => (l.q ? { ...l, geometry: l.geometry.map((v) => v / l.q) } : l));
   // image-px -> client event opts for widget i
   const mkEvt = (i, x, y) => page.evaluate(([idx, ix, iy]) => {
     const host = [...document.querySelectorAll(".ip-host")][idx];

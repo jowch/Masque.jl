@@ -31,7 +31,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         w = masque(f)
         l = only(l for l in w.manifest["layers"] if l["kind"] == "circles")
         @test l["q"] == IP.CIRCLE_QUANTUM == 4 && all(v -> v isa Integer, l["geometry"])
-        g = l["geometry"] ./ l["q"]
+        g = IP._geometry_px(l)
         # The overlay draws the ring from these numbers: within an eighth of an image px of
         # the projected centre, where CairoMakie paints the marker.
         for (k, p) in enumerate(zip(xs, ys))
@@ -39,8 +39,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test abs(g[3k - 2] - q[1]) <= 1 / 8 && abs(g[3k - 1] - q[2]) <= 1 / 8
         end
         # A brush's starting value reads the shipped quarters as image px.
-        @test IP._contained_indices(Dict("x" => 0, "y" => 0, "w" => 1280, "h" => 640), l["geometry"], l["q"]) == 0:3
-        @test isempty(IP._contained_indices(Dict("x" => 0, "y" => 0, "w" => 1, "h" => 1), l["geometry"], l["q"]))
+        @test IP._contained_indices(Dict("x" => 0, "y" => 0, "w" => 1280, "h" => 640), g) == 0:3
+        @test isempty(IP._contained_indices(Dict("x" => 0, "y" => 0, "w" => 1, "h" => 1), g))
     end
 
     @testset "backend = symbol, max_width and px_per_unit keywords (#236)" begin

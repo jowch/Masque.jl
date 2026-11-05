@@ -63,7 +63,8 @@ async function hoverFirstPoint(p) {
     const layer = man.layers.find((l) => l.id === "scatter");
     const r = h.querySelector("canvas").getBoundingClientRect();
     const s = r.width / man.width;
-    return { x: r.x + layer.geometry[0] * s, y: r.y + layer.geometry[1] * s };
+    const q = layer.q ?? 1; // circles ship in quarter px (#588)
+    return { x: r.x + (layer.geometry[0] / q) * s, y: r.y + (layer.geometry[1] / q) * s };
   });
   let tip = "";
   for (let a = 0; a < 10 && !tip; a++) {

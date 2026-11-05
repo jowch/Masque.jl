@@ -172,6 +172,10 @@ function _payload_keys(payloads)
     return ks
 end
 
+# A manifest layer's geometry in image px: a circles layer ships it in `q`ths (#588). Every
+# reader of a built or shipped manifest goes through this, not `l["geometry"]`.
+_geometry_px(l::AbstractDict) = haskey(l, "q") ? l["geometry"] ./ l["q"] : l["geometry"]
+
 function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     hs = hoverstyle(i)
     style = Dict{String, Any}("width" => hs.width)

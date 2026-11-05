@@ -233,6 +233,9 @@ end
             "items:pts:0,pts:2", "items:pts:1,pts:2", "items:pts:0,pts:1,pts:2",
         ]
     )
+    # A widget ships circles in quarter px with `q` (#588): the same points, the same boxes.
+    quarter = merge(pts, Dict{String, Any}("geometry" => Any[400, 1000, 20, 800, 600, 20, 1200, 200, 20], "q" => 4))
+    @test Set(snapshot_key(v) for v in brush_states(_brush_manifest(quarter))) == Set(keys)
     # A point outside the axis viewport cannot be enclosed.
     off = merge(pts, Dict{String, Any}("geometry" => Any[100, 250, 5, 500, 150, 5]))
     @test Set(snapshot_key(v) for v in brush_states(_brush_manifest(off))) == Set(["items:", "items:pts:0"])

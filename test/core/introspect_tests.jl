@@ -495,7 +495,7 @@ end
                 # Makie plots sample quantiles against normal quantiles; the median is exact
                 @test Ls[1]["payloads"][3].x ≈ 0 atol = 1.0e-6
                 @test Ls[1]["payloads"][3].y ≈ 0.1
-                g = Ls[1]["geometry"] ./ Ls[1]["q"]   # circles ship in quarter px (#588)
+                g = Masque._geometry_px(Ls[1])   # circles ship in quarter px (#588)
                 @test drawn_near(img, g[1], g[2]; tol = 2)
                 Ls, img = layers(a -> qqnorm!(a, ys; qqline = :fit))
                 @test shape(Ls) == [("segments", "segments", 1), ("scatter", "circles", 5)]
@@ -520,7 +520,7 @@ end
                 # all stream lines are one NaN-separated element; each arrow head is its own point
                 @test length(Ls[2]["payloads"]) == 1
                 @test length(Ls[1]["payloads"]) > 1
-                g = Ls[1]["geometry"] ./ Ls[1]["q"]   # circles ship in quarter px (#588)
+                g = Masque._geometry_px(Ls[1])   # circles ship in quarter px (#588)
                 @test drawn_near(img, g[1], g[2]; tol = 2)
                 @test drawn_near(img, firstvertex(only(Ls[2]["geometry"]))...; tol = 2)
             end
@@ -901,7 +901,7 @@ end
                 w = @test_logs masque(f)
                 L = only(w.manifest["layers"])
                 @test L["kind"] == "circles"
-                cx, cy, r = Float64.(L["geometry"]) ./ L["q"]
+                cx, cy, r = Float64.(Masque._geometry_px(L))
                 img = Makie.colorbuffer(f; px_per_unit = w.manifest["width"] / 480)
                 red = [
                     (k[2], k[1]) for k in CartesianIndices(img)

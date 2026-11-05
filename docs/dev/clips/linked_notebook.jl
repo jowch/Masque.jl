@@ -84,7 +84,7 @@ end
 # ╔═╡ c1d50015-0001-4000-8000-000000000005
 HTML(
     "<span id=\"clip_manifest\" style=\"display:none\">" *
-        JSON3.write((; width = wid.manifest["width"], height = wid.manifest["height"], layers = [(; id = l["id"], axis = l["axis"], geometry = l["geometry"]) for l in wid.manifest["layers"]], transforms = wid.manifest["transforms"])) *
+        JSON3.write((; width = wid.manifest["width"], height = wid.manifest["height"], layers = [(; id = l["id"], axis = l["axis"], geometry = Masque._geometry_px(l)) for l in wid.manifest["layers"]], transforms = wid.manifest["transforms"])) *
         "</span>"
 )
 
