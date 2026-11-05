@@ -74,7 +74,7 @@ every row below came out the same. A span is constant-size: on a 10-point scatte
 | line, 10 pts | 51 KB | 0.6 KB | ~50 KB antialiasing and text floor for any plot |
 | scatter, 100 | 35 KB | 4 KB | |
 | scatter, 1 000 | 188 KB | 38 KB | typical interactive plot |
-| scatter, 10 000 | 717 KB | 379 KB | manifest approaches PNG; both O(N) |
+| scatter, 10 000 | 717 KB | 381 KB | manifest approaches PNG; both O(N) |
 | heatmap, 50×50 | 30 KB | 13 KB | |
 | heatmap, 200×200 | 190 KB | 197 KB | edges are compact; `values[]` is O(cells) |
 | heatmap, 50×50, cell labels | 30 KB | 54 KB | `payloads = (i, j) -> (; row, col)` (2026-10-08, #290) |
@@ -105,9 +105,12 @@ repo's own docs build) one widget already warns and two fail.
 
 ### What scales the manifest
 
-- **Element count**, linearly: ~38 B/element (three integer-pixel coordinates at 1–3 B each,
+- **Element count**, linearly: ~38 B/element (three integer coordinates at 1–3 B each,
   [§9](architecture/09-wire-encoding.md), plus a payload whose `x`/`y` stay Float64). The payload,
-  not the geometry, now dominates the per-element cost.
+  not the geometry, now dominates the per-element cost. A circle ships its centre and radius in
+  quarter pixels (#588, re-run 2026-11-05 on `3772433` plus the change): the 1 000-point scatter
+  went from 38.1 to 38.3 KB and the 10 000-point one from 379.0 to 381.1 KB (+0.5%), since a
+  quarter-pixel integer under 65 536 packs in 3 bytes, as a whole pixel past 255 already did.
 - **A heatmap's value matrix** (`:grid` `values[]`, O(cells)) while each cell is at least one
   screen pixel: 200×200 is 197 KB. Below one pixel per cell the manifest carries one value per
   screen pixel of the axis viewport instead ("Stress"). Tooltip templates add nothing per cell.
@@ -125,7 +128,7 @@ repo's own docs build) one widget already warns and two fail.
   (~10 B/sample), beside its integer-pixel geometry (~6 B/vertex). That makes a line layer about
   2.7× its geometry alone: 100 samples is 1.0 KB of `points` in a 2.0 KB manifest, 1 000 is
   9.8 KB in 16.0 KB, 10 000 is 98 KB in 156 KB. That stays under a 10 000-point scatter's
-  379 KB. Date and category axes carry text instead, which is larger per sample. A line on an
+  381 KB. Date and category axes carry text instead, which is larger per sample. A line on an
   Axis3 adds each sample's `z` (`zpoints`, ~15 B/sample in all), about 3.5× its geometry: 100
   samples is 1.5 KB in 2.5 KB, 1 000 is 14.7 KB in 21.0 KB, 10 000 is 147 KB in 206 KB. No
   cap, as on 2D: at 10 000 samples it is still under the scatter. A zoomed Axis3 whose limits
@@ -499,7 +502,7 @@ sweeps have 0 slow frames on `:cairo` and 1 or 0 on `:webgl`, against 0 to 11 be
 | heatmap 1000×1000 | 2.13 MB | 4.78 MB | 553 ms | ~260 ms | ~290 ms |
 
 These two heavy rows predate integer-pixel geometry and the heatmap screen-pixel sample, so their
-manifests are larger than what ships today (scatter-10 000 is now 379 KB; the 1000² heatmap ships
+manifests are larger than what ships today (scatter-10 000 is now 381 KB; the 1000² heatmap ships
 896 KB). They still show what a payload of that size costs. Below ~1 MB total the round trip is
 render-bound, with a near-constant 15–55 ms of overhead; above a few MB it is payload-bound, the
 time going to MsgPack-serializing the manifest and shipping it. It degrades into the half-second

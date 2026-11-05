@@ -182,6 +182,11 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         "events" => [string(e) for e in L.events],
         "style" => style,
     )
+    if L.kind === :circles
+        # Quarter-pixel integers (`_qc`); the overlay divides by `q` once, as the manifest lands.
+        d["geometry"] = Real[isfinite(v) ? round(Int, v * CIRCLE_QUANTUM) : v for v in L.geometry]
+        d["q"] = CIRCLE_QUANTUM
+    end
     # The fields Masque filled in that are measured along an axis (`_merge_payloads`), each
     # with that axis: the default tooltip prints them in the axis's format (#510, #543).
     ck = _coord_keys(L.payloads)

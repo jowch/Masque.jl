@@ -2,6 +2,15 @@
     "height": 900,
     "layers": [
         {
+            "q": 4,
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "events": [
+                "click",
+                "hover"
+            ],
             "coords": {
                 "y": "y",
                 "z": "z",
@@ -10,15 +19,15 @@
             "kind": "circles",
             "id": "scatter",
             "geometry": [
-                551,
-                341,
-                10,
-                647,
-                323,
-                10,
-                743,
-                671,
-                10
+                2205,
+                1363,
+                39,
+                2587,
+                1291,
+                39,
+                2971,
+                2684,
+                39
             ],
             "payloads": [
                 {
@@ -41,15 +50,7 @@
                 }
             ],
             "colors": "rgb(0,114,178)",
-            "axis": "ax1",
-            "style": {
-                "width": 2
-            },
-            "bond": "element",
-            "events": [
-                "click",
-                "hover"
-            ]
+            "bond": "element"
         },
         {
             "points": [

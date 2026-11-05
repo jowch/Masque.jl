@@ -265,10 +265,10 @@ end
         # The follower's hit areas are re-projected onto its new view, in the same frame.
         bk = Masque._resolve_backend(:cairo)
         ctx = Masque.context(bk, fig, Masque._ppu(bk, fig, 700), 700)
-        p2 = lay(m, "p2")["geometry"]
+        p2 = lay(m, "p2")["geometry"] ./ lay(m, "p2")["q"]   # quarter px (#588)
         q = data_to_image_px(ctx, a2, pts[2])
-        @test p2[4] ≈ q[1] atol = 0.5   # circles ship x, y, r per point
-        @test p2[5] ≈ q[2] atol = 0.5
+        @test p2[4] ≈ q[1] atol = 0.125   # circles ship x, y, r per point
+        @test p2[5] ≈ q[2] atol = 0.125
         @test p2 != p2_before
 
         # Rotation only by default: a zoom on the dragged panel leaves the others' limits alone.

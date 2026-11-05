@@ -5,13 +5,14 @@
             "kind": "circles",
             "id": "region.circles",
             "geometry": [
-                329,
-                565,
-                24
+                1316,
+                2260,
+                96
             ],
             "payloads": [
                 "c"
             ],
+            "q": 4,
             "axis": "ax1",
             "style": {
                 "width": 2

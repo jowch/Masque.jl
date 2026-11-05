@@ -11,6 +11,9 @@ All notable changes to this project are documented here. The format is based on
   built on WebKit, now shows the image's menu, with Save Image As and Copy Image, as other
   browsers do. Before, it showed the page's menu. Safari has no such menu for a live WGLMakie
   plot (#584).
+- The ring around a hovered or picked point now sits centred on the marker. Its position was
+  rounded to a whole pixel of the rendered image, which left the gap between marker and ring
+  visibly wider on one side, most of all on a high-density screen (#588).
 
 ## [0.5.1] - 2026-11-05
 

@@ -315,7 +315,20 @@ interface WebGLHost extends HTMLElement {
  * @param invalidation  Pluto's cleanup promise (resolves on cell re-render)
  * @param requestFrame  per-frame callback, or null when this widget has none
  */
+// A circles layer ships its numbers in quarters of an image px (#588), so a point's halo sits
+// concentric on its marker. Once per manifest: the result is plain image px, and `q` goes.
+export function dequantize(m: Manifest): Manifest {
+    for (const l of m.layers ?? []) {
+        if (!l.q || (!Array.isArray(l.geometry) && !ArrayBuffer.isView(l.geometry))) continue
+        const q = l.q
+        l.geometry = Array.from(l.geometry as ArrayLike<number>, (v) => v / q)
+        delete l.q
+    }
+    return m
+}
+
 export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: Promise<unknown>, requestFrame?: RenderFrame | null): Mounted {
+    dequantize(manifest)
     const hostEl = scriptEl.parentElement as WebGLHost | null
     // Image-px scale comes from manifest.width, not the element's intrinsic size, so a
     // <canvas> needs no sizer shim. The host is assumed to hold exactly one base element.
@@ -907,6 +920,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     function revealFrame(input: Record<string, unknown>, r: FrameResponse): void {
         const newManifest = r.manifest as Manifest | undefined
         if (!newManifest) return
+        dequantize(newManifest)
         // A frame's manifest describes the new geometry only. The figure's colour and the
         // overlay and tooltip styles were set at mount; the fade and the outlines read them here.
         newManifest.background ??= ctx.manifest_.background
