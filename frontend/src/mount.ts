@@ -214,6 +214,11 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-halo-ink, var(--ma
 @supports not (mix-blend-mode: color-dodge) {
   svg.masque-fill .masque-hi.masque-fillshape { fill: var(--masque-chrome); fill-opacity: var(--masque-noblend-fill-opacity, 0.18); }
 }
+/* Safari paints a blend mode over a WebGL canvas without blending it, which turned the dodge
+   fill's dark source into a black mark (#589). There a faint white lifts the mark instead
+   (measured on one mid blue: rgb(0,103,169) to rgb(24,115,172), near the dodge's lift). */
+:host(.masque-noblend) svg.masque-fill { mix-blend-mode: normal; }
+:host(.masque-noblend) svg.masque-fill .masque-hi.masque-fillshape { fill: #ffffff; fill-opacity: var(--masque-noblend-lift, 0.1); }
 /* The closed-mark selected look (fade.ts): the dim canvas covers a plot's unpicked marks in the
    plot area's colour, and its opacity leaves --masque-unpicked-opacity of them showing. */
 .masque-fades, .masque-fade { position: absolute; inset: 0; pointer-events: none; }
@@ -598,6 +603,13 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         dprQuery?.addEventListener?.("change", trackDensity)
     }
     trackDensity()
+    // Safari's engine (on iOS, every browser's) does not blend over a <canvas> (#589). Every
+    // Blink browser (desktop Edge and Opera too) names Chrome; iOS ones (CriOS, EdgiOS, FxiOS)
+    // don't, and they run on WebKit. Desktop Firefox has no AppleWebKit.
+    const ua = typeof navigator === "undefined" ? "" : navigator.userAgent
+    const noCanvasBlend = /AppleWebKit/.test(ua) && !/Chrome|Chromium/.test(ua)
+    const syncBlend = (): void => { shadowHost.classList.toggle("masque-noblend", noCanvasBlend && base instanceof HTMLCanvasElement) }
+    syncBlend()
 
     // Threshold lines and ROI boxes move with their own axis's pixels. The hair stays on the
     // plain svg, after every home, so the first <line> in the shadow is still a threshold line.
@@ -1282,6 +1294,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         base.style.transformOrigin = ""
         overlayRO?.unobserve(base)
         base = next
+        syncBlend()
         ctx.base_ = next
         if (base instanceof HTMLCanvasElement) {
             const canvas = base as GestureCanvas

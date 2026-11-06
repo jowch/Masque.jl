@@ -12,6 +12,9 @@ All notable changes to this project are documented here. The format is based on
   Tab no longer selects its text.
 
 ### Fixed
+- In Safari, a hovered or selected marker on a WebGL figure no longer turns black. Safari doesn't
+  blend the highlight over a WebGL canvas, so there it now lightens the marker with a faint white
+  instead (#589).
 - A menu now closes on a press anywhere outside it. A press on the zoom and reset buttons in a
   plot's corner used to leave it open, and those buttons sat on top of an open list, so a click
   on an option under them zoomed the plot instead of picking it.
