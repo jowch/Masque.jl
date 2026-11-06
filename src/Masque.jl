@@ -89,6 +89,7 @@ include("markup.jl")
 include("interactables.jl")
 include("introspect.jl")
 include("compose.jl")
+include("choices.jl")
 include("controls.jl")
 include("linked.jl")
 include("fields.jl")
@@ -110,5 +111,6 @@ export masque, interactables, linked, data_to_image_px, hitlayers, bondtype, tra
 export InteractionEvent, ElementEvent, LegendEvent, GridCellEvent, GridWindowEvent, GridSelection,
     AxisEvent, ThresholdEvent, ColorbarEvent, BoundsEvent, SpanEvent
 export Markup, @masque_str
+export RadioGroup, CheckboxGroup
 
 end # module Masque

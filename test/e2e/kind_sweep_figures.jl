@@ -771,6 +771,14 @@ kind_sweep_meta() = [
         "controlStart" => 3,
     ),
     Dict(
+        # Masque's own choice blocks (#592): a stacked RadioGroup and a CheckboxGroup in a row.
+        # A click on an option's label picks it, the arrow keys move the radio's choice, Space
+        # ticks a box, and a finger reaches each option's row. The driver's "choices" block.
+        "key" => "choices", "layerId" => "scale", "layerKind" => "control",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "choices", "field" => "*",
+    ),
+    Dict(
         # A long menu under a plot whose view buttons always show: its list opens upward over
         # the plot and must sit above the buttons, so the option under the zoom-out button is
         # the one a click there picks. The list reopens with the chosen option in view.
@@ -2030,6 +2038,15 @@ function build_kind_sweep()
         )
     end
 
+    choices = let
+        fig = Figure(size = (480, 320))
+        ax = Axis(fig[1, 1]; title = "choices", limits = (0, 10, 0, 10))
+        # `let` shares the function's locals: names another case uses (`series`) would overwrite it.
+        rg = RadioGroup(fig[1, 2]; options = ["linear", ("square root", "sqrt"), ("log", "log")], default = 1)
+        cg = CheckboxGroup(fig[2, 1:2]; options = ["a", "b", "c"], default = ["a"], orientation = :horizontal)
+        masque(fig, (scale = rg, series = cg))
+    end
+
     # The points sit bottom left, so the view buttons take the top-right corner, under the
     # menu's list when it opens upward.
     menu_view = let
@@ -2175,7 +2192,7 @@ function build_kind_sweep()
         scatter, scatter_low, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, box_hidden, box_axes, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, violin_h, raincloud, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_data_corner, view_resized, view_nested, legend, series_legend,
-        legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, menu_view, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
+        legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, choices, menu_view, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
 

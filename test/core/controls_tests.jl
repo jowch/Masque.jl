@@ -122,7 +122,7 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         for r in rs
             r.onchange[] = v -> (calls[] += 1; foreach(o -> o === r || (o.checked[] = false), rs); true)
         end
-        w = @test_logs (:warn, r"checkbox :r1 has its own `onchange`, which does nothing in masque.*Menu"s) match_mode = :any masque(fig, (r1 = rs[1], r2 = rs[2], r3 = rs[3]))
+        w = @test_logs (:warn, r"checkbox :r1 has its own `onchange`, which does nothing in masque.*RadioGroup"s) match_mode = :any masque(fig, (r1 = rs[1], r2 = rs[2], r3 = rs[3]))
         @test calls[] == 0 && [r.checked[] for r in rs] == [true, false, false]
         @test Masque.initial_bond(w) == (r1 = true, r2 = false, r3 = false)
     end
@@ -487,6 +487,91 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         fig2 = Figure()
         m2 = Menu(fig2[1, 1]; options = ["a", "b"])
         @test_logs min_level = Base.CoreLogging.Warn masque(fig2, (pick = m2,))
+    end
+
+    @testset "a radio group and a checkbox group are each one field (#592)" begin
+        fig = Figure(size = (500, 400))
+        ax = Axis(fig[1, 1])
+        rg = RadioGroup(fig[1, 2]; options = ["linear", ("sqrt", sqrt), ("log", log1p)], default = "sqrt")
+        cg = CheckboxGroup(fig[2, 1]; options = ["a", "b", "c"], default = [1, "c"], orientation = :horizontal)
+        seen = Any[]
+        w = masque(fig, (scale = rg, series = cg); onchange = st -> push!(seen, (st.scale, st.series, rg.selection[], cg.selection[])))
+        m = w.manifest
+        s = m["scaling"]
+        v = Masque.initial_bond(w)
+        @test v.scale === sqrt && v.series == ["a", "c"] && v.series isa Vector{String}
+        g = _layer(m, "scale")["geometry"]
+        @test g["control"] == "radiogroup" && g["value"] == 1
+        @test [o["label"] for o in g["options"]] == ["linear", "sqrt", "log"]
+        # The buttons' look ships once, as Makie's checkbox: round, with a dot.
+        b = g["button"]
+        @test b["size"] ≈ 11s && b["radius"] ≈ 11 / 2 * s && startswith(b["mark"], "M")
+        @test b["color"] == Masque._css_color(Makie.to_color(Makie.COLOR_ACCENT[]))
+        # Each option's row holds its button's box.
+        for o in g["options"]
+            bx, by, bw, bh = o["box"]
+            @test o["x"] <= bx && o["y"] <= by && bx + bw <= o["x"] + o["w"] + 1.0e-6 && o["w"] > 2bw
+        end
+        # Stacked by default; the group's box holds every row.
+        ys = [o["y"] for o in g["options"]]
+        @test issorted(ys) && allunique(ys)
+        @test all(o -> g["y"] - 1.0e-6 <= o["y"] && o["y"] + o["h"] <= g["y"] + g["h"] + 1.0e-6, g["options"])
+        h = _layer(m, "series")["geometry"]
+        @test h["control"] == "checkboxgroup" && h["value"] == [true, false, true]
+        @test length(unique(o["y"] for o in h["options"])) == 1   # a row
+        @test h["button"]["radius"] ≈ 0.15 * 11 / 2 * s
+        # The browser's value, back to the options' values.
+        @test Masque.bond_from_js(w, Dict("scale" => _env("scale", 2))).scale === log1p
+        @test Masque.bond_from_js(w, Dict("scale" => _env("scale", -1))).scale === nothing
+        @test Masque.bond_from_js(w, Dict("series" => _env("series", [false, true, false]))).series == ["b"]
+        @test_throws "expected an index from 0 to 2" Masque.bond_from_js(w, Dict("scale" => _env("scale", 3)))
+        @test_throws "expected 3 true/false values" Masque.bond_from_js(w, Dict("series" => _env("series", [true])))
+        # onchange sees the groups move first, as Makie code listening to `selection` would.
+        Masque._sync_view_warmup!(w.render_frame)
+        w.render_frame(Dict{String, Any}("onchange" => true, "settle" => true, "state" => Dict("scale" => _env("scale", 0), "series" => _env("series", [false, true, true]))))
+        @test last(seen) == ("linear", ["b", "c"], "linear", ["b", "c"])
+        @test [b.checked[] for b in rg.buttons] == [true, false, false]
+        @test [b.checked[] for b in cg.buttons] == [false, true, true]
+        # The picture leaves the buttons out and keeps their labels.
+        plots = Masque._block_plots(rg)
+        @test !isempty(plots) && all(p -> any(b -> p in Masque._block_scene(b).plots, rg.buttons), plots)
+    end
+
+    @testset "a radio group or checkbox group works as plain Makie (#592)" begin
+        fig = Figure()
+        rg = RadioGroup(fig[1, 1]; options = ["x", "y", "z"], default = nothing)
+        @test rg.i_selected[] == 0 && rg.selection[] === nothing && !any(b -> b.checked[], rg.buttons)
+        # A click on a button runs its onchange, as Makie's checkbox does: it chooses it, once.
+        click(b) = (n = b.onchange[](b.checked[]); n == b.checked[] || (b.checked[] = n))
+        click(rg.buttons[3])
+        @test rg.selection[] == "z" && [b.checked[] for b in rg.buttons] == [false, false, true]
+        click(rg.buttons[3])
+        @test rg.selection[] == "z" && rg.buttons[3].checked[]
+        click(rg.buttons[1])
+        @test rg.selection[] == "x" && [b.checked[] for b in rg.buttons] == [true, false, false]
+        cg = CheckboxGroup(fig[2, 1]; options = [("one", 1), ("two", 2)])
+        @test cg.selection[] == Int[] && cg.selection[] isa Vector{Int} && cg.checked[] == [false, false]
+        click(cg.buttons[2])
+        @test cg.selection[] == [2] && cg.checked[] == [false, true]
+        w = masque(fig, (r = rg, c = cg))
+        @test _layer(w.manifest, "r")["geometry"]["value"] == 0
+        @test Masque.initial_bond(w) == (r = "x", c = [2])
+        f0 = Figure(); r0 = RadioGroup(f0[1, 1]; options = ["a"], default = nothing)
+        w0 = masque(f0, (r0 = r0,))
+        @test _layer(w0.manifest, "r0")["geometry"]["value"] == -1 && Masque.initial_bond(w0).r0 === nothing
+        @test_throws "`default` names no option" RadioGroup(Figure()[1, 1]; options = ["a"], default = "b")
+        @test_throws "`options` is empty" CheckboxGroup(Figure()[1, 1]; options = String[])
+        # One label or index on its own names one option, not a list of characters.
+        @test CheckboxGroup(Figure()[1, 1]; options = ["a", "b"], default = "b").selection[] == ["b"]
+        @test CheckboxGroup(Figure()[1, 1]; options = ["a", "b"], default = 1).selection[] == ["a"]
+        # An index out of range is refused and leaves the block as it was.
+        r1 = RadioGroup(Figure()[1, 1]; options = ["a", "b"])
+        @test_throws "must be from 0 to 2" (r1.i_selected[] = 5)
+        @test r1.i_selected[] == 1 && r1.selection[] == "a"
+        # A group masque isn't given is an error, as for every block it draws.
+        fig = Figure(); Axis(fig[1, 1]); rg = RadioGroup(fig[2, 1]; options = ["a", "b"])
+        @test_throws "masque wasn't given (RadioGroup)" masque(fig)
+        @test_throws "needs a name" masque(fig, rg)
     end
 
     @testset "a menu with nothing chosen holds nothing" begin

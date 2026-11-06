@@ -993,6 +993,17 @@ HTML(
         "<span id=\"count_controls\" style=\"display:none\">$(runs_controls[] += 1)</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000592
+@bind ev_choices sweep.choices
+
+# ╔═╡ c1000000-0000-0000-0000-000000000593
+HTML(
+    "<span id=\"out_choices\">CHOICES=$(sweep_field("choices", ev_choices))</span>" *
+        "<span id=\"bond_choices\" style=\"display:none\">$(repr(ev_choices))</span>" *
+        "<span id=\"coords_choices\" style=\"display:none\">$(JSON3.write(sweep.choices.manifest["layers"]))</span>" *
+        "<span id=\"axes_choices\" style=\"display:none\">$(JSON3.write(sweep.choices.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000590
 @bind ev_menu_view sweep.menu_view
 
@@ -1325,6 +1336,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000535
 # ╠═c1000000-0000-0000-0000-000000000170
 # ╠═c1000000-0000-0000-0000-000000000171
+# ╠═c1000000-0000-0000-0000-000000000592
+# ╟─c1000000-0000-0000-0000-000000000593
 # ╠═c1000000-0000-0000-0000-000000000590
 # ╟─c1000000-0000-0000-0000-000000000591
 # ╠═c1000000-0000-0000-0000-000000000129

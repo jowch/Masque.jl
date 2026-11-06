@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `RadioGroup` and `CheckboxGroup`, two Makie blocks for the choices Makie has no block for:
+  one option of several, shown as radio buttons, and a list of labelled checkboxes. Each is one
+  field in `masque`, holding the chosen option or a vector of the ticked ones, and works as plain
+  Makie too (#592).
+
 ### Changed
 - A menu opens with the chosen option in view instead of at the top of the list. A search that
   matches no option shows "No matches" instead of an empty list, and moving into a menu with

@@ -7791,6 +7791,48 @@ describe("block controls (#345)", () => {
         expect([text.textContent, text.getAttribute("font-size"), text.getAttribute("fill")]).toEqual(["x", "20", "rgb(5,5,5)"])
     })
 
+    it("a radio group and a checkbox group pick on the option's whole row, and commit as one field (#592)", () => {
+        const opt = (i: number, dx = 0) => ({ x: 100 + dx, y: 700 + 30 * i, w: 120, h: 22, label: `opt ${i}`,
+            box: [100 + dx, 702 + 30 * i, 22, 18] as [number, number, number, number] })
+        const button = { size: 22, radius: 11, stroke: 3, color: "rgb(1,1,1)", off: "rgb(2,2,2)", strokeOn: "rgb(3,3,3)",
+            strokeOff: "rgb(4,4,4)", markOn: "rgb(5,5,5)", markOff: "rgb(6,6,6)", markSize: 10, mark: "M0 0L1 1Z" }
+        const m = controlsManifest()
+        m.layers.push({ id: "scale", kind: "control", axis: "", events: ["change"], payloads: [], label: "scale",
+            geometry: { control: "radiogroup", x: 100, y: 700, w: 120, h: 82, value: 1, button, options: [opt(0), opt(1), opt(2)] } })
+        m.layers.push({ id: "series", kind: "control", axis: "", events: ["change"], payloads: [], label: "series",
+            geometry: { control: "checkboxgroup", x: 300, y: 700, w: 120, h: 52, value: [true, false], button, options: [opt(0, 200), opt(1, 200)] } })
+        m.fields = [...(m.fields ?? []), "scale", "series"]
+        m.initial!.scale = { layer: "scale", index: 0, payload: 1 }
+        m.initial!.series = { layer: "series", index: 0, payload: [true, false] }
+        const { host, script } = setup()
+        mount(script, m)
+        const group = ctl(host, "scale")
+        expect(group.getAttribute("role")).toBe("radiogroup")
+        const rows = [...group.querySelectorAll<HTMLLabelElement>(":scope > label.masque-opt")]
+        expect(rows.length).toBe(3)
+        // Each row is its option's box in the group's, and the button's cell sits in the row.
+        expect([rows[2].style.top, rows[2].style.height]).toEqual([`${(100 * 60) / 82}%`, `${(100 * 22) / 82}%`])
+        const cell = rows[0].querySelector(".masque-opt-cell") as HTMLElement
+        expect([cell.style.top, cell.style.width]).toEqual([`${(100 * 2) / 22}%`, `${(100 * 22) / 120}%`])
+        const radios = rows.map((r) => r.querySelector("input") as HTMLInputElement)
+        expect(radios.map((r) => [r.type, r.checked, r.getAttribute("aria-label")])).toEqual([["radio", false, "opt 0"], ["radio", true, "opt 1"], ["radio", false, "opt 2"]])
+        expect(new Set(radios.map((r) => r.name)).size).toBe(1)
+        // A finger reaches past each row, up to half the 8 px gap to the next row.
+        expect(rows[0].style.getPropertyValue("--cb")).toBe(`${(100 * 4) / 22}cqh`)
+        // A click on the row (its label text, in the picture) chooses it; the others clear.
+        rows[2].click()
+        expect(val(host).scale).toEqual({ layer: "scale", index: 0, payload: 2 })
+        const fills = rows.map((r) => r.querySelector("svg rect")!.getAttribute("fill"))
+        expect(fills).toEqual(["rgb(2,2,2)", "rgb(2,2,2)", "rgb(1,1,1)"])
+        // A checkbox group sends one Bool per option.
+        const boxes = [...ctl(host, "series").querySelectorAll<HTMLLabelElement>("label.masque-opt")]
+        expect(ctl(host, "series").getAttribute("role")).toBe("group")
+        boxes[1].click()
+        expect(val(host).series).toEqual({ layer: "series", index: 0, payload: [true, true] })
+        boxes[0].click()
+        expect(val(host).series).toEqual({ layer: "series", index: 0, payload: [false, true] })
+    })
+
     it("a button draws Makie's box and label, and counts its clicks (#431)", () => {
         const m = controlsManifest()
         m.layers.push({ id: "go", kind: "control", axis: "", events: ["change"], payloads: [], label: "go",

@@ -83,17 +83,28 @@ export interface ROIGeometry {
     settleOnly?: true // `update_while_dragging = false`: `onchange` runs on release only
 }
 
+// One option of a radio or checkbox group (#592): its row and its button's box, image px.
+export interface ChoiceOption {
+    x: number
+    y: number
+    w: number
+    h: number
+    label: string
+    box: [number, number, number, number]
+}
+
 // A Makie block drawn as an HTML control. `value` is the block's state as the wire carries it:
 // a 0-based index (slider, menu; -1 for a menu with nothing chosen), a pair of them (interval
-// slider), a Bool (toggle, checkbox), a click count (button), or the stored text (text box;
-// null before any).
+// slider), a Bool (toggle, checkbox), a click count (button), the stored text (text box;
+// null before any), a radio group's 0-based index (-1 for none), or one Bool per option of a
+// checkbox group.
 export interface ControlGeometry {
-    control: "slider" | "intervalslider" | "toggle" | "checkbox" | "menu" | "slidergrid" | "button" | "textbox"
+    control: "slider" | "intervalslider" | "toggle" | "checkbox" | "menu" | "slidergrid" | "button" | "textbox" | "radiogroup" | "checkboxgroup"
     x: number // the block's box, image px, top-left origin
     y: number
     w: number
     h: number
-    value: number | number[] | boolean | (number | number[])[] | string | null
+    value: number | number[] | boolean | boolean[] | (number | number[])[] | string | null
     n?: number              // slider and menu: how many values
     horizontal?: boolean    // slider: false for a vertical one
     range?: [number, number] // slider over a numeric range: start and step, for the read-out value
@@ -124,6 +135,11 @@ export interface ControlGeometry {
     // SliderGrid: each slider, in image px like the grid's own box, with its value label.
     // `name` is the slider's own label, read to screen readers.
     sliders?: (ControlGeometry & { name?: string; valueLabel?: ValueLabel })[]
+    // RadioGroup and CheckboxGroup (#592): the buttons' look, as a checkbox's (every button
+    // shares it), and each option's row (its button and label, image px like the group's box),
+    // its button's box and its label's text.
+    button?: Partial<ControlGeometry>
+    options?: ChoiceOption[]
     // Menu, as Makie draws it: its box colour in `off`, the text colour in `text`, and the
     // option list that opens under or over it; lengths are image px.
     text?: string           // the text colour

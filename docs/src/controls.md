@@ -34,6 +34,8 @@ field of the `@bind` value, which holds:
 | [`SliderGrid`](https://docs.makie.org/stable/reference/blocks/slidergrid) | a tuple of its sliders' values, in order |
 | [`Button`](https://docs.makie.org/stable/reference/blocks/button) | the number of clicks so far |
 | [`Textbox`](https://docs.makie.org/stable/reference/blocks/textbox) | the text last entered with Enter, or `nothing` before any |
+| [`RadioGroup`](@ref) | the option chosen, or its value for a `(label, value)` option; the first option until the reader picks, or `nothing` with `default = nothing` |
+| [`CheckboxGroup`](@ref) | a vector of the ticked options, or their values, in option order |
 
 Each control takes the colors, sizes and labels you give the block, so
 it looks as it does in Makie. A `Menu` opens Makie's list of options,
@@ -46,6 +48,37 @@ Enter stores only text that passes. A few exceptions are listed under
 
 In a static HTML export the controls still set the `@bind` value; only
 `onchange` below needs a running notebook.
+
+## Radio buttons and checkbox lists
+
+Makie has no radio buttons or list of labelled checkboxes, so Masque
+adds two blocks of its own. Each lays out one button and label per
+option, and is one field in `masque`:
+
+```julia
+scale = RadioGroup(fig[1, 2]; options = ["linear", ("sqrt", sqrt), ("log", log1p)])
+series = CheckboxGroup(fig[2, 1]; options = ["a", "b", "c"], default = ["a", "b"],
+    orientation = :horizontal)
+@bind opts masque(fig, (; scale, series))
+```
+
+The reader picks an option by clicking its button or its label. In a
+radio group, Tab reaches the chosen option (the first one when none is
+chosen) and the arrow keys move the choice; in a checkbox list, Tab
+reaches each box and Space ticks it.
+
+| Keyword | `RadioGroup` | `CheckboxGroup` |
+|---|---|---|
+| `options` | strings, or `(label, value)` tuples, as a `Menu` takes them | the same |
+| `default` | the option chosen at the start, by index or label; `1`, or `nothing` for none | the options ticked at the start, by index or label; none |
+| `orientation` | `:vertical` (default) stacks the options, `:horizontal` puts them in a row | the same |
+| `gap`, `labelgap` | space between options, and between a button and its label | the same |
+| look | `Checkbox`'s colors, `size` and `checkboxstrokewidth`; `fontsize`, `font` and `labelcolor` for the labels | the same, and `checkmark` and `roundness` |
+
+Both are Makie blocks, so they also work in GLMakie and WGLMakie without
+`masque`: listen to their `selection`, as for a `Menu`. They read their
+`options` when they are made, so to change the options, make the block
+again.
 
 ## Redraw the figure from a control
 
@@ -108,8 +141,8 @@ the menu's `options` in `masque`'s own `onchange`.
 
 A `Checkbox`'s own `onchange`, the rule for what a click turns it into,
 does nothing: a click always flips the box, and `masque` warns when a
-named checkbox has one. For one choice of several, use a `Menu`, or set
-the other boxes in `masque`'s own `onchange`.
+named checkbox has one. For one choice of several, use a
+[`RadioGroup`](@ref).
 
 A `Textbox` `validator` that is a function, a type other than a number
 (`Bool` counts as other), or a `Regex` with the `x` flag runs only when
