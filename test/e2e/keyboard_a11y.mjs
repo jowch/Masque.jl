@@ -922,17 +922,52 @@ try {
     s = await look();
     if (s.box !== 1 || s.ring !== "solid") throw new Error(`${key}: Tab did not reach the second box with a ring: ${JSON.stringify(s)}`);
     passed.push(`${key}/radio-one-tab-stop+box-stops+ring`);
-    // The pointer over an unticked row's label shows that row's mark, and only that one.
-    const row = await page.evaluate((k) => {
-      const span = document.querySelector(`#coords_${k}`);
+    // The pointer over an unticked row's label shows that row's mark, and only that one. The
+    // Tabs above can scroll the page, and :hover lands on a later frame, so measure the row
+    // where it is now, move there, and give the style a few frames to follow.
+    const rowEl = `const span = document.querySelector("#coords_" + k);
       const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-      const b = sr.querySelectorAll('[data-masque-control="series"] > label.masque-opt')[2].getBoundingClientRect();
-      return [b.right - 3, (b.top + b.bottom) / 2];
-    }, key);
-    await page.mouse.move(row[0], row[1]);
-    s = await look();
-    if (s.marks.join() !== "visible,hidden,visible") throw new Error(`${key}: row hover marks ${JSON.stringify(s.marks)}, want visible,hidden,visible`);
+      const el = sr.querySelectorAll('[data-masque-control="series"] > label.masque-opt')[2];
+      // Where the widget's host and its surface sit, and the page height: which of them moved
+      // says whether the page scrolled, something above the widget reflowed, or the widget did.
+      const where = (sr, el) => ({ host: Math.round(host.getBoundingClientRect().top), surface: Math.round(sr.querySelector(".surface").getBoundingClientRect().top), pageH: document.documentElement.scrollHeight });`;
+    const rowAt = () => page.evaluate(async ([k, js]) => {
+      const [sr, el, where] = new Function("k", js + "return [sr, el, where];")(k);
+      el.scrollIntoView({ block: "center", inline: "nearest" });
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const b = el.getBoundingClientRect();
+      return { at: [b.right - 3, (b.top + b.bottom) / 2], row: [b.left, b.top, b.right, b.bottom].map(Math.round), scrollY: Math.round(scrollY), ...where(sr, el) };
+    }, [key, rowEl]);
+    // What is under the pointer now, and where the row is now. A shift moves the row off the
+    // point, or puts something else on top of it; a hover bug leaves the row under the point
+    // with no mark.
+    const under = ([x, y]) => page.evaluate(([k, js, x, y]) => {
+      const [sr, el, where] = new Function("k", js + "return [sr, el, where];")(k);
+      const hit = sr.elementFromPoint(x, y);
+      const b = el.getBoundingClientRect();
+      const inside = x >= b.left && x <= b.right && y >= b.top && y <= b.bottom;
+      return {
+        hit: hit ? `${hit.tagName}.${hit.className?.baseVal ?? hit.className}` : null, onRow: inside && !!hit && el.contains(hit),
+        row: [b.left, b.top, b.right, b.bottom].map(Math.round), scrollY: Math.round(scrollY), ...where(sr, el),
+      };
+    }, [key, rowEl, x, y]);
+    const misses = [];
+    for (let i = 0; i < 20; i++) {
+      const m = await rowAt();
+      await page.mouse.move(m.at[0], m.at[1]);
+      s = await look();
+      if (s.marks.join() === "visible,hidden,visible") break;
+      const now = await under(m.at);
+      const miss = { at: m.at.map(Math.round), measured: (({ at, ...rest }) => rest)(m), marks: s.marks, ...now };
+      // The pointer is on the row and the mark is missing: a hover bug, never retried.
+      if (now.onRow) throw new Error(`${key}: the pointer is on row c but its mark is ${JSON.stringify(s.marks)}: ${JSON.stringify(miss)}`);
+      misses.push(miss);
+      await page.waitForTimeout(150);
+    }
+    // A retry that was needed shows on the run's summary, so its cause surfaces on green runs.
+    if (misses.length) console.log(`::warning title=keyboard_a11y ${backend} choices::row hover needed ${misses.length} re-measure(s): ${JSON.stringify(misses.slice(0, 3))}`);
+    if (s.marks.join() !== "visible,hidden,visible") throw new Error(`${key}: row hover marks ${JSON.stringify(s.marks)}, want visible,hidden,visible; misses ${JSON.stringify(misses.slice(0, 3))}`);
     passed.push(`${key}/row-hover-mark`);
     await page.mouse.move(2, 2);
     await page.keyboard.press("Tab");
