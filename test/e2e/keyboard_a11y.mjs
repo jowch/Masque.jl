@@ -959,7 +959,7 @@ try {
       s = await look();
       if (s.marks.join() === "visible,hidden,visible") break;
       const now = await under(m.at);
-      const miss = { at: m.at.map(Math.round), measured: { row: m.row, scrollY: m.scrollY }, marks: s.marks, ...now };
+      const miss = { at: m.at.map(Math.round), measured: (({ at, ...rest }) => rest)(m), marks: s.marks, ...now };
       // The pointer is on the row and the mark is missing: a hover bug, never retried.
       if (now.onRow) throw new Error(`${key}: the pointer is on row c but its mark is ${JSON.stringify(s.marks)}: ${JSON.stringify(miss)}`);
       misses.push(miss);
