@@ -134,9 +134,9 @@ module Choices
 
     const ChoiceGroup = Union{RadioGroup, CheckboxGroup}
 
-# The ticked options' values, as a vector of their common type (`String` for plain options),
-# empty or not.
-_ticked(opts, ticks) = [optionvalue(o) for o in opts][Bool[t for t in ticks]]
+    # The ticked options' values, as a vector of their common type (`String` for plain options),
+    # empty or not.
+    _ticked(opts, ticks) = [optionvalue(o) for o in opts][Bool[t for t in ticks]]
 
     optionlabel(o) = Makie.optionlabel(o)
     optionvalue(o) = Makie.optionvalue(o)
