@@ -922,17 +922,40 @@ try {
     s = await look();
     if (s.box !== 1 || s.ring !== "solid") throw new Error(`${key}: Tab did not reach the second box with a ring: ${JSON.stringify(s)}`);
     passed.push(`${key}/radio-one-tab-stop+box-stops+ring`);
-    // The pointer over an unticked row's label shows that row's mark, and only that one.
-    const row = await page.evaluate((k) => {
+    // The pointer over an unticked row's label shows that row's mark, and only that one. The
+    // Tabs above can scroll the page, and :hover lands on a later frame, so measure the row
+    // where it is now, move there, and give the style a few frames to follow.
+    const rowAt = () => page.evaluate(async (k) => {
       const span = document.querySelector(`#coords_${k}`);
       const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-      const b = sr.querySelectorAll('[data-masque-control="series"] > label.masque-opt')[2].getBoundingClientRect();
+      const el = sr.querySelectorAll('[data-masque-control="series"] > label.masque-opt')[2];
+      el.scrollIntoView({ block: "center", inline: "nearest" });
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const b = el.getBoundingClientRect();
       return [b.right - 3, (b.top + b.bottom) / 2];
     }, key);
-    await page.mouse.move(row[0], row[1]);
-    s = await look();
-    if (s.marks.join() !== "visible,hidden,visible") throw new Error(`${key}: row hover marks ${JSON.stringify(s.marks)}, want visible,hidden,visible`);
+    // What is under the pointer now, and where the row is now: if a miss is a shift, the row
+    // has moved off the point; if it is a hover bug, the label is under the point and unmarked.
+    const under = ([x, y]) => page.evaluate(([k, x, y]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const hit = sr.elementFromPoint(x, y);
+      const b = sr.querySelectorAll('[data-masque-control="series"] > label.masque-opt')[2].getBoundingClientRect();
+      return { hit: hit ? `${hit.tagName}.${hit.className?.baseVal ?? hit.className}` : null, row: [b.left, b.top, b.right, b.bottom].map(Math.round), scrollY: Math.round(scrollY) };
+    }, [key, x, y]);
+    const misses = [];
+    for (let i = 0; i < 20; i++) {
+      const at = await rowAt();
+      await page.mouse.move(at[0], at[1]);
+      s = await look();
+      if (s.marks.join() === "visible,hidden,visible") break;
+      misses.push({ at: at.map(Math.round), marks: s.marks, ...(await under(at)) });
+      await page.waitForTimeout(150);
+    }
+    if (misses.length) console.error(`${key}: row hover needed ${misses.length} re-measure(s): ${JSON.stringify(misses.slice(0, 3))}`);
+    if (s.marks.join() !== "visible,hidden,visible") throw new Error(`${key}: row hover marks ${JSON.stringify(s.marks)}, want visible,hidden,visible; misses ${JSON.stringify(misses.slice(0, 3))}`);
     passed.push(`${key}/row-hover-mark`);
     await page.mouse.move(2, 2);
     await page.keyboard.press("Tab");
