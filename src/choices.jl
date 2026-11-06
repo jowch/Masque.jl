@@ -38,7 +38,7 @@ module Choices
             i_selected::Int = 0
             "Value of the chosen option, `nothing` for none. The output to listen to."
             selection = nothing
-            "`:vertical` stacks the options; `:horizontal` puts them in a row."
+            "`:vertical` stacks the options; `:horizontal` puts them in a row. Read when the block is made."
             orientation = :vertical
             "Space between options; `automatic` is 4 stacked, 14 in a row."
             gap = automatic
@@ -89,13 +89,13 @@ module Choices
         @attributes begin
             "The options: strings, or `(label, value)` tuples. Read when the block is made."
             options = ["option"]
-            "The options ticked at the start: indices or option labels. Read when the block is made."
+            "The options ticked at the start: an index or label, or a vector of them. Read when the block is made."
             default = Int[]
             "One `Bool` per option: whether it is ticked."
             checked = Bool[]
             "Values of the ticked options, in option order. The output to listen to."
             selection = Any[]
-            "`:vertical` stacks the options; `:horizontal` puts them in a row."
+            "`:vertical` stacks the options; `:horizontal` puts them in a row. Read when the block is made."
             orientation = :vertical
             "Space between options; `automatic` is 4 stacked, 14 in a row."
             gap = automatic
@@ -201,8 +201,14 @@ module Choices
         for (i, b) in enumerate(g.buttons)
             b.onchange[] = _ -> (g.i_selected[] == i || (g.i_selected[] = i); true)
         end
+        last = Ref(k)
         on(g.blockscene, g.i_selected) do k
-            0 <= k <= length(opts) || throw(ArgumentError("RadioGroup: `i_selected` must be from 0 to $(length(opts)), got $k"))
+            if !(0 <= k <= length(opts))
+                # Put the last good index back before throwing, so the block never holds one.
+                g.i_selected.val = last[]
+                throw(ArgumentError("RadioGroup: `i_selected` must be from 0 to $(length(opts)), got $k"))
+            end
+            last[] = k
             for (j, b) in enumerate(g.buttons)
                 b.checked[] == (j == k) || (b.checked[] = j == k)
             end
@@ -218,7 +224,9 @@ module Choices
         opts = options(g)
         _lay_out!(g, opts, (; _look(g)..., roundness = g.roundness, checkmark = g.checkmark))
         start = falses(length(opts))
-        for d in g.default[]
+        ds = g.default[]
+        # One index or label on its own names one option; a string is not a list of characters.
+        for d in (ds isa Union{AbstractString, Integer} ? (ds,) : ds)
             start[_option_index(g, opts, d)] = true
         end
         on(g.blockscene, g.checked) do ticks

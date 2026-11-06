@@ -880,6 +880,64 @@ try {
     }
   }
 
+  // Choice groups (#592): a radio group is one Tab stop that lands on the chosen option, each
+  // box of a checkbox list is its own stop, the focus ring sits on the drawn button, and the
+  // pointer over a row shows its mark. docs/src/controls.md promises all four.
+  {
+    const key = "choices";
+    const look = () => page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const inputs = (id) => [...sr.querySelectorAll(`[data-masque-control="${id}"] input`)];
+      const a = sr.activeElement;
+      const art = a?.parentElement?.querySelector(".masque-check-art");
+      return {
+        radio: inputs("scale").indexOf(a), box: inputs("series").indexOf(a), checked: !!a?.checked,
+        ring: art ? getComputedStyle(art).outlineStyle : null,
+        marks: inputs("series").map((i) => getComputedStyle(i.parentElement.querySelector(".masque-check-art .mark")).visibility),
+      };
+    }, key);
+    await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      host.scrollIntoView({ block: "center" });
+      sr.querySelector('[data-masque-control="series"] input').focus();
+    }, key);
+    await page.keyboard.press("Shift+Tab");
+    let s = await look();
+    if (s.radio !== 0 || !s.checked) throw new Error(`${key}: Shift+Tab from the boxes landed on ${JSON.stringify(s)}, want the chosen radio (0)`);
+    if (s.ring !== "solid") throw new Error(`${key}: no focus ring on the radio's button: ${JSON.stringify(s)}`);
+    await page.keyboard.press("Shift+Tab");
+    s = await look();
+    if (s.radio !== -1) throw new Error(`${key}: a second Shift+Tab stayed in the radio group: ${JSON.stringify(s)}`);
+    await page.keyboard.press("Tab");
+    s = await look();
+    if (s.radio !== 0) throw new Error(`${key}: Tab back did not land on the chosen radio: ${JSON.stringify(s)}`);
+    await page.keyboard.press("Tab");
+    s = await look();
+    if (s.box !== 0) throw new Error(`${key}: one Tab did not leave the radio group for the first box: ${JSON.stringify(s)}`);
+    await page.keyboard.press("Tab");
+    s = await look();
+    if (s.box !== 1 || s.ring !== "solid") throw new Error(`${key}: Tab did not reach the second box with a ring: ${JSON.stringify(s)}`);
+    passed.push(`${key}/radio-one-tab-stop+box-stops+ring`);
+    // The pointer over an unticked row's label shows that row's mark, and only that one.
+    const row = await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = sr.querySelectorAll('[data-masque-control="series"] > label.masque-opt')[2].getBoundingClientRect();
+      return [b.right - 3, (b.top + b.bottom) / 2];
+    }, key);
+    await page.mouse.move(row[0], row[1]);
+    s = await look();
+    if (s.marks.join() !== "visible,hidden,visible") throw new Error(`${key}: row hover marks ${JSON.stringify(s.marks)}, want visible,hidden,visible`);
+    passed.push(`${key}/row-hover-mark`);
+    await page.mouse.move(2, 2);
+    await page.keyboard.press("Tab");
+  }
+
   if (unexpected.length) throw new Error(`page errors: ${unexpected.join(" | ")}`);
   passed.push("no-console-errors");
   console.log(`KEYBOARD A11Y OK — ${backend}: ${passed.join(", ")}`);

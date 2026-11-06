@@ -222,6 +222,12 @@
         @test rg.selection[] == 2 && cg.selection[] == ["y"]
         @test all(b -> Masque._block_bbox(b) isa Makie.Rect2, vcat(rg.buttons, rg.labels))
         @test Masque._block_bbox(rg).widths[1] > Masque._block_bbox(rg.buttons[1]).widths[1]
+        # Masque exports both names. If Makie exports one too, `using CairoMakie, Masque` makes
+        # every `RadioGroup(...)` call ambiguous, on a Makie update alone; the nightly canary
+        # runs this against Makie master to warn first. When it fires: defer to Makie's block
+        # if it does the same job (stop exporting ours, keep the wire methods for it), or else
+        # stop exporting ours and tell users to write `Masque.RadioGroup`.
+        @test !Base.isexported(Makie, :RadioGroup) && !Base.isexported(Makie, :CheckboxGroup)
     end
 
     @testset "block accessors (#345)" begin

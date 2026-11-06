@@ -561,6 +561,13 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test _layer(w0.manifest, "r0")["geometry"]["value"] == -1 && Masque.initial_bond(w0).r0 === nothing
         @test_throws "`default` names no option" RadioGroup(Figure()[1, 1]; options = ["a"], default = "b")
         @test_throws "`options` is empty" CheckboxGroup(Figure()[1, 1]; options = String[])
+        # One label or index on its own names one option, not a list of characters.
+        @test CheckboxGroup(Figure()[1, 1]; options = ["a", "b"], default = "b").selection[] == ["b"]
+        @test CheckboxGroup(Figure()[1, 1]; options = ["a", "b"], default = 1).selection[] == ["a"]
+        # An index out of range is refused and leaves the block as it was.
+        r1 = RadioGroup(Figure()[1, 1]; options = ["a", "b"])
+        @test_throws "must be from 0 to 2" (r1.i_selected[] = 5)
+        @test r1.i_selected[] == 1 && r1.selection[] == "a"
         # A group masque isn't given is an error, as for every block it draws.
         fig = Figure(); Axis(fig[1, 1]); rg = RadioGroup(fig[2, 1]; options = ["a", "b"])
         @test_throws "masque wasn't given (RadioGroup)" masque(fig)

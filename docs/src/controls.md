@@ -63,8 +63,9 @@ series = CheckboxGroup(fig[2, 1]; options = ["a", "b", "c"], default = ["a", "b"
 ```
 
 The reader picks an option by clicking its button or its label. In a
-radio group, Tab reaches the chosen option and the arrow keys move the
-choice; in a checkbox list, Tab reaches each box and Space ticks it.
+radio group, Tab reaches the chosen option (the first one when none is
+chosen) and the arrow keys move the choice; in a checkbox list, Tab
+reaches each box and Space ticks it.
 
 | Keyword | `RadioGroup` | `CheckboxGroup` |
 |---|---|---|
