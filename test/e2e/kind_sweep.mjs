@@ -1507,6 +1507,93 @@ try {
       console.error(`OK  ${key} — ${g.topOption} picked through the zoom-out button's spot; option 30 in view on reopen`);
       continue;
     }
+    // Masque's choice blocks (#592): each option is a row over its button and label; the
+    // buttons' Makie drawing is hidden under the HTML, the labels stay in the picture. A click on
+    // a label picks its option, the arrow keys move the radio's choice, Space ticks a box, and
+    // where some input is coarse each row reaches past its box, never into its neighbour's.
+    if (spec.mode === "choices") {
+      const geo = (id) => layers.find((l) => l.id === id).geometry;
+      const shadow = () => `const span = document.querySelector("#coords_" + k);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });`;
+      const rows = (id) => page.evaluate(([k, id, js]) => {
+        const sr = new Function("k", js + "return sr;")(k);
+        const host = sr.host.closest(".ip-host") ?? sr.host;
+        host.scrollIntoView({ block: "center", inline: "nearest" });
+        const r = (el) => { const b = el.getBoundingClientRect(); return [b.left, b.top, b.right, b.bottom]; };
+        const img = sr.querySelector("svg.masque-plain").getBoundingClientRect();
+        return {
+          sc: img.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width, left: img.left, top: img.top,
+          rows: [...sr.querySelectorAll(`[data-masque-control="${id}"] > label.masque-opt`)].map((el) => {
+            const hit = getComputedStyle(el, "::before").content !== "none" ? (() => {
+              const cs = getComputedStyle(el, "::before"); const b = el.getBoundingClientRect();
+              // The ::before reaches past the row by minus its offsets.
+              return [b.left + parseFloat(cs.left || 0), b.top + parseFloat(cs.top || 0), b.right - parseFloat(cs.right || 0), b.bottom - parseFloat(cs.bottom || 0)];
+            })() : r(el);
+            return { box: r(el), hit, art: r(el.querySelector("svg")), fill: el.querySelector("svg rect").getAttribute("fill"), checked: el.querySelector("input").checked, type: el.querySelector("input").type };
+          }),
+        };
+      }, [key, id, shadow()]);
+      const bondIs = async (re, before, what) => {
+        const v = before === null ? await textOf(`#bond_${key}`) : await waitChange(`#bond_${key}`, before, `${key}/${what}`);
+        if (!re.test(v)) throw new Error(`${key}/${what}: value ${JSON.stringify(v)} doesn't match ${re}`);
+        return v;
+      };
+      let v = await bondIs(/scale = "linear", series = \["a"\]/, null, "choices-start");
+      passed.push(`${key}/choices-start`);
+      // Each button's drawing sits on its own box in the manifest, and its row holds it.
+      for (const id of ["scale", "series"]) {
+        const g = geo(id);
+        const s = await rows(id);
+        if (s.rows.length !== g.options.length) throw new Error(`${key}/${id}: ${s.rows.length} rows, want ${g.options.length}`);
+        s.rows.forEach((row, i) => {
+          const [bx, by, bw, bh] = g.options[i].box;
+          const want = [s.left + (bx + (bw - g.button.size) / 2) * s.sc, s.top + (by + (bh - g.button.size) / 2) * s.sc];
+          if (Math.abs(row.art[0] - want[0]) > 1.5 || Math.abs(row.art[1] - want[1]) > 1.5) throw new Error(`${key}/${id}: option ${i} button at ${JSON.stringify(row.art)}, want ${JSON.stringify(want)}`);
+          if (row.art[0] < row.box[0] - 0.5 || row.art[2] > row.box[2] + 0.5) throw new Error(`${key}/${id}: option ${i} button outside its row`);
+        });
+        if (s.rows[0].type !== (id === "scale" ? "radio" : "checkbox")) throw new Error(`${key}/${id}: input type ${s.rows[0].type}`);
+      }
+      passed.push(`${key}/choices-on-blocks`);
+      // A click on the label's text (the right end of the row) picks the option.
+      const clickLabel = async (id, i) => {
+        const row = (await rows(id)).rows[i];
+        await page.mouse.click(row.box[2] - 3, (row.box[1] + row.box[3]) / 2);
+      };
+      await clickLabel("scale", 2);
+      v = await bondIs(/scale = "log"/, v, "radio-label-click");
+      let s = await rows("scale");
+      if (!s.rows[2].checked || s.rows[0].checked || s.rows[2].fill !== geo("scale").button.color) throw new Error(`${key}/radio-label-click: rows ${JSON.stringify(s.rows)}`);
+      passed.push(`${key}/radio-label-click`);
+      // The arrow keys move the choice within the group.
+      await page.keyboard.press("ArrowUp");
+      v = await bondIs(/scale = "sqrt"/, v, "radio-keys");
+      passed.push(`${key}/radio-keys`);
+      await clickLabel("series", 1);
+      v = await bondIs(/series = \["a", "b"\]/, v, "checkbox-label-click");
+      await page.keyboard.press("Space");
+      v = await bondIs(/series = \["a"\]/, v, "checkbox-space");
+      passed.push(`${key}/checkbox-group`);
+      // A finger: rows grow past their box where some input is coarse, but never overlap.
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+      try {
+        const all = [...(await rows("scale")).rows, ...(await rows("series")).rows];
+        const over = (p, q) => p[0] < q[2] - 0.5 && q[0] < p[2] - 0.5 && p[1] < q[3] - 0.5 && q[1] < p[3] - 0.5;
+        let grown = 0;
+        all.forEach((a, i) => {
+          if (a.hit[3] - a.hit[1] > a.box[3] - a.box[1] + 1) grown++;
+          if (a.hit[3] - a.hit[1] > Math.max(44.5, a.box[3] - a.box[1] + 0.5)) throw new Error(`${key}/choices-touch: row ${i} grows past 44 px: ${JSON.stringify(a)}`);
+          all.forEach((b, j) => { if (j > i && over(a.hit, b.hit)) throw new Error(`${key}/choices-touch: rows ${i} and ${j} overlap: ${JSON.stringify([a.hit, b.hit])}`); });
+        });
+        if (grown < 3) throw new Error(`${key}/choices-touch: only ${grown} rows grew: ${JSON.stringify(all.map((a) => [a.box, a.hit]))}`);
+      } finally {
+        await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+      }
+      passed.push(`${key}/choices-touch-reach`);
+      console.error(`OK  ${key} — label clicks, arrow keys, Space and touch reach on a radio group and a checkbox group`);
+      continue;
+    }
     // Makie blocks as controls (#345): each named block is a native HTML control over the box
     // its layout cell gave it, and the picture under it is empty. The slider drives the red line
     // through `onchange` (keyboard and pointer), the toggle hides it, and the interval slider,

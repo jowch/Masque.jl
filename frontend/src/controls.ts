@@ -4,7 +4,7 @@
 // keyboard input, so none of the overlay's gestures see it.
 import { FONT_CSS, useFont } from "./fonts"
 import { fmtNum } from "./template"
-import type { ControlGeometry, HitLayer, Manifest, ValueLabel } from "./types"
+import type { ChoiceOption, ControlGeometry, HitLayer, Manifest, ValueLabel } from "./types"
 
 // A field's envelope, as every control commits it. The payload is a 0-based index, a pair of
 // them, or a Bool; Julia turns it into the block's plain value.
@@ -104,6 +104,13 @@ export const CONTROLS_STYLE = `
 .masque-check-art .mark { visibility: hidden; }
 .masque-check:checked ~ .masque-check-art .mark, .masque-check:hover ~ .masque-check-art .mark { visibility: visible; }
 .masque-check:focus-visible ~ .masque-check-art { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
+/* Radio and checkbox groups (#592): each option is a <label> over its row in the picture (its
+   button and its label's text, which stays in the picture), so a click anywhere on the row
+   picks it; its button is drawn as a checkbox in a cell at the button's own box. The pointer on
+   the row shows the mark in its unchecked colour, as on Makie's checkbox. */
+.masque-control.masque-opt { cursor: pointer; display: block; }
+.masque-opt-cell { position: absolute; }
+.masque-opt:hover .masque-check-art .mark { visibility: visible; }
 /* Button, as Makie draws it: a rounded box with its label in the middle, in one colour pair at
    rest, another under the pointer and a third while pressed. Makie centres the outline on the
    box's edge and clips it to the box: --sw is half its width, drawn inside and out, and the
@@ -191,6 +198,10 @@ export const CONTROLS_STYLE = `
   .masque-interval:has(.masque-range.v)::before { top: 0; bottom: 0; left: calc(-1 * var(--rl)); right: calc(-1 * var(--rr)); }
   .masque-control .masque-toggle, .masque-control .masque-check { box-sizing: content-box; padding: var(--rt) var(--rr) var(--rb) var(--rl);
     margin: calc(-1 * var(--rt)) 0 0 calc(-1 * var(--rl)); }
+  /* A group's option takes the finger on its whole row, so the row reaches, not its button. */
+  .masque-control.masque-opt .masque-check { padding: 0; margin: 0; }
+  .masque-control.masque-opt::before { content: ""; position: absolute; top: calc(-1 * var(--rt)); bottom: calc(-1 * var(--rb));
+    left: calc(-1 * var(--rl)); right: calc(-1 * var(--rr)); }
 }
 `
 
@@ -378,12 +389,77 @@ function toggleParts(g: ControlGeometry, el: HTMLInputElement): { parts_: HTMLEl
     return { parts_: [t, k], show_: show }
 }
 
+// A radio group (one choice; a 0-based index, -1 for none) or a checkbox group (one Bool per
+// option), from src/choices.jl. Each option is a native radio or checkbox input, so the keys
+// are the browser's: a radio group is one Tab stop whose arrow keys move the choice, and each
+// checkbox is its own Tab stop that Space ticks.
+function buildChoices(layer: HitLayer, g: ControlGeometry, box: HTMLElement, label: string, hooks: ControlHooks): ControlEl {
+    const id = layer.id
+    const radio = g.control === "radiogroup"
+    const opts: ChoiceOption[] = g.options ?? []
+    box.style.pointerEvents = "none"
+    box.setAttribute("role", radio ? "radiogroup" : "group")
+    box.setAttribute("aria-label", label)
+    const name = `masque-radio-${id}-${Math.random().toString(36).slice(2, 8)}`
+    const inputs: HTMLInputElement[] = []
+    const arts: ReturnType<typeof checkArt>[] = []
+    const pct = (v: number, of: number) => `${(100 * v) / of}%`
+    // A button's geometry: the group's shared look on the option's own box.
+    const button = (ng: ControlGeometry, o: ChoiceOption): ControlGeometry =>
+        ({ ...ng.button, control: "checkbox", x: o.box[0], y: o.box[1], w: o.box[2], h: o.box[3], value: false })
+    opts.forEach((o, i) => {
+        const row = document.createElement("label")
+        row.className = "masque-control masque-opt"
+        row.style.left = pct(o.x - g.x, g.w)
+        row.style.top = pct(o.y - g.y, g.h)
+        row.style.width = pct(o.w, g.w)
+        row.style.height = pct(o.h, g.h)
+        const cell = document.createElement("span")
+        cell.className = "masque-opt-cell"
+        const [bx, by, bw, bh] = o.box
+        cell.style.left = pct(bx - o.x, o.w)
+        cell.style.top = pct(by - o.y, o.h)
+        cell.style.width = pct(bw, o.w)
+        cell.style.height = pct(bh, o.h)
+        const el = document.createElement("input")
+        el.type = radio ? "radio" : "checkbox"
+        el.className = "masque-check"
+        if (radio) el.name = name
+        el.value = String(i)
+        el.checked = radio ? g.value === i : Array.isArray(g.value) && g.value[i] === true
+        el.setAttribute("aria-label", o.label)
+        const art = checkArt(button(g, o), el)
+        cell.append(el, art.svg_)
+        row.append(cell)
+        box.append(row)
+        inputs.push(el)
+        arts.push(art)
+        el.addEventListener("change", () => {
+            arts.forEach((a) => a.show_())
+            hooks.commit_(id, envelope(id, get()))
+        })
+    })
+    const get = (): number | boolean[] => radio ? inputs.findIndex((el) => el.checked) : inputs.map((el) => el.checked)
+    return {
+        layer_: layer, shape_: shape(g), box_: box, get_: get,
+        set_: (p) => {
+            if (radio && typeof p === "number") inputs.forEach((el, i) => { el.checked = i === p })
+            else if (!radio && Array.isArray(p)) inputs.forEach((el, i) => { el.checked = p[i] === true })
+            else return
+            arts.forEach((a) => a.show_())
+        },
+        restyle_: (ng) => ng.options?.forEach((o, i) => arts[i]?.restyle_(button(ng, o))),
+    }
+}
+
 // What a control is built from, apart from its box and value: when this changes, it is built again.
 function shape(g: ControlGeometry): string {
     // A range arrives as a typed array off the kernel and as a plain one from a docs player's
     // JSON frame; the same range is the same shape either way.
     // A grid is built again when anything inside it moves or changes colour.
     if (g.sliders) return JSON.stringify([g.control, g.w, g.h, g.sliders.map(shape), g.sliders.map((c) => [c.x - g.x, c.y - g.y, c.w, c.h, c.name, c.valueLabel])])
+    // A group is built again when an option moves or its button changes shape.
+    if (g.options) return JSON.stringify([g.control, g.w, g.h, g.button && shape(g.button as ControlGeometry), g.options.map((o) => [o.x - g.x, o.y - g.y, o.w, o.h, o.label, o.box[0] - o.x, o.box[1] - o.y, o.box[2], o.box[3]])])
     return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.duration, g.prompt, g.search, g.direction, g.arrow?.path, g.arrow?.flip, g.size, g.radius, g.stroke, g.mark, g.markChar, g.markSize])
 }
 
@@ -824,6 +900,9 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
         }
         case "menu":
             return buildMenu(layer, g, m, box, label, hooks)
+        case "radiogroup":
+        case "checkboxgroup":
+            return buildChoices(layer, g, box, label, hooks)
         case "button": {
             // The field counts clicks, as Makie's `clicks` does.
             const el = document.createElement("button")
@@ -963,16 +1042,27 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
 }
 
 // The controls a finger reaches past their drawn size (#531).
-const REACHES = new Set(["slider", "intervalslider", "toggle", "checkbox"])
+const REACHES = new Set(["slider", "intervalslider", "toggle", "checkbox", "option"])
 
 // Sets each slider's, toggle's and checkbox's room on every side (--ct, --cb, --cl, --cr) from
 // the other controls and the axes, as shares of its box, so the CSS can turn them into CSS px.
 function reach(m: Manifest, els: Map<string, ControlEl>): void {
-    const leaves: [HTMLElement, ControlGeometry][] = []
+    // Each element a finger reaches, with its kind and box in image px: a control, a grid's
+    // slider, or a group's option row.
+    type Leaf = { control: string; x: number; y: number; w: number; h: number; size?: number }
+    const leaves: [HTMLElement, Leaf][] = []
     for (const l of m.layers) {
         const c = l.kind === "control" ? els.get(l.id) : undefined
         if (!c) continue
         const g = l.geometry as ControlGeometry
+        if (g.options) {
+            // A group's options, each its whole row, in the order the group built them.
+            const rows = c.box_.querySelectorAll<HTMLElement>(":scope > .masque-opt")
+            g.options.forEach((o, i) => {
+                if (rows[i]) leaves.push([rows[i], { control: "option", x: o.x, y: o.y, w: o.w, h: o.h }])
+            })
+            continue
+        }
         if (g.control !== "slidergrid") {
             leaves.push([c.box_, g])
             continue
@@ -982,7 +1072,7 @@ function reach(m: Manifest, els: Map<string, ControlEl>): void {
         ;(g.sliders ?? []).forEach((cg, i) => { if (kids[i]) leaves.push([kids[i], cg]) })
     }
     // A checkbox answers on its square alone, centred in its box.
-    const hit = (g: ControlGeometry): Rect => {
+    const hit = (g: Leaf): Rect => {
         if (g.control !== "checkbox") return [g.x, g.y, g.w, g.h]
         const s = g.size ?? Math.min(g.w, g.h)
         return [g.x + (g.w - s) / 2, g.y + (g.h - s) / 2, s, s]

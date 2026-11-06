@@ -4,7 +4,7 @@
 
 const _CONTROL_BLOCKS = Union{
     Makie.Slider, Makie.IntervalSlider, Makie.Toggle, Makie.Checkbox, Makie.Menu, Makie.SliderGrid, Makie.Button,
-    Makie.Textbox,
+    Makie.Textbox, RadioGroup, CheckboxGroup,
 }
 
 # The wire name of each block type, the `control` entry of its layer's geometry.
@@ -16,16 +16,20 @@ _control_name(::Makie.Menu) = "menu"
 _control_name(::Makie.SliderGrid) = "slidergrid"
 _control_name(::Makie.Button) = "button"
 _control_name(::Makie.Textbox) = "textbox"
+_control_name(::RadioGroup) = "radiogroup"
+_control_name(::CheckboxGroup) = "checkboxgroup"
 
 """
     BlockControl(block, id)
 
 A Makie block drawn as an HTML control: `Slider`, `IntervalSlider`, `Toggle`, `Checkbox`,
-`Menu`, `SliderGrid`, `Button` or `Textbox`. [`masque`](@ref) builds one for each block named in its arguments or
+`Menu`, `SliderGrid`, `Button`, `Textbox`, or masque's own [`RadioGroup`](@ref) and
+[`CheckboxGroup`](@ref). [`masque`](@ref) builds one for each block named in its arguments or
 `bind` (`masque(fig, (degree = sl,))`); there is no need to build it by hand. Its field holds
 the block's plain value: the slider's value, `(lo, hi)`, `true`/`false`, the menu's selection,
-a tuple of a grid's slider values, in order, the number of times a button was clicked, or the
-text last entered in a text box (`nothing` before any).
+a tuple of a grid's slider values, in order, the number of times a button was clicked, the
+text last entered in a text box (`nothing` before any), the chosen option's value of a radio
+group (`nothing` before any), or a vector of a checkbox group's ticked values.
 """
 struct BlockControl <: AbstractInteractable
     block::_CONTROL_BLOCKS
@@ -142,6 +146,9 @@ _control_wire(b::Makie.Menu) = Int(b.i_selected[]) - 1
 _control_wire(b::Makie.Button) = Int(b.clicks[])
 _control_wire(b::Makie.Textbox) = b.stored_string[] === nothing ? nothing : string(b.stored_string[])
 _control_wire(b::Makie.SliderGrid) = Any[_control_wire(sl) for sl in _grid_sliders(b)]
+# A radio group's chosen option as a 0-based index, -1 for none; a checkbox group's ticks.
+_control_wire(b::RadioGroup) = Int(b.i_selected[]) - 1
+_control_wire(b::CheckboxGroup) = Bool[t for t in b.checked[]]
 
 hitlayers(i::BlockControl, ctx) =
     [HitLayer(i.id, :control, _control_geometry(i.block, ctx), Any[], Symbol(""), events(i), string(i.id))]
@@ -178,6 +185,8 @@ function _control_geometry(b, ctx)
         _button_geometry!(g, b, ctx)
     elseif b isa Makie.Textbox
         _textbox_geometry!(g, b, ctx)
+    elseif b isa ChoiceGroup
+        _choices_geometry!(g, b, ctx)
     elseif b isa Makie.SliderGrid
         g["sliders"] = Any[
             _grid_slider_geometry(sl, name, vl, ctx)
@@ -185,6 +194,27 @@ function _control_geometry(b, ctx)
         ]
     end
     return g
+end
+
+# A radio or checkbox group (src/choices.jl): its buttons' look once, as Makie's checkbox
+# (`_checkbox_geometry!`; every button takes the group's settings), and per option its row (the
+# button and its label, which a click anywhere on picks, as an HTML label does), the button's
+# box, and the label's text for a screen reader. The labels stay in the picture. Boxes are
+# image px from the figure's top-left corner.
+function _choices_geometry!(g, b::ChoiceGroup, ctx)
+    g["button"] = _checkbox_geometry!(Dict{String, Any}(), first(b.buttons), ctx)
+    g["options"] = Any[_choice_option(btn, lab, ctx) for (btn, lab) in zip(b.buttons, b.labels)]
+    return g
+end
+
+function _choice_option(btn, lab, ctx)
+    bx, by, bw, bh = _block_rect(btn, ctx)
+    lx, ly, lw, lh = _block_rect(lab, ctx)
+    x0, y0 = min(bx, lx), min(by, ly)
+    return Dict{String, Any}(
+        "x" => x0, "y" => y0, "w" => max(bx + bw, lx + lw) - x0, "h" => max(by + bh, ly + lh) - y0,
+        "label" => string(lab.text[]), "box" => Float64[bx, by, bw, bh],
+    )
 end
 
 # Makie's menu (Makie/src/makielayout/blocks/menu.jl): a box showing the choice, or the prompt
@@ -380,13 +410,13 @@ end
 
 # Makie's `onchange` decides what a click turns a checkbox into, and is meant for radio buttons.
 # In masque the browser owns the click and can't run a Julia function, so the rule is a no-op: a
-# click flips the box, and masque says so once (#457).
+# click flips the box, and masque says so once (#457), pointing at `RadioGroup` (#592).
 function _warn_checkbox_rule(interactables)
     for i in interactables
         i isa BlockControl && i.block isa Makie.Checkbox || continue
         i.block.onchange[] === (!) && continue
         @warn "masque: checkbox :$(i.id) has its own `onchange`, which does nothing in masque: " *
-            "a click always flips the box. For one choice of several, use a `Menu`, or set the " *
+            "a click always flips the box. For one choice of several, use a `RadioGroup`, or set the " *
             "other boxes in `masque`'s own `onchange`." maxlog = 1
     end
     return nothing
@@ -480,6 +510,19 @@ function _control_value(b::Makie.Menu, id, p)
     return Makie.optionvalue(opts[_control_index(id, p, length(opts))])
 end
 
+function _control_value(b::RadioGroup, id, p)
+    p isa Integer && p == -1 && return nothing
+    opts = Choices.options(b)
+    return Choices.optionvalue(opts[_control_index(id, p, length(opts))])
+end
+function _control_value(b::CheckboxGroup, id, p)
+    opts = Choices.options(b)
+    p isa AbstractVector && length(p) == length(opts) && all(t -> t isa Bool, p) || throw(
+        ArgumentError("bond: control :$id expected $(length(opts)) true/false values, got $(repr(p))"),
+    )
+    return Choices._ticked(opts, p)
+end
+
 function _control_value(b::Makie.SliderGrid, id, p)
     sls = _grid_sliders(b)
     p isa AbstractVector && length(p) == length(sls) || throw(
@@ -526,6 +569,8 @@ function _set_control!(b::Makie.SliderGrid, p)
     end
     return nothing
 end
+_set_control!(b::RadioGroup, p) = (b.i_selected[] == p + 1 || (b.i_selected[] = Int(p) + 1); nothing)
+_set_control!(b::CheckboxGroup, p) = (b.checked[] == p || (b.checked[] = Bool[t for t in p]); nothing)
 _set_control!(b::Makie.Menu, p) = (b.i_selected[] == p + 1 || (b.i_selected[] = Int(p) + 1); nothing)
 
 # Every named block takes its value from the state `js` (one envelope per field). Each value
@@ -547,10 +592,12 @@ function _sync_controls!(interactables, js)
 end
 
 # Every plot a block draws, in its scene and the scenes under it (Menu's dropdown). A grid's
-# sliders and value labels are drawn in HTML; its name labels stay in the picture.
+# sliders and value labels are drawn in HTML; its name labels stay in the picture, as a choice
+# group's option labels do.
 function _block_plots(b)
     out = Any[]
     stack = b isa Makie.SliderGrid ? Any[_block_scene(c) for c in vcat(_grid_sliders(b), _grid_valuelabels(b))] :
+        b isa ChoiceGroup ? Any[_block_scene(c) for c in b.buttons] :
         Any[_block_scene(b)]
     while !isempty(stack)
         sc = pop!(stack)

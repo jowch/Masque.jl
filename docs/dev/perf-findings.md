@@ -834,6 +834,20 @@ compact JSON, before and after:
 | 3 options | 238 B | 645 B |
 | 100 options | 1399 B | 1806 B |
 
+### Choice group layer
+
+A `RadioGroup`'s or `CheckboxGroup`'s `:control` layer (#592) carries its buttons' look once (a
+checkbox's colours, sizes and mark path) and, per option, its row, its button's box and its
+label's text: about 165 B per option on every `onchange` frame. Measured on the PR's branch
+(Julia 1.13.3, cloud box) as the layer's geometry in compact JSON, options named `option i`:
+
+| group | 3 options | 20 options |
+|---|---:|---:|
+| `RadioGroup` | 1026 B | 3834 B |
+| `CheckboxGroup` | 1370 B | 4280 B |
+
+The checkbox group's mark is Makie's checkmark path, longer than the radio's dot.
+
 ### Control fonts
 
 A `Menu`, `Button`, `Textbox` or grid value label also carries the font Makie draws its text in

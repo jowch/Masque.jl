@@ -208,6 +208,22 @@
         @test Masque._datashader_aggregate(hm) === nothing   # not a datashader's image
     end
 
+    @testset "Makie's @Block builds masque's choice groups (#592)" begin
+        # `@Block` writes code naming Makie internals unqualified, and blocks lay out children
+        # through a forwarded layout; a Makie that changes either breaks here first.
+        fb = with_theme(Theme(fontsize = 21, RadioGroup = (size = 13,))) do
+            Figure(; size = (300, 200))
+        end
+        rg = RadioGroup(fb[1, 1]; options = ["a", ("b", 2)], default = 2)
+        cg = CheckboxGroup(fb[2, 1]; options = ["x", "y"], default = ["y"])
+        Masque._finalize!(fb)
+        @test rg isa Makie.Block && rg in fb.content && !any(c -> c isa Checkbox, fb.content)
+        @test rg.fontsize[] == 21 && rg.size[] == 13 && rg.buttons[1].size[] == 13
+        @test rg.selection[] == 2 && cg.selection[] == ["y"]
+        @test all(b -> Masque._block_bbox(b) isa Makie.Rect2, vcat(rg.buttons, rg.labels))
+        @test Masque._block_bbox(rg).widths[1] > Masque._block_bbox(rg.buttons[1]).widths[1]
+    end
+
     @testset "block accessors (#345)" begin
         fb = Figure(; size = (300, 200))
         sl = Slider(fb[1, 1]; range = 0:5, startvalue = 2)

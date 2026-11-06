@@ -47,6 +47,16 @@ RegionInteractable
 FunctionInteractable
 ```
 
+## Controls
+
+Masque's own blocks, for choices Makie has no block for. See
+[Radio buttons and checkbox lists](@ref).
+
+```@docs
+RadioGroup
+CheckboxGroup
+```
+
 ## Linking views
 
 ```@docs
