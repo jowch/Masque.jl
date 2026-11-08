@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-08
+
 ### Added
 - `RadioGroup` and `CheckboxGroup`, two Makie blocks for the choices Makie has no block for:
   one option of several, shown as radio buttons, and a list of labelled checkboxes. Each is one
@@ -15,7 +17,7 @@ All notable changes to this project are documented here. The format is based on
 ### Changed
 - A menu opens with the chosen option in view instead of at the top of the list. A search that
   matches no option shows "No matches" instead of an empty list, and moving into a menu with
-  Tab no longer selects its text.
+  Tab no longer selects its text (#586).
 
 ### Fixed
 - In Safari, a hovered or selected marker on a WebGL figure no longer turns black. Safari doesn't
@@ -23,9 +25,9 @@ All notable changes to this project are documented here. The format is based on
   instead (#589).
 - A menu now closes on a press anywhere outside it. A press on the zoom and reset buttons in a
   plot's corner used to leave it open, and those buttons sat on top of an open list, so a click
-  on an option under them zoomed the plot instead of picking it.
+  on an option under them zoomed the plot instead of picking it (#586).
 - A press on the arrow of an open searchable menu closes it, as it does on a menu without
-  search. A press on its text still places the caret.
+  search. A press on its text still places the caret (#586).
 - Right-clicking or Control-clicking a CairoMakie figure in Safari, or in another browser
   built on WebKit, now shows the image's menu, with Save Image As and Copy Image, as other
   browsers do. Before, it showed the page's menu. Safari has no such menu for a live WGLMakie
@@ -948,7 +950,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/jowch/Masque.jl/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/jowch/Masque.jl/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/jowch/Masque.jl/compare/v0.4.5...v0.5.0
 [0.4.5]: https://github.com/jowch/Masque.jl/compare/v0.4.4...v0.4.5
