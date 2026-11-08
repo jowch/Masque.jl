@@ -111,6 +111,9 @@ export const CONTROLS_STYLE = `
 .masque-control.masque-opt { cursor: pointer; display: block; }
 .masque-opt-cell { position: absolute; }
 .masque-opt:hover .masque-check-art .mark { visibility: visible; }
+/* WebKit stops matching :focus-visible on a radio its arrow keys move to (#596). The group
+   marks itself while the keyboard drives it, and the ring follows the focus instead. */
+.masque-keyed .masque-check:focus ~ .masque-check-art { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
 /* Button, as Makie draws it: a rounded box with its label in the middle, in one colour pair at
    rest, another under the pointer and a third while pressed. Makie centres the outline on the
    box's edge and clips it to the box: --sw is half its width, drawn inside and out, and the
@@ -438,6 +441,12 @@ function buildChoices(layer: HitLayer, g: ControlGeometry, box: HTMLElement, lab
             arts.forEach((a) => a.show_())
             hooks.commit_(id, envelope(id, get()))
         })
+    })
+    // A key in the group shows the ring until the pointer presses or the focus leaves (#596).
+    box.addEventListener("keydown", () => box.classList.add("masque-keyed"))
+    box.addEventListener("pointerdown", () => box.classList.remove("masque-keyed"))
+    box.addEventListener("focusout", (e) => {
+        if (!box.contains(e.relatedTarget as Node | null)) box.classList.remove("masque-keyed")
     })
     const get = (): number | boolean[] => radio ? inputs.findIndex((el) => el.checked) : inputs.map((el) => el.checked)
     return {

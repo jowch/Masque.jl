@@ -909,6 +909,13 @@ try {
     let s = await look();
     if (s.radio !== 0 || !s.checked) throw new Error(`${key}: Shift+Tab from the boxes landed on ${JSON.stringify(s)}, want the chosen radio (0)`);
     if (s.ring !== "solid") throw new Error(`${key}: no focus ring on the radio's button: ${JSON.stringify(s)}`);
+    // The ring follows an arrow key's move, which WebKit's :focus-visible drops (#596).
+    await page.keyboard.press("ArrowDown");
+    s = await look();
+    if (s.radio !== 1 || !s.checked || s.ring !== "solid") throw new Error(`${key}: after ArrowDown the radio is ${JSON.stringify(s)}, want option 1 checked with a ring`);
+    await page.keyboard.press("ArrowUp");
+    s = await look();
+    if (s.radio !== 0 || !s.checked || s.ring !== "solid") throw new Error(`${key}: after ArrowUp the radio is ${JSON.stringify(s)}, want option 0 checked with a ring`);
     await page.keyboard.press("Shift+Tab");
     s = await look();
     if (s.radio !== -1) throw new Error(`${key}: a second Shift+Tab stayed in the radio group: ${JSON.stringify(s)}`);

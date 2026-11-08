@@ -7831,6 +7831,17 @@ describe("block controls (#345)", () => {
         expect(val(host).series).toEqual({ layer: "series", index: 0, payload: [true, true] })
         boxes[0].click()
         expect(val(host).series).toEqual({ layer: "series", index: 0, payload: [false, true] })
+        // A key in the group marks it, so the ring follows the focus where WebKit's arrow keys
+        // drop :focus-visible (#596); a press or the focus leaving the group clears the mark.
+        radios[2].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }))
+        expect(group.classList.contains("masque-keyed")).toBe(true)
+        radios[2].dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: radios[1] }))
+        expect(group.classList.contains("masque-keyed")).toBe(true)
+        rows[0].dispatchEvent(new Event("pointerdown", { bubbles: true }))
+        expect(group.classList.contains("masque-keyed")).toBe(false)
+        radios[2].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }))
+        radios[2].dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: null }))
+        expect(group.classList.contains("masque-keyed")).toBe(false)
     })
 
     it("a button draws Makie's box and label, and counts its clicks (#431)", () => {
