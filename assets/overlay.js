@@ -59,7 +59,9 @@
 .masque-check-art { position: absolute; pointer-events: none; overflow: visible; }
 .masque-check-art .mark { visibility: hidden; }
 .masque-check:checked ~ .masque-check-art .mark, .masque-check:hover ~ .masque-check-art .mark { visibility: visible; }
-.masque-check:focus-visible ~ .masque-check-art { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
+/* WebKit stops matching :focus-visible on a radio its arrow keys move to (#596). A group marks
+   itself while the keyboard drives it, and there the ring follows the focus instead. */
+.masque-check:focus-visible ~ .masque-check-art, .masque-keyed .masque-check:focus ~ .masque-check-art { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
 /* Radio and checkbox groups (#592): each option is a <label> over its row in the picture (its
    button and its label's text, which stays in the picture), so a click anywhere on the row
    picks it; its button is drawn as a checkbox in a cell at the button's own box. The pointer on
@@ -67,9 +69,6 @@
 .masque-control.masque-opt { cursor: pointer; display: block; }
 .masque-opt-cell { position: absolute; }
 .masque-opt:hover .masque-check-art .mark { visibility: visible; }
-/* WebKit stops matching :focus-visible on a radio its arrow keys move to (#596). The group
-   marks itself while the keyboard drives it, and the ring follows the focus instead. */
-.masque-keyed .masque-check:focus ~ .masque-check-art { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
 /* Button, as Makie draws it: a rounded box with its label in the middle, in one colour pair at
    rest, another under the pointer and a third while pressed. Makie centres the outline on the
    box's edge and clips it to the box: --sw is half its width, drawn inside and out, and the
