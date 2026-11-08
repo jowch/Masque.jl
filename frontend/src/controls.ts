@@ -103,7 +103,9 @@ export const CONTROLS_STYLE = `
 .masque-check-art { position: absolute; pointer-events: none; overflow: visible; }
 .masque-check-art .mark { visibility: hidden; }
 .masque-check:checked ~ .masque-check-art .mark, .masque-check:hover ~ .masque-check-art .mark { visibility: visible; }
-.masque-check:focus-visible ~ .masque-check-art { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
+/* WebKit stops matching :focus-visible on a radio its arrow keys move to (#596). A group marks
+   itself while the keyboard drives it, and there the ring follows the focus instead. */
+.masque-check:focus-visible ~ .masque-check-art, .masque-keyed .masque-check:focus ~ .masque-check-art { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
 /* Radio and checkbox groups (#592): each option is a <label> over its row in the picture (its
    button and its label's text, which stays in the picture), so a click anywhere on the row
    picks it; its button is drawn as a checkbox in a cell at the button's own box. The pointer on
@@ -438,6 +440,12 @@ function buildChoices(layer: HitLayer, g: ControlGeometry, box: HTMLElement, lab
             arts.forEach((a) => a.show_())
             hooks.commit_(id, envelope(id, get()))
         })
+    })
+    // A key in the group shows the ring until the pointer presses or the focus leaves (#596).
+    box.addEventListener("keydown", () => box.classList.add("masque-keyed"))
+    box.addEventListener("pointerdown", () => box.classList.remove("masque-keyed"))
+    box.addEventListener("focusout", (e) => {
+        if (!box.contains(e.relatedTarget as Node | null)) box.classList.remove("masque-keyed")
     })
     const get = (): number | boolean[] => radio ? inputs.findIndex((el) => el.checked) : inputs.map((el) => el.checked)
     return {

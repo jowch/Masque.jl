@@ -909,6 +909,32 @@ try {
     let s = await look();
     if (s.radio !== 0 || !s.checked) throw new Error(`${key}: Shift+Tab from the boxes landed on ${JSON.stringify(s)}, want the chosen radio (0)`);
     if (s.ring !== "solid") throw new Error(`${key}: no focus ring on the radio's button: ${JSON.stringify(s)}`);
+    // The ring follows an arrow key's move, which WebKit's :focus-visible drops (#596).
+    await page.keyboard.press("ArrowDown");
+    s = await look();
+    if (s.radio !== 1 || !s.checked || s.ring !== "solid") throw new Error(`${key}: after ArrowDown the radio is ${JSON.stringify(s)}, want option 1 checked with a ring`);
+    await page.keyboard.press("ArrowUp");
+    s = await look();
+    if (s.radio !== 0 || !s.checked || s.ring !== "solid") throw new Error(`${key}: after ArrowUp the radio is ${JSON.stringify(s)}, want option 0 checked with a ring`);
+    // A press on another option takes the ring away; the next arrow key brings it back.
+    const optionAt = () => page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = sr.querySelectorAll('[data-masque-control="scale"] > label.masque-opt')[1].getBoundingClientRect();
+      return [b.right - 3, (b.top + b.bottom) / 2];
+    }, key);
+    // WebKit has no scroll anchoring, so measure again once the page has settled.
+    await optionAt();
+    await new Promise((r) => setTimeout(r, 500));
+    const opt1 = await optionAt();
+    await page.mouse.click(opt1[0], opt1[1]);
+    s = await look();
+    if (s.radio !== 1 || !s.checked || s.ring !== "none") throw new Error(`${key}: after a click on option 1 the radio is ${JSON.stringify(s)}, want option 1 checked with no ring`);
+    await page.keyboard.press("ArrowUp");
+    s = await look();
+    if (s.radio !== 0 || !s.checked || s.ring !== "solid") throw new Error(`${key}: ArrowUp after the click left the radio ${JSON.stringify(s)}, want option 0 checked with a ring`);
+    await page.mouse.move(2, 2);
     await page.keyboard.press("Shift+Tab");
     s = await look();
     if (s.radio !== -1) throw new Error(`${key}: a second Shift+Tab stayed in the radio group: ${JSON.stringify(s)}`);
