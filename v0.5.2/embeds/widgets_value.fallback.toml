@@ -1,0 +1,4 @@
+image = "widgets_value.png"
+
+[outputs]
+b7d10001-0001-4000-8000-000000000106 = "w.sample is nothing, w.batch is nothing"

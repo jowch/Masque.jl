@@ -1,0 +1,4 @@
+image = "grids_labels.png"
+
+[outputs]
+c0a10006-0001-4000-8000-000000000004 = "click a cell"
