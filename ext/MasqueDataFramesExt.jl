@@ -12,6 +12,9 @@ end
 # A row merges onto the mark's default payload like a named tuple (#308).
 Masque._merge_payload(d::NamedTuple, row::DataFrameRow) = Masque._merge_payload(d, copy(row))
 
+# A row no default merged onto reaches the page as a named tuple of its columns.
+Masque._packable_other(row::DataFrameRow) = Masque._packable(copy(row))
+
 # Column selectors match DataFrames' own signatures so these methods are strictly more
 # specific than `getindex(::DataFrame, ::Integer/::AbstractVector, …)` and not ambiguous
 # with them. `Base.to_index` does not make `df[ev, :]` work: DataFrames 1.7 requires the

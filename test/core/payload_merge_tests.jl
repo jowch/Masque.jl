@@ -1,4 +1,4 @@
-using Test, Masque, CairoMakie, Makie
+using Test, Masque, CairoMakie, Makie, DataFrames
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
 # #308: a user's payload is merged onto the mark's default payload; the user's fields win a
@@ -84,4 +84,53 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test L["payloads"][1] == (; name = "a", x = 1.0, y = 3.0)
         @test_throws ArgumentError masque(fig, interactables(s; payloads = [(; name = "a"), (; name = "b")], tooltip = masque"$(nme)"))
     end
+end
+
+# Pluto's `published_to_js` takes only plain types (its `assertpackable`): a payload holding a
+# `SubString`, a CSV column's string type or a `Rational` failed to show the widget at all.
+# The manifest now carries plain values, and the interactable keeps the user's own.
+@testset "payloads of any string or number type reach the page" begin
+    plain = Union{Nothing, Missing, String, Symbol, Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64}
+    packable(x) = x isa plain || x isa Union{Tuple, NamedTuple, Vector} && all(packable, x) ||
+        x isa Dict && all(packable, keys(x)) && all(packable, values(x))
+    fig = Figure(); ax = Axis(fig[1, 1])
+    s = scatter!(ax, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
+    gs = Test.GenericString("drugA")
+    pl = [
+        (; name = SubString("ctrl-1", 1, 4), n = big(2)^70, r = 1 // 2, h = Float16(1.5), c = 'q'),
+        (; name = gs, tags = [SubString("ab", 1, 1)], meta = Dict(SubString("k", 1, 1) => Int128(3))),
+        SubString("bare", 1, 4),
+    ]
+    w = masque(fig, interactables(s; payloads = pl, label = SubString("Group A", 1, 7)))
+    @test packable(w.manifest)
+    L = only(l for l in w.manifest["layers"] if l["id"] == "scatter")
+    @test L["label"] === "Group A"
+    p1, p2, p3 = L["payloads"]
+    @test p1.name === "ctrl" && p1.h === 1.5 && p1.c === "q"
+    # Shown as Julia prints them: digits a JavaScript number would round, a fraction.
+    @test p1.n == "1180591620717411303424" && p1.r == "1//2"
+    @test p1.x === 1.0 && p1.y === 1.0     # the fields Masque fills in are untouched
+    @test p2.name === "drugA" && p2.tags == ["a"] && p2.meta == Dict("k" => 3)
+    @test p3 === "bare"
+    # The interactable, which the `@bind` value reads, keeps the values as passed.
+    built = only(i for i in Masque._assemble(fig, (interactables(s; payloads = pl),); auto = true) if i.id === :scatter)
+    @test built.payloads[2].name === gs && built.payloads[3] isa SubString
+    # A DataFrame row that no default merges onto (a region's) goes as its columns.
+    df = DataFrame(name = [SubString("ab", 1, 1)], n = [Int128(2)], m = [missing])
+    wr = masque(fig, RegionInteractable(ax, [(:rect, (1.0, 1.0), 1.0, 1.0)]; payloads = df); auto = false)
+    @test packable(wr.manifest)
+    @test only(only(wr.manifest["layers"])["payloads"]) === (; name = "a", n = 2, m = "missing")
+    # Values the page would print its own way read as they do in Julia; a payload of `nothing`
+    # is still a mark with none.
+    wv = masque(fig, interactables(s; payloads = [(; a = missing, b = nothing, c = NaN), (; a = -Inf32), nothing]))
+    q1, q2, q3 = only(l for l in wv.manifest["layers"] if l["id"] == "scatter")["payloads"]
+    @test (q1.a, q1.b, q1.c, q2.a) == ("missing", "nothing", "NaN", "-Inf")
+    @test q3 === nothing
+    # A manifest that needs nothing keeps its own containers.
+    v = [(; a = "x"), (; a = "y")]
+    @test Masque._packable(v) === v
+    g = [1.0f0, 2.0f0]
+    @test Masque._packable(g) === g
+    d = Dict{String, Any}("a" => v, "b" => g)
+    @test Masque._packable(d) === d
 end

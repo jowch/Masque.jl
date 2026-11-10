@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- A widget whose payloads hold a `SubString`, a CSV.jl string column, a `CategoricalValue`, a
+  `Date`, a `Rational`, a `BigInt` or another value Pluto can't send to the page now shows,
+  instead of failing with "Only simple objects can be shared with JS". The tooltip shows each
+  value as Julia prints it, including `missing`, `nothing` and `Inf`, and the `@bind` value
+  still holds your own values (#607).
+
 ## [0.5.2] - 2026-11-08
 
 ### Added

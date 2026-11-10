@@ -176,13 +176,70 @@ end
 # reader of a built or shipped manifest goes through this, not `l["geometry"]`.
 _geometry_px(l::AbstractDict) = haskey(l, "q") ? l["geometry"] ./ l["q"] : l["geometry"]
 
+# Pluto's `published_to_js` takes only a few plain types: `String` but no other string, and
+# only some number types. A user's payloads, labels and keys can be anything, such as a
+# `SubString`, a `String7` from CSV or a `Date`, so the finished manifest is made of plain
+# types here. Strings become `String`, numbers `Int64` or `Float64`, and any other value its
+# printed text, which is what its tooltip shows. Nothing is changed in place: a layer's
+# `payloads` is the interactable's own vector, which the `@bind` value reads from, so a click
+# still hands back the user's own values. A container whose contents need nothing comes back
+# as itself.
+const _PACKABLE = Union{
+    Nothing, Missing, String, Symbol, Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64,
+}
+function _packable(x)
+    x isa _PACKABLE && return x
+    x isa AbstractString && return String(x)
+    x isa Integer && return typemin(Int64) <= x <= typemax(Int64) ? Int64(x) : Float64(x)
+    x isa Real && return Float64(x)
+    x isa Union{Tuple, NamedTuple} && return map(_packable, x)
+    x isa Vector{<:_PACKABLE} && return x
+    x isa AbstractVector{<:_PACKABLE} && return collect(x)
+    x isa AbstractVector && return _same_or(v -> map(_packable, v), x)
+    x isa AbstractDict && return _packable_dict(x, _packable)
+    return _packable_other(x)
+end
+# A `DataFrameRow` becomes a named tuple (`MasqueDataFramesExt`).
+_packable_other(x) = string(x)
+# `v` itself when `f` changes none of its entries.
+function _same_or(f, v::AbstractVector)
+    out = f(v)
+    return v isa Vector && all(k -> out[k] === v[k], eachindex(v)) ? v : out
+end
+function _packable_dict(d::AbstractDict, f)
+    ps = [_packable(k) => f(v) for (k, v) in d]
+    d isa Dict && all(((k, v),) -> haskey(d, k) && d[k] === v, ps) && return d
+    K = all(p -> p.first isa String, ps) ? String : Any
+    return Dict{K, Any}(ps)
+end
+
+# A payload's values as its tooltip shows them, the way Julia prints them where the page
+# would not: `missing` and `nothing` as those words (JavaScript has only `null`), `Inf` and
+# `NaN` as Julia spells them, a `Rational` as `1//2`, and an integer past 2^53, which a
+# JavaScript number can't hold exactly, as its digits. A payload of `nothing` is a mark with
+# no payload, so only a value inside a payload says `nothing`.
+_tip_payloads(v::AbstractVector) = _same_or(v -> Any[p === nothing ? nothing : _tip_value(p) for p in v], v)
+function _tip_value(x)
+    x === nothing && return "nothing"
+    x === missing && return "missing"
+    x isa AbstractFloat && !isfinite(x) && return string(Float64(x))
+    x isa Integer && !(x isa Bool) && abs(x) > 2^53 && return string(x)
+    x isa Rational && return string(x)
+    x isa Union{Tuple, NamedTuple} && return map(_tip_value, x)
+    x isa AbstractVector && return _same_or(v -> Any[_tip_value(e) for e in v], x)
+    x isa AbstractDict && return _packable_dict(x, _tip_value)
+    x isa Union{_PACKABLE, AbstractString, Real} && return _packable(x)
+    o = _packable_other(x)
+    return o isa String ? o : _tip_value(o)
+end
+
 function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     hs = hoverstyle(i)
     style = Dict{String, Any}("width" => hs.width)
     hs.stroke === nothing || (style["stroke"] = hs.stroke)
     d = Dict{String, Any}(
         "id" => string(L.id), "kind" => string(L.kind), "axis" => string(L.axis),
-        "geometry" => L.geometry, "payloads" => L.payloads,
+        "geometry" => L.geometry, "payloads" => _tip_payloads(L.payloads),
         "events" => [string(e) for e in L.events],
         "style" => style,
     )
@@ -647,6 +704,7 @@ function build_manifest(
         end
     end
     isempty(occluders) || (m["occluders"] = sort!(occluders))
+    m = _packable(m)
     if owners_out !== nothing
         owners = Dict{String, LayerOwner}()
         for (i, L, _) in built
