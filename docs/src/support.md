@@ -133,11 +133,11 @@ the `:rect` symbol draws a smaller square. Its layer has kind `:polygons`; pass 
 markers turn to face the camera, so each one responds over a circle the size of the marker.
 One drawn with a `marker_offset` is skipped with a warning.
 
-A recipe not in the table, such as `rainclouds!`, still gets each
-visible part the table knows, under that part's layer id: `rainclouds!`
-gives `:violin`, `:scatter`, and `:boxplot`, and `tricontourf!` gives
-`:poly`. A `datashader!` of points gives `:cells`, and hovering a pixel
-shows how many points fell in it. A plot whose `space` is not
+A recipe not in the table, such as `rainclouds!` or `contour!`, still
+gets each visible part the table knows, under that part's layer id;
+[Plots with several parts](@ref) lists the common ones. A `datashader!`
+of points gives `:cells`, and hovering a pixel shows how many points
+fell in it. A plot whose `space` is not
 `:data`, such as a `bracket!` label or a `scatter!` placed with
 `space = :relative`, is skipped with a warning that names its `space`.
 A `surface!` responds on an `Axis3` and a `PolarAxis`: hovering it
@@ -161,3 +161,64 @@ shapes where nothing is drawn, see [Custom shapes](@ref).
 
 Bars or cells turned with `rotate!` are skipped with a warning. To make
 rotated bars respond, draw them with `poly!`.
+
+## Plots with several parts
+
+Some plots draw several kinds of mark, such as the points and stems of
+a `stem!`, and each kind is its own part with its own name. You use
+that name to read a click from the `@bind` value and to name the part
+in `bind` or `selected`. Each part's marks come in a fixed order, and
+a click reports the mark's place in that order as its `index`, so
+`index = 2` on a violin is the second violin from the left.
+
+| Plot | Part | One mark is | Order of the marks |
+|---|---|---|---|
+| `stem!` | `points` | one point | the order of your data |
+| | `stems` | one stem | the order of your data |
+| `scatterlines!` | `points` | one point | the order of your data |
+| | `line` | the whole line | — |
+| `rainclouds!` | `scatter` | one raindrop, for one observation | the order of your data |
+| | `violin` | one violin per category | left to right along the axis |
+| | `boxplot` | one box per category | left to right along the axis |
+| `contour!` with `labels = true` | `lines` | every contour line together | — |
+| | `text` | one label | the order Makie draws them, which you don't set |
+| `qqplot!` / `qqnorm!` with a `qqline` | `scatter` | one point | smallest quantile first |
+| | `segments` | the reference line | — |
+| `streamplot!` | `scatter` | one arrowhead | the order Makie draws them, which you don't set |
+| | `lines` | every streamline together | — |
+
+Violins and boxes come out left to right along the axis, not in the
+order of your data. With numbers as categories that is smallest first.
+With strings, `rainclouds!` places each category where it first
+appears in your data, so `["b", "a", "b"]` gives the `"b"` violin
+first. With `dodge`, there is one violin and one box per category and
+dodge group, and the groups of one category come before the next
+category.
+
+The parts of `stem!` and `scatterlines!` sit under the plot's id in
+the `@bind` value, so a click on a stem is `sel.stem.stems`. The parts
+of the other plots each take the id a plot of their own kind would
+take, so a `rainclouds!` click on a violin is `sel.violin`, and its
+raindrops are `sel.scatter_2` when the figure already has a
+`scatter!`. To keep a plot's parts together under one name, give it an
+`id`:
+
+```julia
+rc = rainclouds!(ax, groups, values)
+@bind sel masque(fig, interactables(rc; id = :rain))
+```
+
+A click on a violin is then `sel.rain.violin`.
+
+Other plots that Masque builds from the marks they draw have one part,
+under the id in this table:
+
+| Plot | Layer `id` | One mark is |
+|---|---|---|
+| `contour!` / `contour3d!` without labels | `:lines` | every contour line together |
+| `tricontourf!` | `:poly` | one filled region, so a level split into pieces gives one mark per piece |
+| `triplot!` | `:poly` | one triangle |
+| `pie!` | `:poly` | one slice, in the order of your values |
+| `ablines!` | `:segments` | one line, in the order you give them |
+| `ecdfplot!` | `:stairs` | the whole curve |
+| `arc!` | `:lines` | the whole arc |

@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Fixed
+- A box plot's tooltip and `@bind` value now say which category the box is, as `x` (`y` for a
+  horizontal box), the way a violin's already do. This holds with `dodge` and inside
+  `rainclouds!` (#601).
 - A widget whose payloads hold a `SubString`, a CSV.jl string column, a `CategoricalValue`, a
   `Date`, a `Rational`, a `BigInt` or another value Pluto can't send to the page now shows,
   instead of failing with "Only simple objects can be shared with JS". The tooltip shows each
