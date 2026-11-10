@@ -311,6 +311,18 @@ end
     @test extra1 > sizeof(json_write(a))
 end
 
+@testset "changing_cells leaves out cells that are the same in every state" begin
+    # `w2` is a second widget that doesn't use the bond; `out` is the readout below the widget.
+    idle = Dict("w2" => Dict("body" => "png"), "out" => Dict("body" => "nothing"))
+    one = Dict("w2" => Dict("body" => "png"), "out" => Dict("body" => "1"))
+    back = Dict("w2" => Dict("body" => "png"), "out" => Dict("body" => "nothing"))
+    states = changing_cells([idle, one, back])
+    @test all(st -> !haskey(st, "w2"), states)
+    # A cell that matches idle in one state but not another stays in every state.
+    @test [st["out"]["body"] for st in states] == ["nothing", "1", "nothing"]
+    @test changing_cells(Dict{String, Any}[]) == Dict{String, Any}[]
+end
+
 @testset "player TOMLs hand-list drags only" begin
     embeds = joinpath(@__DIR__, "..", "docs", "src", "embeds")
     n = 0
@@ -540,6 +552,10 @@ end
         "gallery_boxselect",
         "gallery_image",
         "example_heatmap_trace",
+        "plots_violin",
+        "plots_boxplot",
+        "plots_rainclouds",
+        "plots_density",
     ]
     for name in names
         path = joinpath(root, "docs", "src", "embeds", name * ".jl")

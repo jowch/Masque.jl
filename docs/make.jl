@@ -79,6 +79,15 @@ makedocs(;
                 "Custom shapes" => "custom.md",
             ],
         ],
+        "Plot types" => [
+            "All plot types" => "plots.md",
+            "Distributions" => [
+                "violin!" => "plots/violin.md",
+                "boxplot!" => "plots/boxplot.md",
+                "rainclouds!" => "plots/rainclouds.md",
+                "density!" => "plots/density.md",
+            ],
+        ],
         "Examples" => [
             "Examples" => "gallery.md",
             "Compare a cluster" => "gallery/cluster.md",
