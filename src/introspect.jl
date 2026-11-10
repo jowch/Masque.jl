@@ -622,10 +622,22 @@ end
 function _raincloud_cats(p)
     q = p.parent
     while q isa Makie.AbstractPlot
-        q isa Makie.RainClouds && return sort(unique(Float64.(q.x_positions[])))
+        q isa Makie.RainClouds && return sort(unique(Float64.(_raincloud_positions(q))))
         q = q.parent
     end
     return nothing
+end
+# Makie 0.24.16+ keeps the category positions as the `x_positions` node; earlier 0.24 releases
+# compute them inside `plot!` and keep no copy, so they are recomputed the same way from the
+# labels: string categories numbered 1, 2, … in first-appearance order, numbers as given.
+function _raincloud_positions(q)
+    haskey(q.attributes, :x_positions) && return q.x_positions[]
+    return _raincloud_positions_from(q.category_labels[])
+end
+function _raincloud_positions_from(labels)
+    any(x -> x isa AbstractString, labels) || return labels
+    pos = Dict(l => i for (i, l) in enumerate(unique(labels)))
+    return [pos[l] for l in labels]
 end
 function PolygonInteractable(ax, p::Makie.Violin; id = :violin, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     poly = _childof(p, Makie.Poly)

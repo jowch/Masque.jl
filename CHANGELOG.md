@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format is based on
 - A box plot's tooltip and `@bind` value now say which category the box is, as `x` (`y` for a
   horizontal box), the way a violin's already do. This holds with `dodge` and inside
   `rainclouds!` (#601).
+- On Makie 0.24.15 and earlier, `masque` no longer leaves out the violins of a `rainclouds!`
+  plot (#608).
 
 ## [0.5.2] - 2026-11-08
 

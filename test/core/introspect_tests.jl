@@ -1432,6 +1432,21 @@ end
             k = orientation === :horizontal ? :y : :x
             @test [getproperty(pl, k) for pl in v.payloads] == [1.0, 2.0]
         end
+        # String categories, as the docs example draws them (#608).
+        fr = Figure(); ar = Axis(fr[1, 1])
+        rainclouds!(ar, repeat(["North", "South"]; inner = 40), randn(80))
+        Makie.update_state_before_display!(fr)
+        ids = [i.id for i in interactables(fr)]
+        @test :violin in ids && :boxplot in ids
+        @test [pl.x for pl in only(filter(i -> i.id === :violin, interactables(fr))).payloads] == [1.0, 2.0]
+        # Makie before 0.24.16 has no `x_positions` node, so the positions are recomputed from the
+        # labels; on a Makie that has the node, the recomputed positions must match it.
+        @test Masque._raincloud_positions_from(["b", "a", "b", "c"]) == [1, 2, 1, 3]
+        @test Masque._raincloud_positions_from([2.5, 1.0]) == [2.5, 1.0]
+        rc = only(filter(p -> p isa Makie.RainClouds, ar.scene.plots))
+        if haskey(rc.attributes, :x_positions)
+            @test Masque._raincloud_positions_from(rc.category_labels[]) == rc.x_positions[]
+        end
     end
 
     @testset "Voronoiplot extraction" begin
