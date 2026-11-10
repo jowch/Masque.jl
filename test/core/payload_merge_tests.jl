@@ -1,4 +1,4 @@
-using Test, Masque, CairoMakie, Makie, DataFrames
+using Test, Masque, CairoMakie, Makie, DataFrames, Dates
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
 # #308: a user's payload is merged onto the mark's default payload; the user's fields win a
@@ -126,6 +126,24 @@ end
     q1, q2, q3 = only(l for l in wv.manifest["layers"] if l["id"] == "scatter")["payloads"]
     @test (q1.a, q1.b, q1.c, q2.a) == ("missing", "nothing", "NaN", "-Inf")
     @test q3 === nothing
+    # A linked group's value is the keys as given, though the page gets them as text (#609).
+    commit(w, f, env) = Masque.bond_from_js(w, merge(Dict{String, Any}(Masque.mount_envelope(w.manifest)), Dict{String, Any}(f => env)))
+    fl = Figure(); a1 = Axis(fl[1, 1]); a2 = Axis(fl[1, 2])
+    l1 = scatter!(a1, 1:3, 1:3); l2 = scatter!(a2, 1:3, 1:3)
+    ks = [Date(2024, 1, 1), missing, big(2)^60]
+    rows = [(; k) for k in ks]
+    wl = masque(fl, (pick = linked(interactables(l1; payloads = rows), interactables(l2; payloads = rows); key = :k),))
+    @test packable(wl.manifest)
+    @test isequal([commit(wl, "pick", Dict("row" => r)).pick for r in 0:2], ks)
+    wo = masque(fl, (pick = linked(interactables(l1; key = ks), interactables(l2; key = ks)),))
+    @test packable(wo.manifest)
+    @test commit(wo, "pick", Dict("row" => 0)).pick === Date(2024, 1, 1)
+    @test commit(wo, "pick", Dict("row" => 2)).pick == big(2)^60
+    # Ends of the Int64 range are still past what a JavaScript number holds.
+    @test Masque._tip_value(typemin(Int64)) == string(typemin(Int64))
+    # A dict other than `Dict` keeps its order.
+    od = Base.ImmutableDict{String, Any}(Base.ImmutableDict{String, Any}("b", SubString("x", 1, 1)), "a", 1)
+    @test Masque._tip_value(od) === NamedTuple{Tuple(Symbol.(keys(od)))}(Tuple(Masque._tip_value(v) for v in values(od)))
     # A manifest that needs nothing keeps its own containers.
     v = [(; a = "x"), (; a = "y")]
     @test Masque._packable(v) === v

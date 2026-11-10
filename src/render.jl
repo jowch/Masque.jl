@@ -209,6 +209,11 @@ end
 function _packable_dict(d::AbstractDict, f)
     ps = [_packable(k) => f(v) for (k, v) in d]
     d isa Dict && all(((k, v),) -> haskey(d, k) && d[k] === v, ps) && return d
+    # Any other dict, such as an `OrderedDict`, keeps its order as a named tuple, which a
+    # `Dict` would lose.
+    if !(d isa Dict) && all(p -> p.first isa Union{String, Symbol}, ps) && allunique(Symbol(p.first) for p in ps)
+        return NamedTuple{Tuple(Symbol(p.first) for p in ps)}(Tuple(p.second for p in ps))
+    end
     K = all(p -> p.first isa String, ps) ? String : Any
     return Dict{K, Any}(ps)
 end
@@ -223,7 +228,7 @@ function _tip_value(x)
     x === nothing && return "nothing"
     x === missing && return "missing"
     x isa AbstractFloat && !isfinite(x) && return string(Float64(x))
-    x isa Integer && !(x isa Bool) && abs(x) > 2^53 && return string(x)
+    x isa Integer && !(x isa Bool) && !(-2^53 <= x <= 2^53) && return string(x)
     x isa Rational && return string(x)
     x isa Union{Tuple, NamedTuple} && return map(_tip_value, x)
     x isa AbstractVector && return _same_or(v -> Any[_tip_value(e) for e in v], x)
@@ -705,6 +710,11 @@ function build_manifest(
     end
     isempty(occluders) || (m["occluders"] = sort!(occluders))
     m = _packable(m)
+    # The page gets each group's keys as text; its `@bind` value reads back the keys as given.
+    for g in get(m, "groups", ())
+        t = get(tables, Symbol(g["id"]), nothing)
+        t === nothing || _note_group_table!(g, t)
+    end
     if owners_out !== nothing
         owners = Dict{String, LayerOwner}()
         for (i, L, _) in built
