@@ -18,7 +18,7 @@ end
 
 
 # ╔═╡ b10f0002-0001-4000-8000-000000000001
-using Masque, CairoMakie, Random
+using Masque, CairoMakie, Random, Statistics
 
 # ╔═╡ b10f0002-0001-4000-8000-000000000002
 begin
@@ -51,8 +51,19 @@ masque(fig, interactables(b; payloads = routes, tooltip = masque"<b>Route $(rout
 
 # ╔═╡ b10f0002-0001-4000-8000-000000000007
 begin
-    outliers = [(1, 15.0), (2, 20.0), (2, 19.5), (3, 4.0)]
-    trips = [(trip = 5,), (trip = 70,), (trip = 94,), (trip = 150,)]
+    outliers = Point2f[]
+    trips = []
+    for r in 1:3
+        rows = findall(route .== r)
+        q1, q3 = quantile(minutes[rows], [0.25, 0.75])
+        reach = 1.5 * (q3 - q1)
+        for i in rows
+            if minutes[i] < q1 - reach || minutes[i] > q3 + reach
+                push!(outliers, Point2f(r, minutes[i]))
+                push!(trips, (trip = i,))
+            end
+        end
+    end
     masque(fig, PointInteractable(ax, outliers; radius = 6, payloads = trips, id = :outliers))
 end
 

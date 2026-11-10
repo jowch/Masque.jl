@@ -44,9 +44,9 @@ A click also returns the payload's fields, so `sel.density.group` is
 
 Hovering a curve shows its group, not the height under the pointer. To
 read the height anywhere on the axis, add an [`AxisInteractable`](@ref)
-and pass `auto = false`, so the axis is the only part that responds.
-The curves then no longer respond on their own, because over a curve
-the curve answers first:
+and pass `auto = false`. Without it, a curve answers wherever the
+pointer is over one, so the axis would only read between them. With it,
+the curves no longer respond on their own:
 
 ```@raw html
 <div class="masque-embed-wrap">

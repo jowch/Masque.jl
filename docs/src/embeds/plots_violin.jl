@@ -18,7 +18,7 @@ end
 
 
 # ╔═╡ b10f0001-0001-4000-8000-000000000001
-using Masque, CairoMakie, Random
+using Masque, CairoMakie, Random, Statistics
 
 # ╔═╡ b10f0001-0001-4000-8000-000000000002
 begin
@@ -40,9 +40,9 @@ pick
 
 # ╔═╡ b10f0001-0001-4000-8000-000000000005
 summary = [
-    (species = "Adelie", n = 100, median = 4.2),
-    (species = "Chinstrap", n = 100, median = 5.2),
-    (species = "Gentoo", n = 100, median = 4.7),
+    (species = "Adelie", n = 100, median = round(median(weights[groups .== 1]); digits = 1)),
+    (species = "Chinstrap", n = 100, median = round(median(weights[groups .== 2]); digits = 1)),
+    (species = "Gentoo", n = 100, median = round(median(weights[groups .== 3]); digits = 1)),
 ]
 
 # ╔═╡ b10f0001-0001-4000-8000-000000000006

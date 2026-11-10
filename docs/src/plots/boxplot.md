@@ -49,8 +49,10 @@ Main.masque_fallback("plots_boxplot"; segment = "data")
 
 Hovering an outlier shows nothing, because only the boxes respond. To
 see which trip an outlier is, add a [`PointInteractable`](@ref) at the
-outliers' positions, with a payload for each. Pass the positions
-yourself, and `radius` for how many pixels around each one respond:
+outliers' positions, with a payload for each. Masque doesn't know where
+the outliers are drawn, so find them the way `boxplot!` does: a point is
+an outlier when it is more than 1.5 times the box's height beyond the
+box. `radius` sets how many pixels around each one respond:
 
 ```@raw html
 <div class="masque-embed-wrap">

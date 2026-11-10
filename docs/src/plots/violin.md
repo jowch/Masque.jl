@@ -69,9 +69,9 @@ See [Select several marks](@ref).
 
 Hovering a violin shows the whole group, not the weight at the pointer.
 To read the weight anywhere on the axis, add an [`AxisInteractable`](@ref)
-and pass `auto = false`, so the axis is the only part that responds.
-The violins then no longer respond on their own, because over a violin
-the violin answers first:
+and pass `auto = false`. Without it, a violin answers wherever the
+pointer is over one, so the axis would only read between them. With it,
+the violins no longer respond on their own:
 
 ```@raw html
 <div class="masque-embed-wrap">
