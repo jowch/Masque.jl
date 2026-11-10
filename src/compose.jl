@@ -106,8 +106,9 @@ function _part_requests(ax, r)
 end
 
 # The keywords each part of a plot with several layers takes, in the order of `names`, the
-# parts' own names in layer order (`points`, `stems`; a recipe's `scatter`, `violin`). Every keyword applies
-# to every part except `payloads`, which is positional per mark and so names its part:
+# parts' own names as the layers are listed, the part drawn last first (`points`, `stems`; a
+# raincloud's `boxplot`, `scatter`, `violin`). Every keyword applies to every part except
+# `payloads`, which is positional per mark and so names its part:
 # `payloads = (scatter = df, violin = rows)`. A part left out keeps its default payloads, and
 # a part's entry may itself be a `NamedTuple` for a part with parts of its own. A plot with
 # one part also takes a plain list, as before; with several, a list or an unknown name raises
@@ -133,7 +134,7 @@ function _part_payloads_error(p, names, pl)
     head = isempty(unknown) ?
         "$who: this plot has several layers, so `payloads` takes one list per part, keyed by its name: `$example`." :
         "$who: no part named " * join(("`$k`" for k in unknown), ", ") * "."
-    return ArgumentError("$head The parts are $list; each list has one entry per mark of that part")
+    return ArgumentError("$head The parts are $list; each list has one entry per mark of that part.")
 end
 
 # `interactables(ax, p; id, kwargs...)` as `masque` calls it. A recipe's own method need not
