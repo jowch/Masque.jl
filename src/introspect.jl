@@ -791,10 +791,21 @@ function _boxplot_stats_node(p)
     end
     return error("BoxPlot introspection: computed-stats node (4-tuple of equal-length numeric vectors) not found (Makie internals changed?)")
 end
-function _boxplot_payloads(statscv)
-    _centers, medians, q1s, q3s = statscv
+# Each box also names its category, as a violin does (#601): Makie's `centers` are Float32 and
+# shifted by `dodge`, so each snaps to the nearest of the plotted categories, and inside a
+# `rainclouds!` (which nudges the box off its category) once more to the raincloud's. The field
+# is `x`, or `y` for a horizontal box, so it follows that axis's categories and tick format.
+function _boxplot_payloads(p, statscv)
+    centers, medians, q1s, q3s = statscv
+    cats = sort(unique(Float64.(_conv(p)[1])))
+    outer = _raincloud_cats(p)
+    near(vs, v) = vs[argmin(abs.(vs .- v))]
     return Any[
-        (; q1 = Float64(q1s[k]), median = Float64(medians[k]), q3 = Float64(q3s[k]))
+        let c = near(cats, Float64(centers[k]))
+            outer === nothing || (c = near(outer, c))
+            cat = p.orientation[] === :horizontal ? (; y = c) : (; x = c)
+            (; cat..., q1 = Float64(q1s[k]), median = Float64(medians[k]), q3 = Float64(q3s[k]))
+        end
             for k in eachindex(medians)
     ]
 end
@@ -804,7 +815,7 @@ function _boxplot_interactable(ax, p; id = :boxplot, payloads = nothing, kw...)
     geom = _conv(boxpoly)[1]
     who = eltype(geom) <: _GB.HyperRectangle ? "RectInteractable" : "PolygonInteractable"
     dim = _value_dim(p.orientation[] !== :horizontal)
-    pl = _merge_payloads(_boxplot_payloads(_conv(node)), payloads, who; dims = _along(dim, :q1, :median, :q3))
+    pl = _merge_payloads(_unconvert_payloads(ax, _boxplot_payloads(p, _conv(node))), payloads, who; dims = _along(dim, :q1, :median, :q3))
     if eltype(geom) <: _GB.HyperRectangle
         rects = [(r.origin[1] + r.widths[1] / 2, r.origin[2] + r.widths[2] / 2, r.widths[1], r.widths[2]) for r in geom]
         return RectInteractable(ax, rects; id, payloads = pl, kw...)

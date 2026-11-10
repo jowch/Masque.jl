@@ -363,6 +363,19 @@ kind_sweep_meta() = [
         "tip" => "x 1", "hoverIndex" => 1, "hoverTip" => "x 2", "mode" => "element",
     ),
     Dict(
+        # `boxplot!` with `dodge`: each box names its category, not its dodged center (#601).
+        # Boxes run category by category, dodge group within: box 3 is category 2's first.
+        "key" => "boxplot", "layerId" => "boxplot", "layerKind" => "rects",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 2,
+        "tip" => "x 1", "hoverIndex" => 2, "hoverTip" => "x 2", "mode" => "element",
+    ),
+    Dict(
+        # The box of a horizontal `rainclouds!` sits off its category; it names it as `y` (#601).
+        "key" => "raincloud_box", "layerId" => "boxplot", "layerKind" => "rects",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "y 1", "hoverIndex" => 1, "hoverTip" => "y 2", "mode" => "element",
+    ),
+    Dict(
         # `stairs!`: one stepped line is one element; hover reads out the nearest step (#262).
         # A default line, so it shows its tooltip and takes no click (#335): `hoverOnly` makes
         # the driver check that a click commits nothing in place of the click checks.
@@ -1519,6 +1532,27 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:violin => [1]))
     end
 
+    boxplot = let
+        q = [log(p / (1 - p)) / 1.7 for p in range(0.0025, 0.9975; length = 100)]
+        xs = repeat([1, 2]; inner = 200)
+        ys = vcat(q, q .+ 0.5, q .* 0.6 .+ 1, q .* 0.6 .+ 1.5)
+        dodge = repeat([1, 2, 1, 2]; inner = 100)
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "boxplot, dodged")
+        boxplot!(ax, xs, ys; dodge, color = (:steelblue, 0.6), show_outliers = false)
+        masque(fig; selected = Dict(:boxplot => [1]))
+    end
+
+    raincloud_box = let
+        q = [log(p / (1 - p)) / 1.7 for p in range(0.0025, 0.9975; length = 200)]
+        xs = repeat([1, 2]; inner = 200)
+        ys = vcat(q, q .* 0.6 .+ 1)
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "raincloud, horizontal")
+        rainclouds!(ax, xs, ys; orientation = :horizontal, color = (:steelblue, 0.6), markersize = 2)
+        masque(fig; selected = Dict(:boxplot => [1]))
+    end
+
     stairs = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "stairs", limits = (0, 5, 0, 4))
@@ -2191,7 +2225,7 @@ function build_kind_sweep()
     return (;
         scatter, scatter_low, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, box_hidden, box_axes, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, violin_h, raincloud, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_data_corner, view_resized, view_nested, legend, series_legend,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, violin_h, raincloud, boxplot, raincloud_box, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_data_corner, view_resized, view_nested, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, choices, menu_view, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

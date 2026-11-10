@@ -16,6 +16,9 @@ All notable changes to this project are documented here. The format is based on
 ### Fixed
 - `masque(fig; payloads = …)`, and any other keyword `masque` doesn't take, raises an error that
   says where the keyword goes, instead of a `MethodError` from inside Masque (#600).
+- A box plot's tooltip and `@bind` value now say which category the box is, as `x` (`y` for a
+  horizontal box), the way a violin's already do. This holds with `dodge` and inside
+  `rainclouds!` (#601).
 
 ## [0.5.2] - 2026-11-08
 
