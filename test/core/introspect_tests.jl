@@ -1701,6 +1701,28 @@ end
         end
         @test !haskey(pairs(bi.payloads[1]), :index)
         @test any(i -> i isa RectInteractable, interactables(fig))
+        # Each box names its category (#601): `x`, or `y` when horizontal, snapped from the
+        # Float32 dodged center to the plotted categories, and inside a raincloud to its own.
+        @test [pl.x for pl in bi.payloads] == [1.0, 2.0]
+        @test first(keys(bi.payloads[1])) === :x
+        fd = Figure(); ad = Axis(fd[1, 1])
+        boxplot!(ad, repeat([1, 2], inner = 40), randn(80); dodge = repeat([1, 2], 40))
+        Makie.update_state_before_display!(fd)
+        bd = Masque._boxplot_interactable(ad, ad.scene.plots[1]; id = :boxplot)
+        @test [pl.x for pl in bd.payloads] == [1.0, 1.0, 2.0, 2.0]
+        fh = Figure(); ah = Axis(fh[1, 1])
+        boxplot!(ah, cats, vals; orientation = :horizontal); Makie.update_state_before_display!(fh)
+        bh = Masque._boxplot_interactable(ah, ah.scene.plots[1]; id = :boxplot)
+        @test [pl.y for pl in bh.payloads] == [1.0, 2.0]
+        @test all(pl -> !haskey(pl, :x), bh.payloads)
+        for orientation in (:vertical, :horizontal)
+            fr = Figure(); ar = Axis(fr[1, 1])
+            rainclouds!(ar, repeat([1, 2], inner = 30), randn(60); orientation)
+            Makie.update_state_before_display!(fr)
+            b = only(filter(i -> i.id === :boxplot, interactables(fr)))
+            k = orientation === :horizontal ? :y : :x
+            @test [getproperty(pl, k) for pl in b.payloads] == [1.0, 2.0]
+        end
 
         # notch on → PolygonInteractable; same stats payload
         fig2 = Figure(); ax2 = Axis(fig2[1, 1])
