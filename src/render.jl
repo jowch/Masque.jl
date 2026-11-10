@@ -860,6 +860,7 @@ s = scatter!(ax, first.(pts), last.(pts))
 ```
 """
 function masque(fig, xs...; auto::Bool = true, bind = nothing, onchange = nothing, kwargs...)
+    _check_masque_kwargs(kwargs)
     fig = _as_figure(fig)
     plan = _bind_call(fig, xs, bind; auto)
     _check_unnamed_blocks(fig, plan)
@@ -868,6 +869,34 @@ function masque(fig, xs...; auto::Bool = true, bind = nothing, onchange = nothin
     _warn_textbox_check(plan, onchange)
     onchange === nothing || (plan = _with_onchange(plan, onchange, () -> _bind_call(fig, xs, bind; auto)))
     return _masque(fig, plan; onchange, kwargs...)
+end
+
+# The keywords `masque` takes besides `auto`, `bind` and `onchange`: those of `_masque`.
+# `test/core/compose_tests.jl` checks the two lists agree.
+const _MASQUE_KWARGS = (
+    :backend, :max_width, :px_per_unit, :selected, :tooltipstyle, :tooltip_sigdigits, :overlaystyle, :touch,
+)
+# The keywords of one plot, which a reader may try on `masque` first (#600).
+const _PLOT_KWARGS = (:payloads, :tooltip, :label, :id, :select, :touch_radius, :key)
+
+# An unknown keyword would otherwise fail inside `_masque` with a MethodError that names it.
+function _check_masque_kwargs(kwargs)
+    for k in keys(kwargs)
+        k in _MASQUE_KWARGS && continue
+        k in _PLOT_KWARGS && throw(
+            ArgumentError(
+                "masque: `$k` belongs to one plot, not the figure; pass it as " *
+                    "`masque(fig, interactables(plot; $k = …))`" *
+                    (
+                    k === :payloads ? ", one entry per mark. For a plot with several layers, such as " *
+                        "`stem!` or `rainclouds!`, key it by part: `payloads = (points = …, stems = …)`" : ""
+                ),
+            ),
+        )
+        known = join(("`$n`" for n in (:auto, :bind, :onchange, _MASQUE_KWARGS...)), ", ")
+        throw(ArgumentError("masque: no keyword `$k`; it takes $known"))
+    end
+    return nothing
 end
 
 # `scatter(x, y)` returns a FigureAxisPlot and `scatter(fig[1, 1], …)` an AxisPlot: both name
