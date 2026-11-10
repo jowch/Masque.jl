@@ -10,6 +10,9 @@ All notable changes to this project are documented here. The format is based on
 - A box plot's tooltip and `@bind` value now say which category the box is, as `x` (`y` for a
   horizontal box), the way a violin's already do. This holds with `dodge` and inside
   `rainclouds!` (#601).
+- On an axis with hand-placed tick labels, such as `xticks = (1:3, ["a", "b", "c"])`, a
+  tooltip coordinate exactly on a tick shows that tick's label in place of the number, so a
+  box or violin at `1` shows `x a`, not `x 1`. The `@bind` value keeps the number (#606).
 
 ## [0.5.2] - 2026-11-08
 
