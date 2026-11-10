@@ -24,6 +24,10 @@ Makie.plot!(p::NoKwDots) = (scatter!(p, p.positions); p)
 Masque.interactables(ax, p::NoKwDots) = AbstractInteractable[PointInteractable(ax, p.positions[])]
 Makie.@recipe BrushedDots (positions,) begin
 end
+# A recipe whose part is a plot with parts of its own: payloads nest (#599).
+Makie.@recipe StemAndDots (positions,) begin
+end
+Makie.plot!(p::StemAndDots) = (stem!(p, p.positions); scatter!(p, p.positions); p)
 Makie.plot!(p::BrushedDots) = (scatter!(p, p.positions); p)
 Masque.interactables(ax, p::BrushedDots) = AbstractInteractable[
     PointInteractable(ax, p.positions[]), ROIInteractable(ax; bounds = (0.0, 1.0, 0.0, 1.0), selects = :points),
@@ -169,6 +173,15 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
             @test err isa ArgumentError && occursin("`boxplot`, `scatter`, `violin`", err.msg)
             @test_throws ArgumentError interactables(ax, rc; payloads = bad)
         end
+        # A part with parts of its own takes a NamedTuple of them.
+        f = Figure(); ax = Axis(f[1, 1])
+        sd = stemanddots!(ax, Point2f.(1:3, 1:3))
+        out = interactables(ax, sd; payloads = (stem = (points = ["a", "b", "c"],), scatter = ["p", "q", "r"]))
+        byid = Dict(i.id => i for i in out)
+        @test byid[:scatter].payloads == ["p", "q", "r"]
+        @test byid[Symbol("stem.points")].payloads == ["a", "b", "c"]
+        @test byid[Symbol("stem.stems")].payloads[1] isa NamedTuple
+        @test_throws ArgumentError interactables(ax, sd; payloads = (stem = ["a", "b", "c"],))
         # A recipe that draws one part still takes a plain list, and also its part's name.
         f = Figure(); ax = Axis(f[1, 1])
         c = contour!(ax, [sin(i / 2) * cos(j / 2) for i in 1:8, j in 1:8]; levels = 3)
