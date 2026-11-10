@@ -44,8 +44,33 @@ A click or a box feeds the next step of an analysis.
 
 ## Plot types
 
-These pages show what `masque(fig)` makes interactive on other kinds
-of plot.
+Each of these plots has its own page: what a click returns, how to show
+your own data in the tooltip, and the options that plot has. [All plot
+types](plots.md) lists every plot that has a page.
+
+```@raw html
+<div class="masque-gallery">
+<a class="masque-gallery-card" data-dir="plots" data-page="violin">
+  <img alt="Three violins of penguin weight, with the middle one picked" src="assets/gallery/violin.png">
+  <span>violin!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="boxplot">
+  <img alt="Three box plots of travel time, with the middle box picked" src="assets/gallery/boxplot.png">
+  <span>boxplot!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="rainclouds">
+  <img alt="Two rainclouds of scores, with the pointer's tooltip showing a box's quartiles" src="assets/gallery/rainclouds.png">
+  <span>rainclouds!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="density">
+  <img alt="Two overlapping height densities, with the blue one picked" src="assets/gallery/density.png">
+  <span>density!</span>
+</a>
+</div>
+```
+
+These pages show what `masque(fig)` makes interactive on several plots
+at once.
 
 ```@raw html
 <div class="masque-gallery">
@@ -68,7 +93,8 @@ of plot.
   var root = pretty ? "../" : "";
   document.querySelectorAll("a.masque-gallery-card").forEach(function (a) {
     var page = a.getAttribute("data-page");
-    a.href = root + "gallery/" + page + (pretty ? "/" : ".html");
+    var dir = a.getAttribute("data-dir") || "gallery";
+    a.href = root + dir + "/" + page + (pretty ? "/" : ".html");
     var img = a.querySelector("img");
     if (img) img.src = root + "assets/gallery/" + page + ".png";
   });

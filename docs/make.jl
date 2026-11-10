@@ -97,7 +97,7 @@ makedocs(;
             "From a heatmap cell to its trace" => "gallery/heatmap-trace.md",
             "Box-select scatter" => "gallery/boxselect.md",
             "Image ROI" => "gallery/image.md",
-            "Plot types" => [
+            "Plot overviews" => [
                 "Bars and areas" => "gallery/bars.md",
                 "Polygons" => "gallery/polygons.md",
                 "Text labels" => "gallery/text.md",

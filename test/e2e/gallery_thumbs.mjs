@@ -29,6 +29,10 @@ const CARDS = [
   { out: "text", embed: "gallery_text", moves: [["click", 0, 0.53, 0.155], ["leave"]] },
   { out: "boxselect", embed: "gallery_boxselect", moves: [["hover", 0, 0.196, 0.47]] },
   { out: "image", embed: "gallery_image", moves: [["hover", 0, 0.46, 0.57]] },
+  { out: "violin", embed: "plots_violin", moves: [["click", 0, 0.52, 0.4], ["leave"]] },
+  { out: "boxplot", embed: "plots_boxplot", moves: [["click", 0, 0.54, 0.4], ["leave"]] },
+  { out: "rainclouds", embed: "plots_rainclouds", moves: [["hover", 0, 0.852, 0.4]] },
+  { out: "density", embed: "plots_density", moves: [["click", 0, 0.4, 0.55], ["leave"]] },
 ];
 
 const browser = await chromium.launch({ headless: true });
