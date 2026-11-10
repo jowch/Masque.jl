@@ -181,10 +181,10 @@ a click reports the mark's place in that order as its `index`, so
 | | `violin` | one violin per category | left to right along the axis |
 | | `boxplot` | one box per category | left to right along the axis |
 | `contour!` with `labels = true` | `lines` | every contour line together | — |
-| | `text` | one label | — |
+| | `text` | one label | the order Makie draws them, which you don't set |
 | `qqplot!` / `qqnorm!` with a `qqline` | `scatter` | one point | smallest quantile first |
 | | `segments` | the reference line | — |
-| `streamplot!` | `scatter` | one arrowhead | — |
+| `streamplot!` | `scatter` | one arrowhead | the order Makie draws them, which you don't set |
 | | `lines` | every streamline together | — |
 
 Violins and boxes come out left to right along the axis, not in the
