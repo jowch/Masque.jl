@@ -24,6 +24,10 @@ Makie.plot!(p::NoKwDots) = (scatter!(p, p.positions); p)
 Masque.interactables(ax, p::NoKwDots) = AbstractInteractable[PointInteractable(ax, p.positions[])]
 Makie.@recipe BrushedDots (positions,) begin
 end
+# A recipe whose part is a plot with parts of its own: payloads nest (#599).
+Makie.@recipe StemAndDots (positions,) begin
+end
+Makie.plot!(p::StemAndDots) = (stem!(p, p.positions); scatter!(p, p.positions); p)
 Makie.plot!(p::BrushedDots) = (scatter!(p, p.positions); p)
 Masque.interactables(ax, p::BrushedDots) = AbstractInteractable[
     PointInteractable(ax, p.positions[]), ROIInteractable(ax; bounds = (0.0, 1.0, 0.0, 1.0), selects = :points),
@@ -96,7 +100,32 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         out = assemble(f, interactables(st; label = "stems"))
         @test ids(out) == [Symbol("stem.points"), Symbol("stem.stems")]
         @test all(i -> i.label == "stems", out)
-        @test_throws ArgumentError assemble(f, interactables(st; payloads = ["a", "b", "c"]))
+        # `payloads` names its part (#599): one list can't say which layer it is for.
+        err = try
+            assemble(f, interactables(st; payloads = ["a", "b", "c"]))
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("`points`, `stems`", err.msg)
+        out = assemble(f, interactables(st; payloads = (points = ["a", "b", "c"],)))
+        @test out[1].payloads == ["a", "b", "c"]
+        @test out[2].payloads[1] isa NamedTuple && length(out[2].payloads) == 3
+        out = interactables(ax, st; payloads = (points = ["a", "b", "c"], stems = ["p", "q", "r"]))
+        @test [i.payloads for i in out] == [["a", "b", "c"], ["p", "q", "r"]]
+        err = try
+            interactables(ax, st; payloads = (point = ["a", "b", "c"],))
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("no part named `point`", err.msg) &&
+            occursin("`points`, `stems`", err.msg)
+        # Each part's list is still one entry per mark.
+        @test_throws ArgumentError interactables(ax, st; payloads = (points = ["a"],))
+        f = Figure(); ax = Axis(f[1, 1])
+        sl = scatterlines!(ax, xs, ys)
+        out = interactables(ax, sl; payloads = (line = ["whole"],))
+        @test ids(out) == [Symbol("scatterlines.points"), Symbol("scatterlines.line")]
+        @test out[2].payloads == ["whole"] && length(out[1].payloads) == 3
     end
 
     @testset "interactables(recipe) for a recipe built from its parts" begin
@@ -126,6 +155,39 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
             Symbol.(["rain.boxplot", "rain.scatter", "rain.violin"])
         @test ids(interactables(ax, rc)) == [:boxplot, :scatter, :violin]
         @test masque(f; bind = rc).manifest["fields"] == ["boxplot", "scatter", "violin"]
+        # Per-part payloads (#599), keyed by the parts' own names, with or without `id`.
+        drops = ["drop $k" for k in 1:10]
+        out = assemble(f, interactables(rc; payloads = (scatter = drops, violin = ["A", "B"])))
+        @test ids(out) == [:boxplot, :scatter, :violin]
+        @test out[2].payloads == drops && out[3].payloads == ["A", "B"]
+        @test out[1].payloads[1] isa NamedTuple
+        out = assemble(f, interactables(rc; id = :rain, payloads = (scatter = drops,)); auto = false)
+        @test ids(out)[2] === Symbol("rain.scatter") && out[2].payloads == drops
+        @test interactables(ax, rc; payloads = (boxplot = ["a", "b"],))[1].payloads == ["a", "b"]
+        for bad in (drops, (scatters = drops,))
+            err = try
+                assemble(f, interactables(rc; payloads = bad))
+            catch e
+                e
+            end
+            @test err isa ArgumentError && occursin("`boxplot`, `scatter`, `violin`", err.msg)
+            @test_throws ArgumentError interactables(ax, rc; payloads = bad)
+        end
+        # A part with parts of its own takes a NamedTuple of them.
+        f = Figure(); ax = Axis(f[1, 1])
+        sd = stemanddots!(ax, Point2f.(1:3, 1:3))
+        out = interactables(ax, sd; payloads = (stem = (points = ["a", "b", "c"],), scatter = ["p", "q", "r"]))
+        byid = Dict(i.id => i for i in out)
+        @test byid[:scatter].payloads == ["p", "q", "r"]
+        @test byid[Symbol("stem.points")].payloads == ["a", "b", "c"]
+        @test byid[Symbol("stem.stems")].payloads[1] isa NamedTuple
+        @test_throws ArgumentError interactables(ax, sd; payloads = (stem = ["a", "b", "c"],))
+        # A recipe that draws one part still takes a plain list, and also its part's name.
+        f = Figure(); ax = Axis(f[1, 1])
+        c = contour!(ax, [sin(i / 2) * cos(j / 2) for i in 1:8, j in 1:8]; levels = 3)
+        n = length(only(interactables(ax, c)).payloads)
+        @test only(interactables(ax, c; payloads = fill("l", n))).payloads == fill("l", n)
+        @test only(assemble(f, interactables(c; payloads = (lines = fill("l", n),)))).payloads == fill("l", n)
         # A recipe whose parts all give no layer errors, as one with no known parts does.
         f = Figure(); ax = Axis(f[1, 1])
         b = bracket!(ax, 1, 0, 2, 0; text = "gap")
@@ -414,5 +476,21 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         f = Figure(); ax = Axis(f[1, 1])
         brokendots!(ax, pts)
         @test_throws MethodError masque(f)
+    end
+
+    @testset "masque names where a keyword it doesn't take goes (#600)" begin
+        f = Figure(); ax = Axis(f[1, 1])
+        scatter!(ax, [1, 2, 3], [1, 2, 3])
+        msg(k) = try
+            masque(f; NamedTuple{(k,)}((1,))...)
+        catch e
+            e isa ArgumentError ? e.msg : rethrow()
+        end
+        @test occursin("interactables(plot; payloads = …)", msg(:payloads)) && occursin("key it by part", msg(:payloads))
+        @test occursin("interactables(plot; tooltip = …)", msg(:tooltip))
+        @test occursin("no keyword `colour`", msg(:colour)) && occursin("`max_width`", msg(:colour))
+        # The list `masque` checks against is `_masque`'s own.
+        decl = Base.kwarg_decl(only(methods(Masque._masque)))
+        @test Set(decl) == Set(Masque._MASQUE_KWARGS) ∪ Set([:onchange])
     end
 end

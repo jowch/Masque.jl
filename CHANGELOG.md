@@ -6,7 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A plot with several layers takes `payloads` for each of its parts, keyed by the part's name:
+  `interactables(rc; payloads = (scatter = df, violin = per_group))` for a `rainclouds!`, or
+  `interactables(st; payloads = (points = rows,))` for a `stem!`. A part you leave out keeps its
+  own payloads. A plain list, or a name the plot has no part for, raises an error that lists the
+  plot's parts (#599).
+
 ### Fixed
+- `masque(fig; payloads = …)`, and any other keyword `masque` doesn't take, raises an error that
+  says where the keyword goes, instead of a `MethodError` from inside Masque (#600).
 - A box plot's tooltip and `@bind` value now say which category the box is, as `x` (`y` for a
   horizontal box), the way a violin's already do. This holds with `dodge` and inside
   `rainclouds!` (#601).
