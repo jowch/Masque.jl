@@ -1069,29 +1069,20 @@ end
 
 # Point layer keeps the base id; the line/segment layer gets a suffix so the two ids stay
 # distinct in the manifest.
-# `tooltip` and `label` apply to both parts. `payloads` would need one list per part, so a
-# composite refuses it; build the two parts yourself for that.
-function _composite_kwargs(p, kw)
-    haskey(kw, :payloads) && throw(
-        ArgumentError(
-            "interactables($(Makie.plotkey(p))): `payloads` can't apply to both of this plot's layers; " *
-                "build them with PointInteractable and SegmentInteractable instead",
-        ),
-    )
-    return kw
-end
+# `tooltip` and `label` apply to both parts; `payloads` names its part, as in
+# `payloads = (points = rows,)` (see `_part_kwargs`).
 function _stem_parts(ax, p, base; kw...)
-    _composite_kwargs(p, kw)
+    kp, ks = _part_kwargs(p, [:points, :stems], kw)
     return AbstractInteractable[
-        PointInteractable(ax, _childof(p, Makie.Scatter); id = _part_id(base, :points), kw...),
-        SegmentInteractable(ax, _childof(p, Makie.LineSegments); id = _part_id(base, :stems), kw...),
+        PointInteractable(ax, _childof(p, Makie.Scatter); kp..., id = _part_id(base, :points)),
+        SegmentInteractable(ax, _childof(p, Makie.LineSegments); ks..., id = _part_id(base, :stems)),
     ]
 end
 function _scatterlines_parts(ax, p, base; kw...)
-    _composite_kwargs(p, kw)
+    kp, kl = _part_kwargs(p, [:points, :line], kw)
     return AbstractInteractable[
-        PointInteractable(ax, _childof(p, Makie.Scatter); id = _part_id(base, :points), kw...),
-        SegmentInteractable(ax, _childof(p, Makie.Lines); id = _part_id(base, :line), kw...),
+        PointInteractable(ax, _childof(p, Makie.Scatter); kp..., id = _part_id(base, :points)),
+        SegmentInteractable(ax, _childof(p, Makie.Lines); kl..., id = _part_id(base, :line)),
     ]
 end
 

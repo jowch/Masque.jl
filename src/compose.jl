@@ -12,7 +12,8 @@ builds several (`stem!`, `scatterlines!`) names them as its parts, `stem.points`
 (`tooltip`, `payloads`, `label`, and any the plot's constructor takes) pass through to the
 constructor, so `interactables(ax, s; tooltip = masque"…")` is `PointInteractable(ax, s;
 tooltip = masque"…")` for a scatter. A two-layer plot takes `tooltip` and `label` on both
-layers and refuses `payloads`. Unlike the constructor, it also moves the layers to where the
+layers, and `payloads` one list per part, keyed by its name: `payloads = (points = rows,)` for
+a `stem!`. Unlike the constructor, it also moves the layers to where the
 plot is drawn when `translate!`, `scale!`, or `rotate!` moved it, and returns no layers for a
 plot drawn outside data space (`space = :relative`, `:pixel`, `:clip`).
 
@@ -55,8 +56,9 @@ function interactables(ax, p::Makie.AbstractPlot; id = nothing, select = nothing
         )
         # The part drawn last comes first, as in the defaults.
         built = AbstractInteractable[]
-        for (c, pid) in Iterators.reverse(collect(zip(parts, _part_ids(ax, parts, id))))
-            append!(built, _drawn(_plot_interactables(ax, c; id = pid, kwargs...)))
+        kws = _part_kwargs(p, reverse(_part_ids(ax, parts, nothing)), kwargs)
+        for (c, pid, kw) in zip(reverse(parts), reverse(_part_ids(ax, parts, id)), kws)
+            append!(built, _drawn(_plot_interactables(ax, c; kw..., id = pid)))
         end
         isempty(built) && throw(_draws_nothing(ax, p))
         return built
@@ -94,12 +96,44 @@ end
 function _part_requests(ax, r)
     parts = _recipe_parts(ax, r.plot)
     isempty(parts) && throw(_draws_nothing(ax, r.plot))
+    kws = _part_kwargs(r.plot, reverse(_part_ids(ax, parts, nothing)), r.kwargs)
     id = get(r.kwargs, :id, nothing)
-    id === nothing && return _PlotRequest[_PlotRequest(c, r.kwargs) for c in Iterators.reverse(parts)]
+    id === nothing && return _PlotRequest[_PlotRequest(c, kw) for (c, kw) in zip(reverse(parts), kws)]
     return _PlotRequest[
-        _PlotRequest(c, merge(r.kwargs, (; id = pid)))
-            for (c, pid) in Iterators.reverse(collect(zip(parts, _part_ids(ax, parts, id))))
+        _PlotRequest(c, merge(kw, (; id = pid)))
+            for (c, pid, kw) in zip(reverse(parts), reverse(_part_ids(ax, parts, id)), kws)
     ]
+end
+
+# The keywords each part of a plot with several layers takes, in the order of `names`, the
+# parts' own names in layer order (`points`, `stems`; a recipe's `scatter`, `violin`). Every keyword applies
+# to every part except `payloads`, which is positional per mark and so names its part:
+# `payloads = (scatter = df, violin = rows)`. A part left out keeps its default payloads, and
+# a part's entry may itself be a `NamedTuple` for a part with parts of its own. A plot with
+# one part also takes a plain list, as before; with several, a list or an unknown name raises
+# an error that lists the real names, since a list can't say which part it is for.
+function _part_kwargs(p, names, kw)
+    kw = NamedTuple(kw)
+    pl = get(kw, :payloads, nothing)
+    pl === nothing && return fill(kw, length(names))
+    rest = Base.structdiff(kw, NamedTuple{(:payloads,)})
+    routed = pl isa NamedTuple && all(k -> k in names, keys(pl))
+    if !routed
+        length(names) == 1 && return [kw]
+        throw(_part_payloads_error(p, names, pl))
+    end
+    return [haskey(pl, n) ? merge(rest, (; payloads = pl[n])) : rest for n in names]
+end
+
+function _part_payloads_error(p, names, pl)
+    who = "interactables($(Makie.plotkey(p)))"
+    list = join(("`$n`" for n in names), ", ")
+    example = "payloads = (" * join(("$n = …" for n in names[1:min(2, end)]), ", ") * (length(names) > 2 ? ", …" : "") * ")"
+    unknown = pl isa NamedTuple ? [k for k in keys(pl) if !(k in names)] : Symbol[]
+    head = isempty(unknown) ?
+        "$who: this plot has several layers, so `payloads` takes one list per part, keyed by its name: `$example`." :
+        "$who: no part named " * join(("`$k`" for k in unknown), ", ") * "."
+    return ArgumentError("$head The parts are $list; each list has one entry per mark of that part")
 end
 
 # `interactables(ax, p; id, kwargs...)` as `masque` calls it. A recipe's own method need not
@@ -224,7 +258,11 @@ A recipe Masque has no default for, such as `contour!` or `rainclouds!`, gives t
 `masque(fig)` builds from the plots it draws, under the same ids: `contour!` gives `:lines`.
 With `id`, a recipe that draws one such plot takes it as its layer id, and one that draws
 several names them as its parts, `rain.violin` and `rain.scatter`. Each part takes the
-keywords you pass, so `payloads` fits only a recipe that draws one such plot. A recipe that
+keywords you pass, except `payloads`: a recipe that draws several parts takes one list per
+part, keyed by its name, as in `payloads = (scatter = df, violin = per_group)`. Each list has
+one entry per mark of its part, a part you leave out keeps its default payloads, and an
+unknown name raises `ArgumentError` listing the plot's parts. A part's name is its own plot's,
+numbered when one repeats (`lines`, `lines_2`), the name it takes under `id`. A recipe that
 draws none, or only ones that give no layer (`bracket!`'s text in pixel space), raises
 `ArgumentError`.
 
