@@ -1,7 +1,7 @@
 # `boxplot!`
 
 `masque(fig)` makes each box respond: hovering a box shows its
-quartiles, and a click selects it and sends it to your notebook. Only
+category and quartiles, and a click selects it and sends it to your notebook. Only
 the box itself responds, not its whiskers or outliers. Hover the boxes
 below, then click one:
 
@@ -24,6 +24,7 @@ with `@bind sel masque(fig)`, it is `sel.boxplot`.
 | Field | What it holds |
 |---|---|
 | `index` | the box's place from left to right, so `1` is the leftmost |
+| `x` | where the box sits on the axis: the value you passed in `route`, such as `2` for Route B (`y` for a horizontal box) |
 | `q1`, `median`, `q3` | the box's lower edge, middle line and upper edge |
 
 ## Show your own data

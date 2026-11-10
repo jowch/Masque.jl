@@ -23,7 +23,7 @@ of plot it is:
 |---|---|---|---|---|
 | raindrops | `sel.scatter` | one observation | `index`, `x`, `y` | the order of your data |
 | violins | `sel.violin` | one violin per category | `index`, `x` (the category's place on the axis, `1` for the first) | left to right |
-| boxes | `sel.boxplot` | one box per category | `index`, `q1`, `median`, `q3` | left to right |
+| boxes | `sel.boxplot` | one box per category | `index`, `x`, `q1`, `median`, `q3` | left to right |
 
 A raindrop's `index` is its position in your data, so
 `scores[sel.scatter.index]` is its value. Its `x` is where it is drawn,
