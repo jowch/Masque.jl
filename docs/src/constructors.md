@@ -144,7 +144,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `Text` | `TextInteractable` | `text`, `index`, `x`, `y` | `:text` |
 | `Stem` | `interactables(p)` | points, and stems as a second layer | `stem.points`, `stem.stems` |
 | `ScatterLines` | `interactables(p)` | points, and the line as a second layer that only shows its tooltip | `scatterlines.points`, `scatterlines.line` |
-| `BoxPlot` | `interactables(p)` | `q1`, `median`, `q3` (the box only) | `:boxplot` |
+| `BoxPlot` | `interactables(p)` | `x` (`y` when horizontal), `q1`, `median`, `q3` (the box only) | `:boxplot` |
 | `Annotation` | `interactables(p)` | the text's fields | `:annotation` |
 
 ## Axes, legends, and draggable tools

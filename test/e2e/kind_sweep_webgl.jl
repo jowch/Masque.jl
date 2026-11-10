@@ -534,6 +534,26 @@ HTML(
         "<span id=\"coords_raincloud\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.raincloud)))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-00000000054d
+@bind ev_boxplot sweep.boxplot
+
+# ╔═╡ d1000000-0000-0000-0000-00000000054e
+HTML(
+    "<span id=\"out_boxplot\">BOXPLOT=$(sweep_field("boxplot", ev_boxplot))</span>" *
+        "<span id=\"bond_boxplot\" style=\"display:none\">$(repr(ev_boxplot))</span>" *
+        "<span id=\"coords_boxplot\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.boxplot)))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000054f
+@bind ev_raincloud_box sweep.raincloud_box
+
+# ╔═╡ d1000000-0000-0000-0000-000000000550
+HTML(
+    "<span id=\"out_raincloud_box\">RAINCLOUD_BOX=$(sweep_field("raincloud_box", ev_raincloud_box))</span>" *
+        "<span id=\"bond_raincloud_box\" style=\"display:none\">$(repr(ev_raincloud_box))</span>" *
+        "<span id=\"coords_raincloud_box\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.raincloud_box)))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000111
 @bind ev_stairs sweep.stairs
 
@@ -1249,6 +1269,10 @@ HTML(
 # ╠═d1000000-0000-0000-0000-00000000054a
 # ╠═d1000000-0000-0000-0000-00000000054b
 # ╠═d1000000-0000-0000-0000-00000000054c
+# ╠═d1000000-0000-0000-0000-00000000054d
+# ╠═d1000000-0000-0000-0000-00000000054e
+# ╠═d1000000-0000-0000-0000-00000000054f
+# ╠═d1000000-0000-0000-0000-000000000550
 # ╠═d1000000-0000-0000-0000-000000000111
 # ╠═d1000000-0000-0000-0000-000000000112
 # ╠═d1000000-0000-0000-0000-0000000000b5
