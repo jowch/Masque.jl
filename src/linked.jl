@@ -409,10 +409,33 @@ function _manifest_group(manifest::AbstractDict, id::AbstractString)
     return nothing
 end
 
-# A group's key table, read back from the manifest as `_link_table` built it: in member order,
-# each mark's key, first appearance first. `nothing` for positions.
+# The key table `_link_table` built for each group a manifest ships, by the group's dict. The
+# manifest holds the keys as the page shows them (`_packable`): a `Date` key is text there, a
+# `missing` the word, so the `@bind` value reads the keys as given from here. Weak, as the
+# payload records of `_merge_payloads` are (`_COORD_KEYS`): by identity, gone with the manifest.
+const _GROUP_TABLES = Dict{UInt, Tuple{WeakRef, Any}}()
+const _GROUP_TABLES_LOCK = ReentrantLock()
+function _note_group_table!(g::AbstractDict, table)
+    lock(_GROUP_TABLES_LOCK) do
+        length(_GROUP_TABLES) > 64 && filter!(kv -> kv[2][1].value !== nothing, _GROUP_TABLES)
+        _GROUP_TABLES[objectid(g)] = (WeakRef(g), table)
+    end
+    return nothing
+end
+function _noted_group_table(g::AbstractDict)
+    return lock(_GROUP_TABLES_LOCK) do
+        e = get(_GROUP_TABLES, objectid(g), nothing)
+        e === nothing || e[1].value !== g ? nothing : e[2]
+    end
+end
+
+# A group's key table, as `_link_table` built it: in member order, each mark's key, first
+# appearance first. `nothing` for positions. A manifest read from elsewhere, which Masque didn't
+# build in this session, has only the keys it shipped, so the table is read back from those.
 function _group_table(manifest::AbstractDict, g::AbstractDict)
     haskey(g, "rows") || return nothing
+    t = _noted_group_table(g)
+    t === nothing || return t
     own = get(g, "keys", nothing)
     f = haskey(g, "key") ? Symbol(g["key"]) : nothing
     table = Any[]
