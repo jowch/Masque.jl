@@ -232,7 +232,7 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `many` | each `select = :many` layer (#335) | 13 B (`payload_envelope.jl` §K) |
 | `draw` | each layer whose plot `masque` knows (#462) | 6–8 B (key 5 B + a small integer); `payload_envelope.jl` at `d31f6e1` moved only the 1 000-point scatter manifest, by 6 B, and the two `:many` scatters by 0.1 KB |
 | `groups`, `group` | once per `linked(...)` group, and a tag on each member layer (#346) | under 0.1 KB by position; with `key`, `rows` adds one small integer per mark (`payload_envelope.jl` §M) |
-| `xfmt`, `yfmt`, `zfmt` | each axis transform whose ticks have a format string, `AngularTicks` or `MultiplesTicks`, and both dimensions of a `PolarAxis` (#510) | ~15–60 B per formatted dimension; absent on an axis with automatic ticks |
+| `xfmt`, `yfmt`, `zfmt` | each axis transform whose ticks have a format string, `AngularTicks` or `MultiplesTicks`, or hand-placed `(values, labels)` ticks (#606), and both dimensions of a `PolarAxis` (#510) | ~15–60 B per formatted dimension; hand-placed ticks add `ticks`, one `[value, label]` pair per plain-text tick (~10 B plus the label), per axis and not per element, so the envelope doesn't move (not re-benched); absent on an axis with automatic ticks |
 | `coords` | each layer whose payloads include fields Masque filled in that are measured along an axis: points, text, arrows (#510), and a bar's, hist's, waterfall's, box's, crossbar's or span's values (#543) | a field → axis map: 27 B for `{"x":"x","y":"y"}`, ~45 B for a bar's `low`/`high`/`value` |
 | `regions` | each grid layer given `regions = R` (#359) | `[id, n, …]` runs over the row-major cells, one pair per region edge crossed along a row (`payload_envelope.jl` §L) |
 

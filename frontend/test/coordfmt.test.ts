@@ -34,6 +34,13 @@ describe("fmtCoord", () => {
         expect(fmtCoord(Math.PI / 2, DEG, 6, true)).toBe("90°")
         expect(fmtCoord(1, DEG, 6, true)).toBe("57.2958°")
     })
+    it("prints a hand-placed tick's label for a value exactly on it, not while live (#606)", () => {
+        const T: CoordFormat = { ticks: [[1, "a"], [2, "b"]] }
+        expect(fmtCoord(1, T, 4, false)).toBe("a")
+        expect(fmtCoord(2, T, 4, false, true)).toBe("2.000")
+        expect(fmtCoord(1.5, T, 4, false)).toBe("1.5")
+        expect(fmtCoord(2, { ...T, label: "group" }, 4, false)).toBe("b")
+    })
     it("prints scientific notation for an `e` format", () => {
         expect(fmtCoord(12345, { exp: true }, 4, false)).toBe("1.235e+4")
         expect(fmtCoord(12345, { exp: true, spec: ".1e" }, 4, false)).toBe("1.2e+4")
