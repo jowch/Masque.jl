@@ -6,12 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A plot with several layers takes `payloads` for each of its parts, keyed by the part's name:
+  `interactables(rc; payloads = (scatter = df, violin = per_group))` for a `rainclouds!`, or
+  `interactables(st; payloads = (points = rows,))` for a `stem!`. A part you leave out keeps its
+  own payloads. A plain list, or a name the plot has no part for, raises an error that lists the
+  plot's parts (#599).
+
 ### Fixed
+- `masque(fig; payloads = …)`, and any other keyword `masque` doesn't take, raises an error that
+  says where the keyword goes, instead of a `MethodError` from inside Masque (#600).
 - A box plot's tooltip and `@bind` value now say which category the box is, as `x` (`y` for a
   horizontal box), the way a violin's already do. This holds with `dodge` and inside
   `rainclouds!` (#601).
 - On Makie 0.24.15 and earlier, `masque` no longer leaves out the violins of a `rainclouds!`
   plot (#608).
+- A widget whose payloads hold a `SubString`, a CSV.jl string column, a `CategoricalValue`, a
+  `Date`, a `Rational`, a `BigInt` or another value Pluto can't send to the page now shows,
+  instead of failing with "Only simple objects can be shared with JS". The tooltip shows each
+  value as Julia prints it, including `missing`, `nothing` and `Inf`, and the `@bind` value
+  still holds your own values (#607).
 
 ## [0.5.2] - 2026-11-08
 

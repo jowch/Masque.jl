@@ -210,6 +210,22 @@ rc = rainclouds!(ax, groups, values)
 
 A click on a violin is then `sel.rain.violin`.
 
+To attach your own data to a plot with several parts, give `payloads`
+one list per part, keyed by the part's name in the table above:
+
+```julia
+rc = rainclouds!(ax, groups, values)
+masque(fig, interactables(rc; payloads = (scatter = rows, violin = per_group)))
+```
+
+Each list has one entry per mark of its part, in the order the table
+gives: `rows` has one entry per raindrop, in the order of your data,
+and `per_group` one per violin, left to right. A part you leave out
+keeps the payloads Masque gives it. A plain list, or a name the plot
+has no part for, raises an error that lists the plot's parts. On a
+`stem!`, `payloads = (points = rows,)` gives the points your rows and
+leaves the stems as they are.
+
 Other plots that Masque builds from the marks they draw have one part,
 under the id in this table:
 
