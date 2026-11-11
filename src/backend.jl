@@ -250,8 +250,9 @@ end
 # once, as the wire's `CoordFormat` (`frontend/src/types.ts`), or `nothing` for the plain number.
 # Display only: the `@bind` value keeps the raw number. A format string gives its affixes and,
 # when it states one, its precision as a d3 spec; `AngularTicks` and `MultiplesTicks` give a
-# scale and a suffix. A function format, hand-placed `(values, labels)` ticks, a log scale and a
-# converted dimension (categories, dates, units) give nothing. `label` renames the table key
+# scale and a suffix. Hand-placed `(values, labels)` ticks give their labels, for a value exactly
+# on a tick (`_tick_labels`). A function format, a log scale and a converted dimension
+# (categories, dates, units) give nothing. `label` renames the table key
 # (`θ`, `r` on a PolarAxis) and is sent even when the number is plain.
 function _coord_format(ticks, format; scale = identity, conv = nothing, label = nothing)
     # A plot such as `boxplot!` sets `NoDimConversion` on its axes: plain numbers, as with none.
@@ -264,12 +265,29 @@ function _coord_format(ticks, format; scale = identity, conv = nothing, label = 
 end
 
 function _tick_format(ticks, format)
-    ticks isa Tuple && return nothing           # hand-placed `(values, labels)`: no rule between them
+    ticks isa Tuple && return _tick_labels(ticks)   # hand-placed `(values, labels)`
     format isa AbstractString && return _format_string(format)
     format isa Makie.Automatic || return nothing
     ticks isa Makie.AngularTicks && return _scaled_format(ticks.label_factor, ticks.suffix)
     ticks isa Makie.MultiplesTicks && return _scaled_format(1 / ticks.multiple, ticks.suffix)
     return nothing
+end
+
+# Hand-placed `(values, labels)` ticks have no rule between them, so a coordinate prints plain,
+# except one exactly on a tick, which prints that tick's label (#606): a category drawn at `1`
+# under a tick labelled `a` reads `a`, as the axis does. Only plain-text labels are sent; a
+# LaTeX or rich label leaves its tick's number plain.
+function _tick_labels(ticks)
+    length(ticks) == 2 || return nothing
+    vs, ls = ticks
+    (vs isa AbstractVector && ls isa AbstractVector && length(vs) == length(ls)) || return nothing
+    out = Any[]
+    for (v, l) in zip(vs, ls)
+        (v isa Real && isfinite(v)) || continue
+        t = l isa AbstractString && !(l isa Makie.LaTeXString) ? String(l) : nothing
+        t === nothing || push!(out, Any[Float64(v), t])
+    end
+    return isempty(out) ? nothing : Dict{String, Any}("ticks" => out)
 end
 
 function _scaled_format(scale, suffix)
@@ -510,6 +528,8 @@ function _colorbar_transform(id, cb, scaling, out_h)
     isnothing(lims) && error("Colorbar introspection: nothing limits (Makie internals changed?)")
     lo, hi = Float64(lims[1]), Float64(lims[2])
     sc = _scalesym(cb.scale[])
+    # Hand-placed ticks ship their `ticks` here too, unused: every colorbar readout is live, and
+    # `fmtCoord` prints a tick's label only for a settled value (#606).
     f = _coord_format(cb.ticks[], cb.tickformat[]; scale = cb.scale[])
     vertical = cb.vertical[]
     if vertical

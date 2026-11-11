@@ -21,6 +21,9 @@ All notable changes to this project are documented here. The format is based on
   `rainclouds!` (#601).
 - On Makie 0.24.15 and earlier, `masque` no longer leaves out the violins of a `rainclouds!`
   plot (#608).
+- On an axis with hand-placed tick labels, such as `xticks = (1:3, ["a", "b", "c"])`, a
+  tooltip coordinate exactly on a tick shows that tick's label in place of the number, so a
+  box or violin at `1` shows `x a`, not `x 1`. The `@bind` value keeps the number (#606).
 - A widget whose payloads hold a `SubString`, a CSV.jl string column, a `CategoricalValue`, a
   `Date`, a `Rational`, a `BigInt` or another value Pluto can't send to the page now shows,
   instead of failing with "Only simple objects can be shared with JS". The tooltip shows each

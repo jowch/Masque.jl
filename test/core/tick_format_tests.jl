@@ -39,7 +39,20 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test cf(Makie.automatic, Makie.automatic) === nothing
         @test cf(Makie.LinearTicks(4), Makie.automatic) === nothing
         @test cf(Makie.automatic, vs -> string.(vs) .* "%") === nothing    # a function: not followed
-        @test cf(([1, 2], ["a", "b"]), "{:.1f}") === nothing                # hand-placed labels
+        # Hand-placed labels: a value on a tick prints its label (#606); LaTeX labels are left out.
+        @test cf(([1, 2], ["a", "b"]), "{:.1f}") == Dict("ticks" => Any[Any[1.0, "a"], Any[2.0, "b"]])
+        @test cf(([1, 2], [L"\alpha", "b"]), Makie.automatic) == Dict("ticks" => Any[Any[2.0, "b"]])
+        @test cf(([1], [L"\alpha"]), Makie.automatic) === nothing
+        @test cf(([1, 2], ["a", "b"]), Makie.automatic; scale = log10) === nothing
+        # A raincloud whose category ticks carry labels: its box and violin tooltips name them,
+        # while the `@bind` value keeps the number. (Makie places string categories at 1, 2, …
+        # but leaves the ticks numeric, so the labels are set by hand.)
+        figr = Figure(); axr = Axis(figr[1, 1]; xticks = (1:2, ["a", "b"]))
+        rainclouds!(axr, repeat(["a", "b"], inner = 20), randn(40))
+        wr = masque(figr)
+        @test only(values(wr.manifest["transforms"]))["xfmt"]["ticks"] == Any[Any[1.0, "a"], Any[2.0, "b"]]
+        box = only(filter(i -> i.id === :boxplot, Masque.interactables(figr)))
+        @test [pl.x for pl in box.payloads] == [1.0, 2.0]
         @test cf(Makie.automatic, "{:.1f}"; scale = log10) === nothing      # log scale
         @test cf(Makie.automatic, "{:.1f}"; conv = Makie.CategoricalConversion()) === nothing
         @test cf(Makie.automatic, Makie.automatic; label = "r") == Dict("label" => "r")
