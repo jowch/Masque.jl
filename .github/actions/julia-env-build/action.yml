@@ -8,6 +8,17 @@ inputs:
   version:
     description: Julia version to set up ('1.10', '1', ...)
     required: true
+  target:
+    description: >
+      scripts/cloud-warm.sh target that resolves the env: julia-fetch (newest releases) or
+      julia-floor-fetch (the Makie packages at their compat lower bounds)
+    default: julia-fetch
+  env-dir:
+    description: Directory under the runner's temp dir that holds the env
+    default: masque-dev
+  cache-prefix:
+    description: Start of every cache key, so envs resolved differently never share a depot
+    default: julia-env-v1
 outputs:
   key:
     description: Cache key of the precompiled depot + env
@@ -23,7 +34,7 @@ runs:
       with:
         version: ${{ inputs.version }}
     - shell: bash
-      run: echo "MASQUE_DEV_ENV=$RUNNER_TEMP/masque-dev" >> "$GITHUB_ENV"
+      run: echo "MASQUE_DEV_ENV=$RUNNER_TEMP/${{ inputs.env-dir }}" >> "$GITHUB_ENV"
     # Start from the newest depot for this Julia build, so a dependency release only recompiles
     # what it touches. Old package versions pile up in the depot this way (366 MB in Oct 2026);
     # when it grows too big, bump `v1` in every key below to start from an empty depot once.
@@ -35,21 +46,21 @@ runs:
           ~/.julia/packages
           ~/.julia/registries
           ~/.julia/scratchspaces
-          ${{ runner.temp }}/masque-dev
-        key: julia-env-v1-${{ runner.os }}-${{ steps.julia.outputs.julia-version }}-none
-        restore-keys: julia-env-v1-${{ runner.os }}-${{ steps.julia.outputs.julia-version }}-
+          ${{ runner.temp }}/${{ inputs.env-dir }}
+        key: ${{ inputs.cache-prefix }}-${{ runner.os }}-${{ steps.julia.outputs.julia-version }}-none
+        restore-keys: ${{ inputs.cache-prefix }}-${{ runner.os }}-${{ steps.julia.outputs.julia-version }}-
     # Resolve from scratch, like Pkg.test() did: the restored manifest would otherwise pin
     # yesterday's versions, and CI should meet new dependency releases as they come out.
     - name: Resolve and download the env
       shell: bash
       run: |
         rm -rf "$MASQUE_DEV_ENV"
-        scripts/cloud-warm.sh julia-fetch
+        scripts/cloud-warm.sh ${{ inputs.target }}
     - id: key
       shell: bash
       run: |
         hash=$(sha256sum "$MASQUE_DEV_ENV/Manifest.toml" | cut -c1-16)
-        echo "key=julia-env-v1-${{ runner.os }}-${{ steps.julia.outputs.julia-version }}-$hash" >> "$GITHUB_OUTPUT"
+        echo "key=${{ inputs.cache-prefix }}-${{ runner.os }}-${{ steps.julia.outputs.julia-version }}-$hash" >> "$GITHUB_OUTPUT"
     - id: lookup
       uses: actions/cache/restore@v4
       with:
@@ -59,7 +70,7 @@ runs:
           ~/.julia/packages
           ~/.julia/registries
           ~/.julia/scratchspaces
-          ${{ runner.temp }}/masque-dev
+          ${{ runner.temp }}/${{ inputs.env-dir }}
         key: ${{ steps.key.outputs.key }}
         lookup-only: true
     # JULIA_CPU_TARGET=generic: runners differ in CPU, and a native pkgimage built on one is
@@ -80,5 +91,5 @@ runs:
           ~/.julia/packages
           ~/.julia/registries
           ~/.julia/scratchspaces
-          ${{ runner.temp }}/masque-dev
+          ${{ runner.temp }}/${{ inputs.env-dir }}
         key: ${{ steps.key.outputs.key }}

@@ -150,6 +150,29 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
+  compat-floor:
+    # Core on Julia 1.10 with Makie, CairoMakie and WGLMakie at the lowest versions Project.toml's
+    # [compat] allows. Every other job resolves the newest releases, so without this one a read
+    # of an internal that only newer Makie has passes CI and breaks users on an allowed older
+    # release (#608). When it fails, use the newer API only where it exists, or raise the floor
+    # in [compat]; this job follows the new bound by itself. It builds its own env and cache.
+    name: Compat floor (Julia 1.10)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/julia-env-build
+        with:
+          version: '1.10'
+          target: julia-floor-fetch
+          env-dir: masque-floor
+          cache-prefix: julia-floor-env-v1
+      - name: Core tests
+        env:
+          GROUP: Core
+        run: julia --color=yes --project="$MASQUE_DEV_ENV" test/runtests.jl
+
   webgl-bind-e2e:
     # THROUGH-Pluto `@bind` E2E: a live headless Pluto kernel + real Chromium, with the notebook
     # in a worker process, as users run it. The kind sweep runs its notebooks in the server
@@ -426,7 +449,7 @@ jobs:
     # runs, passes when every job passed or skipped, and keeps job renames out of the ruleset.
     name: CI result
     if: always()
-    needs: [changes, setup, setup-lts, julia, webgl-bind-e2e, kind-sweep, examples, lint]
+    needs: [changes, setup, setup-lts, julia, compat-floor, webgl-bind-e2e, kind-sweep, examples, lint]
     runs-on: ubuntu-latest
     steps:
       - name: Every job passed or skipped

@@ -15,7 +15,10 @@ plots in Pluto. Browser layer is TypeScript in `frontend/`, bundled by esbuild t
   every Julia, sweep and fixture job restores it (`.github/actions/julia-env*`). A CI-only
   failure is usually a newer dep: rebuild your env with `rm -rf "$MASQUE_DEV_ENV"` first.
   Notebooks and e2e scripts that CI runs activate `MASQUE_DEV_ENV` when it is set; a new one
-  must too, or it rebuilds the Makie stack in its own temp env. PRs touching only
+  must too, or it rebuilds the Makie stack in its own temp env. The `Compat floor` job runs Core
+  on Julia 1.10 with Makie/CairoMakie/WGLMakie at their `[compat]` lower bounds
+  (`cloud-warm.sh julia-floor-fetch`); reproduce it locally with `MASQUE_DEV_ENV` pointed at a
+  scratch dir, never your dev env. PRs touching only
   `docs/src`, `docs/dev` or `*.md` skip the Julia jobs (the "Changed files" job).
 - **CI runs when a PR is ready.** A draft PR runs only the lint job; the Julia, sweep, fixture
   and docs jobs run once it is marked ready for review. When a draft needs full CI anyway (say,
