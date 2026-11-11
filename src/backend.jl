@@ -528,6 +528,8 @@ function _colorbar_transform(id, cb, scaling, out_h)
     isnothing(lims) && error("Colorbar introspection: nothing limits (Makie internals changed?)")
     lo, hi = Float64(lims[1]), Float64(lims[2])
     sc = _scalesym(cb.scale[])
+    # Hand-placed ticks ship their `ticks` here too, unused: every colorbar readout is live, and
+    # `fmtCoord` prints a tick's label only for a settled value (#606).
     f = _coord_format(cb.ticks[], cb.tickformat[]; scale = cb.scale[])
     vertical = cb.vertical[]
     if vertical
