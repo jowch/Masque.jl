@@ -628,8 +628,11 @@ function _raincloud_cats(p)
     return nothing
 end
 # Makie 0.24.16+ keeps the category positions as the `x_positions` node; earlier 0.24 releases
-# compute them inside `plot!` and keep no copy, so they are recomputed the same way from the
-# labels: string categories numbered 1, 2, … in first-appearance order, numbers as given.
+# compute them inside `plot!` and keep no copy, so they are recomputed from the labels as Makie
+# numbers them: string categories 1, 2, … in first-appearance order, numbers as given. Makie
+# first expands the deprecated nested-vector data per point, which drops the label of an empty
+# group; here that label still takes a number. Payloads snap to the nearest category, so the
+# reported category is the same either way.
 function _raincloud_positions(q)
     haskey(q.attributes, :x_positions) && return q.x_positions[]
     return _raincloud_positions_from(q.category_labels[])

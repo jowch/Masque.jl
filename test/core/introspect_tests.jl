@@ -1436,9 +1436,9 @@ end
         fr = Figure(); ar = Axis(fr[1, 1])
         rainclouds!(ar, repeat(["North", "South"]; inner = 40), randn(80))
         Makie.update_state_before_display!(fr)
-        ids = [i.id for i in interactables(fr)]
-        @test :violin in ids && :boxplot in ids
-        @test [pl.x for pl in only(filter(i -> i.id === :violin, interactables(fr))).payloads] == [1.0, 2.0]
+        rcs = interactables(fr)
+        @test :violin in [i.id for i in rcs] && :boxplot in [i.id for i in rcs]
+        @test [pl.x for pl in only(filter(i -> i.id === :violin, rcs)).payloads] == [1.0, 2.0]
         # Makie before 0.24.16 has no `x_positions` node, so the positions are recomputed from the
         # labels; on a Makie that has the node, the recomputed positions must match it.
         @test Masque._raincloud_positions_from(["b", "a", "b", "c"]) == [1, 2, 1, 3]
