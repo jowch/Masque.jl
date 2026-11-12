@@ -577,6 +577,19 @@ function check_reachable(player::AbstractDict, manifest::AbstractDict, keys)
 end
 
 """
+    changing_cells(states) -> states
+
+Each state's cells without the ones that are the same in every state, such as a second
+widget that doesn't use the bond. The page already shows those, and the player leaves a cell
+it has no snapshot for as it is, so a notebook can hold several widgets and stay small.
+"""
+function changing_cells(states::AbstractVector{<:AbstractDict})
+    isempty(states) && return states
+    same = Set(id for (id, v) in first(states) if all(st -> haskey(st, id) && json_write(jsonable(st[id])) == json_write(jsonable(v)), states))
+    return [filter(p -> !(first(p) in same), st) for st in states]
+end
+
+"""
     snapshot_table(keyed) -> (table, extra_bytes)
 
 `keyed` is `key => snapshot` pairs, idle (`"null"`) first. Identical snapshots are stored
