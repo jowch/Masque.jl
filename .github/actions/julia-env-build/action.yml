@@ -19,6 +19,11 @@ inputs:
   cache-prefix:
     description: Start of every cache key, so envs resolved differently never share a depot
     default: julia-env-v1
+  restore-exact:
+    description: >
+      'true' when the calling job runs its tests itself: on a cache hit, restore the depot under
+      the exact key, since the prefix restore above may have brought a newer, different one
+    default: 'false'
 outputs:
   key:
     description: Cache key of the precompiled depot + env
@@ -76,6 +81,18 @@ runs:
     # JULIA_CPU_TARGET=generic: runners differ in CPU, and a native pkgimage built on one is
     # rejected and rebuilt on another. Generic images load everywhere; the test jobs themselves
     # run native.
+    - if: steps.lookup.outputs.cache-hit == 'true' && inputs.restore-exact == 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          ~/.julia/artifacts
+          ~/.julia/compiled
+          ~/.julia/packages
+          ~/.julia/registries
+          ~/.julia/scratchspaces
+          ${{ runner.temp }}/${{ inputs.env-dir }}
+        key: ${{ steps.key.outputs.key }}
+        fail-on-cache-miss: true
     - name: Precompile
       if: steps.lookup.outputs.cache-hit != 'true'
       shell: bash

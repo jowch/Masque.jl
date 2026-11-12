@@ -63,6 +63,8 @@ for target in "$@"; do
                 # The compat floor: the lowest release each Makie package compat allows, so a
                 # read of an internal that only newer Makie has fails CI (#614).
                 if ARGS[2] == "julia-floor-fetch"
+                    # VersionBound fields .t and .n are Pkg internals (checked on Julia 1.10 and 1.13);
+                    # if a Pkg update breaks this, it breaks here, in the floor CI job only.
                     lowest(spec) = minimum(Pkg.Versions.semver_spec(spec).ranges) do r
                         b = r.lower
                         VersionNumber(ntuple(i -> i <= b.n ? Int(b.t[i]) : 0, 3)...)
