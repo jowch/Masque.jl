@@ -34,10 +34,15 @@ export function fmtNum(v: unknown, digits: number = DEFAULT_SIGDIGITS): string {
 // Precision, highest first: `tooltip_sigdigits` when the user set it (`explicit`), the precision
 // a Makie format string states (`spec`), then `digits` significant figures. `live` is for a value
 // that changes as the pointer moves, which keeps its trailing zeros so the label holds its width
-// (state.ts's `fmt`). With no format this is today's plain number. Not HTML-escaped.
+// (state.ts's `fmt`). A value exactly on a hand-placed tick prints that tick's label, except
+// `live` (#606). With no format this is today's plain number. Not HTML-escaped.
 export function fmtCoord(v: unknown, f: CoordFormat | undefined, digits: number, explicit: boolean, live = false): string {
     if (typeof v !== "number" || !Number.isFinite(v)) return String(v)
     if (!f) return live ? v.toPrecision(digits) : fmtNum(v, digits)
+    if (f.ticks && !live) {
+        const t = f.ticks.find(([tv]) => tv === v)
+        if (t) return t[1]
+    }
     const x = v * (f.scale ?? 1)
     let body: string
     if (f.spec && !explicit) {

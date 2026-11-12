@@ -133,6 +133,12 @@ repo's own docs build) one widget already warns and two fail.
   samples is 1.5 KB in 2.5 KB, 1 000 is 14.7 KB in 21.0 KB, 10 000 is 147 KB in 206 KB. No
   cap, as on 2D: at 10 000 samples it is still under the scatter. A zoomed Axis3 whose limits
   cut a line also ships `drawn`, one small integer per drawn vertex.
+- **Payload value types** (#607, re-run 2026-11-10 on `f1525a6` plus the change): the manifest
+  is converted to the plain types Pluto ships, and payload values to their tooltip text where
+  the page would print them differently. Plain payloads ship the same bytes as before (the
+  10 000-point scatter is still 381.1 KB). The pass costs ~0.13 s of a 2.9 s `masque` call on a
+  200 000-point scatter with `(; name, v)` payloads (38 ms for the payloads, 90 ms for the
+  manifest walk), about 4%.
 - **Not display width.** `px_per_unit` scales the PNG roughly with the square of the width but
   leaves the manifest alone: scatter-1000's PNG is 90 KB at 300 px and 188 KB at 700 px, its
   manifest 38 KB at both. The design width it ships for hit slack (`cssWidth`, #527) is one
@@ -226,7 +232,7 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `many` | each `select = :many` layer (#335) | 13 B (`payload_envelope.jl` §K) |
 | `draw` | each layer whose plot `masque` knows (#462) | 6–8 B (key 5 B + a small integer); `payload_envelope.jl` at `d31f6e1` moved only the 1 000-point scatter manifest, by 6 B, and the two `:many` scatters by 0.1 KB |
 | `groups`, `group` | once per `linked(...)` group, and a tag on each member layer (#346) | under 0.1 KB by position; with `key`, `rows` adds one small integer per mark (`payload_envelope.jl` §M) |
-| `xfmt`, `yfmt`, `zfmt` | each axis transform whose ticks have a format string, `AngularTicks` or `MultiplesTicks`, and both dimensions of a `PolarAxis` (#510) | ~15–60 B per formatted dimension; absent on an axis with automatic ticks |
+| `xfmt`, `yfmt`, `zfmt` | each axis transform whose ticks have a format string, `AngularTicks` or `MultiplesTicks`, or hand-placed `(values, labels)` ticks (#606), and both dimensions of a `PolarAxis` (#510) | ~15–60 B per formatted dimension; hand-placed ticks add `ticks`, one `[value, label]` pair per plain-text tick (~10 B plus the label), per axis and not per element, so the envelope doesn't move (not re-benched); absent on an axis with automatic ticks |
 | `coords` | each layer whose payloads include fields Masque filled in that are measured along an axis: points, text, arrows (#510), and a bar's, hist's, waterfall's, box's, crossbar's or span's values (#543) | a field → axis map: 27 B for `{"x":"x","y":"y"}`, ~45 B for a bar's `low`/`high`/`value` |
 | `regions` | each grid layer given `regions = R` (#359) | `[id, n, …]` runs over the row-major cells, one pair per region edge crossed along a row (`payload_envelope.jl` §L) |
 

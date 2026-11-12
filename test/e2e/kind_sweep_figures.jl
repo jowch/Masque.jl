@@ -371,9 +371,10 @@ kind_sweep_meta() = [
     ),
     Dict(
         # The box of a horizontal `rainclouds!` sits off its category; it names it as `y` (#601).
+        # Its y ticks are labelled by hand, so the tooltip reads the label (#606).
         "key" => "raincloud_box", "layerId" => "boxplot", "layerKind" => "rects",
         "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
-        "tip" => "y 1", "hoverIndex" => 1, "hoverTip" => "y 2", "mode" => "element",
+        "tip" => "y a", "hoverIndex" => 1, "hoverTip" => "y b", "mode" => "element",
     ),
     Dict(
         # `stairs!`: one stepped line is one element; hover reads out the nearest step (#262).
@@ -1545,10 +1546,10 @@ function build_kind_sweep()
 
     raincloud_box = let
         q = [log(p / (1 - p)) / 1.7 for p in range(0.0025, 0.9975; length = 200)]
-        xs = repeat([1, 2]; inner = 200)
+        xs = repeat(["a", "b"]; inner = 200)
         ys = vcat(q, q .* 0.6 .+ 1)
         fig = Figure(size = (480, 260))
-        ax = Axis(fig[1, 1]; title = "raincloud, horizontal")
+        ax = Axis(fig[1, 1]; title = "raincloud, horizontal", yticks = (1:2, ["a", "b"]))
         rainclouds!(ax, xs, ys; orientation = :horizontal, color = (:steelblue, 0.6), markersize = 2)
         masque(fig; selected = Dict(:boxplot => [1]))
     end

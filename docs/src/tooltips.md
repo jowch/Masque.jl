@@ -122,9 +122,12 @@ such as `$(y:.1f) mV`.
 Set `tooltip_sigdigits` and it wins over the format's own precision:
 with `tooltip_sigdigits = 6`, the `"{:.1f} mV"` axis shows `3.4721 mV`.
 
-An axis whose `xtickformat` is a function, whose ticks are hand-placed
-`(values, labels)`, or that has a log scale, keeps plain numbers. Use a
-template to format those.
+On an axis with hand-placed ticks, such as `xticks = (1:3, ["a", "b",
+"c"])`, a coordinate that sits exactly on a tick shows that tick's
+label, so a box at `1` shows `x a`.
+The `@bind` value keeps the number. Any other coordinate on that axis
+stays a plain number, as it does on an axis whose `xtickformat` is a
+function or that has a log scale. Use a template to format those.
 
 ## Write a template
 
