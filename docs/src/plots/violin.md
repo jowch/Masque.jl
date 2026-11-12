@@ -1,7 +1,7 @@
 # `violin!`
 
 `masque(fig)` makes each violin respond on its own: hovering a violin
-shows its `x`, the number you placed it at, and a click selects it and
+shows its category, the tick label under it, and a click selects it and
 sends it to your notebook. Hover the violins below, then click one:
 
 ```@raw html
@@ -30,8 +30,9 @@ its category as `y` instead of `x`.
 
 ## Show your own data
 
-To show the species instead of its number, give each violin a payload, one per
-violin from left to right, and a tooltip template that uses its fields:
+To show what the axis can't, such as how many penguins each violin holds and
+their median weight, give each violin a payload, one per violin from left to
+right, and a tooltip template that uses its fields:
 
 ```@raw html
 <div class="masque-embed-wrap">
