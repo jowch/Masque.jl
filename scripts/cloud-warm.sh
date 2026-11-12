@@ -2,7 +2,8 @@
 # Lazily warm what a task needs, instead of paying for it at every session start.
 # Idempotent: re-running `julia` on a warm machine takes ~10 s (npm ci always reinstalls).
 #
-#   scripts/cloud-warm.sh [julia] [julia-fetch] [frontend] [e2e]     (no args = julia)
+#   scripts/cloud-warm.sh [julia] [julia-fetch] [julia-floor-fetch] [frontend] [e2e]
+#                                                                    (no args = julia)
 #
 #   julia     Shared dev env at $MASQUE_DEV_ENV: Masque (dev'd from this checkout)
 #             + every [deps]/[extras] package in Project.toml + Pluto 1 + PlutoUI, precompiled
@@ -19,6 +20,10 @@
 #                   bash /tmp/masque-setup/scripts/cloud-warm.sh julia-fetch || true
 #               rm -rf /tmp/masque-setup
 #             The env then points at the deleted clone until a session runs `julia`.
+#   julia-floor-fetch  The julia-fetch env with Makie, CairoMakie and WGLMakie pinned to the
+#             lowest versions Project.toml's [compat] allows, not precompiled. CI's compat-floor
+#             job builds it in its own directory (point MASQUE_DEV_ENV elsewhere first, or it
+#             replaces your dev env's versions).
 #   frontend  `npm ci` in frontend/.
 #   e2e       `npm install` + the Chromium build matching test/e2e's pinned Playwright
 #             (already preinstalled on the cloud image: no download, see CLAUDE.md).
@@ -34,7 +39,7 @@ DEV_ENV="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}"
 for target in "$@"; do
     echo "== cloud-warm: $target"
     case "$target" in
-        julia | julia-fetch)
+        julia | julia-fetch | julia-floor-fetch)
             mkdir -p "$DEV_ENV"
             # JULIA_NOSYSIMAGE=1: a sysimage wrapper (e.g. the Cursor image) would preload
             # CairoMakie + Masque; a no-op for stock julia. JULIA_PKG_PRECOMPILE_AUTO=0: precompile
@@ -55,6 +60,25 @@ for target in "$@"; do
                 Pkg.add(Pkg.PackageSpec(name = "Pluto", version = "1"))
                 # The fixture notebook test/notebooks/view_manip.jl uses PlutoUI.
                 Pkg.add("PlutoUI")
+                # The compat floor: the lowest release each Makie package compat allows, so a
+                # read of an internal that only newer Makie has fails CI (#614).
+                if ARGS[2] == "julia-floor-fetch"
+                    # VersionBound fields .t and .n are Pkg internals (checked on Julia 1.10 and 1.13);
+                    # if a Pkg update breaks this, it breaks here, in the floor CI job only.
+                    lowest(spec) = minimum(Pkg.Versions.semver_spec(spec).ranges) do r
+                        b = r.lower
+                        VersionNumber(ntuple(i -> i <= b.n ? Int(b.t[i]) : 0, 3)...)
+                    end
+                    floors = [
+                        Pkg.PackageSpec(name = n, version = lowest(p["compat"][n]))
+                            for n in ("Makie", "CairoMakie", "WGLMakie")
+                    ]
+                    Pkg.add(floors)
+                    Pkg.pin([Pkg.PackageSpec(name = s.name) for s in floors])
+                    for s in floors
+                        println(s.name, " pinned at ", s.version)
+                    end
+                end
                 ARGS[2] == "julia" && Pkg.precompile()
             ' "$REPO" "$target"
             echo "$target env ready: $DEV_ENV"
@@ -88,7 +112,7 @@ for target in "$@"; do
             (cd "$REPO/test/e2e" && npx playwright install --with-deps chromium)
             ;;
         *)
-            echo "unknown target: $target (expected julia, julia-fetch, frontend, e2e)" >&2
+            echo "unknown target: $target (expected julia, julia-fetch, julia-floor-fetch, frontend, e2e)" >&2
             exit 2
             ;;
     esac

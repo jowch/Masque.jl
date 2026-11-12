@@ -13,6 +13,11 @@ All notable changes to this project are documented here. The format is based on
   own payloads. A plain list, or a name the plot has no part for, raises an error that lists the
   plot's parts (#599).
 
+### Changed
+- Masque now needs Makie 0.24.14 or later, with CairoMakie 0.15.14 or WGLMakie 0.13.14 or later.
+  On older 0.24 releases, 3D axes already misbehaved: Masque picked up an Axis3's own panes as
+  plots. With an older Makie, Pkg keeps the Masque version you have (#614).
+
 ### Fixed
 - `masque(fig; payloads = …)`, and any other keyword `masque` doesn't take, raises an error that
   says where the keyword goes, instead of a `MethodError` from inside Masque (#600).
