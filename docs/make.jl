@@ -79,6 +79,15 @@ makedocs(;
                 "Custom shapes" => "custom.md",
             ],
         ],
+        "Plot types" => [
+            "All plot types" => "plots.md",
+            "Distributions" => [
+                "violin!" => "plots/violin.md",
+                "boxplot!" => "plots/boxplot.md",
+                "rainclouds!" => "plots/rainclouds.md",
+                "density!" => "plots/density.md",
+            ],
+        ],
         "Examples" => [
             "Examples" => "gallery.md",
             "Compare a cluster" => "gallery/cluster.md",
@@ -88,7 +97,7 @@ makedocs(;
             "From a heatmap cell to its trace" => "gallery/heatmap-trace.md",
             "Box-select scatter" => "gallery/boxselect.md",
             "Image ROI" => "gallery/image.md",
-            "Plot types" => [
+            "Plot overviews" => [
                 "Bars and areas" => "gallery/bars.md",
                 "Polygons" => "gallery/polygons.md",
                 "Text labels" => "gallery/text.md",

@@ -582,7 +582,7 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
         push!(states, (; key, payloads, htmls, n_inlined))
     end
     first(states).key == "null" || error("first player state must be idle in $(basename(path))")
-    snapshots, extra = snapshot_table([st.key => Dict("cells" => st.payloads) for st in states]; manifest)
+    snapshots, extra = snapshot_table([st.key => Dict("cells" => cells) for (st, cells) in zip(states, changing_cells([st.payloads for st in states]))]; manifest)
     check_budget(path, length(states), length(snapshots["snaps"]), extra)
     onchange && (snapshots["frames"] = Dict{String, Any}("dir" => basename(frames_dir) * "/", "keys" => frames))
     # The frames redrew the figure and moved its controls. Back to the starting picture through
