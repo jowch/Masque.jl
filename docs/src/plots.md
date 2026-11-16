@@ -30,6 +30,7 @@ add for the parts that don't respond on their own.
 | [`contourf!`](plots/contourf.md) | grid | each filled region |
 | [`hexbin!`](plots/hexbin.md) | grid | each hexagon |
 | [`datashader!`](plots/datashader.md) | grid | each pixel |
+| [`spy!`](plots/spy.md) | grid | each nonzero entry |
 | [`scatter!`, `lines!` on an `Axis3`](plots/points3d.md) | 3D | each marker, sphere and line |
 | [`surface!`](plots/surface.md) | 3D | the point nearest the pointer |
 | [`arrows3d!`](plots/arrows3d.md) | 3D | each arrow |
@@ -39,7 +40,6 @@ add for the parts that don't respond on their own.
 | [`hlines!`, `vlines!`](plots/hlines.md) | segments | each line |
 | [`ablines!`](plots/ablines.md) | segments | each line |
 | [`arrows2d!`](plots/arrows2d.md) | segments | each arrow |
-| [`spy!`](plots/spy.md) | segments | each nonzero entry |
 | [`streamplot!`](plots/streamplot.md) | several parts | each arrowhead, and the stream lines |
 | [`stem!`](plots/stem.md) | several parts | each point, and each stem |
 

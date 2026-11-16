@@ -31,7 +31,9 @@ reads "Jun" rather than `6`.
 
 ## Show your own data
 
-Give each bar a payload, one per bar in the order of your data:
+Give each bar a payload, one per bar in the order of your data. A
+click then returns the payload's fields, and the bar's place moves from
+`segment_index` to `pick.index`:
 
 ```@raw html
 <div class="masque-embed-wrap">

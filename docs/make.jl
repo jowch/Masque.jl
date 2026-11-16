@@ -114,6 +114,7 @@ makedocs(;
                 "contourf!" => "plots/contourf.md",
                 "hexbin!" => "plots/hexbin.md",
                 "datashader!" => "plots/datashader.md",
+                "spy!" => "plots/spy.md",
             ],
             "3D" => [
                 "Points and lines on an Axis3" => "plots/points3d.md",
@@ -128,7 +129,6 @@ makedocs(;
                 "ablines!" => "plots/ablines.md",
                 "arrows2d!" => "plots/arrows2d.md",
                 "stem!" => "plots/stem.md",
-                "spy!" => "plots/spy.md",
             ],
             "Several parts" => [
                 "streamplot!" => "plots/streamplot.md",

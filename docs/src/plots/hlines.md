@@ -30,7 +30,8 @@ itself, and a click on a vertical line leaves it alone. With
 ## Show your own data
 
 Give each plot its own [`interactables`](@ref), with a payload per
-line:
+line. A click then returns the payload's fields, and the line's place
+moves from `segment_index` to `pick.index`:
 
 ```@raw html
 <div class="masque-embed-wrap">

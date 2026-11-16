@@ -31,7 +31,9 @@ respond too, with their own field in the `@bind` value.
 
 ## Show your own data
 
-Give each line a payload, one per line in the order you gave them:
+Give each line a payload, one per line in the order you gave them. A
+click then returns the payload's fields, and the line's place moves
+from `segment_index` to `pick.index`:
 
 ```@raw html
 <div class="masque-embed-wrap">

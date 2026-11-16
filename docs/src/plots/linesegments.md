@@ -45,7 +45,8 @@ Main.masque_fallback("plots_linesegments"; segment = "data")
 ```
 
 A click also returns the payload's fields, so `pick.task` is the task
-you clicked. [Tooltips](@ref) lists what a template can do.
+you clicked, and the segment's place moves from `segment_index` to
+`pick.index`. [Tooltips](@ref) lists what a template can do.
 
 ## Supported axes
 

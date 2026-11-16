@@ -146,6 +146,10 @@ types](plots.md) lists every plot that has a page.
   <img alt="A ring of points drawn with datashader, with the pointer's tooltip showing a pixel's count" src="assets/gallery/datashader.png">
   <span>datashader!</span>
 </a>
+<a class="masque-gallery-card" data-dir="plots" data-page="spy">
+  <img alt="The nonzero entries of a 20 by 20 matrix, with one entry picked" src="assets/gallery/spy.png">
+  <span>spy!</span>
+</a>
 <a class="masque-gallery-card" data-dir="plots" data-page="points3d">
   <img alt="A 3D scatter of response by dose and age, with one marker picked" src="assets/gallery/points3d.png">
   <span>3D scatter! / lines!</span>
@@ -189,10 +193,6 @@ types](plots.md) lists every plot that has a page.
 <a class="masque-gallery-card" data-dir="plots" data-page="stem">
   <img alt="A decaying signal drawn as stems, with one point picked" src="assets/gallery/stem.png">
   <span>stem!</span>
-</a>
-<a class="masque-gallery-card" data-dir="plots" data-page="spy">
-  <img alt="The nonzero entries of a 20 by 20 matrix, with one entry picked" src="assets/gallery/spy.png">
-  <span>spy!</span>
 </a>
 </div>
 ```

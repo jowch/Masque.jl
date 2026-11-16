@@ -2,7 +2,8 @@
 
 `masque(fig)` makes each error bar respond: hovering a bar shows the
 value it belongs to and its two ends, and a click selects it and sends
-it to your notebook. Hover the bars below, then click one:
+it to your notebook. Hover a bar's whiskers or ends below, since its
+middle sits under a marker, then click one:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -31,7 +32,9 @@ respond too, with their own field in the `@bind` value.
 
 ## Show your own data
 
-Give each bar a payload, one per bar in the order of your data:
+Give each bar a payload, one per bar in the order of your data. A
+click then returns the payload's fields, and the bar's place moves from
+`segment_index` to `pick.index`:
 
 ```@raw html
 <div class="masque-embed-wrap">
