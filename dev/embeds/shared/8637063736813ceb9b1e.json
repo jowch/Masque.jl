@@ -1,0 +1,1 @@
+{"cells":{"b10f0003-0001-4000-8000-000000000004":{"body":{"elements":[["boxplot",["ElementEvent(:boxplot, 1, x = 1.0, q1 = 5.25818, median = 5.77252, q3 = 6.48168)","text/plain"]],["scatter",["nothing","text/plain"]],["violin",["nothing","text/plain"]]],"objectid":"bb69bb29919a1c3","type":"NamedTuple"},"mime":"application/vnd.pluto.tree+object"}}}
