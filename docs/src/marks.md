@@ -39,7 +39,8 @@ these fields:
 | [`barplot!`](plots/barplot.md), [`waterfall!`](plots/waterfall.md) | `x`, the bar's category (`y` for horizontal bars), `value`, `low`, `high` |
 | [`hist!`](plots/hist.md) | `value` (the bin's height, a count with `normalization = :none`), `low`, `high` |
 | [`crossbar!`](plots/crossbar.md) | `midpoint`, `low`, `high` |
-| `poly!`, bands, densities, Voronoi cells | `index` only: the polygon's position in the order you plotted them |
+| `poly!`, bands, densities | `index` only: the polygon's position in the order you plotted them |
+| `voronoiplot!` | `x` and `y` of the cell's point, and `value` when the cells are coloured by values; `index` is the point's position in the order you passed them |
 | [`violin!`](plots/violin.md) | `x`, the violin's category (`y` for a horizontal violin) |
 | [`contourf!`](plots/contourf.md) | `low` and `high` of the level |
 | [`hexbin!`](plots/hexbin.md) | `x` and `y`, the hexagon's center, and `count` |
