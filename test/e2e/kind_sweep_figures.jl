@@ -384,6 +384,13 @@ kind_sweep_meta() = [
         "tip" => "x a", "hoverIndex" => 3, "hoverTip" => "x b", "mode" => "element",
     ),
     Dict(
+        # A `qqnorm!` with a reference line, its tooltip keyed by part (#616): the template
+        # names the points' own payload field, which the line doesn't have.
+        "key" => "qq_tip", "layerId" => "scatter", "layerKind" => "circles",
+        "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "customer = 2", "hoverIndex" => 0, "hoverTip" => "Customer 2 waited", "mode" => "element",
+    ),
+    Dict(
         # `stairs!`: one stepped line is one element; hover reads out the nearest step (#262).
         # A default line, so it shows its tooltip and takes no click (#335): `hoverOnly` makes
         # the driver check that a click commits nothing in place of the click checks.
@@ -1568,6 +1575,22 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:boxplot => [1]))
     end
 
+    qq_tip = let
+        wait = [3.0, 1.0, 4.0, 1.5, 5.0, 9.0, 2.5, 6.0]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "qqnorm, per-part tooltip")
+        q = qqnorm!(ax, wait; qqline = :fitrobust)
+        masque(
+            fig,
+            interactables(
+                q;
+                payloads = (scatter = [(customer = c,) for c in sortperm(wait)],),
+                tooltip = (scatter = masque"Customer $(customer) waited $(y) min",),
+            );
+            selected = Dict(:scatter => [2]),
+        )
+    end
+
     stairs = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "stairs", limits = (0, 5, 0, 4))
@@ -2240,7 +2263,7 @@ function build_kind_sweep()
     return (;
         scatter, scatter_low, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, box_hidden, box_axes, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, violin_h, raincloud, boxplot, raincloud_box, barplot_cat, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_data_corner, view_resized, view_nested, legend, series_legend,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, violin_h, raincloud, boxplot, raincloud_box, qq_tip, barplot_cat, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_data_corner, view_resized, view_nested, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, choices, menu_view, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

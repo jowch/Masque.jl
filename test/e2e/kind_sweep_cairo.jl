@@ -563,6 +563,16 @@ HTML(
         "<span id=\"coords_barplot_cat\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.barplot_cat)))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000616
+@bind ev_qq_tip sweep.qq_tip
+
+# ╔═╡ c1000000-0000-0000-0000-000000000617
+HTML(
+    "<span id=\"out_qq_tip\">QQ_TIP=$(sweep_field("qq_tip", ev_qq_tip))</span>" *
+        "<span id=\"bond_qq_tip\" style=\"display:none\">$(repr(ev_qq_tip))</span>" *
+        "<span id=\"coords_qq_tip\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.qq_tip)))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000111
 @bind ev_stairs sweep.stairs
 
@@ -1284,6 +1294,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000550
 # ╠═c1000000-0000-0000-0000-000000000551
 # ╠═c1000000-0000-0000-0000-000000000552
+# ╠═c1000000-0000-0000-0000-000000000616
+# ╠═c1000000-0000-0000-0000-000000000617
 # ╠═c1000000-0000-0000-0000-000000000111
 # ╠═c1000000-0000-0000-0000-000000000112
 # ╠═c1000000-0000-0000-0000-0000000000b5

@@ -126,6 +126,51 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         out = interactables(ax, sl; payloads = (line = ["whole"],))
         @test ids(out) == [Symbol("scatterlines.points"), Symbol("scatterlines.line")]
         @test out[2].payloads == ["whole"] && length(out[1].payloads) == 3
+        # `tooltip` may name its part too (#616); a plain template still goes to both.
+        tip = masque"point {y}"
+        out = interactables(ax, sl; tooltip = (points = tip,))
+        @test out[1].tooltip === tip && out[2].tooltip === nothing
+        out = interactables(ax, sl; tooltip = tip)
+        @test all(i -> i.tooltip === tip, out)
+        out = interactables(ax, sl; tooltip = (points = tip, line = false))
+        @test out[1].tooltip === tip && out[2].tooltip === false
+        out = assemble(f, interactables(sl; tooltip = (line = tip,), payloads = (line = ["whole"],)))
+        @test out[1].tooltip === nothing && out[2].tooltip === tip && out[2].payloads == ["whole"]
+        err = try
+            interactables(ax, sl; tooltip = (point = tip,))
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("no part named `point` in `tooltip`", err.msg) &&
+            occursin("`points`, `line`", err.msg)
+        # A part's own entry is one template; a nested `NamedTuple` there says so.
+        err = try
+            interactables(ax, sl; tooltip = (line = (x = tip,),))
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("part `line` has one layer", err.msg)
+    end
+
+    @testset "a tooltip for one part of a qqnorm! (#616)" begin
+        f = Figure(); ax = Axis(f[1, 1])
+        wait = [3.0, 1.0, 4.0, 1.5, 5.0, 9.0]
+        q = qqnorm!(ax, wait; qqline = :fitrobust)
+        tip = masque"Customer $(customer), waited $(y) min"
+        pl = (scatter = [(customer = c,) for c in sortperm(wait)],)
+        # One template for every part fails on the reference line, which has no `customer`.
+        @test_throws ArgumentError masque(f, interactables(q; payloads = pl, tooltip = tip)).manifest
+        w = masque(f, interactables(q; payloads = pl, tooltip = (scatter = tip,)))
+        layers = Dict(l["id"] => l for l in w.manifest["layers"])
+        @test haskey(layers["scatter"], "template") && !haskey(layers["segments"], "template")
+        # A plot with one layer takes one template, and says so.
+        s = scatter!(ax, wait, wait)
+        err = try
+            assemble(f, interactables(s; tooltip = (scatter = tip,)))
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("one layer", err.msg)
     end
 
     @testset "interactables(recipe) for a recipe built from its parts" begin
@@ -173,6 +218,23 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
             @test err isa ArgumentError && occursin("`boxplot`, `scatter`, `violin`", err.msg)
             @test_throws ArgumentError interactables(ax, rc; payloads = bad)
         end
+        # Per-part tooltips (#616): a template naming one part's fields goes to that part only.
+        tip = masque"{drop}"
+        rows = [(drop = d,) for d in drops]
+        out = assemble(f, interactables(rc; payloads = (scatter = rows,), tooltip = (scatter = tip,)))
+        @test out[2].tooltip === tip && out[1].tooltip === nothing && out[3].tooltip === nothing
+        @test masque(f, interactables(rc; payloads = (scatter = rows,), tooltip = (scatter = tip,))).manifest isa AbstractDict
+        out = assemble(f, interactables(rc; id = :rain, tooltip = (violin = tip,)); auto = false)
+        @test [i.tooltip for i in out] == [nothing, nothing, tip]
+        for bad in ((scatters = tip,), (scatter = tip, box = tip))
+            err = try
+                assemble(f, interactables(rc; tooltip = bad))
+            catch e
+                e
+            end
+            @test err isa ArgumentError && occursin("`boxplot`, `scatter`, `violin`", err.msg) &&
+                occursin("`tooltip`", err.msg)
+        end
         # A part with parts of its own takes a NamedTuple of them.
         f = Figure(); ax = Axis(f[1, 1])
         sd = stemanddots!(ax, Point2f.(1:3, 1:3))
@@ -182,12 +244,17 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         @test byid[Symbol("stem.points")].payloads == ["a", "b", "c"]
         @test byid[Symbol("stem.stems")].payloads[1] isa NamedTuple
         @test_throws ArgumentError interactables(ax, sd; payloads = (stem = ["a", "b", "c"],))
+        out = interactables(ax, sd; tooltip = (stem = (stems = tip,),))
+        byid = Dict(i.id => i for i in out)
+        @test byid[Symbol("stem.stems")].tooltip === tip
+        @test byid[Symbol("stem.points")].tooltip === nothing && byid[:scatter].tooltip === nothing
         # A recipe that draws one part still takes a plain list, and also its part's name.
         f = Figure(); ax = Axis(f[1, 1])
         c = contour!(ax, [sin(i / 2) * cos(j / 2) for i in 1:8, j in 1:8]; levels = 3)
         n = length(only(interactables(ax, c)).payloads)
         @test only(interactables(ax, c; payloads = fill("l", n))).payloads == fill("l", n)
         @test only(assemble(f, interactables(c; payloads = (lines = fill("l", n),)))).payloads == fill("l", n)
+        @test only(interactables(ax, c; tooltip = (lines = tip,))).tooltip === tip
         # A recipe whose parts all give no layer errors, as one with no known parts does.
         f = Figure(); ax = Axis(f[1, 1])
         b = bracket!(ax, 1, 0, 2, 0; text = "gap")
