@@ -38,8 +38,9 @@ under the part's name, `scatter`. Because the points come smallest
 first, sort your rows the same way: `sortperm(wait)` lists the
 customers from the shortest wait up. (A `qqplot!` of two samples of
 different lengths draws as many points as the shorter sample has, so
-give it that many payloads.) The tooltip then shows the payload's fields
-next to the quantiles:
+give it that many payloads.) A tooltip template, keyed by the same part
+name, can use the payload's fields next to `x` and `y`; the line keeps
+its default tooltip:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -53,7 +54,7 @@ Main.masque_fallback("plots_qqplot"; segment = "data")
 
 A click on a point also returns its payload, so `sel.scatter.customer`
 is the customer you clicked. [Plots with several parts](@ref) says how
-payloads work for each part.
+payloads and tooltips work for each part.
 
 ## Supported axes
 

@@ -33,8 +33,10 @@ point, call it with `pick.scatter.x` and `pick.scatter.y`.
 ## Show your own text
 
 Makie decides where the arrowheads and lines go, so give a tooltip
-template rather than payloads. The template applies to both parts and
-can use `x` and `y`:
+template rather than payloads. A plain template applies to both parts
+and can use `x` and `y`; to give one part its own, key the templates by
+part name, as in `tooltip = (scatter = masque"…",)`, and the other part
+keeps its default:
 
 ```@raw html
 <div class="masque-embed-wrap">
