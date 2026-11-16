@@ -1273,6 +1273,27 @@ end
         @test [pl.x for pl in ri2.payloads] == [1.0, 2.0, 3.0]         # #613: the step's position
         # |value| ≈ bar height (low..high span)
         @test abs(ri2.payloads[2].value) ≈ ri2.payloads[2].high - ri2.payloads[2].low
+
+        # show_final = true (#618): the total bars are drawn first; the hit boxes and low/high
+        # must still come from the step bars, not the total.
+        fig3 = Figure(); ax3 = Axis(fig3[1, 1])
+        wf3 = waterfall!(ax3, 1:4, [5.0, -2.0, 3.0, -1.0]; show_final = true)
+        Makie.update_state_before_display!(fig3)
+        ri3 = RectInteractable(ax3, wf3; id = :waterfall)
+        @test length(ri3.payloads) == 4
+        @test [(q.low, q.high) for q in ri3.payloads] == [(0.0, 5.0), (3.0, 5.0), (3.0, 6.0), (5.0, 6.0)]
+        @test [q.value for q in ri3.payloads] == [5.0, -2.0, 3.0, -1.0]
+        # each hit box is its own step's bar, not the full-height total bar
+        @test [r[4] for r in ri3.data] ≈ [5.0, 2.0, 3.0, 1.0]
+        @test [r[2] for r in ri3.data] ≈ [2.5, 4.0, 4.5, 5.5]
+
+        # with dodge, each x gets its own total; the steps still come from the step bars
+        fig4 = Figure(); ax4 = Axis(fig4[1, 1])
+        wf4 = waterfall!(ax4, [1, 1, 2, 2], [2.0, 1.0, -1.0, 3.0]; dodge = [1, 2, 1, 2], show_final = true)
+        Makie.update_state_before_display!(fig4)
+        ri4 = RectInteractable(ax4, wf4; id = :waterfall)
+        @test [(q.low, q.high) for q in ri4.payloads] == [(0.0, 2.0), (2.0, 3.0), (-1.0, 0.0), (-1.0, 2.0)]
+        @test [r[4] for r in ri4.data] ≈ [2.0, 1.0, 1.0, 3.0]
     end
 
     @testset "CrossBar extraction" begin

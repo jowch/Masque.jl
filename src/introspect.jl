@@ -1054,8 +1054,18 @@ function RectInteractable(ax, p::Makie.Hist; id = :hist, payloads = nothing, too
     pl = _merge_payloads(_hist_payloads(rs, bar.direction[]), payloads, "RectInteractable"; dims)
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
+# With `show_final = true` Makie draws the final-total bars first (one translucent bar behind
+# each step, or one per x with `dodge`), then the step bars, so the step bars are the last
+# BarPlot child. The total bars stay out of the hit layer for now: they would compete with
+# the steps they sit behind. Hovering the grey total area answers nothing.
+function _waterfall_steps(p)
+    bars = filter(c -> c isa Makie.BarPlot, _child_plots(p))
+    length(bars) == 1 + p.show_final[] ||
+        error("Waterfall: expected $(1 + p.show_final[]) BarPlot children, got $(length(bars)) (Makie internals changed?)")
+    return last(bars)
+end
 function RectInteractable(ax, p::Makie.Waterfall; id = :waterfall, payloads = nothing, tooltip = nothing, label = _plot_label(p))
-    bar = _childof(p, Makie.BarPlot)
+    bar = _waterfall_steps(p)
     rs = _bar_rects(bar)
     # Waterfall has no `direction`: its bars always stand on y.
     pl = _merge_payloads(_unconvert_payloads(ax, _waterfall_payloads(p, rs)), payloads, "RectInteractable"; dims = _along(:y, :low, :high, :value))

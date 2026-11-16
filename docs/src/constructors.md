@@ -124,8 +124,8 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 |---|---|---|---|
 | `Scatter` | `PointInteractable` | `index`, `x`, `y`[, `z`] | `:scatter` |
 | `MeshScatter` | `PointInteractable` | `index`, `x`, `y`, `z` | `:meshscatter` |
-| `Lines` / `Stairs` | `SegmentInteractable` | `index` (the whole line is one mark); a click, once the line is named in `bind`, picks its nearest data point: `index`, `line`, `x`, `y` | `:lines` / `:stairs` |
-| `Series` | `SegmentInteractable` | `index`; `label` when the series has one; a click, once named in `bind`, picks a data point as for `Lines` | `:series` |
+| [`Lines`](plots/lines.md) / [`Stairs`](plots/stairs.md) | `SegmentInteractable` | `index` (the whole line is one mark); a click, once the line is named in `bind`, picks its nearest data point: `index`, `line`, `x`, `y` | `:lines` / `:stairs` |
+| [`Series`](plots/series.md) | `SegmentInteractable` | `index`; `label` when the series has one; a click, once named in `bind`, picks a data point as for `Lines` | `:series` |
 | `LineSegments` / `Errorbars` / `Rangebars` / `HLines` / `VLines` / `Wireframe` | `SegmentInteractable` | `segment_index` | `:segments`, `:errorbars`, … |
 | `Arrows3D` | `SegmentInteractable` | `index`, `x`, `y`, `z`, `u`, `v`, `w` | `:arrows3d` |
 | `Arrows2D` | `SegmentInteractable` | `index`, `x`, `y`, `u`, `v` | `:arrows2d` |
@@ -143,7 +143,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `Hexbin` | `PolygonInteractable` | `x`, `y`, `count` | `:hexbin` |
 | `Text` | `TextInteractable` | `text`, `index`, `x`, `y` | `:text` |
 | `Stem` | `interactables(p)` | points, and stems as a second layer | `stem.points`, `stem.stems` |
-| `ScatterLines` | `interactables(p)` | points, and the line as a second layer that only shows its tooltip | `scatterlines.points`, `scatterlines.line` |
+| [`ScatterLines`](plots/scatterlines.md) | `interactables(p)` | points, and the line as a second layer that only shows its tooltip | `scatterlines.points`, `scatterlines.line` |
 | [`BoxPlot`](plots/boxplot.md) | `interactables(p)` | `x` (`y` when horizontal), `q1`, `median`, `q3` (the box only) | `:boxplot` |
 | `Annotation` | `interactables(p)` | the text's fields | `:annotation` |
 
