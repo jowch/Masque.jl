@@ -47,9 +47,8 @@ Main.masque_fallback("plots_stairs"; segment = "data")
 
 ## Supported axes
 
-`stairs!` works on a 2D `Axis`. On an `Axis3`, it responds as one whole
-line, with no step to pick. On a `PolarAxis`, it is skipped with a
-warning.
+`stairs!` works on a 2D `Axis`. On an `Axis3` or a `PolarAxis`, it is
+skipped with a warning.
 
 ## Where to go next
 

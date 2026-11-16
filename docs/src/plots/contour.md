@@ -33,7 +33,7 @@ The click doesn't say which level the contour is.
 
 Draw the contours with `labels = true`, and each label responds on its
 own: hovering one shows its text, the level, and a click on it returns
-`text`. The lines and the labels are then two parts; see [Plots with
+its `text`, `index`, `x` and `y`. The lines and the labels are then two parts; see [Plots with
 several parts](@ref):
 
 ```@raw html

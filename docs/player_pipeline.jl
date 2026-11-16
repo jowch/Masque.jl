@@ -11,6 +11,9 @@ include("player_segments.jl")
 # JSON.jl 1.9 loads Parsers 3 into this process, and Julia can only bind one
 # Parsers per UUID, so harvest writes through JSON.jl instead.
 const _JSON = Base.require(Base.PkgId(Base.UUID("682c06a0-de6a-54ab-a142-c8b1cf79cde6"), "JSON"))
+# `allownan` writes a bare `NaN` (contour paths break with it). That is safe in the payloads
+# inlined into the player's `<script>`, which JavaScript parses, but not in a state file the
+# player loads with `r.json()`, where `NaN` is a parse error: keep `NaN` out of state files.
 json_write(x) = _JSON.json(x; allownan = true)
 json_read(s::AbstractString) = _JSON.parse(s)
 

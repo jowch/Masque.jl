@@ -24,10 +24,13 @@ figure passes the plot as `bind`, so `pick` is that event itself; with
 
 | Field | What it holds |
 |---|---|
-| `index` | the step's place along the curve, from the smallest value up |
+| `index` | the point's place along the curve: `1` is where the curve starts, and each later point is one distinct value, smallest first |
 | `line` | always `1` |
 | `x` | one of your values |
-| `y` | the share of your data at or below `x`, from 0 to 1 |
+| `y` | the share of your data at or below `x`, from 0 to 1; at index `1`, the start, it is `0` |
+
+Equal values share one step, so `index` doesn't count your data: to
+find the rows at a step, keep those equal to `pick.x`.
 
 ## Show your own data
 
