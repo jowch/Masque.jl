@@ -129,22 +129,22 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `LineSegments` / `Errorbars` / `Rangebars` / `HLines` / `VLines` / `Wireframe` | `SegmentInteractable` | `segment_index` | `:segments`, `:errorbars`, … |
 | `Arrows3D` | `SegmentInteractable` | `index`, `x`, `y`, `z`, `u`, `v`, `w` | `:arrows3d` |
 | `Arrows2D` | `SegmentInteractable` | `index`, `x`, `y`, `u`, `v` | `:arrows2d` |
-| `BarPlot` | `RectInteractable` | `low`, `high`, `value` | `:bars` |
-| `Hist` | `RectInteractable` | `value`, `low`, `high` | `:hist` |
-| `Waterfall` | `RectInteractable` | `low`, `high`, `value` | `:waterfall` |
-| `CrossBar` | `RectInteractable` | `midpoint`, `low`, `high` | `:crossbar` |
-| `HSpan` / `VSpan` | `RectInteractable` | `low`, `high` | `:hspan` / `:vspan` |
+| [`BarPlot`](plots/barplot.md) | `RectInteractable` | `low`, `high`, `value` | `:bars` |
+| [`Hist`](plots/hist.md) | `RectInteractable` | `value`, `low`, `high` | `:hist` |
+| [`Waterfall`](plots/waterfall.md) | `RectInteractable` | `low`, `high`, `value` | `:waterfall` |
+| [`CrossBar`](plots/crossbar.md) | `RectInteractable` | `midpoint`, `low`, `high` | `:crossbar` |
+| [`HSpan`](plots/hspan.md) / [`VSpan`](plots/hspan.md) | `RectInteractable` | `low`, `high` | `:hspan` / `:vspan` |
 | `Spy` | `RectInteractable` | `index` | `:spy` |
 | `Heatmap` / `Image` | `GridInteractable` | `i`, `j`, `value`, plus the cell's own `payloads` | `:cells` |
 | `Surface` | `SurfaceInteractable` | `i`, `j`, `x`, `y`, `z`; `value` when `color` is a separate matrix | `:surface` |
-| `Poly` / `Band` / `Density` / `Voronoiplot` | `PolygonInteractable` | `index` | `:poly`, `:band`, … |
+| `Poly` / `Band` / [`Density`](plots/density.md) / `Voronoiplot` | `PolygonInteractable` | `index` | `:poly`, `:band`, … |
 | `Contourf` | `PolygonInteractable` | `low`, `high` | `:contourf` |
-| `Violin` | `PolygonInteractable` | `x` (`y` when horizontal) | `:violin` |
+| [`Violin`](plots/violin.md) | `PolygonInteractable` | `x` (`y` when horizontal) | `:violin` |
 | `Hexbin` | `PolygonInteractable` | `x`, `y`, `count` | `:hexbin` |
 | `Text` | `TextInteractable` | `text`, `index`, `x`, `y` | `:text` |
 | `Stem` | `interactables(p)` | points, and stems as a second layer | `stem.points`, `stem.stems` |
 | `ScatterLines` | `interactables(p)` | points, and the line as a second layer that only shows its tooltip | `scatterlines.points`, `scatterlines.line` |
-| `BoxPlot` | `interactables(p)` | `x` (`y` when horizontal), `q1`, `median`, `q3` (the box only) | `:boxplot` |
+| [`BoxPlot`](plots/boxplot.md) | `interactables(p)` | `x` (`y` when horizontal), `q1`, `median`, `q3` (the box only) | `:boxplot` |
 | `Annotation` | `interactables(p)` | the text's fields | `:annotation` |
 
 ## Axes, legends, and draggable tools

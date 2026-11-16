@@ -92,7 +92,7 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | `arrows2d!` (`Arrows2D`) | `:arrows2d` | `:segments` | — | — |
 | `heatmap!` / `image!` | `:cells` | `:grid` | — | — |
 | `surface!` | `:surface` | `:surface` | yes | yes |
-| `barplot!` | `:bars` | `:rects` | — | — |
+| [`barplot!`](plots/barplot.md) | `:bars` | `:rects` | — | — |
 | `poly!` | `:poly` | `:polygons` | — | — |
 | `stairs!` | `:stairs` | `:lines` | — | — |
 | `series!` | `:series` | `:lines` | — | yes |
@@ -100,19 +100,19 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | `rangebars!` | `:rangebars` | `:segments` | — | — |
 | `hlines!` / `vlines!` | `:hlines` / `:vlines` | `:segments` | — | — |
 | `spy!` | `:spy` | `:rects` | — | — |
-| `hist!` | `:hist` | `:rects` | — | — |
-| `waterfall!` | `:waterfall` | `:rects` | — | — |
-| `crossbar!` | `:crossbar` | `:rects` | — | — |
-| `hspan!` / `vspan!` | `:hspan` / `:vspan` | `:rects` | — | — |
+| [`hist!`](plots/hist.md) | `:hist` | `:rects` | — | — |
+| [`waterfall!`](plots/waterfall.md) | `:waterfall` | `:rects` | — | — |
+| [`crossbar!`](plots/crossbar.md) | `:crossbar` | `:rects` | — | — |
+| [`hspan!`](plots/hspan.md) / [`vspan!`](plots/hspan.md) | `:hspan` / `:vspan` | `:rects` | — | — |
 | `band!` | `:band` | `:polygons` | — | — |
-| `density!` | `:density` | `:polygons` | — | — |
+| [`density!`](plots/density.md) | `:density` | `:polygons` | — | — |
 | `contourf!` | `:contourf` | `:polygons` | — | — |
-| `violin!` | `:violin` | `:polygons` | — | — |
+| [`violin!`](plots/violin.md) | `:violin` | `:polygons` | — | — |
 | `voronoiplot!` | `:voronoiplot` | `:polygons` | — | — |
 | `hexbin!` | `:hexbin` | `:polygons` | — | — |
 | `stem!` | `stem.points` + `stem.stems` | `:circles` + `:segments` | — | — |
 | `scatterlines!` | `scatterlines.points` + `scatterlines.line` | `:circles` + `:lines` | yes | yes |
-| `boxplot!` | `:boxplot` | `:rects` or `:polygons` (body only) | — | — |
+| [`boxplot!`](plots/boxplot.md) | `:boxplot` | `:rects` or `:polygons` (body only) | — | — |
 | `text!` | `:text` | `:rects` | yes | — |
 | `annotation!` | `:annotation` | `:rects` | — | — |
 | `Colorbar` (block) | `:colorbar` | `:axis` | yes | yes |
@@ -177,12 +177,12 @@ a click reports the mark's place in that order as its `index`, so
 | | `stems` | one stem | the order of your data |
 | `scatterlines!` | `points` | one point | the order of your data |
 | | `line` | the whole line | — |
-| `rainclouds!` | `scatter` | one raindrop, for one observation | the order of your data |
+| [`rainclouds!`](plots/rainclouds.md) | `scatter` | one raindrop, for one observation | the order of your data |
 | | `violin` | one violin per category | left to right along the axis |
 | | `boxplot` | one box per category | left to right along the axis |
 | `contour!` with `labels = true` | `lines` | every contour line together | — |
 | | `text` | one label | the order Makie draws them, which you don't set |
-| `qqplot!` / `qqnorm!` with a `qqline` | `scatter` | one point | smallest quantile first |
+| [`qqplot!`](plots/qqplot.md) / [`qqnorm!`](plots/qqplot.md) with a `qqline` | `scatter` | one point | smallest quantile first |
 | | `segments` | the reference line | — |
 | `streamplot!` | `scatter` | one arrowhead | the order Makie draws them, which you don't set |
 | | `lines` | every streamline together | — |
