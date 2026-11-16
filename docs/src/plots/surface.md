@@ -17,9 +17,9 @@ Main.masque_fallback("plots_surface"; segment = "default")
 ## What a click returns
 
 In the figures on this page, hover the surface to read it; a click works
-in your notebook, where it gives a [`GridCellEvent`](@ref): with `@bind pick masque(fig; bind = sf)`,
-`pick` is that event itself, and with `@bind sel masque(fig)`, it is
-`sel.surface`. Its fields:
+in your notebook, where it gives a [`GridCellEvent`](@ref): with `@bind
+pick masque(fig; bind = sf)`, `pick` is that event itself, and with
+`@bind sel masque(fig)`, it is `sel.surface`. Its fields:
 
 | Field | What it holds |
 |---|---|
@@ -49,9 +49,10 @@ Main.masque_fallback("plots_surface"; segment = "data")
 `surface!` works on an `Axis3` and on a `PolarAxis`, where the tooltip
 shows each point's angle and radius. A `heatmap!` on a `PolarAxis` is
 [skipped with a warning](@ref polar-skipped-plots), so draw a polar
-heatmap with `surface!(ax, θ, r, values; shading = NoShading)` instead. On a 2D `Axis`, it is skipped with a warning; draw the
-matrix with [`heatmap!`](heatmap.md) there instead. A `wireframe!` over
-the same grid is left as decoration, so the surface responds.
+heatmap with `surface!(ax, θ, r, values; shading = NoShading)` instead.
+On a 2D `Axis`, it is skipped with a warning; draw the matrix with
+[`heatmap!`](heatmap.md) there instead. A `wireframe!` over the same
+grid is left as decoration, so the surface responds.
 
 ## Where to go next
 

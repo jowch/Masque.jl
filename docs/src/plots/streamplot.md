@@ -25,7 +25,7 @@ click there. Each is an [`ElementEvent`](@ref):
 | Part | Fields |
 |---|---|
 | `scatter` | `index`, which arrowhead in Makie's order, and `x`, `y`, where it sits |
-| `lines` | `index`, always `1`, and `x`, `y`, the point on a line nearest the pointer |
+| `lines` | `index`, the point's place along all the lines together; `line`, always `1`; and `x`, `y`, the point on a line nearest the pointer |
 
 The flow function itself isn't sent: to read the flow at a clicked
 point, call it with `pick.scatter.x` and `pick.scatter.y`.

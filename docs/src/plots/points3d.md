@@ -44,8 +44,8 @@ Main.masque_fallback("plots_points3d"; segment = "data")
 ## Hover lines and spheres
 
 A `lines!` responds along its whole length, with the point you plotted
-nearest the pointer, and a `meshscatter!` responds over each sphere.
-Where two spheres overlap, the one nearer the camera responds:
+nearest the pointer, and a `meshscatter!` responds over each sphere,
+the one nearer the camera where two overlap:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -67,8 +67,9 @@ orbit the view by dragging.
 
 On an `Axis3`, `scatter!`, `meshscatter!`, `lines!`, `linesegments!`,
 `scatterlines!`, `text!`, `surface!`, `wireframe!` and `arrows3d!`
-respond. A `scatter!` drawn with a `marker_offset` is skipped with a
-warning, and so is any other plot, with a note that names it.
+respond. A `scatter!` sized in data units (`markerspace = :data`) with a
+`marker_offset` is skipped with a warning, and so is any other plot,
+with a note that names it.
 
 ## Where to go next
 
