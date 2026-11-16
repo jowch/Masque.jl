@@ -1561,7 +1561,22 @@ end
         xs, ys = [0.1, 0.4, 0.7, 0.3, 0.9, 0.5, 0.2, 0.8], [0.2, 0.6, 0.1, 0.9, 0.4, 0.5, 0.8, 0.3]
         @test sort([(pl.x, pl.y) for pl in pi.payloads]) == sort(collect(zip(xs, ys)))
         @test all(k -> pi.payloads[k].index == k, 1:8)
-        @test all(k -> IP._in_ring(Point2f(pi.payloads[k].x, pi.payloads[k].y), pi.rings[k]), 1:8)
+        function inring(pt, ring)
+            inside = false
+            for i in eachindex(ring)
+                a, b = ring[i], ring[mod1(i + 1, length(ring))]
+                (a[2] > pt[2]) != (b[2] > pt[2]) && pt[1] < (b[1] - a[1]) * (pt[2] - a[2]) / (b[2] - a[2]) + a[1] && (inside = !inside)
+            end
+            return inside
+        end
+        @test all(k -> inring(Point2f(pi.payloads[k].x, pi.payloads[k].y), pi.rings[k]), 1:8)
+        # A clip that leaves a site outside the drawn cells still names every cell's site.
+        fk = Figure(); ak = Axis(fk[1, 1])
+        pk = voronoiplot!(ak, [0.1, 0.4, 0.7, 0.3, 0.9], [0.2, 0.6, 0.1, 0.9, 0.4]; clip = Rect2f(0.2, 0.0, 1.0, 1.0))
+        Makie.update_state_before_display!(fk)
+        ik = PolygonInteractable(ak, pk)
+        @test all(pl -> haskey(pl, :x), ik.payloads)
+        @test allunique([(pl.x, pl.y) for pl in ik.payloads])
         @test IP._coord_keys(pi.payloads) == [:x => :x, :y => :y]
         ints = interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
@@ -1603,6 +1618,17 @@ end
         ic = only(interactables(fc))
         @test all(pl -> haskey(pl, :index) && pl.high > pl.low, ic.payloads)
         @test sort(unique([(round(pl.low; digits = 4), round(pl.high; digits = 4)) for pl in ic.payloads])) == [(0.0, 1.0), (1.0, 2.0)]
+        # Float32 levels and values print as you wrote them, not as their Float32 neighbours.
+        fl = Figure(); al = Axis(fl[1, 1])
+        tricontourf!(al, [0.0, 1.0, 0.0, 1.0, 0.5], [0.0, 0.0, 1.0, 1.0, 0.5], [0.0, 0.25, 0.5, 1.0, 0.15]; levels = [0.0, 0.1, 0.2, 0.3, 1.0])
+        Makie.update_state_before_display!(fl)
+        @test Set(pl.low for pl in only(interactables(fl)).payloads) ⊆ Set([0.0, 0.1, 0.2, 0.3])
+        f32 = Figure(); a32 = Axis(f32[1, 1])
+        pie!(a32, Float32[0.1, 0.2, 0.3, 0.4])
+        Makie.update_state_before_display!(f32)
+        @test [pl.share for pl in only(interactables(f32)).payloads] ≈ [0.1, 0.2, 0.3, 0.4]
+        @test [pl.value for pl in only(interactables(f32)).payloads] == [0.1, 0.2, 0.3, 0.4]
+        @test only(interactables(f32)).payloads[1].share == 0.1 / 1.0
     end
 
     @testset "Hexbin extraction" begin

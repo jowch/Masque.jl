@@ -601,10 +601,10 @@ _plot_parent(p) = hasfield(typeof(p), :parent) ? getfield(p, :parent) : nothing
 # means Makie changed how it draws the recipe, so it errors rather than mislabel the marks.
 _recipe_poly_payloads(parent, p, n) = nothing
 function _recipe_poly_payloads(parent::Makie.Pie, p, n)
-    vals = parent.values[]
+    vals = _short64.(parent.values[])
     _recipe_count(parent, length(vals), n)
-    total = sum(Float64, vals; init = 0.0)
-    return Any[(; index = k, value = _short64(v), share = Float64(v) / total) for (k, v) in enumerate(vals)]
+    total = sum(vals; init = 0.0)
+    return Any[(; index = k, value = v, share = v / total) for (k, v) in enumerate(vals)]
 end
 # Bands come out as contourf's do, so they get its `low` and `high`.
 _recipe_poly_payloads(parent::Makie.Tricontourf, p, n) = Any[merge((; index = k), pl) for (k, pl) in enumerate(_contourf_payloads(parent, p))]
@@ -645,7 +645,7 @@ _poly_exterior_rings(polys) = [poly.exterior for poly in polys]
 # is the band MIDPOINT, not the lower edge — map each color to its nearest midpoint to recover
 # (low, high).
 function _contourf_payloads(p, poly)
-    edges = sort(Float64.(_computed_levels(p)))
+    edges = sort(_short64.(_computed_levels(p)))
     length(edges) >= 2 || error("Contourf introspection: <2 computed level edges (Makie internals changed?)")
     mids = [(edges[k] + edges[k + 1]) / 2 for k in 1:(length(edges) - 1)]
     colors = Float64.(poly.color[])
@@ -844,8 +844,8 @@ function _place_data_markers(i::PolygonInteractable, p, f)
     return PolygonInteractable(i.ax, rings, i.id, i.payloads, i.tooltip, i.label, i.holes, i.tol, i.select)
 end
 
-# Cells come back in tessellation order, not input-site order. Each cell holds exactly one
-# site, so a cell's site is the one inside it; its default payload is that site's `x`, `y`
+# Cells come back in tessellation order, not input-site order. A cell's site is the one
+# nearest the cell; its default payload is that site's `x`, `y`
 # and, when the cells are coloured by values (`voronoiplot!(xs, ys, zs)` or a `color`
 # vector), its `value` (#623).
 function PolygonInteractable(ax, p::Makie.Voronoiplot; id = :voronoiplot, payloads = nothing, tooltip = nothing, label = _plot_label(p))
@@ -866,32 +866,19 @@ function _voronoi_payloads(ax, p, rings)
         c isa AbstractVector{<:Real} && length(c) == length(sites) ? c : nothing
     end
     tsites = [Makie.Point2d(_apply_transform(_transform_func(ax.scene), Makie.Point2d(s[1], s[2]))) for s in sites]
+    isempty(tsites) && return nothing
     out = Any[]
     for (k, ring) in enumerate(rings)
-        j = findfirst(t -> _in_ring(t, ring), tsites)
-        j === nothing && return nothing
+        isempty(ring) && return nothing
+        # A cell, and its rect or circle clip, is convex and part of its own site's Voronoi
+        # region, so the site nearest any point inside it, such as its vertex mean, is its site.
+        c = sum(q -> Makie.Point2d(q[1], q[2]), ring) / length(ring)
+        j = argmin(i -> (tsites[i][1] - c[1])^2 + (tsites[i][2] - c[2])^2, eachindex(tsites))
         s = sites[j]
         pl = (; index = k, x = _short64(s[1]), y = _short64(s[2]))
         push!(out, vals === nothing ? pl : merge(pl, (; value = _short64(vals[j]))))
     end
     return out
-end
-# Even-odd point-in-ring, with a bounding-box test first: most cells are far from a site.
-function _in_ring(pt, ring)
-    x, y = pt[1], pt[2]
-    lo, hi = extrema(q -> q[1], ring)
-    lo <= x <= hi || return false
-    lo, hi = extrema(q -> q[2], ring)
-    lo <= y <= hi || return false
-    inside = false
-    n = length(ring)
-    for i in 1:n
-        a, b = ring[i], ring[mod1(i + 1, n)]
-        if (a[2] > y) != (b[2] > y) && x < (b[1] - a[1]) * (y - a[2]) / (b[2] - a[2]) + a[1]
-            inside = !inside
-        end
-    end
-    return inside
 end
 
 # Stats come from Makie's computed-stats node (converted is a 4-tuple centers/medians/q1s/q3s,

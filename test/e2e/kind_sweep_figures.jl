@@ -1660,7 +1660,6 @@ function build_kind_sweep()
         masque(fig)
     end
 
-    # Hexagons from a fixed point cloud, so the bins and counts don't change between runs.
     pie = let
         fig = Figure(size = (480, 320))
         ax = Axis(fig[1, 1]; title = "pie", aspect = DataAspect())
@@ -1690,6 +1689,7 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:poly => [1]))
     end
 
+    # Hexagons from a fixed point cloud, so the bins and counts don't change between runs.
     hexbin = let
         xs = [1.0, 1.2, 1.1, 3.0, 3.2, 3.1, 3.3, 5.0, 5.1, 2.0, 4.0, 4.2]
         ys = [1.0, 1.1, 1.3, 3.0, 3.1, 2.9, 3.2, 1.0, 1.2, 4.0, 4.5, 4.4]
