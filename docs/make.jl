@@ -130,6 +130,14 @@ makedocs(;
                 "arrows2d!" => "plots/arrows2d.md",
                 "stem!" => "plots/stem.md",
             ],
+            "Areas and shapes" => [
+                "poly!" => "plots/poly.md",
+                "band!" => "plots/band.md",
+                "pie!" => "plots/pie.md",
+                "voronoiplot!" => "plots/voronoiplot.md",
+                "tricontourf!" => "plots/tricontourf.md",
+                "triplot!" => "plots/triplot.md",
+            ],
             "Several parts" => [
                 "streamplot!" => "plots/streamplot.md",
             ],

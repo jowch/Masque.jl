@@ -93,7 +93,7 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | [`heatmap!`](plots/heatmap.md) / [`image!`](plots/heatmap.md) | `:cells` | `:grid` | — | — |
 | [`surface!`](plots/surface.md) | `:surface` | `:surface` | yes | yes |
 | [`barplot!`](plots/barplot.md) | `:bars` | `:rects` | — | — |
-| `poly!` | `:poly` | `:polygons` | — | — |
+| [`poly!`](plots/poly.md) | `:poly` | `:polygons` | — | — |
 | [`stairs!`](plots/stairs.md) | `:stairs` | `:lines` | — | — |
 | [`series!`](plots/series.md) | `:series` | `:lines` | — | yes |
 | [`errorbars!`](plots/errorbars.md) | `:errorbars` | `:segments` | — | — |
@@ -104,11 +104,11 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | [`waterfall!`](plots/waterfall.md) | `:waterfall` | `:rects` | — | — |
 | [`crossbar!`](plots/crossbar.md) | `:crossbar` | `:rects` | — | — |
 | [`hspan!`](plots/hspan.md) / [`vspan!`](plots/hspan.md) | `:hspan` / `:vspan` | `:rects` | — | — |
-| `band!` | `:band` | `:polygons` | — | — |
+| [`band!`](plots/band.md) | `:band` | `:polygons` | — | — |
 | [`density!`](plots/density.md) | `:density` | `:polygons` | — | — |
 | [`contourf!`](plots/contourf.md) | `:contourf` | `:polygons` | — | — |
 | [`violin!`](plots/violin.md) | `:violin` | `:polygons` | — | — |
-| `voronoiplot!` | `:voronoiplot` | `:polygons` | — | — |
+| [`voronoiplot!`](plots/voronoiplot.md) | `:voronoiplot` | `:polygons` | — | — |
 | [`hexbin!`](plots/hexbin.md) | `:hexbin` | `:polygons` | — | — |
 | [`stem!`](plots/stem.md) | `stem.points` + `stem.stems` | `:circles` + `:segments` | — | — |
 | [`scatterlines!`](plots/scatterlines.md) | `scatterlines.points` + `scatterlines.line` | `:circles` + `:lines` | yes | yes |
@@ -247,9 +247,9 @@ under the id in this table:
 | Plot | Layer `id` | One mark is |
 |---|---|---|
 | [`contour!`](plots/contour.md) / `contour3d!` without labels | `:lines` | every contour line together |
-| `tricontourf!` | `:poly` | one filled region, so a level split into pieces gives one mark per piece; it reports its `low` and `high` level |
-| `triplot!` | `:poly` | one triangle; it reports its three `vertices`, as indices into your points |
-| `pie!` | `:poly` | one slice, in the order of your values; it reports its `value` and its `share` of the total |
+| [`tricontourf!`](plots/tricontourf.md) | `:poly` | one filled region, so a level split into pieces gives one mark per piece; it reports its `low` and `high` level |
+| [`triplot!`](plots/triplot.md) | `:poly` | one triangle; it reports its three `vertices`, as indices into your points |
+| [`pie!`](plots/pie.md) | `:poly` | one slice, in the order of your values; it reports its `value` and its `share` of the total |
 | [`ablines!`](plots/ablines.md) | `:segments` | one line, in the order you give them |
 | [`ecdfplot!`](plots/ecdfplot.md) | `:stairs` | the whole curve |
 | `arc!` | `:lines` | the whole arc |

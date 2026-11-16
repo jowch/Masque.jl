@@ -64,6 +64,12 @@ const CARDS = [
   { out: "ablines", embed: "plots_ablines", moves: [["click", 0, 0.96, 0.15], ["leave"]] },
   { out: "arrows2d", embed: "plots_arrows2d", moves: [["click", 0, 0.4, 0.325], ["leave"]] },
   { out: "stem", embed: "plots_stem", moves: [["click", 0, 0.46, 0.3], ["leave"]] },
+  { out: "poly", embed: "plots_poly", moves: [["click", 0, 0.6, 0.4], ["leave"]] },
+  { out: "band", embed: "plots_band", moves: [["click", 0, 0.88, 0.275], ["leave"]] },
+  { out: "pie", embed: "plots_pie", moves: [["click", 0, 0.44, 0.1], ["leave"]] },
+  { out: "voronoiplot", embed: "plots_voronoiplot", moves: [["click", 0, 0.58, 0.1], ["leave"]] },
+  { out: "tricontourf", embed: "plots_tricontourf", moves: [["click", 0, 0.34, 0.1], ["leave"]] },
+  { out: "triplot", embed: "plots_triplot", moves: [["click", 0, 0.52, 0.175], ["leave"]] },
   { out: "spy", embed: "plots_spy", moves: [["click", 0, 0.48, 0.225], ["leave"]] },
 ];
 

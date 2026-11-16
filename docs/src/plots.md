@@ -40,6 +40,12 @@ add for the parts that don't respond on their own.
 | [`hlines!`, `vlines!`](plots/hlines.md) | segments | each line |
 | [`ablines!`](plots/ablines.md) | segments | each line |
 | [`arrows2d!`](plots/arrows2d.md) | segments | each arrow |
+| [`poly!`](plots/poly.md) | areas | each polygon |
+| [`band!`](plots/band.md) | areas | the whole band |
+| [`pie!`](plots/pie.md) | areas | each slice |
+| [`voronoiplot!`](plots/voronoiplot.md) | areas | each cell |
+| [`tricontourf!`](plots/tricontourf.md) | areas | each filled region |
+| [`triplot!`](plots/triplot.md) | areas | each triangle |
 | [`streamplot!`](plots/streamplot.md) | several parts | each arrowhead, and the stream lines |
 | [`stem!`](plots/stem.md) | several parts | each point, and each stem |
 
