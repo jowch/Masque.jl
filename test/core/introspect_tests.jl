@@ -1589,6 +1589,30 @@ end
         pc = voronoiplot!(ac, xs, ys; color = 100 .* ys)
         Makie.update_state_before_display!(fc)
         @test all(pl -> pl.value ≈ 100 * pl.y, PolygonInteractable(ac, pc).payloads)
+        # Each cell's value is the colour Makie gives that cell, and its x, y name the same
+        # site, also when `smooth = true` moves the generators and when a circle clip empties
+        # a cell (the empty cell keeps its generator).
+        function check_cells(xs, ys; kw...)
+            f = Figure(); a = Axis(f[1, 1])
+            p = voronoiplot!(a, xs, ys; color = Float64.(eachindex(xs)), kw...)
+            Makie.update_state_before_display!(f)
+            pls = PolygonInteractable(a, p).payloads
+            cs = Masque._descendant(p, Makie.Poly).color[]
+            return length(pls) == length(cs) &&
+                all(k -> pls[k].value == cs[k] && (pls[k].x, pls[k].y) == (xs[Int(cs[k])], ys[Int(cs[k])]), eachindex(pls))
+        end
+        rx = [0.81, 0.12, 0.55, 0.33, 0.97, 0.05, 0.68, 0.24, 0.43, 0.9, 0.61, 0.17]
+        ry = [0.37, 0.88, 0.14, 0.62, 0.71, 0.29, 0.93, 0.08, 0.51, 0.02, 0.46, 0.77]
+        @test check_cells(rx, ry)
+        @test check_cells(rx, ry; smooth = true)
+        cx, cy = [0.1, 0.4, 0.7, 0.3, 0.9], [0.2, 0.6, 0.1, 0.9, 0.4]
+        @test check_cells(cx, cy; clip = Circle(Point2f(0.5, 0.5), 0.45))
+        fo = Figure(); ao = Axis(fo[1, 1])
+        po = voronoiplot!(ao, cx, cy; clip = Circle(Point2f(0.5, 0.5), 0.45))
+        Makie.update_state_before_display!(fo)
+        io = PolygonInteractable(ao, po)
+        @test any(isempty, io.rings)
+        @test sort([(pl.x, pl.y) for pl in io.payloads]) == sort(collect(zip(cx, cy)))
     end
 
     @testset "pie, tricontourf and triplot report what they draw (#623)" begin

@@ -844,18 +844,19 @@ function _place_data_markers(i::PolygonInteractable, p, f)
     return PolygonInteractable(i.ax, rings, i.id, i.payloads, i.tooltip, i.label, i.holes, i.tol, i.select)
 end
 
-# Cells come back in tessellation order, not input-site order. A cell's site is the one
-# nearest the cell; its default payload is that site's `x`, `y`
-# and, when the cells are coloured by values (`voronoiplot!(xs, ys, zs)` or a `color`
-# vector), its `value` (#623).
+# Makie builds one cell per generator with a polygon, in its generator order
+# (`get_voronoi_tiles!`), and colours them in that order too. A generator's index is its input
+# site's index, even when `smooth = true` moves the generator or a clip empties the cell. Each
+# cell's default payload is its site's `x`, `y` and, when the cells are coloured by values
+# (`voronoiplot!(xs, ys, zs)` or a `color` vector), its `value` (#623).
 function PolygonInteractable(ax, p::Makie.Voronoiplot; id = :voronoiplot, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     poly = _descendant(p, Makie.Poly)
     rings = _poly_exterior_rings(_conv(poly)[1])
-    d = _voronoi_payloads(ax, p, rings)
+    d = _voronoi_payloads(p, rings)
     d === nothing || (payloads = _merge_payloads(_unconvert_payloads(ax, d), payloads, "PolygonInteractable"))
     return PolygonInteractable(ax, rings; id, payloads, tooltip, label)
 end
-function _voronoi_payloads(ax, p, rings)
+function _voronoi_payloads(p, rings)
     args = _converted(p)
     args[1] isa AbstractVector{<:Makie.VecTypes} || return nothing   # a tessellation passed in
     sites = args[1]
@@ -865,20 +866,23 @@ function _voronoi_payloads(ax, p, rings)
         c = p.color[]
         c isa AbstractVector{<:Real} && length(c) == length(sites) ? c : nothing
     end
-    tsites = [Makie.Point2d(_apply_transform(_transform_func(ax.scene), Makie.Point2d(s[1], s[2]))) for s in sites]
-    isempty(tsites) && return nothing
-    out = Any[]
-    for (k, ring) in enumerate(rings)
-        isempty(ring) && return nothing
-        # A cell, and its rect or circle clip, is convex and part of its own site's Voronoi
-        # region, so the site nearest any point inside it, such as its vertex mean, is its site.
-        c = sum(q -> Makie.Point2d(q[1], q[2]), ring) / length(ring)
-        j = argmin(i -> (tsites[i][1] - c[1])^2 + (tsites[i][2] - c[2])^2, eachindex(tsites))
+    gens = try
+        v = p.vorn[]
+        # Newer Makie sorts the generators (`sorted_generators`); older releases, such as the
+        # 0.24.14 compat floor, use `each_generator` order. Either way it is the cell order.
+        order = isdefined(Makie, :sorted_generators) ? Makie.sorted_generators(v) : collect(Makie.DelTri.each_generator(v))
+        [i for i in order if Makie.DelTri.has_polygon(v, i)]
+    catch e
+        e isa InterruptException && rethrow()
+        return nothing
+    end
+    # Count guard: if Makie ever orders or filters the cells differently, show bare `index`.
+    (length(gens) == length(rings) && all(j -> j isa Integer && 1 <= j <= length(sites), gens)) || return nothing
+    return map(enumerate(gens)) do (k, j)
         s = sites[j]
         pl = (; index = k, x = _short64(s[1]), y = _short64(s[2]))
-        push!(out, vals === nothing ? pl : merge(pl, (; value = _short64(vals[j]))))
+        vals === nothing ? pl : merge(pl, (; value = _short64(vals[j])))
     end
-    return out
 end
 
 # Stats come from Makie's computed-stats node (converted is a 4-tuple centers/medians/q1s/q3s,
