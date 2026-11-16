@@ -1294,6 +1294,7 @@ end
         ri4 = RectInteractable(ax4, wf4; id = :waterfall)
         @test [(q.low, q.high) for q in ri4.payloads] == [(0.0, 2.0), (2.0, 3.0), (-1.0, 0.0), (-1.0, 2.0)]
         @test [r[4] for r in ri4.data] ≈ [2.0, 1.0, 1.0, 3.0]
+        @test [q.x for q in ri4.payloads] == [1.0, 1.0, 2.0, 2.0]       # #613: the step's own x
     end
 
     @testset "CrossBar extraction" begin

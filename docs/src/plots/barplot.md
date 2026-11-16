@@ -28,7 +28,9 @@ with `@bind sel masque(fig)`, it is `sel.bars`.
 | `low`, `high` | where the bar starts and ends along its value axis |
 
 For bars drawn with `direction = :x`, the category is `y`, and `low`
-and `high` are measured along `x`.
+and `high` are measured along `x`. Makie puts the labels of
+`Categorical` input on the `x` axis even then, so for those bars `y`
+is the bar's number on the `y` axis.
 
 ## Show your own data
 
