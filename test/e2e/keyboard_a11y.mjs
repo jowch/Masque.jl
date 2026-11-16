@@ -356,6 +356,47 @@ try {
     passed.push(`${key}/escape`);
   }
 
+  // #634: a voronoiplot! site the triangulation drops (a duplicate) has an empty cell. The
+  // keyboard skips it like any off-screen element: the arrows visit the drawn cells only, the
+  // live region counts only them, and no step parks the tooltip at the plot's corner.
+  {
+    const key = "voronoi";
+    const layer = (await layersOf(key))[0];
+    const empty = layer.geometry.filter((g) => !g.flat(Infinity).some((v) => Number.isFinite(v))).length;
+    if (empty !== 1) throw new Error(`${key}: want one empty cell (the duplicate site), got ${empty}`);
+    const drawn = layer.geometry.length - empty;
+    const surface = await surfaceHandle(key);
+    await surface.focus();
+    await settle(key);
+    const seen = [];
+    let tips = 0;
+    for (let i = 0; i < layer.geometry.length; i++) {
+      await page.keyboard.press("ArrowRight");
+      // Each step announces a new element, so wait for the text to change.
+      const prev = seen.at(-1) ?? "";
+      let s = await state(key);
+      for (let t = 0; t < 20 && (s.liveText === prev || !/element \d+ of \d+/.test(s.liveText)); t++) {
+        await page.waitForTimeout(150);
+        s = await state(key);
+      }
+      const tip = await surface.evaluate((el) => {
+        const t = el.getRootNode().querySelector(".masque-tip");
+        const a = t.getBoundingClientRect(), b = el.getBoundingClientRect();
+        return { shown: t.classList.contains("show"), dx: a.left - b.left, dy: a.top - b.top };
+      });
+      // A cell already picked shows no hover tooltip, so only a shown one is checked.
+      if (tip.shown && tip.dx < 2 && tip.dy < 2) throw new Error(`${key}: step ${i + 1} put the tooltip at the corner: ${JSON.stringify(tip)}`);
+      if (tip.shown) tips++;
+      seen.push(s.liveText);
+    }
+    if (tips === 0) throw new Error(`${key}: no step showed a tooltip`);
+    if (seen.some((t) => !new RegExp(`of ${drawn}\\b`).test(t))) throw new Error(`${key}: live region counted the empty cell: ${JSON.stringify(seen)}`);
+    if (!new RegExp(`element ${drawn} of ${drawn}`).test(seen.at(-1))) throw new Error(`${key}: arrows did not reach the last drawn cell: ${JSON.stringify(seen)}`);
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    passed.push(`${key}/empty-cell-skipped`);
+  }
+
   // #335: Shift+←/→ step a focused line's readout through its data points, and Enter picks
   // the point shown. `series` bakes no selection, so the first line's point 1 (Julia index 2)
   // is a fresh value unless a warm re-run already picked it; then point 2 is.
