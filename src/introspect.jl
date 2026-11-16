@@ -1095,8 +1095,8 @@ end
 
 # Point layer keeps the base id; the line/segment layer gets a suffix so the two ids stay
 # distinct in the manifest.
-# `tooltip` and `label` apply to both parts; `payloads` names its part, as in
-# `payloads = (points = rows,)` (see `_part_kwargs`).
+# `label` and a plain `tooltip` apply to both parts; `payloads`, and a `tooltip` given as a
+# `NamedTuple`, name their part, as in `payloads = (points = rows,)` (see `_part_kwargs`).
 function _stem_parts(ax, p, base; kw...)
     kp, ks = _part_kwargs(p, [:points, :stems], kw)
     return AbstractInteractable[
@@ -1252,6 +1252,15 @@ function _dim_strings(vals)
 end
 
 function _construct_unplaced(ax, p, id; kw...)
+    # A `tooltip` keyed by part name is for a plot with several parts (#616); one with a
+    # single layer would otherwise fail on the constructor's `tooltip` type.
+    get(kw, :tooltip, nothing) isa NamedTuple && !(p isa Makie.Stem || p isa Makie.ScatterLines) &&
+        throw(
+        ArgumentError(
+            "interactables($(Makie.plotkey(p))): this plot has one layer, so `tooltip` takes one " *
+                "template, `tooltip = masque\"…\"`, not one per part",
+        ),
+    )
     p isa Makie.Scatter && return [_scatter_interactable(ax, p; id, kw...)]
     p isa Makie.MeshScatter && return [PointInteractable(ax, p; id, kw...)]
     (p isa Makie.Lines || p isa Makie.LineSegments || p isa Makie.Wireframe || p isa Makie.Arrows3D || p isa Makie.Arrows2D) &&

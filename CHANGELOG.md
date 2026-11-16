@@ -12,6 +12,9 @@ All notable changes to this project are documented here. The format is based on
   `interactables(st; payloads = (points = rows,))` for a `stem!`. A part you leave out keeps its
   own payloads. A plain list, or a name the plot has no part for, raises an error that lists the
   plot's parts (#599).
+- `tooltip` can name its part the same way, `interactables(q; tooltip = (scatter = masque"…",))`,
+  so a template that names one part's fields no longer raises an error on the others. A part you
+  leave out keeps its default tooltip, and a plain template still applies to every part (#616).
 
 ### Changed
 - Masque now needs Makie 0.24.14 or later, with CairoMakie 0.15.14 or WGLMakie 0.13.14 or later.

@@ -11,9 +11,10 @@ builds several (`stem!`, `scatterlines!`) names them as its parts, `stem.points`
 `stem.stems`, which the `@bind` value nests as `w.stem.points`. Other keywords
 (`tooltip`, `payloads`, `label`, and any the plot's constructor takes) pass through to the
 constructor, so `interactables(ax, s; tooltip = masque"…")` is `PointInteractable(ax, s;
-tooltip = masque"…")` for a scatter. A two-layer plot takes `tooltip` and `label` on both
-layers, and `payloads` one list per part, keyed by its name: `payloads = (points = rows,)` for
-a `stem!`. Unlike the constructor, it also moves the layers to where the
+tooltip = masque"…")` for a scatter. A two-layer plot takes `label` and a plain `tooltip` on
+both layers, and `payloads` one list per part, keyed by its name: `payloads = (points = rows,)`
+for a `stem!`. `tooltip` may name its parts the same way, `tooltip = (points = masque"…",)`,
+and a part left out keeps its default tooltip. Unlike the constructor, it also moves the layers to where the
 plot is drawn when `translate!`, `scale!`, or `rotate!` moved it, and returns no layers for a
 plot drawn outside data space (`space = :relative`, `:pixel`, `:clip`).
 
@@ -109,32 +110,46 @@ end
 # parts' own names as the layers are listed, the part drawn last first (`points`, `stems`; a
 # raincloud's `boxplot`, `scatter`, `violin`). Every keyword applies to every part except
 # `payloads`, which is positional per mark and so names its part:
-# `payloads = (scatter = df, violin = rows)`. A part left out keeps its default payloads, and
-# a part's entry may itself be a `NamedTuple` for a part with parts of its own. A plot with
-# one part also takes a plain list, as before; with several, a list or an unknown name raises
+# `payloads = (scatter = df, violin = rows)`, and a `tooltip` given as a `NamedTuple`,
+# `tooltip = (scatter = masque"…",)`, since the parts have different fields (#616). A part
+# left out keeps its default, and a part's entry may itself be a `NamedTuple` for a part with
+# parts of its own. A plain template still applies to every part. A plot with one part also
+# takes a plain list of payloads, as before; with several, a list or an unknown name raises
 # an error that lists the real names, since a list can't say which part it is for.
 function _part_kwargs(p, names, kw)
     kw = NamedTuple(kw)
-    pl = get(kw, :payloads, nothing)
-    pl === nothing && return fill(kw, length(names))
-    rest = Base.structdiff(kw, NamedTuple{(:payloads,)})
-    routed = pl isa NamedTuple && all(k -> k in names, keys(pl))
-    if !routed
-        length(names) == 1 && return [kw]
-        throw(_part_payloads_error(p, names, pl))
+    out = fill(kw, length(names))
+    for key in (:payloads, :tooltip)
+        v = get(kw, key, nothing)
+        # A template, `false` or `nothing` is one tooltip for every part.
+        key === :tooltip && !(v isa NamedTuple) && continue
+        v === nothing && continue
+        routed = v isa NamedTuple && all(k -> k in names, keys(v))
+        if !routed
+            key === :payloads && length(names) == 1 && continue
+            throw(_part_kwarg_error(p, names, key, v))
+        end
+        out = [
+            haskey(v, n) ? merge(o, NamedTuple{(key,)}((v[n],))) : Base.structdiff(o, NamedTuple{(key,)})
+                for (o, n) in zip(out, names)
+        ]
     end
-    return [haskey(pl, n) ? merge(rest, (; payloads = pl[n])) : rest for n in names]
+    return out
 end
 
-function _part_payloads_error(p, names, pl)
+function _part_kwarg_error(p, names, key, v)
     who = "interactables($(Makie.plotkey(p)))"
     list = join(("`$n`" for n in names), ", ")
-    example = "payloads = (" * join(("$n = …" for n in names[1:min(2, end)]), ", ") * (length(names) > 2 ? ", …" : "") * ")"
-    unknown = pl isa NamedTuple ? [k for k in keys(pl) if !(k in names)] : Symbol[]
+    item = key === :payloads ? "list" : "template"
+    eg = key === :payloads ? "…" : "masque\"…\""
+    example = "$key = (" * join(("$n = $eg" for n in names[1:min(2, end)]), ", ") * (length(names) > 2 ? ", …" : "") * ")"
+    unknown = v isa NamedTuple ? [k for k in keys(v) if !(k in names)] : Symbol[]
     head = isempty(unknown) ?
-        "$who: this plot has several layers, so `payloads` takes one list per part, keyed by its name: `$example`." :
-        "$who: no part named " * join(("`$k`" for k in unknown), ", ") * "."
-    return ArgumentError("$head The parts are $list; each list has one entry per mark of that part.")
+        "$who: this plot has several layers, so `$key` takes one $item per part, keyed by its name: `$example`." :
+        "$who: no part named " * join(("`$k`" for k in unknown), ", ") * " in `$key`."
+    tail = key === :payloads ? "; each list has one entry per mark of that part." :
+        "; a part you leave out keeps its default tooltip."
+    return ArgumentError("$head The parts are $list$tail")
 end
 
 # `interactables(ax, p; id, kwargs...)` as `masque` calls it. A recipe's own method need not
@@ -262,7 +277,9 @@ several names them as its parts, `rain.violin` and `rain.scatter`. Each part tak
 keywords you pass, except `payloads`: a recipe that draws several parts takes one list per
 part, keyed by its name, as in `payloads = (scatter = df, violin = per_group)`. Each list has
 one entry per mark of its part, a part you leave out keeps its default payloads, and an
-unknown name raises `ArgumentError` listing the plot's parts. A part's name is its own plot's,
+unknown name raises `ArgumentError` listing the plot's parts. A `tooltip` template applies to
+every part; to give one part its own, key it the same way, as in
+`tooltip = (scatter = masque"…",)`, and the parts you leave out keep their default tooltips. A part's name is its own plot's,
 numbered when one repeats (`lines`, `lines_2`), the name it takes under `id`. A recipe that
 draws none, or only ones that give no layer (`bracket!`'s text in pixel space), raises
 `ArgumentError`.
