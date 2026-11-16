@@ -88,10 +88,10 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | [`lines!`](plots/lines.md) | `:lines` | `:lines` | yes | yes |
 | `linesegments!` | `:segments` | `:segments` | yes | yes |
 | `wireframe!` | `:wireframe` | `:segments` | yes | — |
-| `arrows3d!` (`Arrows3D`) | `:arrows3d` | `:segments` | yes | — |
+| [`arrows3d!`](plots/arrows3d.md) (`Arrows3D`) | `:arrows3d` | `:segments` | yes | — |
 | `arrows2d!` (`Arrows2D`) | `:arrows2d` | `:segments` | — | — |
 | [`heatmap!`](plots/heatmap.md) / [`image!`](plots/heatmap.md) | `:cells` | `:grid` | — | — |
-| `surface!` | `:surface` | `:surface` | yes | yes |
+| [`surface!`](plots/surface.md) | `:surface` | `:surface` | yes | yes |
 | [`barplot!`](plots/barplot.md) | `:bars` | `:rects` | — | — |
 | `poly!` | `:poly` | `:polygons` | — | — |
 | [`stairs!`](plots/stairs.md) | `:stairs` | `:lines` | — | — |
@@ -184,7 +184,7 @@ a click reports the mark's place in that order as its `index`, so
 | | `text` | one label | the order Makie draws them, which you don't set |
 | [`qqplot!`](plots/qqplot.md) / [`qqnorm!`](plots/qqplot.md) with a `qqline` | `scatter` | one point | smallest quantile first |
 | | `segments` | the reference line | — |
-| `streamplot!` | `scatter` | one arrowhead | the order Makie draws them, which you don't set |
+| [`streamplot!`](plots/streamplot.md) | `scatter` | one arrowhead | the order Makie draws them, which you don't set |
 | | `lines` | every streamline together | — |
 
 Violins and boxes come out left to right along the axis, not in the

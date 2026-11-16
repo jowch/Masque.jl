@@ -146,6 +146,22 @@ types](plots.md) lists every plot that has a page.
   <img alt="A ring of points drawn with datashader, with the pointer's tooltip showing a pixel's count" src="assets/gallery/datashader.png">
   <span>datashader!</span>
 </a>
+<a class="masque-gallery-card" data-dir="plots" data-page="points3d">
+  <img alt="A 3D scatter of response by dose and age, with one marker picked" src="assets/gallery/points3d.png">
+  <span>3D scatter! / lines!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="surface">
+  <img alt="A 3D surface of two hills, with the pointer's tooltip showing the height near the top" src="assets/gallery/surface.png">
+  <span>surface!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="arrows3d">
+  <img alt="Nine arrows in 3D, with one arrow picked" src="assets/gallery/arrows3d.png">
+  <span>arrows3d!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="streamplot">
+  <img alt="A swirling streamplot, with one arrowhead picked" src="assets/gallery/streamplot.png">
+  <span>streamplot!</span>
+</a>
 </div>
 ```
 

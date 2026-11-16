@@ -30,6 +30,10 @@ add for the parts that don't respond on their own.
 | [`contourf!`](plots/contourf.md) | grid | each filled region |
 | [`hexbin!`](plots/hexbin.md) | grid | each hexagon |
 | [`datashader!`](plots/datashader.md) | grid | each pixel |
+| [`scatter!`, `lines!` on an `Axis3`](plots/points3d.md) | 3D | each marker, sphere and line |
+| [`surface!`](plots/surface.md) | 3D | the point nearest the pointer |
+| [`arrows3d!`](plots/arrows3d.md) | 3D | each arrow |
+| [`streamplot!`](plots/streamplot.md) | several parts | each arrowhead, and the stream lines |
 
 For every plot Masque supports, and the axes each one works on, see
 [Supported plots and axes](@ref).

@@ -115,6 +115,14 @@ makedocs(;
                 "hexbin!" => "plots/hexbin.md",
                 "datashader!" => "plots/datashader.md",
             ],
+            "3D" => [
+                "Points and lines on an Axis3" => "plots/points3d.md",
+                "surface!" => "plots/surface.md",
+                "arrows3d!" => "plots/arrows3d.md",
+            ],
+            "Several parts" => [
+                "streamplot!" => "plots/streamplot.md",
+            ],
         ],
         "Examples" => [
             "Examples" => "gallery.md",
