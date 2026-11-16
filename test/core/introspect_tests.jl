@@ -1349,6 +1349,12 @@ end
         # each hit box is its own step's bar, not the full-height total bar
         @test [r[4] for r in ri3.data] ≈ [5.0, 2.0, 3.0, 1.0]
         @test [r[2] for r in ri3.data] ≈ [2.5, 4.0, 4.5, 5.5]
+        # #624: each step carries the total drawn behind it, here the grand total
+        @test [q.total for q in ri3.payloads] == fill(5.0, 4)
+        @test !haskey(pairs(ri2.payloads[1]), :total)                  # no total without show_final
+        # a user payload's own `total` wins over the default
+        ri3u = RectInteractable(ax3, wf3; id = :waterfall, payloads = [(; total = k) for k in 1:4])
+        @test [q.total for q in ri3u.payloads] == 1:4
 
         # with dodge, each x gets its own total; the steps still come from the step bars
         fig4 = Figure(); ax4 = Axis(fig4[1, 1])
@@ -1358,6 +1364,12 @@ end
         @test [(q.low, q.high) for q in ri4.payloads] == [(0.0, 2.0), (2.0, 3.0), (-1.0, 0.0), (-1.0, 2.0)]
         @test [r[4] for r in ri4.data] ≈ [2.0, 1.0, 1.0, 3.0]
         @test [q.x for q in ri4.payloads] == [1.0, 1.0, 2.0, 2.0]       # #613: the step's own x
+        @test [q.total for q in ri4.payloads] == [3.0, 3.0, 2.0, 2.0]   # #624: the total at its x
+        # unsorted x: each step still reads its own total bar, not a sorted neighbour's
+        fig5 = Figure(); ax5 = Axis(fig5[1, 1])
+        wf5 = waterfall!(ax5, [2, 1, 2, 1], [-1.0, 2.0, 3.0, 1.0]; dodge = [1, 1, 2, 2], show_final = true)
+        Makie.update_state_before_display!(fig5)
+        @test [q.total for q in RectInteractable(ax5, wf5; id = :waterfall).payloads] == [2.0, 3.0, 2.0, 3.0]
     end
 
     @testset "CrossBar extraction" begin

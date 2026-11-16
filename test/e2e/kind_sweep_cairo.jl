@@ -563,6 +563,16 @@ HTML(
         "<span id=\"coords_barplot_cat\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.barplot_cat)))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000624
+@bind ev_waterfall_total sweep.waterfall_total
+
+# ╔═╡ c1000000-0000-0000-0000-000000000625
+HTML(
+    "<span id=\"out_waterfall_total\">WATERFALL_TOTAL=$(sweep_field("waterfall_total", ev_waterfall_total))</span>" *
+        "<span id=\"bond_waterfall_total\" style=\"display:none\">$(repr(ev_waterfall_total))</span>" *
+        "<span id=\"coords_waterfall_total\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.waterfall_total)))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000616
 @bind ev_qq_tip sweep.qq_tip
 
@@ -1364,6 +1374,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000550
 # ╠═c1000000-0000-0000-0000-000000000551
 # ╠═c1000000-0000-0000-0000-000000000552
+# ╠═c1000000-0000-0000-0000-000000000624
+# ╠═c1000000-0000-0000-0000-000000000625
 # ╠═c1000000-0000-0000-0000-000000000616
 # ╠═c1000000-0000-0000-0000-000000000617
 # ╠═c1000000-0000-0000-0000-000000000111

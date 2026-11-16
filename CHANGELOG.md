@@ -26,6 +26,9 @@ All notable changes to this project are documented here. The format is based on
   its `low` and `high` level, and a `triplot!` triangle its three `vertices`, as indices into your
   points. `index` stays, and a click's event carries the same fields. A `contourf!` region's `low`
   and `high` now read as the levels you set (`0.1`, not `0.10000000149011612`) (#623).
+- In a `waterfall!` plot with `show_final = true`, hovering a step also shows the `total` drawn
+  behind it: the total of all the steps, or with `dodge`, the total of the step's group. A
+  click's event and `@bind` value carry it too (#624).
 
 ### Changed
 - Masque now needs Makie 0.24.14 or later, with CairoMakie 0.15.14 or WGLMakie 0.13.14 or later.

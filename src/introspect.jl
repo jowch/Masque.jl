@@ -1201,12 +1201,12 @@ function _hist_payloads(rects, direction)
             for r in rects
     ]
 end
-function _waterfall_payloads(p, rects)
+function _waterfall_payloads(p, rects, totals)
     deltas = _converted(p)[1]
     pts = length(deltas) == length(rects) ? deltas : nothing
     return Any[
-        let (cx, cy, w, h) = rects[k]
-            (; _bar_category(pts, k, false)..., low = Float64(cy - h / 2), high = Float64(cy + h / 2), value = Float64(deltas[k][2]))
+        let (cx, cy, w, h) = rects[k], t = totals === nothing ? (;) : (; total = Float64(totals[k][2]))
+            (; _bar_category(pts, k, false)..., low = Float64(cy - h / 2), high = Float64(cy + h / 2), value = Float64(deltas[k][2]), t...)
         end
             for k in eachindex(rects)
     ]
@@ -1220,20 +1220,25 @@ function RectInteractable(ax, p::Makie.Hist; id = :hist, payloads = nothing, too
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 # With `show_final = true` Makie draws the final-total bars first (one translucent bar behind
-# each step, or one per x with `dodge`), then the step bars, so the step bars are the last
-# BarPlot child. The total bars stay out of the hit layer for now: they would compete with
-# the steps they sit behind. Hovering the grey total area answers nothing.
-function _waterfall_steps(p)
+# each step, at the step's own x and dodge slot), then the step bars, so the step bars are the
+# last BarPlot child. The total bars stay out of the hit layer: they sit behind every step and
+# would compete with it. Instead each step's payload carries its group's `total` (#624), read
+# from the total bar drawn behind it (the grand total, or its group's total with `dodge`).
+function _waterfall_bars(p)
     bars = filter(c -> c isa Makie.BarPlot, _child_plots(p))
     length(bars) == 1 + p.show_final[] ||
         error("Waterfall: expected $(1 + p.show_final[]) BarPlot children, got $(length(bars)) (Makie internals changed?)")
-    return last(bars)
+    p.show_final[] || return (last(bars), nothing)
+    totals = _converted(first(bars))[1]
+    length(totals) == length(_converted(p)[1]) ||
+        error("Waterfall: expected one total bar per step, got $(length(totals)) (Makie internals changed?)")
+    return (last(bars), totals)
 end
 function RectInteractable(ax, p::Makie.Waterfall; id = :waterfall, payloads = nothing, tooltip = nothing, label = _plot_label(p))
-    bar = _waterfall_steps(p)
+    bar, totals = _waterfall_bars(p)
     rs = _bar_rects(bar)
     # Waterfall has no `direction`: its bars always stand on y.
-    pl = _merge_payloads(_unconvert_payloads(ax, _waterfall_payloads(p, rs)), payloads, "RectInteractable"; dims = _along(:y, :low, :high, :value))
+    pl = _merge_payloads(_unconvert_payloads(ax, _waterfall_payloads(p, rs, totals)), payloads, "RectInteractable"; dims = _along(:y, :low, :high, :value, :total))
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 
