@@ -114,11 +114,21 @@ makedocs(;
                 "contourf!" => "plots/contourf.md",
                 "hexbin!" => "plots/hexbin.md",
                 "datashader!" => "plots/datashader.md",
+                "spy!" => "plots/spy.md",
             ],
             "3D" => [
                 "Points and lines on an Axis3" => "plots/points3d.md",
                 "surface!" => "plots/surface.md",
                 "arrows3d!" => "plots/arrows3d.md",
+            ],
+            "Segments and arrows" => [
+                "linesegments!" => "plots/linesegments.md",
+                "errorbars!" => "plots/errorbars.md",
+                "rangebars!" => "plots/rangebars.md",
+                "hlines! / vlines!" => "plots/hlines.md",
+                "ablines!" => "plots/ablines.md",
+                "arrows2d!" => "plots/arrows2d.md",
+                "stem!" => "plots/stem.md",
             ],
             "Several parts" => [
                 "streamplot!" => "plots/streamplot.md",

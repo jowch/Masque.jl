@@ -86,20 +86,20 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | [`scatter!`](plots/scatter.md) | `:scatter` | `:circles` | yes | yes |
 | [`meshscatter!`](plots/meshscatter.md) | `:meshscatter` | `:circles` | yes | — |
 | [`lines!`](plots/lines.md) | `:lines` | `:lines` | yes | yes |
-| `linesegments!` | `:segments` | `:segments` | yes | yes |
+| [`linesegments!`](plots/linesegments.md) | `:segments` | `:segments` | yes | yes |
 | `wireframe!` | `:wireframe` | `:segments` | yes | — |
 | [`arrows3d!`](plots/arrows3d.md) (`Arrows3D`) | `:arrows3d` | `:segments` | yes | — |
-| `arrows2d!` (`Arrows2D`) | `:arrows2d` | `:segments` | — | — |
+| [`arrows2d!`](plots/arrows2d.md) (`Arrows2D`) | `:arrows2d` | `:segments` | — | — |
 | [`heatmap!`](plots/heatmap.md) / [`image!`](plots/heatmap.md) | `:cells` | `:grid` | — | — |
 | [`surface!`](plots/surface.md) | `:surface` | `:surface` | yes | yes |
 | [`barplot!`](plots/barplot.md) | `:bars` | `:rects` | — | — |
 | `poly!` | `:poly` | `:polygons` | — | — |
 | [`stairs!`](plots/stairs.md) | `:stairs` | `:lines` | — | — |
 | [`series!`](plots/series.md) | `:series` | `:lines` | — | yes |
-| `errorbars!` | `:errorbars` | `:segments` | — | — |
-| `rangebars!` | `:rangebars` | `:segments` | — | — |
-| `hlines!` / `vlines!` | `:hlines` / `:vlines` | `:segments` | — | — |
-| `spy!` | `:spy` | `:rects` | — | — |
+| [`errorbars!`](plots/errorbars.md) | `:errorbars` | `:segments` | — | — |
+| [`rangebars!`](plots/rangebars.md) | `:rangebars` | `:segments` | — | — |
+| [`hlines!` / `vlines!`](plots/hlines.md) | `:hlines` / `:vlines` | `:segments` | — | — |
+| [`spy!`](plots/spy.md) | `:spy` | `:rects` | — | — |
 | [`hist!`](plots/hist.md) | `:hist` | `:rects` | — | — |
 | [`waterfall!`](plots/waterfall.md) | `:waterfall` | `:rects` | — | — |
 | [`crossbar!`](plots/crossbar.md) | `:crossbar` | `:rects` | — | — |
@@ -110,7 +110,7 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | [`violin!`](plots/violin.md) | `:violin` | `:polygons` | — | — |
 | `voronoiplot!` | `:voronoiplot` | `:polygons` | — | — |
 | [`hexbin!`](plots/hexbin.md) | `:hexbin` | `:polygons` | — | — |
-| `stem!` | `stem.points` + `stem.stems` | `:circles` + `:segments` | — | — |
+| [`stem!`](plots/stem.md) | `stem.points` + `stem.stems` | `:circles` + `:segments` | — | — |
 | [`scatterlines!`](plots/scatterlines.md) | `scatterlines.points` + `scatterlines.line` | `:circles` + `:lines` | yes | yes |
 | [`boxplot!`](plots/boxplot.md) | `:boxplot` | `:rects` or `:polygons` (body only) | — | — |
 | [`text!`](plots/text.md) | `:text` | `:rects` | yes | — |
@@ -173,7 +173,7 @@ a click reports the mark's place in that order as its `index`, so
 
 | Plot | Part | One mark is | Order of the marks |
 |---|---|---|---|
-| `stem!` | `points` | one point | the order of your data |
+| [`stem!`](plots/stem.md) | `points` | one point | the order of your data |
 | | `stems` | one stem | the order of your data |
 | [`scatterlines!`](plots/scatterlines.md) | `points` | one point | the order of your data |
 | | `line` | the whole line | — |
@@ -250,6 +250,6 @@ under the id in this table:
 | `tricontourf!` | `:poly` | one filled region, so a level split into pieces gives one mark per piece; it reports its `low` and `high` level |
 | `triplot!` | `:poly` | one triangle; it reports its three `vertices`, as indices into your points |
 | `pie!` | `:poly` | one slice, in the order of your values; it reports its `value` and its `share` of the total |
-| `ablines!` | `:segments` | one line, in the order you give them |
+| [`ablines!`](plots/ablines.md) | `:segments` | one line, in the order you give them |
 | [`ecdfplot!`](plots/ecdfplot.md) | `:stairs` | the whole curve |
 | `arc!` | `:lines` | the whole arc |
