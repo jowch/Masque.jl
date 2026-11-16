@@ -756,7 +756,8 @@ Lines / polylines or disjoint segment pairs. Produces one `:polyline`, `:lines`,
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit.
 - `payloads` — one entry per element (per segment when `unit = :segment`, one entry when
   `unit = :line`); `ArgumentError` if the length doesn't match. Default: `(; segment_index)`
-  (1-based) for `:segment`, `(; index)` (1-based) for `:line`.
+  (1-based) for `:segment`, `(; index)` (1-based) for `:line`. A plot object fills in more
+  (see the table below), and a payload you pass is merged onto those fields.
 - `tol` — the mouse's and pen's hit-test slack around a segment, in logical px (scaled to the
   rendered image's DPI like [`PointInteractable`](@ref)'s `radius`). A finger reaches by
   `touch_radius` instead, so a small `tol` doesn't make a line hard to tap. Must be finite and
@@ -785,14 +786,15 @@ by the plot type):
 | `Makie.Lines` | `:lines` | one `:lines` element, the whole path | converted data |
 | `Makie.Stairs` | `:stairs` | one `:lines` element, the whole staircase | the child `Lines`' pre-expanded step polyline |
 | `Makie.Series` | `:series` | one `:lines` layer, one element per series | each child line (or a `ScatterLines` child's line) |
-| `Makie.LineSegments` | `:segments` | `:pairs`, per segment | converted data |
+| `Makie.LineSegments` | `:segments` | `:pairs`, per segment | converted data; default payload `(; segment_index, x1, y1, x2, y2)`, the segment's ends (`z1`, `z2` too on an Axis3) |
 | `Makie.Wireframe` | `:wireframe` | `:pairs`, per drawn edge, each once, in drawing order (see below) | the child `LineSegments`' edges (incl. mesh-triangulation diagonals), an edge shared by two faces kept at its first copy |
 | `Makie.Arrows3D` | `:arrows3d` | `:pairs`, per shaft | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, z, u, v, w)` from `points`/`directions` |
 | `Makie.Arrows2D` | `:arrows2d` | `:pairs`, per arrow, tail to tip | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, u, v)` from `points`/`directions` |
-| `Makie.Errorbars` | `:errorbars` | `:pairs`, per bar | each bar's low→high endpoints |
-| `Makie.Rangebars` | `:rangebars` | `:pairs`, per bar | each bar's low→high endpoints |
-| `Makie.HLines` | `:hlines` | `:pairs`, per line | each line's rendered span (`xmin`/`xmax` fractions of the axis; default 0–1 is the full limits; re-resolved on limit changes) |
-| `Makie.VLines` | `:vlines` | `:pairs`, per line | each line's rendered span (`ymin`/`ymax` fractions of the axis; default 0–1 is the full limits; re-resolved on limit changes) |
+| `Makie.Errorbars` | `:errorbars` | `:pairs`, per bar | each bar's low→high endpoints; default payload `(; segment_index, x, y, low, high)`, `low`/`high` the bar's ends in data |
+| `Makie.Rangebars` | `:rangebars` | `:pairs`, per bar | each bar's low→high endpoints; default payload `(; segment_index, x, low, high)` (`y` in place of `x` for `direction = :x`) |
+| `Makie.HLines` | `:hlines` | `:pairs`, per line | each line's rendered span (`xmin`/`xmax` fractions of the axis; default 0–1 is the full limits; re-resolved on limit changes); default payload `(; segment_index, y)` |
+| `Makie.VLines` | `:vlines` | `:pairs`, per line | each line's rendered span (`ymin`/`ymax` fractions of the axis; default 0–1 is the full limits; re-resolved on limit changes); default payload `(; segment_index, x)` |
+| `Makie.ABLines` | `:segments` | `:pairs`, per line | the child `LineSegments`, across the axis limits when the figure is drawn; default payload `(; segment_index, intercept, slope)` |
 
 A `series!` element's default payload is `(; index, label)` when the child plot's label is a
 non-empty string (Makie's own default is `"series k"`), otherwise `(; index)`.

@@ -332,8 +332,31 @@ function SegmentInteractable(ax, p::Makie.Lines; id = :lines, payloads = nothing
     i = SegmentInteractable(ax, data; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
     return _with_linewidth(_with_samples(i, nothing, [[_pt3d(v) for v in data]]), p)
 end
-SegmentInteractable(ax, p::Makie.LineSegments; id = :segments, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p)) =
-    _with_linewidth(SegmentInteractable(ax, _conv(p)[1]; mode = :pairs, id, payloads, tol, tooltip, label), p)
+# Each segment's default payload holds its two ends, `x1`, `y1` to `x2`, `y2` (and `z1`, `z2`
+# on an Axis3), beside the `segment_index` it has always had (#619).
+function SegmentInteractable(ax, p::Makie.LineSegments; id = :segments, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p))
+    vs = _conv(p)[1]
+    defaults, dims = _segment_end_payloads(vs)
+    pl = _merge_payloads(_unconvert_payloads(ax, defaults; dims), payloads, "SegmentInteractable"; dims)
+    return _with_linewidth(SegmentInteractable(ax, vs; mode = :pairs, id, payloads = pl, tol, tooltip, label), p)
+end
+# Makie holds most converted data as Float32, and `Float64(0.1f0)` is 0.10000000149011612: a
+# payload field takes the shortest decimal that reads back as the same Float32 (0.1), which is
+# closer to what the user plotted and a third the size on the wire.
+_short64(x::Float32) = isfinite(x) ? parse(Float64, replace(string(x), "f" => "e")) : Float64(x)
+_short64(x::Real) = Float64(x)
+function _segment_end_payloads(vs)
+    nd = isempty(vs) ? 2 : length(first(vs))
+    ks = nd >= 3 ? (:x1, :y1, :z1, :x2, :y2, :z2) : (:x1, :y1, :x2, :y2)
+    dims = nd >= 3 ? (; x1 = :x, y1 = :y, z1 = :z, x2 = :x, y2 = :y, z2 = :z) : (; x1 = :x, y1 = :y, x2 = :x, y2 = :y)
+    pls = Any[]
+    for k in 1:(length(vs) ÷ 2)
+        a, b = vs[2k - 1], vs[2k]
+        ends = nd >= 3 ? (a[1], a[2], a[3], b[1], b[2], b[3]) : (a[1], a[2], b[1], b[2])
+        push!(pls, merge((; segment_index = k), NamedTuple{ks}(map(_short64, ends))))
+    end
+    return pls, dims
+end
 
 # The rendered edges live in the child LineSegments' converted (DATA space), including
 # mesh-triangulation diagonals a grid-edge reconstruction would miss. Makie outlines every
@@ -931,10 +954,53 @@ function _rangebar_pairs(p)
     end
     return vs
 end
-SegmentInteractable(ax, p::Makie.Errorbars; id = :errorbars, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p)) =
-    _with_linewidth(SegmentInteractable(ax, _errorbar_pairs(p); mode = :pairs, id, payloads, tol, tooltip, label), p)
-SegmentInteractable(ax, p::Makie.Rangebars; id = :rangebars, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p)) =
-    _with_linewidth(SegmentInteractable(ax, _rangebar_pairs(p); mode = :pairs, id, payloads, tol, tooltip, label), p)
+# A bar's default payload is the point it marks and its two ends, in data, all along the axes
+# they are measured on: `x`, `y`, `low`, `high` for an error bar, and the position (`x`, or `y`
+# for `direction = :x`) with `low`, `high` for a range bar (#619).
+function _errorbar_payloads(p)
+    horiz = p.direction[] === :x
+    return Any[
+        let (x, y, lo, hi) = map(_short64, (v[1], v[2], v[3], v[4]))
+            c = horiz ? x : y
+            (; segment_index = k, x, y, low = _short64(Float32(c - lo)), high = _short64(Float32(c + hi)))
+        end
+            for (k, v) in enumerate(_converted(p)[1])
+    ]
+end
+function _rangebar_payloads(p)
+    horiz = p.direction[] === :x
+    return Any[
+        let (val, lo, hi) = map(_short64, (v[1], v[2], v[3]))
+            horiz ? (; segment_index = k, y = val, low = lo, high = hi) : (; segment_index = k, x = val, low = lo, high = hi)
+        end
+            for (k, v) in enumerate(_converted(p)[1])
+    ]
+end
+function SegmentInteractable(ax, p::Makie.Errorbars; id = :errorbars, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p))
+    dims = _along(_value_dim(p.direction[] !== :x), :low, :high)
+    pl = _merge_payloads(_unconvert_payloads(ax, _errorbar_payloads(p); dims), payloads, "SegmentInteractable"; dims)
+    return _with_linewidth(SegmentInteractable(ax, _errorbar_pairs(p); mode = :pairs, id, payloads = pl, tol, tooltip, label), p)
+end
+function SegmentInteractable(ax, p::Makie.Rangebars; id = :rangebars, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p))
+    dims = _along(_value_dim(p.direction[] !== :x), :low, :high)
+    pl = _merge_payloads(_unconvert_payloads(ax, _rangebar_payloads(p); dims), payloads, "SegmentInteractable"; dims)
+    return _with_linewidth(SegmentInteractable(ax, _rangebar_pairs(p); mode = :pairs, id, payloads = pl, tol, tooltip, label), p)
+end
+
+# `ablines!` draws a child `LineSegments` across the axis limits; its default payload is each
+# line's `intercept` (where it crosses x = 0, so measured along y) and `slope` (#619).
+function SegmentInteractable(ax, p::Makie.ABLines; id = :segments, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p))
+    vs = _conv(_childof(p, Makie.LineSegments))[1]
+    defaults = Any[]
+    Makie.broadcast_foreach(_converted(p)[1], _converted(p)[2]) do b, m
+        push!(defaults, (; segment_index = length(defaults) + 1, intercept = _short64(b), slope = _short64(m)))
+    end
+    length(defaults) == length(vs) ÷ 2 ||
+        error("ABLines introspection: $(length(defaults)) lines but $(length(vs) ÷ 2) drawn segments")
+    dims = (; intercept = :y)
+    pl = _merge_payloads(_unconvert_payloads(ax, defaults; dims), payloads, "SegmentInteractable"; dims)
+    return _with_linewidth(SegmentInteractable(ax, vs; mode = :pairs, id, payloads = pl, tol, tooltip, label), p)
+end
 
 # `xmin`/`xmax` (HLines) and `ymin`/`ymax` (VLines) are fractions of the axis in relative
 # units. Default 0 and 1 is the full limits. Makie applies the fraction on the transformed
@@ -956,6 +1022,15 @@ function _span_pairs(ax, p, ishoriz)
             (push!(vs, Point2f(val, s0)); push!(vs, Point2f(val, s1)))
     end
     return vs
+end
+
+# Each segment's position (an `hlines!` line's `y`, a `vlines!` line's `x`), in the order
+# `_span_pairs` lays the segments out.
+function _span_values(p, ishoriz)
+    fr0, fr1 = ishoriz ? (p.xmin[], p.xmax[]) : (p.ymin[], p.ymax[])
+    out = Float64[]
+    Makie.broadcast_foreach((val, _, _) -> push!(out, _short64(val)), _converted(p)[1], fr0, fr1)
+    return out
 end
 
 # Transformed min/max of one axis dimension, from `finallimits` through the scene scale.
@@ -983,14 +1058,14 @@ _frac_to_data(finv, tlo, thi, frac) = Float64(_apply_transform(finv, tlo + (thi 
 
 function SegmentInteractable(ax, p::Makie.HLines; id = :hlines, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p))
     vs = _span_pairs(ax, p, true)
-    nseg = length(vs) ÷ 2
-    pl = payloads === nothing ? Any[(; segment_index = k) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
+    defaults = Any[(; segment_index = k, y = v) for (k, v) in enumerate(_span_values(p, true))]
+    pl = _merge_payloads(_unconvert_payloads(ax, defaults), payloads, "SegmentInteractable")
     return _with_linewidth(_segment_with_resolve(ax, vs, :pairs, id, pl, tol, _ax -> _span_pairs(_ax, p, true); tooltip, label), p)
 end
 function SegmentInteractable(ax, p::Makie.VLines; id = :vlines, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p))
     vs = _span_pairs(ax, p, false)
-    nseg = length(vs) ÷ 2
-    pl = payloads === nothing ? Any[(; segment_index = k) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
+    defaults = Any[(; segment_index = k, x = v) for (k, v) in enumerate(_span_values(p, false))]
+    pl = _merge_payloads(_unconvert_payloads(ax, defaults), payloads, "SegmentInteractable")
     return _with_linewidth(_segment_with_resolve(ax, vs, :pairs, id, pl, tol, _ax -> _span_pairs(_ax, p, false); tooltip, label), p)
 end
 
@@ -1149,6 +1224,7 @@ function _plotbase(p)
     p isa Makie.Rangebars && return :rangebars
     p isa Makie.HLines && return :hlines
     p isa Makie.VLines && return :vlines
+    p isa Makie.ABLines && return :segments
     p isa Makie.Spy && return :spy
     p isa Makie.Hist && return :hist
     p isa Makie.Waterfall && return :waterfall
@@ -1208,9 +1284,16 @@ _with_stroke(i::PolygonInteractable, sw) = PolygonInteractable(
 # that converts that dimension, show what the user plotted instead: a category's label (as
 # the axis readout does), or a date/time. Both go out as strings, the form the tooltip
 # shows. Any other conversion, or a number that maps back to nothing, is left as is.
-function _unconvert_payloads(ax, pls)
+# `dims` names other position fields with their axis, as `_merge_payloads` takes them: a
+# segment's `x1` along `:x`. Only positions belong there, never a length such as a bar's `value`.
+const _DIM_CONVERSIONS = (; x = :dim1_conversion, y = :dim2_conversion, z = :dim3_conversion)
+function _unconvert_payloads(ax, pls; dims::NamedTuple = (;))
     out = nothing
-    for (k, d) in ((:x, :dim1_conversion), (:y, :dim2_conversion), (:z, :dim3_conversion))
+    fields = [(k, _DIM_CONVERSIONS[k]) for k in (:x, :y, :z)]
+    for (k, dim) in pairs(dims)
+        push!(fields, (k, _DIM_CONVERSIONS[dim]))
+    end
+    for (k, d) in fields
         hasproperty(ax, d) || continue
         c = getproperty(ax, d)[]
         (c isa Makie.CategoricalConversion || c isa Makie.DateTimeConversion) || continue
@@ -1258,7 +1341,7 @@ function _construct_unplaced(ax, p, id; kw...)
         return [SegmentInteractable(ax, p; id, kw...)]
     (
         p isa Makie.Stairs || p isa Makie.Errorbars || p isa Makie.Rangebars ||
-            p isa Makie.HLines || p isa Makie.VLines
+            p isa Makie.HLines || p isa Makie.VLines || p isa Makie.ABLines
     ) && return [SegmentInteractable(ax, p; id, kw...)]
     (p isa Makie.Heatmap || p isa Makie.Image) && return [GridInteractable(ax, p; id, kw...)]
     p isa Makie.Surface && return [SurfaceInteractable(ax, p; id, kw...)]
@@ -1486,7 +1569,7 @@ function _skip_for_axis(ax, p)
             p isa Union{
                 Makie.Scatter, Makie.Lines, Makie.LineSegments,
                 Makie.MeshScatter, Makie.Wireframe, Makie.Arrows3D, Makie.ScatterLines,
-                Makie.Surface, Makie.Text,
+                Makie.Surface, Makie.Text, Makie.ABLines,
             }
         )
         _skip_note(

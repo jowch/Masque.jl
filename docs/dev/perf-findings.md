@@ -202,6 +202,15 @@ surface inside the 50–400 KB envelope at this size; a 700-px-wide axis reaches
 (387 KB vector, 661 KB matrix, measured for the design in #259). In-drag frames leave the layer
 out (see "`:cairo` gesture frames").
 
+Segment plots (2026-11-16 on `186b483` plus #619, Julia 1.13, 600×450 figure, Cairo; measured
+by building the manifest from the plot object and from its bare vertices, which keep the old
+`(; segment_index)` payload). Each `linesegments!` segment now ships its two ends, `x1`, `y1`,
+`x2`, `y2`, written as the shortest decimal of Makie's Float32 value: **+62 B per segment** of
+random data, so the layer grows ~2.6× (1 000 segments 37.8 → 98.8 KB, 10 000 segments
+382 → 993 KB). Rounder data writes shorter numbers. A segment carries two points, so this is
+about twice a `scatter!` point (above). `errorbars!`, `rangebars!`, `hlines!`, `vlines!` and
+`ablines!` add two to four numbers per mark and, like bars, are low-N.
+
 Bars, spans, and text are low-N by nature (tens to hundreds of elements), so their per-element
 payloads never move the envelope. A high-cell `voronoiplot!` (1 000 cells) would reach
 scatter-scale manifests, a few hundred KB.

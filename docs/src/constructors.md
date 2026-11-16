@@ -126,7 +126,12 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `MeshScatter` | `PointInteractable` | `index`, `x`, `y`, `z` | `:meshscatter` |
 | `Lines` / `Stairs` | `SegmentInteractable` | `index` (the whole line is one mark); a click, once the line is named in `bind`, picks its nearest data point: `index`, `line`, `x`, `y` | `:lines` / `:stairs` |
 | `Series` | `SegmentInteractable` | `index`; `label` when the series has one; a click, once named in `bind`, picks a data point as for `Lines` | `:series` |
-| `LineSegments` / `Errorbars` / `Rangebars` / `HLines` / `VLines` / `Wireframe` | `SegmentInteractable` | `segment_index` | `:segments`, `:errorbars`, … |
+| `LineSegments` | `SegmentInteractable` | `segment_index`, `x1`, `y1`, `x2`, `y2` (the segment's two ends; `z1`, `z2` on an `Axis3`) | `:segments` |
+| `Errorbars` | `SegmentInteractable` | `segment_index`, `x`, `y`, `low`, `high` (the bar's two ends) | `:errorbars` |
+| `Rangebars` | `SegmentInteractable` | `segment_index`, `x` (`y` for `direction = :x`), `low`, `high` | `:rangebars` |
+| `HLines` / `VLines` | `SegmentInteractable` | `segment_index`, `y` / `x` | `:hlines` / `:vlines` |
+| `ABLines` | `SegmentInteractable` | `segment_index`, `intercept`, `slope` | `:segments` |
+| `Wireframe` | `SegmentInteractable` | `segment_index` | `:wireframe` |
 | `Arrows3D` | `SegmentInteractable` | `index`, `x`, `y`, `z`, `u`, `v`, `w` | `:arrows3d` |
 | `Arrows2D` | `SegmentInteractable` | `index`, `x`, `y`, `u`, `v` | `:arrows2d` |
 | `BarPlot` | `RectInteractable` | `low`, `high`, `value` | `:bars` |

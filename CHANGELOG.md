@@ -12,6 +12,12 @@ All notable changes to this project are documented here. The format is based on
   `interactables(st; payloads = (points = rows,))` for a `stem!`. A part you leave out keeps its
   own payloads. A plain list, or a name the plot has no part for, raises an error that lists the
   plot's parts (#599).
+- Hovering a `linesegments!`, `errorbars!`, `rangebars!`, `hlines!`, `vlines!` or `ablines!` mark
+  now shows what it marks, not only its `segment_index`: a segment's two ends (`x1`, `y1`, `x2`,
+  `y2`), an error bar's `x`, `y`, `low` and `high`, a range bar's position with `low` and
+  `high`, a line's `y` or `x`, and an `ablines!` line's `intercept` and `slope`. Positions
+  follow the axis tick format, and a click's event and `@bind` value carry the same fields.
+  `segment_index` stays (#619).
 
 ### Changed
 - Masque now needs Makie 0.24.14 or later, with CairoMakie 0.15.14 or WGLMakie 0.13.14 or later.
