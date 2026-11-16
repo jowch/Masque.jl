@@ -385,6 +385,14 @@ kind_sweep_meta() = [
         "tip" => "x a", "hoverIndex" => 3, "hoverTip" => "x b", "mode" => "element",
     ),
     Dict(
+        # A dodged `waterfall!` with `show_final = true`: each step names the total drawn behind
+        # it, the total at its x (#624). Steps 1-2 sit at x = 1 (total 3), steps 3-4 at x = 2
+        # (total 2).
+        "key" => "waterfall_total", "layerId" => "waterfall", "layerKind" => "rects",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "total 3", "hoverIndex" => 3, "hoverTip" => "total 2", "mode" => "element",
+    ),
+    Dict(
         # A `qqnorm!` with a reference line, its tooltip keyed by part (#616): the template
         # names the points' own payload field, which the line doesn't have.
         "key" => "qq_tip", "layerId" => "scatter", "layerKind" => "circles",
@@ -1609,6 +1617,13 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:bars => [1]))
     end
 
+    waterfall_total = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "waterfall, show_final")
+        waterfall!(ax, [1, 1, 2, 2], [2.0, 1.0, -1.0, 3.0]; dodge = [1, 2, 1, 2], show_final = true)
+        masque(fig; selected = Dict(:waterfall => [1]))
+    end
+
     raincloud_box = let
         q = [log(p / (1 - p)) / 1.7 for p in range(0.0025, 0.9975; length = 200)]
         xs = repeat(["a", "b"]; inner = 200)
@@ -2359,7 +2374,7 @@ function build_kind_sweep()
     return (;
         scatter, scatter_low, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, box_hidden, box_axes, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, violin_h, raincloud, boxplot, raincloud_box, qq_tip, barplot_cat, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, errorbars, spy, ablines, pie, voronoi, triplot, tricontourf, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_data_corner, view_resized, view_nested, legend, series_legend,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, violin_h, raincloud, boxplot, raincloud_box, qq_tip, barplot_cat, waterfall_total, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, errorbars, spy, ablines, pie, voronoi, triplot, tricontourf, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_data_corner, view_resized, view_nested, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, choices, menu_view, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

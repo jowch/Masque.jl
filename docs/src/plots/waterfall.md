@@ -26,16 +26,22 @@ with `@bind sel masque(fig)`, it is `sel.waterfall`.
 | `x` | the bar's position on the `x` axis |
 | `value` | the change you passed for this bar, negative for a fall |
 | `low`, `high` | where the bar starts and ends on the `y` axis |
+| `total` | with `show_final = true`, the total drawn behind the bar |
+
+With `waterfall!(ax, x, change; show_final = true)`, hovering any bar
+also shows the total drawn behind it, the sum of all your changes. With
+`dodge`, each position has its own total, so a bar shows the total at
+its position.
 
 ## Show your own data
 
-To name each step and show the running total, give each bar a payload,
+To name each step and show the running balance, give each bar a payload,
 one per bar in the order of your data, and a tooltip template that uses
 its fields:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-plots-waterfall-data" data-masque-embed="plots_waterfall" data-masque-segment="data" title="The same waterfall with a tooltip giving each step's name, its change and the running total." style="width:100%;height:560px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-plots-waterfall-data" data-masque-embed="plots_waterfall" data-masque-segment="data" title="The same waterfall with a tooltip giving each step's name, its change and the running balance." style="width:100%;height:560px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
