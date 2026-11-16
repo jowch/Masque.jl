@@ -1670,7 +1670,8 @@ function build_kind_sweep()
     voronoi = let
         fig = Figure(size = (480, 320))
         ax = Axis(fig[1, 1]; title = "voronoi")
-        voronoiplot!(ax, [1.0, 3.0, 2.0, 1.2, 2.8], [1.0, 1.2, 2.5, 3.5, 3.4], [10.0, 20.0, 30.0, 40.0, 50.0])
+        # Site 4 repeats site 3, so the triangulation drops it and its cell is empty (#634).
+        voronoiplot!(ax, [1.0, 3.0, 2.0, 2.0, 1.2, 2.8], [1.0, 1.2, 2.5, 2.5, 3.5, 3.4], [10.0, 20.0, 30.0, 35.0, 40.0, 50.0])
         masque(fig; selected = Dict(:voronoiplot => [1]))
     end
 

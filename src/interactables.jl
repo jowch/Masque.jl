@@ -1706,7 +1706,7 @@ Arbitrary filled polygons, hit-tested even-odd. Produces one `:polygons` [`HitLa
 | `Makie.Density` | `:density` | its descendant `Band`'s KDE fill | same shape as `Band` |
 | `Makie.Contourf` | `:contourf` | each filled polygon's exterior, plus its holes as further rings of the same element | payload `(; low, high)`, the band edges nearest each polygon's fill color |
 | `Makie.Violin` | `:violin` | each violin's outline | payload `(; x)`, the nearest category to the ring's geometric center; `(; y)` when `orientation = :horizontal` |
-| `Makie.Voronoiplot` | `:voronoiplot` | each cell's exterior ring | cells come back in tessellation order (no cheap cell→generator map), so default payload is `(; index)` only |
+| `Makie.Voronoiplot` | `:voronoiplot` | each cell's exterior ring, in the order of your sites | default payload `(; index, x, y)` (the cell's site), plus `value` when the cells are coloured by values; `payloads` takes one entry per site |
 | `Makie.Hexbin` | `:hexbin` | each drawn hexagon's six corners | payload `(; x, y, count)`: the hexagon's center in data units and its count (summed `weights` when given); `threshold = 0` keeps the empty hexagons |
 
 # Examples

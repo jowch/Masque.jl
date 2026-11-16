@@ -1589,17 +1589,21 @@ end
         pc = voronoiplot!(ac, xs, ys; color = 100 .* ys)
         Makie.update_state_before_display!(fc)
         @test all(pl -> pl.value ≈ 100 * pl.y, PolygonInteractable(ac, pc).payloads)
-        # Each cell's value is the colour Makie gives that cell, and its x, y name the same
-        # site, also when `smooth = true` moves the generators and when a circle clip empties
-        # a cell (the empty cell keeps its generator).
+        # Cells come in the order of the sites (#634): cell j is the ring Makie colours with
+        # site j's colour, whatever Makie's own cell order, also when `smooth = true` moves the
+        # generators and when a circle clip empties a cell (the empty cell keeps its site).
         function check_cells(xs, ys; kw...)
             f = Figure(); a = Axis(f[1, 1])
             p = voronoiplot!(a, xs, ys; color = Float64.(eachindex(xs)), kw...)
             Makie.update_state_before_display!(f)
-            pls = PolygonInteractable(a, p).payloads
-            cs = Masque._descendant(p, Makie.Poly).color[]
-            return length(pls) == length(cs) &&
-                all(k -> pls[k].value == cs[k] && (pls[k].x, pls[k].y) == (xs[Int(cs[k])], ys[Int(cs[k])]), eachindex(pls))
+            vi = PolygonInteractable(a, p)
+            poly = Masque._descendant(p, Makie.Poly)
+            cs = poly.color[]
+            mrings = Masque._poly_exterior_rings(Masque._conv(poly)[1])
+            pls = vi.payloads
+            return length(pls) == length(xs) &&
+                all(j -> pls[j].index == j && pls[j].value == j && (pls[j].x, pls[j].y) == (xs[j], ys[j]), eachindex(xs)) &&
+                all(k -> (r = vi.rings[Int(cs[k])]; length(r) == length(mrings[k]) && all(((q, m),) -> q[1] ≈ m[1] && q[2] ≈ m[2], zip(r, mrings[k]))), eachindex(cs))
         end
         rx = [0.81, 0.12, 0.55, 0.33, 0.97, 0.05, 0.68, 0.24, 0.43, 0.9, 0.61, 0.17]
         ry = [0.37, 0.88, 0.14, 0.62, 0.71, 0.29, 0.93, 0.08, 0.51, 0.02, 0.46, 0.77]
@@ -1612,7 +1616,27 @@ end
         Makie.update_state_before_display!(fo)
         io = PolygonInteractable(ao, po)
         @test any(isempty, io.rings)
-        @test sort([(pl.x, pl.y) for pl in io.payloads]) == sort(collect(zip(cx, cy)))
+        @test [(pl.x, pl.y) for pl in io.payloads] == collect(zip(cx, cy))
+        # A user's payloads take one entry per site, in the sites' order.
+        names = ["s$j" for j in eachindex(cx)]
+        iu = PolygonInteractable(ao, po; payloads = [(; name = n) for n in names])
+        @test [pl.name for pl in iu.payloads] == names
+        @test [(pl.x, pl.y) for pl in iu.payloads] == collect(zip(cx, cy))
+        # Duplicate sites: the triangulation drops the copy, which gets an empty ring; later
+        # sites keep their own index, and payloads still take one entry per site.
+        sx, sy = [1, 2, 3, 2, 4, 1.5], [1, 3, 1, 3, 2.5, 2]
+        fd = Figure(); ad = Axis(fd[1, 1])
+        pd = voronoiplot!(ad, sx, sy)
+        Makie.update_state_before_display!(fd)
+        id = PolygonInteractable(ad, pd; payloads = ["p$j" for j in 1:6])
+        @test length(id.rings) == 6 && count(isempty, id.rings) == 1
+        @test id.payloads == Any["p$j" for j in 1:6]
+        dd = PolygonInteractable(ad, pd)
+        @test [pl.index for pl in dd.payloads] == 1:6
+        @test [(pl.x, pl.y) for pl in dd.payloads] == collect(zip(Float64.(sx), Float64.(sy)))
+        # The empty ring still builds a hit layer, with no area to hit.
+        _, _, ctxd = ctx_for(fd)
+        @test length(only(hitlayers(dd, ctxd)).geometry) == 6
     end
 
     @testset "pie, tricontourf and triplot report what they draw (#623)" begin

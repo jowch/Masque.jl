@@ -557,6 +557,34 @@ describe("keyboard navigation", () => {
         }
     })
 
+    it("skips a polygon element with no vertex, such as an empty Voronoi cell (#634)", async () => {
+        vi.useFakeTimers()
+        try {
+            const manifest: Manifest = {
+                width: 1200, height: 800, scaling: 2, transforms: {},
+                layers: [{
+                    id: "v", kind: "polygons", label: "Cells",
+                    geometry: [[0, 0, 100, 0, 100, 100], [], [200, 200, 300, 200, 300, 300], [[], []]],
+                    payloads: [{ c: 1 }, { c: 2 }, { c: 3 }, { c: 4 }], axis: "ax1", events: ["click", "hover"],
+                }],
+            }
+            const { surface, shadow, host } = setup(manifest)
+            const value = () => (host as unknown as { value: Record<string, unknown> }).value
+            const live = shadow.querySelector('[aria-live="polite"]') as HTMLElement
+            surface.focus()
+            down(surface, "ArrowRight")
+            vi.advanceTimersByTime(200)
+            expect(live.textContent).toBe("Cells, element 1 of 2: c 1")
+            down(surface, "ArrowRight") // the empty element 1 is skipped
+            vi.advanceTimersByTime(200)
+            expect(live.textContent).toBe("Cells, element 2 of 2: c 3")
+            down(surface, "Enter")
+            expect(value().v).toMatchObject({ layer: "v", index: 2 })
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it(":lines is one focus stop for the whole path, NaN gap included", () => {
         const manifest: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},

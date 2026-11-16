@@ -845,21 +845,30 @@ function _place_data_markers(i::PolygonInteractable, p, f)
 end
 
 # Makie builds one cell per generator with a polygon, in its generator order
-# (`get_voronoi_tiles!`), and colours them in that order too. A generator's index is its input
-# site's index, even when `smooth = true` moves the generator or a clip empties the cell. Each
-# cell's default payload is its site's `x`, `y` and, when the cells are coloured by values
-# (`voronoiplot!(xs, ys, zs)` or a `color` vector), its `value` (#623).
+# (`get_voronoi_tiles!`): sorted on newer Makie, `each_generator` (`Dict`) order on older
+# releases such as the 0.24.14 compat floor. A generator's index is its input site's index,
+# even when `smooth = true` moves the generator or a clip empties the cell. So the cells are put
+# back in site order, cell `j` being site `j`: `index`, `ev.index` and a user's `payloads` (one
+# per site) all follow the user's points. A site with no cell (a duplicate the triangulation
+# dropped) gets an empty ring, which is never hit. Each cell's default payload is its site's
+# `x`, `y` and, when the cells are coloured by values (`voronoiplot!(xs, ys, zs)` or a `color`
+# vector), its `value` (#623, #634). When the cells can't be mapped to sites they stay in
+# Makie's order with a bare `index`.
 function PolygonInteractable(ax, p::Makie.Voronoiplot; id = :voronoiplot, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     poly = _descendant(p, Makie.Poly)
     rings = _poly_exterior_rings(_conv(poly)[1])
-    d = _voronoi_payloads(p, rings)
-    d === nothing || (payloads = _merge_payloads(_unconvert_payloads(ax, d), payloads, "PolygonInteractable"))
+    m = _voronoi_sites(p, rings)
+    if m !== nothing
+        rings, d = m
+        payloads = _merge_payloads(_unconvert_payloads(ax, d), payloads, "PolygonInteractable")
+    end
     return PolygonInteractable(ax, rings; id, payloads, tooltip, label)
 end
-function _voronoi_payloads(p, rings)
+function _voronoi_sites(p, rings)
     args = _converted(p)
     args[1] isa AbstractVector{<:Makie.VecTypes} || return nothing   # a tessellation passed in
     sites = args[1]
+    (isempty(sites) || isempty(rings)) && return nothing
     vals = if length(eltype(sites)) == 3
         [s[3] for s in sites]
     else
@@ -868,21 +877,24 @@ function _voronoi_payloads(p, rings)
     end
     gens = try
         v = p.vorn[]
-        # Newer Makie sorts the generators (`sorted_generators`); older releases, such as the
-        # 0.24.14 compat floor, use `each_generator` order. Either way it is the cell order.
         order = isdefined(Makie, :sorted_generators) ? Makie.sorted_generators(v) : collect(Makie.DelTri.each_generator(v))
         [i for i in order if Makie.DelTri.has_polygon(v, i)]
     catch e
         e isa InterruptException && rethrow()
         return nothing
     end
-    # Count guard: if Makie ever orders or filters the cells differently, show bare `index`.
-    (length(gens) == length(rings) && all(j -> j isa Integer && 1 <= j <= length(sites), gens)) || return nothing
-    return map(enumerate(gens)) do (k, j)
+    # Count guard: if Makie ever orders or filters the cells differently, keep its own order.
+    (length(gens) == length(rings) && allunique(gens) && all(j -> j isa Integer && 1 <= j <= length(sites), gens)) || return nothing
+    byside = [empty(first(rings)) for _ in sites]
+    for (k, j) in enumerate(gens)
+        byside[j] = rings[k]
+    end
+    d = map(eachindex(sites)) do j
         s = sites[j]
-        pl = (; index = k, x = _short64(s[1]), y = _short64(s[2]))
+        pl = (; index = j, x = _short64(s[1]), y = _short64(s[2]))
         vals === nothing ? pl : merge(pl, (; value = _short64(vals[j])))
     end
+    return byside, d
 end
 
 # Stats come from Makie's computed-stats node (converted is a 4-tuple centers/medians/q1s/q3s,
