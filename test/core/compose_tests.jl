@@ -143,6 +143,13 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         end
         @test err isa ArgumentError && occursin("no part named `point` in `tooltip`", err.msg) &&
             occursin("`points`, `line`", err.msg)
+        # A part's own entry is one template; a nested `NamedTuple` there says so.
+        err = try
+            interactables(ax, sl; tooltip = (line = (x = tip,),))
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("part `line` has one layer", err.msg)
     end
 
     @testset "a tooltip for one part of a qqnorm! (#616)" begin

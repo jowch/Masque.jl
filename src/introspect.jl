@@ -1095,10 +1095,25 @@ end
 
 # Point layer keeps the base id; the line/segment layer gets a suffix so the two ids stay
 # distinct in the manifest.
+# Every layer below the two-layer plots takes one `tooltip` template. One keyed by part name
+# (#616) is for a plot with several parts, and would otherwise fail on the constructor's
+# `tooltip` type.
+function _check_one_template(p, kw; part = nothing)
+    get(kw, :tooltip, nothing) isa NamedTuple || return nothing
+    who = part === nothing ? "this plot has one layer" : "its part `$part` has one layer"
+    throw(
+        ArgumentError(
+            "interactables($(Makie.plotkey(p))): $who, so `tooltip` takes one template, " *
+                "`tooltip = masque\"…\"`, not one per part.",
+        ),
+    )
+end
+
 # `label` and a plain `tooltip` apply to both parts; `payloads`, and a `tooltip` given as a
 # `NamedTuple`, name their part, as in `payloads = (points = rows,)` (see `_part_kwargs`).
 function _stem_parts(ax, p, base; kw...)
     kp, ks = _part_kwargs(p, [:points, :stems], kw)
+    _check_one_template(p, kp; part = :points); _check_one_template(p, ks; part = :stems)
     return AbstractInteractable[
         PointInteractable(ax, _childof(p, Makie.Scatter); kp..., id = _part_id(base, :points)),
         SegmentInteractable(ax, _childof(p, Makie.LineSegments); ks..., id = _part_id(base, :stems)),
@@ -1106,6 +1121,7 @@ function _stem_parts(ax, p, base; kw...)
 end
 function _scatterlines_parts(ax, p, base; kw...)
     kp, kl = _part_kwargs(p, [:points, :line], kw)
+    _check_one_template(p, kp; part = :points); _check_one_template(p, kl; part = :line)
     return AbstractInteractable[
         PointInteractable(ax, _childof(p, Makie.Scatter); kp..., id = _part_id(base, :points)),
         SegmentInteractable(ax, _childof(p, Makie.Lines); kl..., id = _part_id(base, :line)),
@@ -1252,15 +1268,9 @@ function _dim_strings(vals)
 end
 
 function _construct_unplaced(ax, p, id; kw...)
-    # A `tooltip` keyed by part name is for a plot with several parts (#616); one with a
-    # single layer would otherwise fail on the constructor's `tooltip` type.
-    get(kw, :tooltip, nothing) isa NamedTuple && !(p isa Makie.Stem || p isa Makie.ScatterLines) &&
-        throw(
-        ArgumentError(
-            "interactables($(Makie.plotkey(p))): this plot has one layer, so `tooltip` takes one " *
-                "template, `tooltip = masque\"…\"`, not one per part",
-        ),
-    )
+    p isa Makie.Stem && return _stem_parts(ax, p, id; kw...)
+    p isa Makie.ScatterLines && return _scatterlines_parts(ax, p, id; kw...)
+    _check_one_template(p, kw)
     p isa Makie.Scatter && return [_scatter_interactable(ax, p; id, kw...)]
     p isa Makie.MeshScatter && return [PointInteractable(ax, p; id, kw...)]
     (p isa Makie.Lines || p isa Makie.LineSegments || p isa Makie.Wireframe || p isa Makie.Arrows3D || p isa Makie.Arrows2D) &&
@@ -1281,8 +1291,6 @@ function _construct_unplaced(ax, p, id; kw...)
     p isa Makie.Violin && return [PolygonInteractable(ax, p; id, kw...)]
     p isa Makie.Voronoiplot && return [PolygonInteractable(ax, p; id, kw...)]
     p isa Makie.Hexbin && return [PolygonInteractable(ax, p; id, kw...)]
-    p isa Makie.Stem && return _stem_parts(ax, p, id; kw...)
-    p isa Makie.ScatterLines && return _scatterlines_parts(ax, p, id; kw...)
     p isa Makie.Series && return [SegmentInteractable(ax, p; id, kw...)]
     p isa Makie.BoxPlot && return [_boxplot_interactable(ax, p; id, kw...)]
     p isa Makie.Text && return _text_interactables(ax, p, id; kw...)

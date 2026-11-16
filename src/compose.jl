@@ -14,9 +14,10 @@ constructor, so `interactables(ax, s; tooltip = masque"…")` is `PointInteracta
 tooltip = masque"…")` for a scatter. A two-layer plot takes `label` and a plain `tooltip` on
 both layers, and `payloads` one list per part, keyed by its name: `payloads = (points = rows,)`
 for a `stem!`. `tooltip` may name its parts the same way, `tooltip = (points = masque"…",)`,
-and a part left out keeps its default tooltip. Unlike the constructor, it also moves the layers to where the
-plot is drawn when `translate!`, `scale!`, or `rotate!` moved it, and returns no layers for a
-plot drawn outside data space (`space = :relative`, `:pixel`, `:clip`).
+and a part left out keeps its default tooltip. Unlike the constructor, it also moves the
+layers to where the plot is drawn when `translate!`, `scale!`, or `rotate!` moved it, and
+returns no layers for a plot drawn outside data space (`space = :relative`, `:pixel`,
+`:clip`).
 
 `select = :many` lets a reader hold several of the plot's marks at once: its `@bind` field is
 then a `Vector{ElementEvent}`, empty to start, and a click adds a mark or takes it out. It
@@ -279,10 +280,10 @@ part, keyed by its name, as in `payloads = (scatter = df, violin = per_group)`. 
 one entry per mark of its part, a part you leave out keeps its default payloads, and an
 unknown name raises `ArgumentError` listing the plot's parts. A `tooltip` template applies to
 every part; to give one part its own, key it the same way, as in
-`tooltip = (scatter = masque"…",)`, and the parts you leave out keep their default tooltips. A part's name is its own plot's,
-numbered when one repeats (`lines`, `lines_2`), the name it takes under `id`. A recipe that
-draws none, or only ones that give no layer (`bracket!`'s text in pixel space), raises
-`ArgumentError`.
+`tooltip = (scatter = masque"…",)`, and the parts you leave out keep their default tooltips.
+A part's name is its own plot's, numbered when one repeats (`lines`, `lines_2`), the name it
+takes under `id`. A recipe that draws none, or only ones that give no layer (`bracket!`'s
+text in pixel space), raises `ArgumentError`.
 
 The defaults stay unless you leave them out: to overlay only the plots you pass, add
 `auto = false`, as in `masque(fig, interactables(c), ViewInteractable(ax); auto = false)`.
