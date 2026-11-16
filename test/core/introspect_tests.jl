@@ -1259,6 +1259,19 @@ end
         @test ri2.payloads[3].value == 3.0                             # up-step: positive
         # |value| ≈ bar height (low..high span)
         @test abs(ri2.payloads[2].value) ≈ ri2.payloads[2].high - ri2.payloads[2].low
+
+        # show_final = true (#618): the total bars are drawn first; the hit boxes and low/high
+        # must still come from the step bars, not the total.
+        fig3 = Figure(); ax3 = Axis(fig3[1, 1])
+        wf3 = waterfall!(ax3, 1:4, [5.0, -2.0, 3.0, -1.0]; show_final = true)
+        Makie.update_state_before_display!(fig3)
+        ri3 = RectInteractable(ax3, wf3; id = :waterfall)
+        @test length(ri3.payloads) == 4
+        @test [(q.low, q.high) for q in ri3.payloads] == [(0.0, 5.0), (3.0, 5.0), (3.0, 6.0), (5.0, 6.0)]
+        @test [q.value for q in ri3.payloads] == [5.0, -2.0, 3.0, -1.0]
+        # each hit box is its own step's bar, not the full-height total bar
+        @test [r[4] for r in ri3.data] ≈ [5.0, 2.0, 3.0, 1.0]
+        @test [r[2] for r in ri3.data] ≈ [2.5, 4.0, 4.5, 5.5]
     end
 
     @testset "CrossBar extraction" begin
