@@ -238,6 +238,16 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test coords(RectInteractable(ax, bp; payloads = [(; value = 1), (; name = "b")])) == merge(on(:x, :x), on(:y, :low, :high))
         @test coords(RectInteractable(ax, bp; payloads = [Dict("value" => 1), Dict("name" => "b")])) == merge(on(:x, :x), on(:y, :low, :high))
         @test coords(RectInteractable(ax, bp; payloads = [Dict(:high => 1), Dict(:name => "b")])) == merge(on(:x, :x), on(:y, :low, :value))
+        # Segment plots (#619): positions follow their axis; a slope is a ratio, plain.
+        @test coords(SegmentInteractable(ax, errorbars!(ax, [1.0], [2.0], [0.5]))) == merge(on(:x, :x), on(:y, :y, :low, :high))
+        @test coords(SegmentInteractable(ax, errorbars!(ax, [1.0], [2.0], [0.5]; direction = :x))) == merge(on(:x, :x, :low, :high), on(:y, :y))
+        @test coords(SegmentInteractable(ax, rangebars!(ax, [1.0], [0.5], [1.5]))) == merge(on(:x, :x), on(:y, :low, :high))
+        @test coords(SegmentInteractable(ax, rangebars!(ax, [1.0], [0.5], [1.5]; direction = :x))) == merge(on(:y, :y), on(:x, :low, :high))
+        @test coords(SegmentInteractable(ax, hlines!(ax, [1.0]))) == on(:y, :y)
+        @test coords(SegmentInteractable(ax, vlines!(ax, [1.0]))) == on(:x, :x)
+        @test coords(SegmentInteractable(ax, linesegments!(ax, [Point2f(0, 0), Point2f(1, 1)]))) == merge(on(:x, :x1, :x2), on(:y, :y1, :y2))
+        @test coords(SegmentInteractable(ax, ablines!(ax, 0.0, 1.0))) == on(:y, :intercept)
+        @test coords(SegmentInteractable(ax, hlines!(ax, [1.0]); payloads = [(; y = 3)])) == Dict{String, String}()
         # Colour values are read off a colorbar, not an axis: plain.
         @test coords(PolygonInteractable(ax, contourf!(ax, rand(5, 5)))) == Dict{String, String}()
     end

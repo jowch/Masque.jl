@@ -1023,6 +1023,69 @@ end
             rbars = [(0.5, 1.0), (1.5, 1.0), (1.0, 2.0), (2.0, 2.0)]
             @test geom(SegmentInteractable(a, pr), c) ==
                 geom(SegmentInteractable(a, rbars; mode = :pairs), c)
+            # The fields name the bar along x: low/high are its ends in x.
+            @test SegmentInteractable(a, pe).payloads[2] == (; segment_index = 2, x = 2.0, y = 4.0, low = 1.7, high = 2.3)
+            @test SegmentInteractable(a, pr).payloads[1] == (; segment_index = 1, y = 1.0, low = 0.5, high = 1.5)
+        end
+
+        @testset "segment plots report what they mark (#619)" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1])
+            pe = errorbars!(a, [0.0, 5.0], [2.0, 3.5], [0.5, 0.25], [0.25, 1.0])
+            pr = rangebars!(a, [1.0, 2.0], [0.5, 1.0], [1.5, 2.0])
+            ps = linesegments!(a, [Point2f(0, 0), Point2f(1, 1), Point2f(2, 0), Point2f(3, 1)])
+            pa = ablines!(a, [0.0, 1.0], [1.0, -0.5])
+            pv = vlines!(a, [1.0, 4.0])
+            _, _, c = ctx_for(f)
+            # An error bar's low/high are its ends in data, not Makie's relative offsets.
+            @test SegmentInteractable(a, pe).payloads ==
+                Any[(; segment_index = 1, x = 0.0, y = 2.0, low = 1.5, high = 2.25), (; segment_index = 2, x = 5.0, y = 3.5, low = 3.25, high = 4.5)]
+            @test SegmentInteractable(a, pr).payloads[2] == (; segment_index = 2, x = 2.0, low = 1.0, high = 2.0)
+            @test SegmentInteractable(a, ps).payloads ==
+                Any[(; segment_index = 1, x1 = 0.0, y1 = 0.0, x2 = 1.0, y2 = 1.0), (; segment_index = 2, x1 = 2.0, y1 = 0.0, x2 = 3.0, y2 = 1.0)]
+            @test SegmentInteractable(a, pv).payloads == Any[(; segment_index = 1, x = 1.0), (; segment_index = 2, x = 4.0)]
+            # ablines! is its own kind now, under the id it had as a walked LineSegments.
+            ia = only(IP._construct_unplaced(a, pa, :segments))
+            @test ia.payloads == Any[(; segment_index = 1, intercept = 0.0, slope = 1.0), (; segment_index = 2, intercept = 1.0, slope = -0.5)]
+            @test geom(ia, c) == geom(SegmentInteractable(a, IP._childof(pa, Makie.LineSegments)), c)
+            # A scalar intercept broadcasts over a vector of slopes, one line each.
+            @test length(SegmentInteractable(a, ablines!(a, 1.0, [1.0, 2.0, 3.0])).payloads) == 3
+            # A user's payload merges onto the defaults, its own fields winning.
+            pl = SegmentInteractable(a, pe; payloads = [(; name = "a"), (; name = "b", y = "top")]).payloads
+            @test pl[1] == (; name = "a", x = 0.0, y = 2.0, low = 1.5, high = 2.25)
+            @test pl[2] == (; name = "b", y = "top", x = 5.0, low = 3.25, high = 4.5)
+            # A click's event carries the fields too.
+            ev = ElementEvent(:errorbars, 1, SegmentInteractable(a, pe).payloads[1])
+            @test ev.low == 1.5 && ev.segment_index == 1
+            # Float64 data keeps its digits (review of #627).
+            pb = errorbars!(a, [1.0], [1.0e8 + 3], [1.0])
+            @test SegmentInteractable(a, pb).payloads[1] == (; segment_index = 1, x = 1.0, y = 1.0e8 + 3, low = 1.0e8 + 2, high = 1.0e8 + 4)
+            pb = errorbars!(a, [1.0], [123456.789], [0.01])
+            @test SegmentInteractable(a, pb).payloads[1].low == 123456.789 - 0.01
+            # Axis3 segments name their z ends.
+            f3 = Figure(); a3 = Axis3(f3[1, 1])
+            p3 = linesegments!(a3, [Point3f(0, 0, 0), Point3f(1, 2, 3)])
+            @test SegmentInteractable(a3, p3).payloads == Any[(; segment_index = 1, x1 = 0.0, y1 = 0.0, z1 = 0.0, x2 = 1.0, y2 = 2.0, z2 = 3.0)]
+            # A wireframe edge names its two ends too.
+            wf = wireframe!(a3, 0:1, 0:1, [0.0 1.0; 2.0 3.0])
+            wi = SegmentInteractable(a3, wf)
+            @test length(wi.payloads) == length(wi.vertices) ÷ 2
+            for (k, pl) in enumerate(wi.payloads)
+                @test Point3f(pl.x1, pl.y1, pl.z1) == wi.vertices[2k - 1] && Point3f(pl.x2, pl.y2, pl.z2) == wi.vertices[2k]
+            end
+            # A spy entry names its row, column and value.
+            fs = Figure(); as = Axis(fs[1, 1])
+            M = zeros(3, 4); M[2, 3] = 5.0; M[3, 1] = -1.5
+            ss = Masque.RectInteractable(as, spy!(as, M))
+            @test Set((pl.i, pl.j, pl.value) for pl in ss.payloads) == Set([(2, 3, 5.0), (3, 1, -1.5)])
+            @test all(k -> ss.payloads[k].index == k, eachindex(ss.payloads))
+        end
+
+        @testset "segment ends on a date axis show the date (#619)" begin
+            f = Figure(); a = Axis(f[1, 1])
+            D = Makie.Dates
+            ps = linesegments!(a, D.Date(2024, 1, 1) .+ D.Day.(0:3), [1.0, 2.0, 3.0, 1.0])
+            Makie.update_state_before_display!(f)
+            @test SegmentInteractable(a, ps).payloads[2] == (; segment_index = 2, x1 = "2024-01-03", y1 = 3.0, x2 = "2024-01-04", y2 = 1.0)
         end
 
         @testset "hlines/vlines -> Segment(:pairs) spanning finallimits" begin
@@ -1064,7 +1127,7 @@ end
                 geom(SegmentInteractable(a, [(1.0, 2.0), (4.0, 2.0), (5.0, 8.0), (9.0, 8.0)]; mode = :pairs), c)
             ps = hlines!(a, 4.0; xmin = [0.1, 0.6], xmax = [0.3, 0.9])
             Ls = only(hitlayers(SegmentInteractable(a, ps), c))
-            @test Ls.payloads == Any[(; segment_index = 1), (; segment_index = 2)]
+            @test Ls.payloads == Any[(; segment_index = 1, y = 4.0), (; segment_index = 2, y = 4.0)]
             @test geom(SegmentInteractable(a, ps), c) ==
                 geom(SegmentInteractable(a, [(1.0, 4.0), (3.0, 4.0), (6.0, 4.0), (9.0, 4.0)]; mode = :pairs), c)
 

@@ -231,7 +231,8 @@ kind_sweep_meta() = [
         # share shipped once (#316). Elements 0 and 3 are the first quad's two outer edges.
         "key" => "wireframe3d", "layerId" => "wireframe", "layerKind" => "segments",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 3,
-        "tip" => "index", "hoverIndex" => 3, "hoverTip" => "index", "mode" => "element",
+        # Each edge names its two ends (#619).
+        "tip" => "z1", "hoverIndex" => 3, "hoverTip" => "z2", "mode" => "element",
     ),
     Dict(
         # Two plots overlapping on screen on Axis3: the scatter, drawn after the meshscatter,
@@ -444,8 +445,27 @@ kind_sweep_meta() = [
     Dict(
         "key" => "hlines", "layerId" => "hlines", "layerKind" => "segments",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
-        "tip" => "segment_index", "hoverIndex" => 1, "hoverTip" => "segment_index",
+        # Each line's tooltip names its `y` (#619).
+        "tip" => "y1.5", "hoverIndex" => 1, "hoverTip" => "y3.5",
         "mode" => "element",
+    ),
+    Dict(
+        # An error bar's tooltip gives its point and its two ends in data (#619).
+        "key" => "errorbars", "layerId" => "errorbars", "layerKind" => "segments",
+        "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "low1", "hoverIndex" => 1, "hoverTip" => "high4.5", "mode" => "element",
+    ),
+    Dict(
+        # A `spy!` entry names its row, column and value (#619).
+        "key" => "spy", "layerId" => "spy", "layerKind" => "rects",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "value", "hoverIndex" => 0, "hoverTip" => "value2", "mode" => "element",
+    ),
+    Dict(
+        # `ablines!` is its own kind (#619): each line's `intercept` and `slope`.
+        "key" => "ablines", "layerId" => "segments", "layerKind" => "segments",
+        "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "intercept0.5", "hoverIndex" => 1, "hoverTip" => "slope-0.5", "mode" => "element",
     ),
     Dict(
         "key" => "threshold", "layerId" => "threshold", "layerKind" => "threshold",
@@ -1678,6 +1698,28 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:hlines => [1]))
     end
 
+    errorbars = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "errorbars", limits = (0, 4, 0, 5))
+        errorbars!(ax, [1.0, 3.0], [1.5, 3.5], [0.5, 0.25], [0.5, 1.0]; color = :gray, linewidth = 3, whiskerwidth = 10)
+        masque(fig; selected = Dict(:errorbars => [1]))
+    end
+
+    spy = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "spy")
+        M = zeros(3, 3); M[1, 1] = 2.0; M[3, 2] = 5.0; M[2, 3] = 8.0
+        spy!(ax, M; colormap = [:gray, :gray])
+        masque(fig; selected = Dict(:spy => [2]))
+    end
+
+    ablines = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "ablines", limits = (0, 4, 0, 4))
+        ablines!(ax, [0.5, 3.5], [0.5, -0.5]; color = :gray, linewidth = 3)
+        masque(fig; selected = Dict(:segments => [1]))
+    end
+
     threshold = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "threshold", limits = (0, 10, 0, 10))
@@ -2263,7 +2305,7 @@ function build_kind_sweep()
     return (;
         scatter, scatter_low, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, box_hidden, box_axes, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, violin_h, raincloud, boxplot, raincloud_box, qq_tip, barplot_cat, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_data_corner, view_resized, view_nested, legend, series_legend,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, violin_h, raincloud, boxplot, raincloud_box, qq_tip, barplot_cat, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, errorbars, spy, ablines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_data_corner, view_resized, view_nested, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, choices, menu_view, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

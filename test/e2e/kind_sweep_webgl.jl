@@ -584,6 +584,36 @@ HTML(
         "<span id=\"coords_stairs\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.stairs)))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-00000000a619
+@bind ev_errorbars sweep.errorbars
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a620
+HTML(
+    "<span id=\"out_errorbars\">ERRORBARS=$(sweep_field("errorbars", ev_errorbars))</span>" *
+        "<span id=\"bond_errorbars\" style=\"display:none\">$(repr(ev_errorbars))</span>" *
+        "<span id=\"coords_errorbars\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.errorbars)))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a621
+@bind ev_spy sweep.spy
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a622
+HTML(
+    "<span id=\"out_spy\">SPY=$(sweep_field("spy", ev_spy))</span>" *
+        "<span id=\"bond_spy\" style=\"display:none\">$(repr(ev_spy))</span>" *
+        "<span id=\"coords_spy\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.spy)))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a61a
+@bind ev_ablines sweep.ablines
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a61f
+HTML(
+    "<span id=\"out_ablines\">ABLINES=$(sweep_field("ablines", ev_ablines))</span>" *
+        "<span id=\"bond_ablines\" style=\"display:none\">$(repr(ev_ablines))</span>" *
+        "<span id=\"coords_ablines\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.ablines)))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-0000000000b5
 @bind ev_arrows2d sweep.arrows2d
 
@@ -1299,6 +1329,12 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000617
 # ╠═d1000000-0000-0000-0000-000000000111
 # ╠═d1000000-0000-0000-0000-000000000112
+# ╠═d1000000-0000-0000-0000-00000000a619
+# ╟─d1000000-0000-0000-0000-00000000a620
+# ╠═d1000000-0000-0000-0000-00000000a621
+# ╟─d1000000-0000-0000-0000-00000000a622
+# ╠═d1000000-0000-0000-0000-00000000a61a
+# ╟─d1000000-0000-0000-0000-00000000a61f
 # ╠═d1000000-0000-0000-0000-0000000000b5
 # ╠═d1000000-0000-0000-0000-0000000000b6
 # ╠═d1000000-0000-0000-0000-00000000006a

@@ -15,6 +15,12 @@ All notable changes to this project are documented here. The format is based on
 - `tooltip` can name its part the same way, `interactables(q; tooltip = (scatter = masque"…",))`,
   so a template that names one part's fields no longer raises an error on the others. A part you
   leave out keeps its default tooltip, and a plain template still applies to every part (#616).
+- Hovering a `linesegments!`, `wireframe!`, `errorbars!`, `rangebars!`, `hlines!`, `vlines!` or
+  `ablines!` mark, or a `stem!`'s stem, now shows what it marks, not only its `segment_index`: a
+  segment's or edge's two ends (`x1`, `y1`, `x2`, `y2`, and `z1`, `z2` on an `Axis3`), an error bar's `x`, `y`, `low` and `high`, a range bar's position with `low` and
+  `high`, a line's `y` or `x`, and an `ablines!` line's `intercept` and `slope`. Positions
+  follow the axis tick format, and a click's event and `@bind` value carry the same fields.
+  `segment_index` stays. A `spy!` entry shows its row `i`, column `j` and `value` (#619).
 
 ### Changed
 - Masque now needs Makie 0.24.14 or later, with CairoMakie 0.15.14 or WGLMakie 0.13.14 or later.

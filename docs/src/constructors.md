@@ -126,7 +126,12 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | [`MeshScatter`](plots/meshscatter.md) | `PointInteractable` | `index`, `x`, `y`[, `z`] | `:meshscatter` |
 | [`Lines`](plots/lines.md) / [`Stairs`](plots/stairs.md) | `SegmentInteractable` | `index` (the whole line is one mark); a click, once the line is named in `bind`, picks its nearest data point: `index`, `line`, `x`, `y` | `:lines` / `:stairs` |
 | [`Series`](plots/series.md) | `SegmentInteractable` | `index`; `label` when the series has one; a click, once named in `bind`, picks a data point as for `Lines` | `:series` |
-| `LineSegments` / `Errorbars` / `Rangebars` / `HLines` / `VLines` / `Wireframe` | `SegmentInteractable` | `segment_index` | `:segments`, `:errorbars`, … |
+| `LineSegments` | `SegmentInteractable` | `segment_index`, `x1`, `y1`, `x2`, `y2` (the segment's two ends; `z1`, `z2` on an `Axis3`) | `:segments` |
+| `Errorbars` | `SegmentInteractable` | `segment_index`, `x`, `y`, `low`, `high` (the bar's two ends) | `:errorbars` |
+| `Rangebars` | `SegmentInteractable` | `segment_index`, `x` (`y` for `direction = :x`), `low`, `high` | `:rangebars` |
+| `HLines` / `VLines` | `SegmentInteractable` | `segment_index`, `y` / `x` | `:hlines` / `:vlines` |
+| `ABLines` | `SegmentInteractable` | `segment_index`, `intercept`, `slope` | `:segments` |
+| `Wireframe` | `SegmentInteractable` | `segment_index`, `x1`, `y1`, `z1`, `x2`, `y2`, `z2` (the edge's two ends) | `:wireframe` |
 | `Arrows3D` | `SegmentInteractable` | `index`, `x`, `y`, `z`, `u`, `v`, `w` | `:arrows3d` |
 | `Arrows2D` | `SegmentInteractable` | `index`, `x`, `y`, `u`, `v` | `:arrows2d` |
 | [`BarPlot`](plots/barplot.md) | `RectInteractable` | `x` (`y` when `direction = :x`), `low`, `high`, `value` | `:bars` |
@@ -134,7 +139,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | [`Waterfall`](plots/waterfall.md) | `RectInteractable` | `x`, `low`, `high`, `value` | `:waterfall` |
 | [`CrossBar`](plots/crossbar.md) | `RectInteractable` | `midpoint`, `low`, `high` | `:crossbar` |
 | [`HSpan`](plots/hspan.md) / [`VSpan`](plots/hspan.md) | `RectInteractable` | `low`, `high` | `:hspan` / `:vspan` |
-| `Spy` | `RectInteractable` | `index` | `:spy` |
+| `Spy` | `RectInteractable` | `index`, `i`, `j` (the entry's row and column in the matrix), `value` | `:spy` |
 | `Heatmap` / `Image` | `GridInteractable` | `i`, `j`, `value`, plus the cell's own `payloads` | `:cells` |
 | `Surface` | `SurfaceInteractable` | `i`, `j`, `x`, `y`, `z`; `value` when `color` is a separate matrix | `:surface` |
 | `Poly` / `Band` / [`Density`](plots/density.md) / `Voronoiplot` | `PolygonInteractable` | `index` | `:poly`, `:band`, … |
