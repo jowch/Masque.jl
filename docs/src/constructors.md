@@ -124,32 +124,32 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 |---|---|---|---|
 | `Scatter` | `PointInteractable` | `index`, `x`, `y`[, `z`] | `:scatter` |
 | `MeshScatter` | `PointInteractable` | `index`, `x`, `y`, `z` | `:meshscatter` |
-| `Lines` / `Stairs` | `SegmentInteractable` | `index` (the whole line is one mark); a click, once the line is named in `bind`, picks its nearest data point: `index`, `line`, `x`, `y` | `:lines` / `:stairs` |
-| `Series` | `SegmentInteractable` | `index`; `label` when the series has one; a click, once named in `bind`, picks a data point as for `Lines` | `:series` |
+| [`Lines`](plots/lines.md) / [`Stairs`](plots/stairs.md) | `SegmentInteractable` | `index` (the whole line is one mark); a click, once the line is named in `bind`, picks its nearest data point: `index`, `line`, `x`, `y` | `:lines` / `:stairs` |
+| [`Series`](plots/series.md) | `SegmentInteractable` | `index`; `label` when the series has one; a click, once named in `bind`, picks a data point as for `Lines` | `:series` |
 | `LineSegments` | `SegmentInteractable` | `segment_index`, `x1`, `y1`, `x2`, `y2` (the segment's two ends; `z1`, `z2` on an `Axis3`) | `:segments` |
 | `Errorbars` | `SegmentInteractable` | `segment_index`, `x`, `y`, `low`, `high` (the bar's two ends) | `:errorbars` |
 | `Rangebars` | `SegmentInteractable` | `segment_index`, `x` (`y` for `direction = :x`), `low`, `high` | `:rangebars` |
 | `HLines` / `VLines` | `SegmentInteractable` | `segment_index`, `y` / `x` | `:hlines` / `:vlines` |
 | `ABLines` | `SegmentInteractable` | `segment_index`, `intercept`, `slope` | `:segments` |
-| `Wireframe` | `SegmentInteractable` | `segment_index` | `:wireframe` |
+| `Wireframe` | `SegmentInteractable` | `segment_index`, `x1`, `y1`, `z1`, `x2`, `y2`, `z2` (the edge's two ends) | `:wireframe` |
 | `Arrows3D` | `SegmentInteractable` | `index`, `x`, `y`, `z`, `u`, `v`, `w` | `:arrows3d` |
 | `Arrows2D` | `SegmentInteractable` | `index`, `x`, `y`, `u`, `v` | `:arrows2d` |
-| `BarPlot` | `RectInteractable` | `low`, `high`, `value` | `:bars` |
-| `Hist` | `RectInteractable` | `value`, `low`, `high` | `:hist` |
-| `Waterfall` | `RectInteractable` | `low`, `high`, `value` | `:waterfall` |
-| `CrossBar` | `RectInteractable` | `midpoint`, `low`, `high` | `:crossbar` |
-| `HSpan` / `VSpan` | `RectInteractable` | `low`, `high` | `:hspan` / `:vspan` |
-| `Spy` | `RectInteractable` | `index` | `:spy` |
+| [`BarPlot`](plots/barplot.md) | `RectInteractable` | `low`, `high`, `value` | `:bars` |
+| [`Hist`](plots/hist.md) | `RectInteractable` | `value`, `low`, `high` | `:hist` |
+| [`Waterfall`](plots/waterfall.md) | `RectInteractable` | `low`, `high`, `value` | `:waterfall` |
+| [`CrossBar`](plots/crossbar.md) | `RectInteractable` | `midpoint`, `low`, `high` | `:crossbar` |
+| [`HSpan`](plots/hspan.md) / [`VSpan`](plots/hspan.md) | `RectInteractable` | `low`, `high` | `:hspan` / `:vspan` |
+| `Spy` | `RectInteractable` | `index`, `i`, `j` (the entry's row and column in the matrix), `value` | `:spy` |
 | `Heatmap` / `Image` | `GridInteractable` | `i`, `j`, `value`, plus the cell's own `payloads` | `:cells` |
 | `Surface` | `SurfaceInteractable` | `i`, `j`, `x`, `y`, `z`; `value` when `color` is a separate matrix | `:surface` |
-| `Poly` / `Band` / `Density` / `Voronoiplot` | `PolygonInteractable` | `index` | `:poly`, `:band`, … |
+| `Poly` / `Band` / [`Density`](plots/density.md) / `Voronoiplot` | `PolygonInteractable` | `index` | `:poly`, `:band`, … |
 | `Contourf` | `PolygonInteractable` | `low`, `high` | `:contourf` |
-| `Violin` | `PolygonInteractable` | `x` (`y` when horizontal) | `:violin` |
+| [`Violin`](plots/violin.md) | `PolygonInteractable` | `x` (`y` when horizontal) | `:violin` |
 | `Hexbin` | `PolygonInteractable` | `x`, `y`, `count` | `:hexbin` |
 | `Text` | `TextInteractable` | `text`, `index`, `x`, `y` | `:text` |
 | `Stem` | `interactables(p)` | points, and stems as a second layer | `stem.points`, `stem.stems` |
-| `ScatterLines` | `interactables(p)` | points, and the line as a second layer that only shows its tooltip | `scatterlines.points`, `scatterlines.line` |
-| `BoxPlot` | `interactables(p)` | `x` (`y` when horizontal), `q1`, `median`, `q3` (the box only) | `:boxplot` |
+| [`ScatterLines`](plots/scatterlines.md) | `interactables(p)` | points, and the line as a second layer that only shows its tooltip | `scatterlines.points`, `scatterlines.line` |
+| [`BoxPlot`](plots/boxplot.md) | `interactables(p)` | `x` (`y` when horizontal), `q1`, `median`, `q3` (the box only) | `:boxplot` |
 | `Annotation` | `interactables(p)` | the text's fields | `:annotation` |
 
 ## Axes, legends, and draggable tools

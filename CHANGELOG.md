@@ -12,12 +12,15 @@ All notable changes to this project are documented here. The format is based on
   `interactables(st; payloads = (points = rows,))` for a `stem!`. A part you leave out keeps its
   own payloads. A plain list, or a name the plot has no part for, raises an error that lists the
   plot's parts (#599).
-- Hovering a `linesegments!`, `errorbars!`, `rangebars!`, `hlines!`, `vlines!` or `ablines!` mark
-  now shows what it marks, not only its `segment_index`: a segment's two ends (`x1`, `y1`, `x2`,
-  `y2`), an error bar's `x`, `y`, `low` and `high`, a range bar's position with `low` and
+- `tooltip` can name its part the same way, `interactables(q; tooltip = (scatter = masque"…",))`,
+  so a template that names one part's fields no longer raises an error on the others. A part you
+  leave out keeps its default tooltip, and a plain template still applies to every part (#616).
+- Hovering a `linesegments!`, `wireframe!`, `errorbars!`, `rangebars!`, `hlines!`, `vlines!` or
+  `ablines!` mark, or a `stem!`'s stem, now shows what it marks, not only its `segment_index`: a
+  segment's or edge's two ends (`x1`, `y1`, `x2`, `y2`, and `z1`, `z2` on an `Axis3`), an error bar's `x`, `y`, `low` and `high`, a range bar's position with `low` and
   `high`, a line's `y` or `x`, and an `ablines!` line's `intercept` and `slope`. Positions
   follow the axis tick format, and a click's event and `@bind` value carry the same fields.
-  `segment_index` stays (#619).
+  `segment_index` stays. A `spy!` entry shows its row `i`, column `j` and `value` (#619).
 
 ### Changed
 - Masque now needs Makie 0.24.14 or later, with CairoMakie 0.15.14 or WGLMakie 0.13.14 or later.
@@ -25,6 +28,9 @@ All notable changes to this project are documented here. The format is based on
   plots. With an older Makie, Pkg keeps the Masque version you have (#614).
 
 ### Fixed
+- In a `waterfall!` plot with `show_final = true`, each bar now answers for its own step, with
+  that step's `low` and `high`. Before, every bar took the hit area and values of the
+  final-total bar (#618).
 - `masque(fig; payloads = …)`, and any other keyword `masque` doesn't take, raises an error that
   says where the keyword goes, instead of a `MethodError` from inside Masque (#600).
 - A box plot's tooltip and `@bind` value now say which category the box is, as `x` (`y` for a

@@ -787,7 +787,7 @@ by the plot type):
 | `Makie.Stairs` | `:stairs` | one `:lines` element, the whole staircase | the child `Lines`' pre-expanded step polyline |
 | `Makie.Series` | `:series` | one `:lines` layer, one element per series | each child line (or a `ScatterLines` child's line) |
 | `Makie.LineSegments` | `:segments` | `:pairs`, per segment | converted data; default payload `(; segment_index, x1, y1, x2, y2)`, the segment's ends (`z1`, `z2` too on an Axis3) |
-| `Makie.Wireframe` | `:wireframe` | `:pairs`, per drawn edge, each once, in drawing order (see below) | the child `LineSegments`' edges (incl. mesh-triangulation diagonals), an edge shared by two faces kept at its first copy |
+| `Makie.Wireframe` | `:wireframe` | `:pairs`, per drawn edge, each once, in drawing order (see below) | the child `LineSegments`' edges (incl. mesh-triangulation diagonals), an edge shared by two faces kept at its first copy; default payload `(; segment_index, x1, y1, z1, x2, y2, z2)`, the edge's ends |
 | `Makie.Arrows3D` | `:arrows3d` | `:pairs`, per shaft | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, z, u, v, w)` from `points`/`directions` |
 | `Makie.Arrows2D` | `:arrows2d` | `:pairs`, per arrow, tail to tip | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, u, v)` from `points`/`directions` |
 | `Makie.Errorbars` | `:errorbars` | `:pairs`, per bar | each bar's low→high endpoints; default payload `(; segment_index, x, y, low, high)`, `low`/`high` the bar's ends in data |

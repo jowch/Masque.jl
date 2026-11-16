@@ -1043,10 +1043,28 @@ end
             # A click's event carries the fields too.
             ev = ElementEvent(:errorbars, 1, SegmentInteractable(a, pe).payloads[1])
             @test ev.low == 1.5 && ev.segment_index == 1
+            # Float64 data keeps its digits (review of #627).
+            pb = errorbars!(a, [1.0], [1.0e8 + 3], [1.0])
+            @test SegmentInteractable(a, pb).payloads[1] == (; segment_index = 1, x = 1.0, y = 1.0e8 + 3, low = 1.0e8 + 2, high = 1.0e8 + 4)
+            pb = errorbars!(a, [1.0], [123456.789], [0.01])
+            @test SegmentInteractable(a, pb).payloads[1].low == 123456.789 - 0.01
             # Axis3 segments name their z ends.
             f3 = Figure(); a3 = Axis3(f3[1, 1])
             p3 = linesegments!(a3, [Point3f(0, 0, 0), Point3f(1, 2, 3)])
             @test SegmentInteractable(a3, p3).payloads == Any[(; segment_index = 1, x1 = 0.0, y1 = 0.0, z1 = 0.0, x2 = 1.0, y2 = 2.0, z2 = 3.0)]
+            # A wireframe edge names its two ends too.
+            wf = wireframe!(a3, 0:1, 0:1, [0.0 1.0; 2.0 3.0])
+            wi = SegmentInteractable(a3, wf)
+            @test length(wi.payloads) == length(wi.vertices) ÷ 2
+            for (k, pl) in enumerate(wi.payloads)
+                @test Point3f(pl.x1, pl.y1, pl.z1) == wi.vertices[2k - 1] && Point3f(pl.x2, pl.y2, pl.z2) == wi.vertices[2k]
+            end
+            # A spy entry names its row, column and value.
+            fs = Figure(); as = Axis(fs[1, 1])
+            M = zeros(3, 4); M[2, 3] = 5.0; M[3, 1] = -1.5
+            ss = Masque.RectInteractable(as, spy!(as, M))
+            @test Set((pl.i, pl.j, pl.value) for pl in ss.payloads) == Set([(2, 3, 5.0), (3, 1, -1.5)])
+            @test all(k -> ss.payloads[k].index == k, eachindex(ss.payloads))
         end
 
         @testset "segment ends on a date axis show the date (#619)" begin
@@ -1304,6 +1322,27 @@ end
         @test ri2.payloads[3].value == 3.0                             # up-step: positive
         # |value| ≈ bar height (low..high span)
         @test abs(ri2.payloads[2].value) ≈ ri2.payloads[2].high - ri2.payloads[2].low
+
+        # show_final = true (#618): the total bars are drawn first; the hit boxes and low/high
+        # must still come from the step bars, not the total.
+        fig3 = Figure(); ax3 = Axis(fig3[1, 1])
+        wf3 = waterfall!(ax3, 1:4, [5.0, -2.0, 3.0, -1.0]; show_final = true)
+        Makie.update_state_before_display!(fig3)
+        ri3 = RectInteractable(ax3, wf3; id = :waterfall)
+        @test length(ri3.payloads) == 4
+        @test [(q.low, q.high) for q in ri3.payloads] == [(0.0, 5.0), (3.0, 5.0), (3.0, 6.0), (5.0, 6.0)]
+        @test [q.value for q in ri3.payloads] == [5.0, -2.0, 3.0, -1.0]
+        # each hit box is its own step's bar, not the full-height total bar
+        @test [r[4] for r in ri3.data] ≈ [5.0, 2.0, 3.0, 1.0]
+        @test [r[2] for r in ri3.data] ≈ [2.5, 4.0, 4.5, 5.5]
+
+        # with dodge, each x gets its own total; the steps still come from the step bars
+        fig4 = Figure(); ax4 = Axis(fig4[1, 1])
+        wf4 = waterfall!(ax4, [1, 1, 2, 2], [2.0, 1.0, -1.0, 3.0]; dodge = [1, 2, 1, 2], show_final = true)
+        Makie.update_state_before_display!(fig4)
+        ri4 = RectInteractable(ax4, wf4; id = :waterfall)
+        @test [(q.low, q.high) for q in ri4.payloads] == [(0.0, 2.0), (2.0, 3.0), (-1.0, 0.0), (-1.0, 2.0)]
+        @test [r[4] for r in ri4.data] ≈ [2.0, 1.0, 1.0, 3.0]
     end
 
     @testset "CrossBar extraction" begin

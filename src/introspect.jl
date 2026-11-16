@@ -345,6 +345,10 @@ end
 # closer to what the user plotted and a third the size on the wire.
 _short64(x::Float32) = isfinite(x) ? parse(Float64, replace(string(x), "f" => "e")) : Float64(x)
 _short64(x::Real) = Float64(x)
+# An error bar's end, `c ± offset`, computed in Float64 either way. Makie keeps Float64 data as
+# Float64 (`1e8 + 3 ± 1` must keep its digits); from Float32 data the sum takes the Float32
+# that Makie draws at, printed short, so `0.3 - 0.1` reads 0.2 and not 0.19999999999999998.
+_end_value(v, x) = eltype(v) === Float32 ? _short64(Float32(x)) : x
 function _segment_end_payloads(vs)
     nd = isempty(vs) ? 2 : length(first(vs))
     ks = nd >= 3 ? (:x1, :y1, :z1, :x2, :y2, :z2) : (:x1, :y1, :x2, :y2)
@@ -362,8 +366,13 @@ end
 # mesh-triangulation diagonals a grid-edge reconstruction would miss. Makie outlines every
 # quad (or triangle), so an edge two faces share is drawn twice; `_unique_edges` keeps one
 # copy so each drawn edge is one element (#316).
-SegmentInteractable(ax, p::Makie.Wireframe; id = :wireframe, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p)) =
-    _with_linewidth(SegmentInteractable(ax, _unique_edges(_conv(_childof(p, Makie.LineSegments))[1]); mode = :pairs, id, payloads, tol, tooltip, label), p)
+# Each edge's default payload is its two ends, as a `linesegments!` segment's (#619).
+function SegmentInteractable(ax, p::Makie.Wireframe; id = :wireframe, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p))
+    vs = _unique_edges(_conv(_childof(p, Makie.LineSegments))[1])
+    defaults, dims = _segment_end_payloads(vs)
+    pl = _merge_payloads(_unconvert_payloads(ax, defaults; dims), payloads, "SegmentInteractable"; dims)
+    return _with_linewidth(SegmentInteractable(ax, vs; mode = :pairs, id, payloads = pl, tol, tooltip, label), p)
+end
 
 # Drop repeated `:pairs` edges, in either direction, keeping each edge's first occurrence and
 # its order. Endpoints compare with `isequal`, so a NaN gap edge still matches its own copy.
@@ -962,7 +971,7 @@ function _errorbar_payloads(p)
     return Any[
         let (x, y, lo, hi) = map(_short64, (v[1], v[2], v[3], v[4]))
             c = horiz ? x : y
-            (; segment_index = k, x, y, low = _short64(Float32(c - lo)), high = _short64(Float32(c + hi)))
+            (; segment_index = k, x, y, low = _end_value(v, c - lo), high = _end_value(v, c + hi))
         end
             for (k, v) in enumerate(_converted(p)[1])
     ]
@@ -1082,8 +1091,18 @@ function _spy_rects(p)
     w, h = ms isa AbstractVector ? (Float64(ms[1]), Float64(ms[2])) : (Float64(ms), Float64(ms))
     return [(Float64(c[1]), Float64(c[2]), w, h) for c in _converted(sc)[1]]
 end
-RectInteractable(ax, p::Makie.Spy; id = :spy, payloads = nothing, tooltip = nothing, label = _plot_label(p)) =
-    RectInteractable(ax, _spy_rects(p); id, payloads, tooltip, label)
+# Each entry's default payload is its row `i`, column `j` and `value` in the matrix, in the
+# order Makie draws the entries (`findnz`) (#619).
+function RectInteractable(ax, p::Makie.Spy; id = :spy, payloads = nothing, tooltip = nothing, label = _plot_label(p))
+    rs = _spy_rects(p)
+    is, js, vs = Makie.SparseArrays.findnz(_converted(p)[3])
+    length(is) == length(rs) || error("Spy introspection: $(length(is)) entries but $(length(rs)) drawn cells")
+    defaults = Any[(; index = k, i = Int(is[k]), j = Int(js[k]), value = _spy_value(vs[k])) for k in eachindex(is)]
+    return RectInteractable(ax, rs; id, payloads = _merge_payloads(defaults, payloads, "RectInteractable"), tooltip, label)
+end
+_spy_value(v::Integer) = Int(v)
+_spy_value(v::Real) = _short64(v)
+_spy_value(v) = v
 
 # Hist bar height is the bin value: a count only for default normalization=:none; with
 # :pdf/:density/:probability it's a density/fraction (hence `value`, not `count`).
@@ -1115,8 +1134,18 @@ function RectInteractable(ax, p::Makie.Hist; id = :hist, payloads = nothing, too
     pl = _merge_payloads(_hist_payloads(rs, bar.direction[]), payloads, "RectInteractable"; dims)
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
+# With `show_final = true` Makie draws the final-total bars first (one translucent bar behind
+# each step, or one per x with `dodge`), then the step bars, so the step bars are the last
+# BarPlot child. The total bars stay out of the hit layer for now: they would compete with
+# the steps they sit behind. Hovering the grey total area answers nothing.
+function _waterfall_steps(p)
+    bars = filter(c -> c isa Makie.BarPlot, _child_plots(p))
+    length(bars) == 1 + p.show_final[] ||
+        error("Waterfall: expected $(1 + p.show_final[]) BarPlot children, got $(length(bars)) (Makie internals changed?)")
+    return last(bars)
+end
 function RectInteractable(ax, p::Makie.Waterfall; id = :waterfall, payloads = nothing, tooltip = nothing, label = _plot_label(p))
-    bar = _childof(p, Makie.BarPlot)
+    bar = _waterfall_steps(p)
     rs = _bar_rects(bar)
     # Waterfall has no `direction`: its bars always stand on y.
     pl = _merge_payloads(_waterfall_payloads(p, rs), payloads, "RectInteractable"; dims = _along(:y, :low, :high, :value))
@@ -1170,10 +1199,25 @@ end
 
 # Point layer keeps the base id; the line/segment layer gets a suffix so the two ids stay
 # distinct in the manifest.
-# `tooltip` and `label` apply to both parts; `payloads` names its part, as in
-# `payloads = (points = rows,)` (see `_part_kwargs`).
+# Every layer below the two-layer plots takes one `tooltip` template. One keyed by part name
+# (#616) is for a plot with several parts, and would otherwise fail on the constructor's
+# `tooltip` type.
+function _check_one_template(p, kw; part = nothing)
+    get(kw, :tooltip, nothing) isa NamedTuple || return nothing
+    who = part === nothing ? "this plot has one layer" : "its part `$part` has one layer"
+    throw(
+        ArgumentError(
+            "interactables($(Makie.plotkey(p))): $who, so `tooltip` takes one template, " *
+                "`tooltip = masque\"…\"`, not one per part.",
+        ),
+    )
+end
+
+# `label` and a plain `tooltip` apply to both parts; `payloads`, and a `tooltip` given as a
+# `NamedTuple`, name their part, as in `payloads = (points = rows,)` (see `_part_kwargs`).
 function _stem_parts(ax, p, base; kw...)
     kp, ks = _part_kwargs(p, [:points, :stems], kw)
+    _check_one_template(p, kp; part = :points); _check_one_template(p, ks; part = :stems)
     return AbstractInteractable[
         PointInteractable(ax, _childof(p, Makie.Scatter); kp..., id = _part_id(base, :points)),
         SegmentInteractable(ax, _childof(p, Makie.LineSegments); ks..., id = _part_id(base, :stems)),
@@ -1181,6 +1225,7 @@ function _stem_parts(ax, p, base; kw...)
 end
 function _scatterlines_parts(ax, p, base; kw...)
     kp, kl = _part_kwargs(p, [:points, :line], kw)
+    _check_one_template(p, kp; part = :points); _check_one_template(p, kl; part = :line)
     return AbstractInteractable[
         PointInteractable(ax, _childof(p, Makie.Scatter); kp..., id = _part_id(base, :points)),
         SegmentInteractable(ax, _childof(p, Makie.Lines); kl..., id = _part_id(base, :line)),
@@ -1335,6 +1380,9 @@ function _dim_strings(vals)
 end
 
 function _construct_unplaced(ax, p, id; kw...)
+    p isa Makie.Stem && return _stem_parts(ax, p, id; kw...)
+    p isa Makie.ScatterLines && return _scatterlines_parts(ax, p, id; kw...)
+    _check_one_template(p, kw)
     p isa Makie.Scatter && return [_scatter_interactable(ax, p; id, kw...)]
     p isa Makie.MeshScatter && return [PointInteractable(ax, p; id, kw...)]
     (p isa Makie.Lines || p isa Makie.LineSegments || p isa Makie.Wireframe || p isa Makie.Arrows3D || p isa Makie.Arrows2D) &&
@@ -1355,8 +1403,6 @@ function _construct_unplaced(ax, p, id; kw...)
     p isa Makie.Violin && return [PolygonInteractable(ax, p; id, kw...)]
     p isa Makie.Voronoiplot && return [PolygonInteractable(ax, p; id, kw...)]
     p isa Makie.Hexbin && return [PolygonInteractable(ax, p; id, kw...)]
-    p isa Makie.Stem && return _stem_parts(ax, p, id; kw...)
-    p isa Makie.ScatterLines && return _scatterlines_parts(ax, p, id; kw...)
     p isa Makie.Series && return [SegmentInteractable(ax, p; id, kw...)]
     p isa Makie.BoxPlot && return [_boxplot_interactable(ax, p; id, kw...)]
     p isa Makie.Text && return _text_interactables(ax, p, id; kw...)
@@ -1574,7 +1620,7 @@ function _skip_for_axis(ax, p)
         )
         _skip_note(
             "$(Makie.plotkey(p)) on Axis3 — only Scatter/Lines/LineSegments/MeshScatter/" *
-                "Wireframe/Arrows3D/ScatterLines/Surface/Text have 3D-valid extraction today. " * _SUPPORT_PAGE
+                "Wireframe/Arrows3D/ScatterLines/Surface/Text/ABLines have 3D-valid extraction today. " * _SUPPORT_PAGE
         )
         return true
     end

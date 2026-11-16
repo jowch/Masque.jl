@@ -553,6 +553,16 @@ HTML(
         "<span id=\"coords_raincloud_box\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.raincloud_box)))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000616
+@bind ev_qq_tip sweep.qq_tip
+
+# ╔═╡ c1000000-0000-0000-0000-000000000617
+HTML(
+    "<span id=\"out_qq_tip\">QQ_TIP=$(sweep_field("qq_tip", ev_qq_tip))</span>" *
+        "<span id=\"bond_qq_tip\" style=\"display:none\">$(repr(ev_qq_tip))</span>" *
+        "<span id=\"coords_qq_tip\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.qq_tip)))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000111
 @bind ev_stairs sweep.stairs
 
@@ -571,6 +581,16 @@ HTML(
     "<span id=\"out_errorbars\">ERRORBARS=$(sweep_field("errorbars", ev_errorbars))</span>" *
         "<span id=\"bond_errorbars\" style=\"display:none\">$(repr(ev_errorbars))</span>" *
         "<span id=\"coords_errorbars\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.errorbars)))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-00000000a621
+@bind ev_spy sweep.spy
+
+# ╔═╡ c1000000-0000-0000-0000-00000000a622
+HTML(
+    "<span id=\"out_spy\">SPY=$(sweep_field("spy", ev_spy))</span>" *
+        "<span id=\"bond_spy\" style=\"display:none\">$(repr(ev_spy))</span>" *
+        "<span id=\"coords_spy\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.spy)))</span>",
 )
 
 # ╔═╡ c1000000-0000-0000-0000-00000000a61a
@@ -1292,10 +1312,14 @@ HTML(
 # ╠═c1000000-0000-0000-0000-00000000054e
 # ╠═c1000000-0000-0000-0000-00000000054f
 # ╠═c1000000-0000-0000-0000-000000000550
+# ╠═c1000000-0000-0000-0000-000000000616
+# ╠═c1000000-0000-0000-0000-000000000617
 # ╠═c1000000-0000-0000-0000-000000000111
 # ╠═c1000000-0000-0000-0000-000000000112
 # ╠═c1000000-0000-0000-0000-00000000a619
 # ╟─c1000000-0000-0000-0000-00000000a620
+# ╠═c1000000-0000-0000-0000-00000000a621
+# ╟─c1000000-0000-0000-0000-00000000a622
 # ╠═c1000000-0000-0000-0000-00000000a61a
 # ╟─c1000000-0000-0000-0000-00000000a61f
 # ╠═c1000000-0000-0000-0000-0000000000b5

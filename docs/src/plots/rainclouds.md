@@ -58,8 +58,9 @@ Main.masque_fallback("plots_rainclouds"; segment = "data")
 
 Hovering a raindrop now shows its student, and hovering a violin shows
 its region and number of schools. The boxes still show their quartiles.
-A `tooltip` template you pass applies to every part, so leave it out to
-keep each part's own default tooltip.
+A `tooltip` template you pass applies to every part. To give one part
+its own, key it by the part's name, `tooltip = (scatter = masque"…",)`;
+the parts you leave out keep their default tooltips.
 
 ## Select several raindrops
 

@@ -452,6 +452,10 @@ end
     @test obj["width"] == 10
     @test isempty(obj["layers"])
 
+    # The NaN gaps in a contour's lines stay NaN, which the script reads as a number.
+    gap, _ = rewrite_published_to_js(html, Dict("abc123" => Dict{String, Any}("v" => [1.0, NaN])))
+    @test occursin("[1.0,NaN]", gap)
+
     missed, n0 = rewrite_published_to_js("<script>const manifest = {};</script>", published)
     @test n0 == 0
     @test missed == "<script>const manifest = {};</script>"
@@ -552,11 +556,11 @@ end
         "gallery_boxselect",
         "gallery_image",
         "example_heatmap_trace",
-        "plots_violin",
-        "plots_boxplot",
-        "plots_rainclouds",
-        "plots_density",
     ]
+    # Every plot page's player, so a new one is checked without listing it here.
+    plots = sort([first(splitext(f)) for f in readdir(joinpath(root, "docs", "src", "embeds")) if startswith(f, "plots_") && endswith(f, ".jl")])
+    @test "plots_violin" in plots
+    append!(names, plots)
     for name in names
         path = joinpath(root, "docs", "src", "embeds", name * ".jl")
         @test isfile(path)
