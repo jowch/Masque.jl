@@ -83,8 +83,8 @@ and `PolarAxis`. Constructor signatures and default fields are in
 
 | Recipe | Layer `id` | Kind | Axis3 | PolarAxis |
 |---|---|---|---|---|
-| `scatter!` | `:scatter` | `:circles` | yes | yes |
-| `meshscatter!` | `:meshscatter` | `:circles` | yes | — |
+| [`scatter!`](plots/scatter.md) | `:scatter` | `:circles` | yes | yes |
+| [`meshscatter!`](plots/meshscatter.md) | `:meshscatter` | `:circles` | yes | — |
 | [`lines!`](plots/lines.md) | `:lines` | `:lines` | yes | yes |
 | `linesegments!` | `:segments` | `:segments` | yes | yes |
 | `wireframe!` | `:wireframe` | `:segments` | yes | — |
@@ -113,8 +113,8 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | `stem!` | `stem.points` + `stem.stems` | `:circles` + `:segments` | — | — |
 | [`scatterlines!`](plots/scatterlines.md) | `scatterlines.points` + `scatterlines.line` | `:circles` + `:lines` | yes | yes |
 | [`boxplot!`](plots/boxplot.md) | `:boxplot` | `:rects` or `:polygons` (body only) | — | — |
-| `text!` | `:text` | `:rects` | yes | — |
-| `annotation!` | `:annotation` | `:rects` | — | — |
+| [`text!`](plots/text.md) | `:text` | `:rects` | yes | — |
+| [`annotation!`](plots/annotation.md) | `:annotation` | `:rects` | — | — |
 | `Colorbar` (block) | `:colorbar` | `:axis` | yes | yes |
 | `Legend` (block) | `:legend` | `:rects` | yes | yes |
 

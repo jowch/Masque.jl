@@ -6,6 +6,10 @@ add for the parts that don't respond on their own.
 
 | Plot | Kind of plot | What responds |
 |---|---|---|
+| [`scatter!`](plots/scatter.md) | points | each marker |
+| [`meshscatter!`](plots/meshscatter.md) | points | each sphere |
+| [`text!`](plots/text.md) | labels | each label |
+| [`annotation!`](plots/annotation.md) | labels | each annotation's text |
 | [`violin!`](plots/violin.md) | distribution | each violin |
 | [`boxplot!`](plots/boxplot.md) | distribution | each box |
 | [`rainclouds!`](plots/rainclouds.md) | distribution | each raindrop, violin and box |

@@ -81,6 +81,12 @@ makedocs(;
         ],
         "Plot types" => [
             "All plot types" => "plots.md",
+            "Points and labels" => [
+                "scatter!" => "plots/scatter.md",
+                "meshscatter!" => "plots/meshscatter.md",
+                "text!" => "plots/text.md",
+                "annotation!" => "plots/annotation.md",
+            ],
             "Distributions" => [
                 "violin!" => "plots/violin.md",
                 "boxplot!" => "plots/boxplot.md",
