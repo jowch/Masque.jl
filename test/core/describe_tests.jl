@@ -62,3 +62,34 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     @test !showable(MIME"image/png"(), bare)
     @test repr(MIME"text/plain"(), bare) == "MasqueWidget, no picture, 0 layers"
 end
+
+# After the page moves the widget, its PNG and text forms follow it (#637).
+@testset "PNG and text forms follow the page" begin
+    fig = Figure(size = (400, 300))
+    ax = Axis(fig[1, 1])
+    fit = lines!(ax, [1.0, 6.0], [2.5, 2.5])
+    thr = ThresholdInteractable(ax; value = 2.5)
+    w = masque(fig, (cutoff = thr,); onchange = st -> update!(fit, [1.0, 6.0], fill(st.cutoff.value, 2)))
+    APD = Masque.APD
+    first_png = repr(MIME"image/png"(), w)
+    @test occursin("value: (cutoff = ThresholdEvent(:cutoff, value = 2.5", repr(MIME"text/plain"(), w))
+
+    state = Dict("cutoff" => Dict{String, Any}("layer" => "cutoff", "index" => 0, "payload" => 4.0))
+    # A frame mid-drag is a preview; the widget keeps the picture it had.
+    w.render_frame(Dict{String, Any}("onchange" => true, "settle" => false, "state" => state))
+    @test repr(MIME"image/png"(), w) == first_png
+    r = w.render_frame(Dict{String, Any}("onchange" => true, "settle" => true, "state" => state))
+    @test repr(MIME"image/png"(), w) == r["png"] != first_png
+
+    # The text form gives the value Pluto last read, which every copy of the widget shares.
+    v = APD.Bonds.transform_value(w, state)
+    @test v.cutoff.value == 4.0
+    @test occursin("value: (cutoff = ThresholdEvent(:cutoff, value = 4.0", repr(MIME"text/plain"(), w))
+    @test occursin("value = 4.0", repr(MIME"text/plain"(), Masque.with_titles(w, w.titles)))
+
+    # A frame that fails keeps the last good picture.
+    bad = masque(fig, (cutoff = thr,); onchange = st -> st.cutoff.value > 3 && error("too high"))
+    before = repr(MIME"image/png"(), bad)
+    @test_logs (:error,) match_mode = :any bad.render_frame(Dict{String, Any}("onchange" => true, "settle" => true, "state" => state))
+    @test repr(MIME"image/png"(), bad) == before
+end

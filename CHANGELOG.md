@@ -36,6 +36,14 @@ All notable changes to this project are documented here. The format is based on
   plots. With an older Makie, Pkg keeps the Masque version you have (#614).
 
 ### Fixed
+- A widget's `image/png` and text forms, which an AI agent or the REPL reads in place of the
+  figure, now follow the page. After a pan, a zoom or an `onchange` redraw, `image/png` is the
+  last picture the page settled on, not the first one, and the text form's `value:` is what the
+  `@bind` variable holds now, not its start. With the notebook open in two tabs, the last one
+  to settle wins. Only a tool that asks the widget again sees these: the output saved when
+  the cell ran stays the first picture and value until the cell reruns, and in
+  `@bind x masque(fig)` the cell's result is Pluto's bond, so a tool asking that cell for a
+  PNG gets none. Name the widget in one cell and bind it in another (#637).
 - A `voronoiplot!` cell's `index`, its click's `ev.index` and its entry in `payloads` now follow
   the order of your points: cell `j` is the cell around point `j`, and `payloads` takes one entry
   per point. Before, they followed Makie's internal cell order, which on older Makie differs

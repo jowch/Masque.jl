@@ -162,6 +162,17 @@ end
     @test startswith(text, "WebGLWidget, ")
     @test occursin("ax1 \"Drawn in the browser\":\n  scatter: 3 points", text)
     @test startswith(repr(w), "WebGLWidget(")
+
+    # The value is the one Pluto last read, shared by every copy of the widget (#637).
+    sc = only(ax.scene.plots)
+    w2 = masque(fig, (; sc = interactables(sc)); backend = :webgl)
+    @test occursin("value: (sc = nothing,)", repr(MIME"text/plain"(), w2))
+    pick = Dict{String, Any}("sc" => Dict{String, Any}("layer" => "sc", "index" => 1))
+    v = Masque.APD.Bonds.transform_value(w2, pick)
+    @test v.sc isa ElementEvent && v.sc.index == 2
+    for copy in (w2, Masque.with_titles(w2, w2.titles), Masque.with_owners(w2, w2.owners))
+        @test occursin("value: (sc = ElementEvent(:sc, 2", repr(MIME"text/plain"(), copy))
+    end
 end
 
 @testset "LScene is refused on :webgl, the same as :cairo (#172)" begin
