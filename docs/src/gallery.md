@@ -194,6 +194,30 @@ types](plots.md) lists every plot that has a page.
   <img alt="A decaying signal drawn as stems, with one point picked" src="assets/gallery/stem.png">
   <span>stem!</span>
 </a>
+<a class="masque-gallery-card" data-dir="plots" data-page="poly">
+  <img alt="Four fields drawn as polygons, with the barley field picked" src="assets/gallery/poly.png">
+  <span>poly!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="band">
+  <img alt="Two forecast bands, with the blue one picked" src="assets/gallery/band.png">
+  <span>band!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="pie">
+  <img alt="Sales by region as a pie, with the north slice picked" src="assets/gallery/pie.png">
+  <span>pie!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="voronoiplot">
+  <img alt="Rainfall cells around 18 stations, with one cell picked" src="assets/gallery/voronoiplot.png">
+  <span>voronoiplot!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="tricontourf">
+  <img alt="Filled depth contours from scattered points, with one region picked" src="assets/gallery/tricontourf.png">
+  <span>tricontourf!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="triplot">
+  <img alt="The triangles between 12 points, with one triangle picked" src="assets/gallery/triplot.png">
+  <span>triplot!</span>
+</a>
 </div>
 ```
 
