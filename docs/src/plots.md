@@ -33,7 +33,15 @@ add for the parts that don't respond on their own.
 | [`scatter!`, `lines!` on an `Axis3`](plots/points3d.md) | 3D | each marker, sphere and line |
 | [`surface!`](plots/surface.md) | 3D | the point nearest the pointer |
 | [`arrows3d!`](plots/arrows3d.md) | 3D | each arrow |
+| [`linesegments!`](plots/linesegments.md) | segments | each segment |
+| [`errorbars!`](plots/errorbars.md) | segments | each error bar |
+| [`rangebars!`](plots/rangebars.md) | segments | each range bar |
+| [`hlines!`, `vlines!`](plots/hlines.md) | segments | each line |
+| [`ablines!`](plots/ablines.md) | segments | each line |
+| [`arrows2d!`](plots/arrows2d.md) | segments | each arrow |
+| [`spy!`](plots/spy.md) | segments | each nonzero entry |
 | [`streamplot!`](plots/streamplot.md) | several parts | each arrowhead, and the stream lines |
+| [`stem!`](plots/stem.md) | several parts | each point, and each stem |
 
 For every plot Masque supports, and the axes each one works on, see
 [Supported plots and axes](@ref).

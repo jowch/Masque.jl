@@ -57,6 +57,14 @@ const CARDS = [
   { out: "surface", embed: "plots_surface", moves: [["hover", 0, 0.5, 0.39]] },
   { out: "arrows3d", embed: "plots_arrows3d", moves: [["click", 0, 0.73, 0.47], ["leave"]] },
   { out: "streamplot", embed: "plots_streamplot", moves: [["click", 0, 0.56, 0.155], ["leave"]] },
+  { out: "linesegments", embed: "plots_linesegments", moves: [["click", 0, 0.34, 0.25], ["leave"]] },
+  { out: "errorbars", embed: "plots_errorbars", moves: [["click", 0, 0.34, 0.375], ["leave"]] },
+  { out: "rangebars", embed: "plots_rangebars", moves: [["click", 0, 0.62, 0.325], ["leave"]] },
+  { out: "hlines", embed: "plots_hlines", moves: [["click", 0, 0.12, 0.15], ["leave"]] },
+  { out: "ablines", embed: "plots_ablines", moves: [["click", 0, 0.96, 0.15], ["leave"]] },
+  { out: "arrows2d", embed: "plots_arrows2d", moves: [["click", 0, 0.4, 0.325], ["leave"]] },
+  { out: "stem", embed: "plots_stem", moves: [["click", 0, 0.46, 0.3], ["leave"]] },
+  { out: "spy", embed: "plots_spy", moves: [["click", 0, 0.48, 0.225], ["leave"]] },
 ];
 
 const browser = await chromium.launch({ headless: true });

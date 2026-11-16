@@ -162,6 +162,38 @@ types](plots.md) lists every plot that has a page.
   <img alt="A swirling streamplot, with one arrowhead picked" src="assets/gallery/streamplot.png">
   <span>streamplot!</span>
 </a>
+<a class="masque-gallery-card" data-dir="plots" data-page="linesegments">
+  <img alt="A project schedule drawn as segments, with the build task picked" src="assets/gallery/linesegments.png">
+  <span>linesegments!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="errorbars">
+  <img alt="Mean response at five doses with error bars, with the 10 mg bar picked" src="assets/gallery/errorbars.png">
+  <span>errorbars!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="rangebars">
+  <img alt="Monthly temperature ranges, with April picked" src="assets/gallery/rangebars.png">
+  <span>rangebars!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="hlines">
+  <img alt="Daily load with two horizontal limits and two event lines, with the upper limit picked" src="assets/gallery/hlines.png">
+  <span>hlines! / vlines!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="ablines">
+  <img alt="Points with a fitted line and the line y = x, with the fitted line picked" src="assets/gallery/ablines.png">
+  <span>ablines!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="arrows2d">
+  <img alt="A field of arrows, with one arrow picked" src="assets/gallery/arrows2d.png">
+  <span>arrows2d!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="stem">
+  <img alt="A decaying signal drawn as stems, with one point picked" src="assets/gallery/stem.png">
+  <span>stem!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="spy">
+  <img alt="The nonzero entries of a 20 by 20 matrix, with one entry picked" src="assets/gallery/spy.png">
+  <span>spy!</span>
+</a>
 </div>
 ```
 
