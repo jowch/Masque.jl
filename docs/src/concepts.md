@@ -40,7 +40,7 @@ cities = interactables(s; payloads = rows)   # rows[i] belongs to point i
 The tooltip shows the payload, and a click returns it to Julia, so with
 `pick = sel.scatter` you read `pick.city`, `pick.pop`, and so on. Without `payloads`, each mark gets
 an `index` and its own data, such as `x` and `y` for a scatter point or
-`low`, `high`, and `value` for a bar.
+`x`, `low`, `high`, and `value` for a bar.
 
 Your payloads are added to the mark's own data, so `(; city = "Lyon")`
 on a scatter point gives `city`, `x`, and `y`, and `pick.index` still

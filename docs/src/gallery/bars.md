@@ -6,7 +6,7 @@ ranges, bar plots, and horizontal and vertical spans.
 
 The four panels are one figure, so a single `masque(fig)` call covers
 them all. For a single `barplot!` whose click another cell uses, see
-[What each mark returns](@ref).
+the [`barplot!` page](../plots/barplot.md).
 
 ```@raw html
 <div class="masque-embed-wrap">
