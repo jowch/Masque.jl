@@ -36,11 +36,11 @@ these fields:
 
 | Plot | Fields |
 |---|---|
-| `barplot!`, `waterfall!` | `value`, `low`, `high` |
-| `hist!` | `value` (the bin's height, a count with `normalization = :none`), `low`, `high` |
-| `crossbar!` | `midpoint`, `low`, `high` |
+| [`barplot!`](plots/barplot.md), [`waterfall!`](plots/waterfall.md) | `value`, `low`, `high` |
+| [`hist!`](plots/hist.md) | `value` (the bin's height, a count with `normalization = :none`), `low`, `high` |
+| [`crossbar!`](plots/crossbar.md) | `midpoint`, `low`, `high` |
 | `poly!`, bands, densities, Voronoi cells | `index` only: the polygon's position in the order you plotted them |
-| `violin!` | `x`, the violin's category (`y` for a horizontal violin) |
+| [`violin!`](plots/violin.md) | `x`, the violin's category (`y` for a horizontal violin) |
 | `contourf!` | `low` and `high` of the level |
 | `hexbin!` | `x` and `y`, the hexagon's center, and `count` |
 | `scatter!` on a `PolarAxis` | `x` is the angle and `y` the radius, in the order you passed them |

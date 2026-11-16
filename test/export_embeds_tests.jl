@@ -552,11 +552,11 @@ end
         "gallery_boxselect",
         "gallery_image",
         "example_heatmap_trace",
-        "plots_violin",
-        "plots_boxplot",
-        "plots_rainclouds",
-        "plots_density",
     ]
+    # Every plot page's player, so a new one is checked without listing it here.
+    plots = sort([first(splitext(f)) for f in readdir(joinpath(root, "docs", "src", "embeds")) if startswith(f, "plots_") && endswith(f, ".jl")])
+    @test "plots_violin" in plots
+    append!(names, plots)
     for name in names
         path = joinpath(root, "docs", "src", "embeds", name * ".jl")
         @test isfile(path)

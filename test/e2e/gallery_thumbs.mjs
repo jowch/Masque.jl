@@ -33,6 +33,12 @@ const CARDS = [
   { out: "boxplot", embed: "plots_boxplot", moves: [["click", 0, 0.54, 0.4], ["leave"]] },
   { out: "rainclouds", embed: "plots_rainclouds", moves: [["hover", 0, 0.852, 0.4]] },
   { out: "density", embed: "plots_density", moves: [["click", 0, 0.4, 0.55], ["leave"]] },
+  { out: "qqplot", embed: "plots_qqplot", moves: [["click", 0, 0.933, 0.084], ["leave"]] },
+  { out: "barplot", embed: "plots_barplot", moves: [["click", 0, 0.2, 0.6], ["leave"]] },
+  { out: "hist", embed: "plots_hist", moves: [["click", 0, 0.5, 0.5], ["leave"]] },
+  { out: "waterfall", embed: "plots_waterfall", moves: [["click", 0, 0.6, 0.32], ["leave"]] },
+  { out: "crossbar", embed: "plots_crossbar", moves: [["click", 0, 0.4, 0.5], ["leave"]] },
+  { out: "hspan", embed: "plots_hspan", moves: [["click", 0, 0.36, 0.5], ["leave"]] },
 ];
 
 const browser = await chromium.launch({ headless: true });
