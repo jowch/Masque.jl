@@ -1080,7 +1080,7 @@ entry is merged onto that default, as for [`PointInteractable`](@ref):
 | `Makie.BarPlot` | `:bars` | reads the laid-out child `Poly` (dodge/stack/auto-width honored); payload `(; x, low, high, value)`, `x` the bar's plotted category (`y` when `direction = :x`) |
 | `Makie.Spy` | `:spy` | cell size from the child `Scatter`'s data-space `markersize` (length-2 vector or scalar; other shapes error) |
 | `Makie.Hist` | `:hist` | payload `(; value, low, high)` (`value` is a count only for `normalization = :none`) |
-| `Makie.Waterfall` | `:waterfall` | payload `(; x, low, high, value)`, `x` the step's position |
+| `Makie.Waterfall` | `:waterfall` | payload `(; x, low, high, value)`, `x` the step's position; with `show_final = true` also `total`, the total of the step's group |
 | `Makie.CrossBar` | `:crossbar` | payload `(; midpoint, low, high)` |
 | `Makie.HSpan` | `:hspan` | spans the full x-range of `ax`'s current limits; `clamp_to_viewport = true`; payload `(; low, high)` (y-bounds); re-resolved on limit changes |
 | `Makie.VSpan` | `:vspan` | spans the full y-range of `ax`'s current limits; `clamp_to_viewport = true`; payload `(; low, high)` (x-bounds); re-resolved on limit changes |
