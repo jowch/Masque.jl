@@ -41,8 +41,8 @@ pick
 masque(
     fig, interactables(
         w;
-        payloads = [(step = s, total = t) for (s, t) in zip(steps, cumsum(change))],
-        tooltip = masque"<b>$(step)</b><br>$(value) thousand, total $(total) thousand",
+        payloads = [(step = s, balance = b) for (s, b) in zip(steps, cumsum(change))],
+        tooltip = masque"<b>$(step)</b><br>$(value) thousand, balance $(balance) thousand",
     )
 )
 
