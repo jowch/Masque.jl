@@ -589,8 +589,34 @@ function PolygonInteractable(ax, p::Makie.Poly; id = :poly, payloads = nothing, 
     els = _poly_elements(_conv(p)[1])
     rings = [first(e) for e in els]
     holes = [last(e) for e in els]
+    d = _recipe_poly_payloads(_plot_parent(p), p, length(rings))
+    d === nothing || (payloads = _merge_payloads(d, payloads, "PolygonInteractable"))
     return PolygonInteractable(ax, rings; id, payloads, holes, tooltip, label)
 end
+_plot_parent(p) = hasfield(typeof(p), :parent) ? getfield(p, :parent) : nothing
+
+# A `Poly` drawn by a recipe Masque reads through its children (`pie!`, `tricontourf!`,
+# `triplot!`) takes its default payload from that recipe, one per element beside its `index`
+# (#623). `nothing` leaves the bare `(; index)`. A count that doesn't match what was drawn
+# means Makie changed how it draws the recipe, so it errors rather than mislabel the marks.
+_recipe_poly_payloads(parent, p, n) = nothing
+function _recipe_poly_payloads(parent::Makie.Pie, p, n)
+    vals = _short64.(parent.values[])
+    _recipe_count(parent, length(vals), n)
+    total = sum(vals; init = 0.0)
+    return Any[(; index = k, value = v, share = v / total) for (k, v) in enumerate(vals)]
+end
+# Bands come out as contourf's do, so they get its `low` and `high`.
+_recipe_poly_payloads(parent::Makie.Tricontourf, p, n) = Any[merge((; index = k), pl) for (k, pl) in enumerate(_contourf_payloads(parent, p))]
+# The triangles are a mesh over every point of the triangulation, in your points' order, so a
+# triangle's faces are indices into the points you passed.
+function _recipe_poly_payloads(parent::Makie.Triplot, p, n)
+    faces = parent.triangle_faces[]
+    _recipe_count(parent, length(faces), n)
+    return Any[(; index = k, vertices = (Int(f[1]), Int(f[2]), Int(f[3]))) for (k, f) in enumerate(faces)]
+end
+_recipe_count(parent, m, n) = m == n ||
+    error("$(typeof(parent).name.name) introspection: $m marks but $n drawn polygons (Makie internals changed?)")
 
 # Ring = lower curve followed by the reversed upper curve, in data space. Open ring (last
 # vertex ≠ first); the :polygons even-odd hit-test closes it implicitly.
@@ -619,7 +645,7 @@ _poly_exterior_rings(polys) = [poly.exterior for poly in polys]
 # is the band MIDPOINT, not the lower edge — map each color to its nearest midpoint to recover
 # (low, high).
 function _contourf_payloads(p, poly)
-    edges = sort(Float64.(_computed_levels(p)))
+    edges = sort(_short64.(_computed_levels(p)))
     length(edges) >= 2 || error("Contourf introspection: <2 computed level edges (Makie internals changed?)")
     mids = [(edges[k] + edges[k + 1]) / 2 for k in 1:(length(edges) - 1)]
     colors = Float64.(poly.color[])
@@ -818,12 +844,45 @@ function _place_data_markers(i::PolygonInteractable, p, f)
     return PolygonInteractable(i.ax, rings, i.id, i.payloads, i.tooltip, i.label, i.holes, i.tol, i.select)
 end
 
-# Cells come back in tessellation order, not input-site order, so there's no cheap
-# cell→generator mapping; default payload is (; index) only.
+# Makie builds one cell per generator with a polygon, in its generator order
+# (`get_voronoi_tiles!`), and colours them in that order too. A generator's index is its input
+# site's index, even when `smooth = true` moves the generator or a clip empties the cell. Each
+# cell's default payload is its site's `x`, `y` and, when the cells are coloured by values
+# (`voronoiplot!(xs, ys, zs)` or a `color` vector), its `value` (#623).
 function PolygonInteractable(ax, p::Makie.Voronoiplot; id = :voronoiplot, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     poly = _descendant(p, Makie.Poly)
     rings = _poly_exterior_rings(_conv(poly)[1])
+    d = _voronoi_payloads(p, rings)
+    d === nothing || (payloads = _merge_payloads(_unconvert_payloads(ax, d), payloads, "PolygonInteractable"))
     return PolygonInteractable(ax, rings; id, payloads, tooltip, label)
+end
+function _voronoi_payloads(p, rings)
+    args = _converted(p)
+    args[1] isa AbstractVector{<:Makie.VecTypes} || return nothing   # a tessellation passed in
+    sites = args[1]
+    vals = if length(eltype(sites)) == 3
+        [s[3] for s in sites]
+    else
+        c = p.color[]
+        c isa AbstractVector{<:Real} && length(c) == length(sites) ? c : nothing
+    end
+    gens = try
+        v = p.vorn[]
+        # Newer Makie sorts the generators (`sorted_generators`); older releases, such as the
+        # 0.24.14 compat floor, use `each_generator` order. Either way it is the cell order.
+        order = isdefined(Makie, :sorted_generators) ? Makie.sorted_generators(v) : collect(Makie.DelTri.each_generator(v))
+        [i for i in order if Makie.DelTri.has_polygon(v, i)]
+    catch e
+        e isa InterruptException && rethrow()
+        return nothing
+    end
+    # Count guard: if Makie ever orders or filters the cells differently, show bare `index`.
+    (length(gens) == length(rings) && all(j -> j isa Integer && 1 <= j <= length(sites), gens)) || return nothing
+    return map(enumerate(gens)) do (k, j)
+        s = sites[j]
+        pl = (; index = k, x = _short64(s[1]), y = _short64(s[2]))
+        vals === nothing ? pl : merge(pl, (; value = _short64(vals[j])))
+    end
 end
 
 # Stats come from Makie's computed-stats node (converted is a 4-tuple centers/medians/q1s/q3s,

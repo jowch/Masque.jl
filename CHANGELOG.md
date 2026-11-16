@@ -21,6 +21,11 @@ All notable changes to this project are documented here. The format is based on
   `high`, a line's `y` or `x`, and an `ablines!` line's `intercept` and `slope`. Positions
   follow the axis tick format, and a click's event and `@bind` value carry the same fields.
   `segment_index` stays. A `spy!` entry shows its row `i`, column `j` and `value` (#619).
+- Hovering a `pie!` slice shows its `value` and its `share` of the total, a `voronoiplot!` cell its
+  site's `x` and `y` (and `value` when the cells are coloured by values), a `tricontourf!` region
+  its `low` and `high` level, and a `triplot!` triangle its three `vertices`, as indices into your
+  points. `index` stays, and a click's event carries the same fields. A `contourf!` region's `low`
+  and `high` now read as the levels you set (`0.1`, not `0.10000000149011612`) (#623).
 
 ### Changed
 - Masque now needs Makie 0.24.14 or later, with CairoMakie 0.15.14 or WGLMakie 0.13.14 or later.

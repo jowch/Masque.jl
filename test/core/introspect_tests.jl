@@ -1557,9 +1557,102 @@ end
         pi = PolygonInteractable(ax, p; id = :voronoiplot)
         @test length(pi.rings) == 8                        # one cell per generator site
         @test all(isempty, pi.holes)                       # cells have no interiors; the shared helper stays exterior-only
-        @test pi.payloads == Any[(; index = k) for k in 1:8]   # cell order ≠ site order → index only
+        # Cells come in tessellation order; each names the site inside it (#623).
+        xs, ys = [0.1, 0.4, 0.7, 0.3, 0.9, 0.5, 0.2, 0.8], [0.2, 0.6, 0.1, 0.9, 0.4, 0.5, 0.8, 0.3]
+        @test sort([(pl.x, pl.y) for pl in pi.payloads]) == sort(collect(zip(xs, ys)))
+        @test all(k -> pi.payloads[k].index == k, 1:8)
+        function inring(pt, ring)
+            inside = false
+            for i in eachindex(ring)
+                a, b = ring[i], ring[mod1(i + 1, length(ring))]
+                (a[2] > pt[2]) != (b[2] > pt[2]) && pt[1] < (b[1] - a[1]) * (pt[2] - a[2]) / (b[2] - a[2]) + a[1] && (inside = !inside)
+            end
+            return inside
+        end
+        @test all(k -> inring(Point2f(pi.payloads[k].x, pi.payloads[k].y), pi.rings[k]), 1:8)
+        # A clip that leaves a site outside the drawn cells still names every cell's site.
+        fk = Figure(); ak = Axis(fk[1, 1])
+        pk = voronoiplot!(ak, [0.1, 0.4, 0.7, 0.3, 0.9], [0.2, 0.6, 0.1, 0.9, 0.4]; clip = Rect2f(0.2, 0.0, 1.0, 1.0))
+        Makie.update_state_before_display!(fk)
+        ik = PolygonInteractable(ak, pk)
+        @test all(pl -> haskey(pl, :x), ik.payloads)
+        @test allunique([(pl.x, pl.y) for pl in ik.payloads])
+        @test IP._coord_keys(pi.payloads) == [:x => :x, :y => :y]
         ints = interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
+        # Coloured by values: each cell carries its own site's value.
+        fz = Figure(); az = Axis(fz[1, 1])
+        pz = voronoiplot!(az, xs, ys, 10 .* xs)
+        Makie.update_state_before_display!(fz)
+        @test all(pl -> pl.value ≈ 10 * pl.x, PolygonInteractable(az, pz).payloads)
+        fc = Figure(); ac = Axis(fc[1, 1])
+        pc = voronoiplot!(ac, xs, ys; color = 100 .* ys)
+        Makie.update_state_before_display!(fc)
+        @test all(pl -> pl.value ≈ 100 * pl.y, PolygonInteractable(ac, pc).payloads)
+        # Each cell's value is the colour Makie gives that cell, and its x, y name the same
+        # site, also when `smooth = true` moves the generators and when a circle clip empties
+        # a cell (the empty cell keeps its generator).
+        function check_cells(xs, ys; kw...)
+            f = Figure(); a = Axis(f[1, 1])
+            p = voronoiplot!(a, xs, ys; color = Float64.(eachindex(xs)), kw...)
+            Makie.update_state_before_display!(f)
+            pls = PolygonInteractable(a, p).payloads
+            cs = Masque._descendant(p, Makie.Poly).color[]
+            return length(pls) == length(cs) &&
+                all(k -> pls[k].value == cs[k] && (pls[k].x, pls[k].y) == (xs[Int(cs[k])], ys[Int(cs[k])]), eachindex(pls))
+        end
+        rx = [0.81, 0.12, 0.55, 0.33, 0.97, 0.05, 0.68, 0.24, 0.43, 0.9, 0.61, 0.17]
+        ry = [0.37, 0.88, 0.14, 0.62, 0.71, 0.29, 0.93, 0.08, 0.51, 0.02, 0.46, 0.77]
+        @test check_cells(rx, ry)
+        @test check_cells(rx, ry; smooth = true)
+        cx, cy = [0.1, 0.4, 0.7, 0.3, 0.9], [0.2, 0.6, 0.1, 0.9, 0.4]
+        @test check_cells(cx, cy; clip = Circle(Point2f(0.5, 0.5), 0.45))
+        fo = Figure(); ao = Axis(fo[1, 1])
+        po = voronoiplot!(ao, cx, cy; clip = Circle(Point2f(0.5, 0.5), 0.45))
+        Makie.update_state_before_display!(fo)
+        io = PolygonInteractable(ao, po)
+        @test any(isempty, io.rings)
+        @test sort([(pl.x, pl.y) for pl in io.payloads]) == sort(collect(zip(cx, cy)))
+    end
+
+    @testset "pie, tricontourf and triplot report what they draw (#623)" begin
+        f = Figure(); a = Axis(f[1, 1])
+        pp = pie!(a, [3, 2, 1])
+        Makie.update_state_before_display!(f)
+        ip = only(interactables(f))
+        @test ip.payloads == Any[(; index = 1, value = 3.0, share = 0.5), (; index = 2, value = 2.0, share = 2 / 6), (; index = 3, value = 1.0, share = 1 / 6)]
+        # A user's payload merges onto the slice's fields.
+        iu = only(interactables(a, pp; payloads = [(; name = "a"), (; name = "b"), (; name = "c")]))
+        @test iu.payloads[2] == (; name = "b", value = 2.0, share = 2 / 6)
+
+        ft = Figure(); at = Axis(ft[1, 1])
+        pts = [Point2f(0, 0), Point2f(1, 0), Point2f(0, 1), Point2f(1, 1)]
+        triplot!(at, pts)
+        Makie.update_state_before_display!(ft)
+        it = only(interactables(ft))
+        @test length(it.payloads) == 2
+        # Each triangle's vertices index your points, and its ring is those three points.
+        for (pl, ring) in zip(it.payloads, it.rings)
+            @test Set(Point2f(q[1], q[2]) for q in ring) == Set(pts[collect(pl.vertices)])
+        end
+
+        fc = Figure(); ac = Axis(fc[1, 1])
+        tricontourf!(ac, [0.0, 1.0, 0.0, 1.0, 0.5], [0.0, 0.0, 1.0, 1.0, 0.5], [0.0, 1.0, 1.0, 2.0, 1.0]; levels = [0.0, 1.0, 2.0])
+        Makie.update_state_before_display!(fc)
+        ic = only(interactables(fc))
+        @test all(pl -> haskey(pl, :index) && pl.high > pl.low, ic.payloads)
+        @test sort(unique([(round(pl.low; digits = 4), round(pl.high; digits = 4)) for pl in ic.payloads])) == [(0.0, 1.0), (1.0, 2.0)]
+        # Float32 levels and values print as you wrote them, not as their Float32 neighbours.
+        fl = Figure(); al = Axis(fl[1, 1])
+        tricontourf!(al, [0.0, 1.0, 0.0, 1.0, 0.5], [0.0, 0.0, 1.0, 1.0, 0.5], [0.0, 0.25, 0.5, 1.0, 0.15]; levels = [0.0, 0.1, 0.2, 0.3, 1.0])
+        Makie.update_state_before_display!(fl)
+        @test Set(pl.low for pl in only(interactables(fl)).payloads) ⊆ Set([0.0, 0.1, 0.2, 0.3])
+        f32 = Figure(); a32 = Axis(f32[1, 1])
+        pie!(a32, Float32[0.1, 0.2, 0.3, 0.4])
+        Makie.update_state_before_display!(f32)
+        @test [pl.share for pl in only(interactables(f32)).payloads] ≈ [0.1, 0.2, 0.3, 0.4]
+        @test [pl.value for pl in only(interactables(f32)).payloads] == [0.1, 0.2, 0.3, 0.4]
+        @test only(interactables(f32)).payloads[1].share == 0.1 / 1.0
     end
 
     @testset "Hexbin extraction" begin

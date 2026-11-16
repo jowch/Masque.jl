@@ -419,6 +419,30 @@ kind_sweep_meta() = [
         "tip" => "count", "hoverIndex" => 1, "hoverTip" => "count", "mode" => "element",
     ),
     Dict(
+        # A slice names its value and share (#623).
+        "key" => "pie", "layerId" => "poly", "layerKind" => "polygons",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "share", "hoverIndex" => 1, "hoverTip" => "value2", "mode" => "element",
+    ),
+    Dict(
+        # A cell names its site (#623).
+        "key" => "voronoi", "layerId" => "voronoiplot", "layerKind" => "polygons",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "value", "hoverIndex" => 1, "hoverTip" => "value", "mode" => "element",
+    ),
+    Dict(
+        # A triangle names its vertices (#623).
+        "key" => "triplot", "layerId" => "poly", "layerKind" => "polygons",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "vertices", "hoverIndex" => 1, "hoverTip" => "vertices", "mode" => "element",
+    ),
+    Dict(
+        # A region names its levels (#623).
+        "key" => "tricontourf", "layerId" => "poly", "layerKind" => "polygons",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "low", "hoverIndex" => 1, "hoverTip" => "high", "mode" => "element",
+    ),
+    Dict(
         # A scatter sized in data units (#291): each square marker is one polygon element
         # covering its heatmap cell, on top of the heatmap's `:cells`.
         "key" => "scatter_data", "layerId" => "scatter", "layerKind" => "polygons",
@@ -1636,6 +1660,35 @@ function build_kind_sweep()
         masque(fig)
     end
 
+    pie = let
+        fig = Figure(size = (480, 320))
+        ax = Axis(fig[1, 1]; title = "pie", aspect = DataAspect())
+        pie!(ax, [3, 2, 1]; color = [:gray, :lightgray, :darkgray])
+        masque(fig; selected = Dict(:poly => [1]))
+    end
+
+    voronoi = let
+        fig = Figure(size = (480, 320))
+        ax = Axis(fig[1, 1]; title = "voronoi")
+        voronoiplot!(ax, [1.0, 3.0, 2.0, 1.2, 2.8], [1.0, 1.2, 2.5, 3.5, 3.4], [10.0, 20.0, 30.0, 40.0, 50.0])
+        masque(fig; selected = Dict(:voronoiplot => [1]))
+    end
+
+    triplot = let
+        fig = Figure(size = (480, 320))
+        ax = Axis(fig[1, 1]; title = "triplot")
+        triplot!(ax, [0.0, 2.0, 0.0, 2.0, 1.0], [0.0, 0.0, 2.0, 2.0, 1.0]; triangle_color = :lightgray)
+        masque(fig; selected = Dict(:poly => [1]))
+    end
+
+    tricontourf = let
+        fig = Figure(size = (480, 320))
+        ax = Axis(fig[1, 1]; title = "tricontourf")
+        gx = repeat(0.0:0.5:2.0, 5); gy = repeat(0.0:0.5:2.0; inner = 5)
+        tricontourf!(ax, gx, gy, gx; levels = [0.0, 1.0, 2.0], colormap = [:gray, :lightgray])
+        masque(fig; selected = Dict(:poly => [1]))
+    end
+
     # Hexagons from a fixed point cloud, so the bins and counts don't change between runs.
     hexbin = let
         xs = [1.0, 1.2, 1.1, 3.0, 3.2, 3.1, 3.3, 5.0, 5.1, 2.0, 4.0, 4.2]
@@ -2305,7 +2358,7 @@ function build_kind_sweep()
     return (;
         scatter, scatter_low, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, tick_units, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, box_hidden, box_axes, hidden_plot, added_plot, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, violin_h, raincloud, boxplot, raincloud_box, qq_tip, barplot_cat, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, errorbars, spy, ablines, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_data_corner, view_resized, view_nested, legend, series_legend,
+        scatter3d, scatter3d_data, lines3d, meshscatter3d, wireframe3d, surface3d, surface3d_low, surface_polar, surface_sector, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, violin_h, raincloud, boxplot, raincloud_box, qq_tip, barplot_cat, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, errorbars, spy, ablines, pie, voronoi, triplot, tricontourf, threshold, threshold_default, threshold_colorbar, threshold_colorbar_h, span_axis, span_colorbar, span_colorbar_h, colorbar_owner, roi_bounds, roi_default, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, view_wheel, view_dark, view_data_corner, view_resized, view_nested, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange_colorbar, onchange, controls, choices, menu_view, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

@@ -142,7 +142,8 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | [`Spy`](plots/spy.md) | `RectInteractable` | `index`, `i`, `j` (the entry's row and column in the matrix), `value` | `:spy` |
 | [`Heatmap`](plots/heatmap.md) / [`Image`](plots/heatmap.md) | `GridInteractable` | `i`, `j`, `value`, plus the cell's own `payloads` | `:cells` |
 | [`Surface`](plots/surface.md) | `SurfaceInteractable` | `i`, `j`, `x`, `y`, `z`; `value` when `color` is a separate matrix | `:surface` |
-| `Poly` / `Band` / [`Density`](plots/density.md) / `Voronoiplot` | `PolygonInteractable` | `index` | `:poly`, `:band`, … |
+| `Poly` / `Band` / [`Density`](plots/density.md) | `PolygonInteractable` | `index` | `:poly`, `:band`, … |
+| `Voronoiplot` | `PolygonInteractable` | `index`, `x`, `y` (the cell's site); `value` when the cells are coloured by values | `:voronoiplot` |
 | [`Contourf`](plots/contourf.md) | `PolygonInteractable` | `low`, `high` | `:contourf` |
 | [`Violin`](plots/violin.md) | `PolygonInteractable` | `x` (`y` when horizontal) | `:violin` |
 | [`Hexbin`](plots/hexbin.md) | `PolygonInteractable` | `x`, `y`, `count` | `:hexbin` |

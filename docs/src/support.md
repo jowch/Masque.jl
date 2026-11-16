@@ -247,9 +247,9 @@ under the id in this table:
 | Plot | Layer `id` | One mark is |
 |---|---|---|
 | [`contour!`](plots/contour.md) / `contour3d!` without labels | `:lines` | every contour line together |
-| `tricontourf!` | `:poly` | one filled region, so a level split into pieces gives one mark per piece |
-| `triplot!` | `:poly` | one triangle |
-| `pie!` | `:poly` | one slice, in the order of your values |
+| `tricontourf!` | `:poly` | one filled region, so a level split into pieces gives one mark per piece; it reports its `low` and `high` level |
+| `triplot!` | `:poly` | one triangle; it reports its three `vertices`, as indices into your points |
+| `pie!` | `:poly` | one slice, in the order of your values; it reports its `value` and its `share` of the total |
 | [`ablines!`](plots/ablines.md) | `:segments` | one line, in the order you give them |
 | [`ecdfplot!`](plots/ecdfplot.md) | `:stairs` | the whole curve |
 | `arc!` | `:lines` | the whole arc |
