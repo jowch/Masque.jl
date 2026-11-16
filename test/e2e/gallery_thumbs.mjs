@@ -49,6 +49,10 @@ const CARDS = [
   { out: "scatterlines", embed: "plots_scatterlines", moves: [["click", 0, 0.823, 0.084], ["leave"]] },
   { out: "ecdfplot", embed: "plots_ecdfplot", moves: [["click", 0, 0.29, 0.43], ["leave"]] },
   { out: "contour", embed: "plots_contour", moves: [["click", 0, 0.544, 0.11], ["leave"]] },
+  { out: "heatmap", embed: "plots_heatmap", moves: [["click", 0, 0.5, 0.5], ["leave"]] },
+  { out: "contourf", embed: "plots_contourf", moves: [["click", 0, 0.3, 0.45], ["leave"]] },
+  { out: "hexbin", embed: "plots_hexbin", moves: [["click", 0, 0.4, 0.5], ["leave"]] },
+  { out: "datashader", embed: "plots_datashader", moves: [["hover", 0, 0.5, 0.2]] },
 ];
 
 const browser = await chromium.launch({ headless: true });

@@ -129,6 +129,21 @@ types](plots.md) lists every plot that has a page.
 <a class="masque-gallery-card" data-dir="plots" data-page="contour">
   <img alt="Contours of a hill's height, with a point on the outer contour picked" src="assets/gallery/contour.png">
   <span>contour!</span>
+<a class="masque-gallery-card" data-dir="plots" data-page="heatmap">
+  <img alt="A heatmap of shop visits by weekday and hour, with one cell picked" src="assets/gallery/heatmap.png">
+  <span>heatmap! / image!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="contourf">
+  <img alt="Filled contours of two hills, with the top of the higher hill picked" src="assets/gallery/contourf.png">
+  <span>contourf!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="hexbin">
+  <img alt="A hexbin of height and weight, with the fullest hexagon picked" src="assets/gallery/hexbin.png">
+  <span>hexbin!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="datashader">
+  <img alt="A ring of points drawn with datashader, with the pointer's tooltip showing a pixel's count" src="assets/gallery/datashader.png">
+  <span>datashader!</span>
 </a>
 </div>
 ```
