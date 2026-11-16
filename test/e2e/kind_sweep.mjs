@@ -3880,7 +3880,7 @@ try {
       // #543: a bar's low/high/value print in its value axis's format, a hist's value in its
       // value axis's and its low/high (the bin edges) in the bin axis's.
       const rectWant = {
-        bars: { coords: { low: "y", high: "y", value: "y" }, want: [/\blow 0\.0 mV\b/, /\bhigh 3\.5 mV\b/, /\bvalue 3\.5 mV\b/], never: [/3\.472/] },
+        bars: { coords: { x: "x", low: "y", high: "y", value: "y" }, want: [/\blow 0\.0 mV\b/, /\bhigh 3\.5 mV\b/, /\bvalue 3\.5 mV\b/], never: [/3\.472/] },
         hist: { coords: { value: "y", low: "x", high: "x" }, want: [/\bvalue 3 n\b/, /\blow 0\.0 s\b/, /\bhigh 1\.0 s\b/], never: [/\bvalue 3 s\b/, /\blow 0 n\b/] },
         boxplot: { coords: { y: "y", q1: "x", median: "x", q3: "x" }, want: [/\bq1 2\.0 kg\b/, /\bmedian 3\.0 kg\b/, /\bq3 4\.0 kg\b/], never: [] },
         vspan: { coords: { low: "x", high: "x" }, want: [/\blow 1\.0 s\b/, /\bhigh 2\.0 s\b/], never: [] },

@@ -485,19 +485,32 @@ end
 _value_dim(vertical::Bool) = vertical ? :y : :x
 _along(dim, ks::Symbol...) = NamedTuple{ks}(ntuple(_ -> dim, length(ks)))
 
-function _bar_payloads(rects, direction)
+# Each bar also names where it stands on the category axis (#613), as a box or violin does: the
+# plotted position, read from the converted input rather than the laid-out rectangle, so
+# `dodge` and `stack` don't move it. The field is `x`, or `y` for `direction = :x`, so it follows
+# that axis's categories, tick format and hand-placed tick labels. Bars and input points pair
+# up one to one; if a recipe ever breaks that, the field is left out rather than misassigned.
+function _bar_category(pts, k, horiz)
+    (pts === nothing || length(pts) < k) && return (;)
+    c = Float64(pts[k][1])
+    return horiz ? (; y = c) : (; x = c)
+end
+_bar_points(p, n) = (pts = _converted(p)[1]; pts isa AbstractVector && length(pts) == n ? pts : nothing)
+function _bar_payloads(p, rects, direction)
     vert = direction === :y
+    pts = _bar_points(p, length(rects))
     return Any[
-        let (cx, cy, w, h) = r
+        let (cx, cy, w, h) = rects[k]
             lo, hi = vert ? (cy - h / 2, cy + h / 2) : (cx - w / 2, cx + w / 2)
-            (; low = Float64(lo), high = Float64(hi), value = Float64(hi - lo))
+            (; _bar_category(pts, k, !vert)..., low = Float64(lo), high = Float64(hi), value = Float64(hi - lo))
         end
-            for r in rects
+            for k in eachindex(rects)
     ]
 end
 function RectInteractable(ax, p::Makie.BarPlot; id = :bars, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     rs = _bar_rects(p)
-    pl = _merge_payloads(_bar_payloads(rs, p.direction[]), payloads, "RectInteractable"; dims = _along(_value_dim(p.direction[] === :y), :low, :high, :value))
+    defaults = _unconvert_payloads(ax, _bar_payloads(p, rs, p.direction[]))
+    pl = _merge_payloads(defaults, payloads, "RectInteractable"; dims = _along(_value_dim(p.direction[] === :y), :low, :high, :value))
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 
@@ -1025,9 +1038,10 @@ function _hist_payloads(rects, direction)
 end
 function _waterfall_payloads(p, rects)
     deltas = _converted(p)[1]
+    pts = length(deltas) == length(rects) ? deltas : nothing
     return Any[
         let (cx, cy, w, h) = rects[k]
-            (; low = Float64(cy - h / 2), high = Float64(cy + h / 2), value = Float64(deltas[k][2]))
+            (; _bar_category(pts, k, false)..., low = Float64(cy - h / 2), high = Float64(cy + h / 2), value = Float64(deltas[k][2]))
         end
             for k in eachindex(rects)
     ]
@@ -1044,7 +1058,7 @@ function RectInteractable(ax, p::Makie.Waterfall; id = :waterfall, payloads = no
     bar = _childof(p, Makie.BarPlot)
     rs = _bar_rects(bar)
     # Waterfall has no `direction`: its bars always stand on y.
-    pl = _merge_payloads(_waterfall_payloads(p, rs), payloads, "RectInteractable"; dims = _along(:y, :low, :high, :value))
+    pl = _merge_payloads(_unconvert_payloads(ax, _waterfall_payloads(p, rs)), payloads, "RectInteractable"; dims = _along(:y, :low, :high, :value))
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 

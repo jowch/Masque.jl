@@ -47,7 +47,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 
         b = barplot!(ax, [1, 2], [5.0, 7.0])
         i = only(interactables(ax, b; payloads = [(; name = "a"), (; name = "b")]))
-        @test i.payloads[2] === (; name = "b", low = 0.0, high = 7.0, value = 7.0)
+        @test i.payloads[2] === (; name = "b", x = 2.0, low = 0.0, high = 7.0, value = 7.0)
 
         t = text!(ax, [Point2f(1, 2)]; text = ["hi"])
         i = only(interactables(ax, t; payloads = [(; name = "a")]))
