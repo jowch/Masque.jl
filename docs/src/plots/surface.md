@@ -16,8 +16,8 @@ Main.masque_fallback("plots_surface"; segment = "default")
 
 ## What a click returns
 
-The figures on this page answer hover only. In your notebook, a click
-gives a [`GridCellEvent`](@ref): with `@bind pick masque(fig; bind = sf)`,
+In the figures on this page, hover the surface to read it; a click works
+in your notebook, where it gives a [`GridCellEvent`](@ref): with `@bind pick masque(fig; bind = sf)`,
 `pick` is that event itself, and with `@bind sel masque(fig)`, it is
 `sel.surface`. Its fields:
 
@@ -28,13 +28,13 @@ gives a [`GridCellEvent`](@ref): with `@bind pick masque(fig; bind = sf)`,
 
 `zs[pick]` reads the same point from your matrix.
 
-## Show your own text
+## Show your own data
 
 A tooltip template can use `i`, `j`, `x`, `y` and `z`:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-plots-surface-data" data-masque-embed="plots_surface" data-masque-segment="data" title="The same surface with a tooltip giving the height in kilometres." style="width:100%;height:600px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-plots-surface-data" data-masque-embed="plots_surface" data-masque-segment="data" title="The same surface with a tooltip giving the height in kilometers." style="width:100%;height:600px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -46,11 +46,12 @@ Main.masque_fallback("plots_surface"; segment = "data")
 
 ## Supported axes
 
-`surface!` works on an `Axis3` and on a `PolarAxis`, where it is how
-Makie draws a polar heatmap and the tooltip shows each point's angle
-and radius. On a 2D `Axis`, it is skipped with a warning; draw the
+`surface!` works on an `Axis3` and on a `PolarAxis`, where the tooltip
+shows each point's angle and radius. A `heatmap!` on a `PolarAxis` is
+[skipped with a warning](@ref polar-skipped-plots), so draw a polar
+heatmap with `surface!(ax, θ, r, values; shading = NoShading)` instead. On a 2D `Axis`, it is skipped with a warning; draw the
 matrix with [`heatmap!`](heatmap.md) there instead. A `wireframe!` over
-the same grid is left as decoration, so the surface answers.
+the same grid is left as decoration, so the surface responds.
 
 ## Where to go next
 

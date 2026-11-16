@@ -41,11 +41,11 @@ The template can use `x`, `y` and `z` next to your fields:
 Main.masque_fallback("plots_points3d"; segment = "data")
 ```
 
-## Lines and spheres
+## Hover lines and spheres
 
 A `lines!` responds along its whole length, with the point you plotted
 nearest the pointer, and a `meshscatter!` responds over each sphere.
-Where two spheres overlap, the one nearer the camera answers:
+Where two spheres overlap, the one nearer the camera responds:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -57,7 +57,7 @@ Where two spheres overlap, the one nearer the camera answers:
 Main.masque_fallback("plots_points3d"; segment = "lines")
 ```
 
-## Turning the view
+## Turn the view
 
 The figures on this page stay put, because turning one has Julia draw
 it again. In your notebook, [Explore a 3D figure](@ref) shows how to

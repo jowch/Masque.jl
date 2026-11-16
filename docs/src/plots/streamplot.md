@@ -30,7 +30,7 @@ click there. Each is an [`ElementEvent`](@ref):
 The flow function itself isn't sent: to read the flow at a clicked
 point, call it with `pick.scatter.x` and `pick.scatter.y`.
 
-## Show your own text
+## Show your own data
 
 Makie decides where the arrowheads and lines go, so give a tooltip
 template rather than payloads. A plain template applies to both parts
@@ -40,7 +40,7 @@ keeps its default:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-plots-streamplot-data" data-masque-embed="plots_streamplot" data-masque-segment="data" title="The same flow with a tooltip giving the point in kilometres." style="width:100%;height:560px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-plots-streamplot-data" data-masque-embed="plots_streamplot" data-masque-segment="data" title="The same flow with a tooltip giving the point in kilometers." style="width:100%;height:560px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 

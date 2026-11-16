@@ -39,6 +39,8 @@ masque(fig)
 masque(fig, interactables(sf; tooltip = masque"<b>$(z:.2f) km</b> high at $(x:.1f), $(y:.1f)"))
 
 # ╔═╡ b10f0020-0001-4000-8000-000000000005
+# The player needs a bound widget to record. No page shows this cell: a
+# surface has cells under a screen pixel, so the players answer hover.
 @bind pick masque(fig; bind = (;))
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
