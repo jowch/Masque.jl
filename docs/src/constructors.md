@@ -123,7 +123,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | Plot | Constructor | Default fields | id |
 |---|---|---|---|
 | [`Scatter`](plots/scatter.md) | `PointInteractable` | `index`, `x`, `y`[, `z`] | `:scatter` |
-| [`MeshScatter`](plots/meshscatter.md) | `PointInteractable` | `index`, `x`, `y`, `z` | `:meshscatter` |
+| [`MeshScatter`](plots/meshscatter.md) | `PointInteractable` | `index`, `x`, `y`[, `z`] | `:meshscatter` |
 | [`Lines`](plots/lines.md) / [`Stairs`](plots/stairs.md) | `SegmentInteractable` | `index` (the whole line is one mark); a click, once the line is named in `bind`, picks its nearest data point: `index`, `line`, `x`, `y` | `:lines` / `:stairs` |
 | [`Series`](plots/series.md) | `SegmentInteractable` | `index`; `label` when the series has one; a click, once named in `bind`, picks a data point as for `Lines` | `:series` |
 | `LineSegments` / `Errorbars` / `Rangebars` / `HLines` / `VLines` / `Wireframe` | `SegmentInteractable` | `segment_index` | `:segments`, `:errorbars`, … |

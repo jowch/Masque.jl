@@ -63,7 +63,8 @@ to the selection or takes it out again:
 Main.masque_fallback("plots_violin"; segment = "many")
 ```
 
-The `@bind` value is then a vector of events, one per selected violin.
+With `@bind sel` in front, `sel.violin` is then a vector of events,
+one per selected violin.
 See [Select several marks](@ref).
 
 ## Read the value under the pointer

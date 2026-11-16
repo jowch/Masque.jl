@@ -18,7 +18,7 @@ end
 
 
 # ╔═╡ b10f0013-0001-4000-8000-000000000001
-using Masque, CairoMakie, Random
+using Masque, CairoMakie
 
 # ╔═╡ b10f0013-0001-4000-8000-000000000002
 begin

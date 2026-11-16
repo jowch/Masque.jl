@@ -63,7 +63,8 @@ takes it out again:
 Main.masque_fallback("plots_scatter"; segment = "many")
 ```
 
-The `@bind` value is then a vector of events, one per selected marker.
+With `@bind sel` in front, `sel.scatter` is then a vector of events,
+one per selected marker.
 See [Select several marks](@ref). To select every marker inside a box
 you drag, see [Brush a region](@ref).
 
@@ -71,7 +72,7 @@ you drag, see [Brush a region](@ref).
 
 `scatter!` works on a 2D `Axis`, an `Axis3` and a `PolarAxis`. A
 marker sized in data units (`markerspace = :data`) responds over its
-drawn shape. On an `Axis3`, a scatter drawn with a `marker_offset` is
+drawn shape, but on an `Axis3` one drawn with a `marker_offset` is
 skipped with a warning.
 
 ## Where to go next

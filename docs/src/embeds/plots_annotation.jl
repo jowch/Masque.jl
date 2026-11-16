@@ -18,7 +18,7 @@ end
 
 
 # ╔═╡ b10f0014-0001-4000-8000-000000000001
-using Masque, CairoMakie, Random
+using Masque, CairoMakie
 
 # ╔═╡ b10f0014-0001-4000-8000-000000000002
 begin
@@ -28,7 +28,7 @@ begin
     fig = Figure(size = (520, 320))
     ax = Axis(fig[1, 1]; xlabel = "Year", ylabel = "Visitors (million)")
     lines!(ax, year, visitors; color = :gray40)
-    a = annotation!(ax, [-70, -90], [40, -10], [2009, 2020], [4.0, 3.4]; text = ["Recession", "Pandemic"])
+    a = annotation!(ax, [-70, -90], [70, -10], [2009, 2020], [4.0, 3.4]; text = ["Recession", "Pandemic"])
     nothing
 end
 
