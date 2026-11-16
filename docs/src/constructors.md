@@ -131,7 +131,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | [`Rangebars`](plots/rangebars.md) | `SegmentInteractable` | `segment_index`, `x` (`y` for `direction = :x`), `low`, `high` | `:rangebars` |
 | [`HLines`](plots/hlines.md) / [`VLines`](plots/hlines.md) | `SegmentInteractable` | `segment_index`, `y` / `x` | `:hlines` / `:vlines` |
 | [`ABLines`](plots/ablines.md) | `SegmentInteractable` | `segment_index`, `intercept`, `slope` | `:segments` |
-| `Wireframe` | `SegmentInteractable` | `segment_index`, `x1`, `y1`, `z1`, `x2`, `y2`, `z2` (the edge's two ends) | `:wireframe` |
+| [`Wireframe`](plots/wireframe.md) | `SegmentInteractable` | `segment_index`, `x1`, `y1`, `z1`, `x2`, `y2`, `z2` (the edge's two ends) | `:wireframe` |
 | [`Arrows3D`](plots/arrows3d.md) | `SegmentInteractable` | `index`, `x`, `y`, `z`, `u`, `v`, `w` | `:arrows3d` |
 | [`Arrows2D`](plots/arrows2d.md) | `SegmentInteractable` | `index`, `x`, `y`, `u`, `v` | `:arrows2d` |
 | [`BarPlot`](plots/barplot.md) | `RectInteractable` | `x` (`y` when `direction = :x`), `low`, `high`, `value` | `:bars` |

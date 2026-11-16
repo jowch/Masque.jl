@@ -26,6 +26,7 @@ add for the parts that don't respond on their own.
 | [`scatterlines!`](plots/scatterlines.md) | lines | each point, and the line's tooltip |
 | [`ecdfplot!`](plots/ecdfplot.md) | lines | the curve, and the step nearest the pointer |
 | [`contour!`](plots/contour.md) | lines | all contours as one line, and each label |
+| [`arc!`](plots/arc.md) | lines | the arc, and the point nearest the pointer |
 | [`heatmap!`, `image!`](plots/heatmap.md) | grid | each cell |
 | [`contourf!`](plots/contourf.md) | grid | each filled region |
 | [`hexbin!`](plots/hexbin.md) | grid | each hexagon |
@@ -34,6 +35,7 @@ add for the parts that don't respond on their own.
 | [`scatter!`, `lines!` on an `Axis3`](plots/points3d.md) | 3D | each marker, sphere and line |
 | [`surface!`](plots/surface.md) | 3D | the point nearest the pointer |
 | [`arrows3d!`](plots/arrows3d.md) | 3D | each arrow |
+| [`wireframe!`](plots/wireframe.md) | 3D | each edge |
 | [`linesegments!`](plots/linesegments.md) | segments | each segment |
 | [`errorbars!`](plots/errorbars.md) | segments | each error bar |
 | [`rangebars!`](plots/rangebars.md) | segments | each range bar |

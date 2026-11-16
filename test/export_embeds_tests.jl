@@ -425,7 +425,7 @@ include(joinpath(@__DIR__, "..", "docs", "player_fallback.jl"))
 end
 
 @testset "overlay-only players set chip = false" begin
-    for name in ("home_hover_stars", "home_export", "gallery_bars")
+    for name in ("home_hover_stars", "home_export", "readouts_axis")
         player = parse_player_toml(joinpath(@__DIR__, "..", "docs", "src", "embeds", name * ".jl"))
         @test player["chip"] == false
     end
@@ -550,9 +550,6 @@ end
     @test !isfile(joinpath(root, "docs", "src", "examples.md"))
 
     names = [
-        "gallery_bars",
-        "gallery_polygons",
-        "gallery_text",
         "gallery_boxselect",
         "gallery_image",
         "example_heatmap_trace",
