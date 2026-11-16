@@ -12,10 +12,16 @@ end
 
 # Backends whose widget is their own type extend this to keep the titles; others drop them.
 with_titles(w, titles) = w
-with_titles(w::MasqueWidget, titles) = MasqueWidget(w.b64, w.manifest, w.display_css, w.render_frame, w.owners, titles)
+with_titles(w::MasqueWidget, titles) = MasqueWidget(w.b64, w.manifest, w.display_css, w.render_frame, w.owners, titles, w.value)
 
+# The picture as the page shows it now: the last settled frame of a pan, zoom or `onchange`
+# redraw, else the first picture (#637). The PNG in the cell's HTML stays the first one, since
+# Pluto keeps the output it was given; asking the widget again gets the latest.
 Base.showable(::MIME"image/png", w::MasqueWidget) = !isempty(w.b64)
-Base.show(io::IO, ::MIME"image/png", w::MasqueWidget) = write(io, base64decode(w.b64))
+function Base.show(io::IO, ::MIME"image/png", w::MasqueWidget)
+    png = _latest_png(w.render_frame)
+    return png === nothing ? write(io, base64decode(w.b64)) : write(io, png)
+end
 
 Base.show(io::IO, w::MasqueWidget) = _show_compact(io, "MasqueWidget", w.manifest)
 Base.show(io::IO, ::MIME"text/plain", w::MasqueWidget) = _describe(io, "MasqueWidget", w)
@@ -28,7 +34,7 @@ _size_text(m) = haskey(m, "width") ? string(m["width"], "×", m["height"], " px"
 
 # A few lines, since this goes into an agent's context: the picture's size, then each axis with
 # its title and its layers (what they draw, the gestures they take, their tooltip fields), then
-# the `@bind` value the widget starts with.
+# the `@bind` value it holds now.
 function _describe(io::IO, name, w)
     m = w.manifest
     layers = get(m, "layers", Any[])
@@ -56,7 +62,7 @@ function _describe(io::IO, name, w)
         end
     end
     fields = get(m, "fields", ())
-    isempty(fields) || print(io, "\nstarts as: ", _clip(sprint(show, initial_bond(w); context = :limit => true), 300))
+    isempty(fields) || print(io, "\nvalue: ", _clip(sprint(show, current_bond(w); context = :limit => true), 300))
     return nothing
 end
 

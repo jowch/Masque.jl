@@ -676,6 +676,19 @@ function initial_bond(w)
     return bond_from_js(w.manifest, w.owners, _bind_envelope(w.manifest))
 end
 
+# Pluto reads each value the page sends through `transform_value`; the widget keeps the last
+# one so its text form says what the `@bind` variable holds now (#637).
+function _note_value!(w, v)
+    hasfield(typeof(w), :value) && (w.value[] = Some(v))
+    return v
+end
+
+# The `@bind` value now: the last one Pluto read, else the start.
+function current_bond(w)
+    v = hasfield(typeof(w), :value) ? w.value[] : nothing
+    return v === nothing ? initial_bond(w) : something(v)
+end
+
 function with_owners end   # backends that own a distinct widget type extend this
 
 # ---------------------------------------------------------------------------

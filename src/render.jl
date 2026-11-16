@@ -735,6 +735,9 @@ struct MasqueWidget
     owners::Dict{String, LayerOwner}
     # Axis id => title, in figure order, for the text form (src/describe.jl). Not published.
     titles::Vector{Pair{String, String}}
+    # The `@bind` value Pluto last read from the page, shared by every copy of the widget, for
+    # the text form (#637). `nothing` until Pluto reads one.
+    value::Base.RefValue{Any}
 end
 MasqueWidget(b64, manifest, display_css) = MasqueWidget(b64, manifest, display_css, nothing)
 function MasqueWidget(b64, manifest, display_css, render_frame)
@@ -743,8 +746,11 @@ end
 function MasqueWidget(b64, manifest, display_css, render_frame, owners)
     return MasqueWidget(b64, manifest, display_css, render_frame, owners, Pair{String, String}[])
 end
+function MasqueWidget(b64, manifest, display_css, render_frame, owners, titles)
+    return MasqueWidget(b64, manifest, display_css, render_frame, owners, titles, Ref{Any}(nothing))
+end
 function with_owners(w::MasqueWidget, owners::Dict{String, LayerOwner})
-    return MasqueWidget(w.b64, w.manifest, w.display_css, w.render_frame, owners, w.titles)
+    return MasqueWidget(w.b64, w.manifest, w.display_css, w.render_frame, owners, w.titles, w.value)
 end
 
 # The built-in backends by `backend=` symbol: the extension that defines each, and the package
@@ -1289,8 +1295,24 @@ end
 struct _GestureFrame <: Function
     f::Function
     decode::Union{Nothing, Base.RefValue{Any}}
+    # The PNG of the last settled frame the page asked for, which `image/png` returns in place
+    # of the first picture (#637). With the widget open in two tabs, the last one to settle
+    # wins. The warmup's frames don't come through here.
+    png::Base.RefValue{Any}
 end
-(g::_GestureFrame)(input) = g.f(input)
+_GestureFrame(f, decode) = _GestureFrame(f, decode, Ref{Any}(nothing))
+function (g::_GestureFrame)(input)
+    frame = g.f(input)
+    if frame isa AbstractDict && get(input, "settle", false) === true && !haskey(frame, "error")
+        png = get(frame, "png", nothing)
+        png isa AbstractVector{UInt8} && (g.png[] = png)
+    end
+    return frame
+end
+
+# The picture the widget shows now: the last settled frame, else the first picture.
+_latest_png(rf::_GestureFrame) = rf.png[]
+_latest_png(rf) = nothing
 
 # The manifest and owners a value from the browser is read with.
 function _decoder(w)
@@ -1792,4 +1814,4 @@ end
 # envelope `mount_envelope` builds, or the browser's mount-time report would overwrite
 # `initial_value`.
 APD.Bonds.initial_value(w::MasqueWidget) = initial_bond(w)
-APD.Bonds.transform_value(w::MasqueWidget, js) = bond_from_js(w, js)
+APD.Bonds.transform_value(w::MasqueWidget, js) = _note_value!(w, bond_from_js(w, js))

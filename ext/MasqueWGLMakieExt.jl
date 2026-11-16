@@ -282,21 +282,22 @@ struct WebGLWidget
     render_frame::Union{Nothing, Function}
     owners::Dict{String, Masque.LayerOwner}
     titles::Vector{Pair{String, String}}   # axis id => title, for the text form
+    value::Base.RefValue{Any}              # the `@bind` value Pluto last read (#637)
 end
 function WebGLWidget(scene, manifest, display_css, width, height, px_per_unit, render_frame = nothing)
     return WebGLWidget(
         scene, manifest, display_css, width, height, px_per_unit, render_frame,
-        Dict{String, Masque.LayerOwner}(), Pair{String, String}[],
+        Dict{String, Masque.LayerOwner}(), Pair{String, String}[], Ref{Any}(nothing),
     )
 end
 function Masque.with_owners(w::WebGLWidget, owners::Dict{String, Masque.LayerOwner})
     return WebGLWidget(
-        w.scene, w.manifest, w.display_css, w.width, w.height, w.px_per_unit, w.render_frame, owners, w.titles,
+        w.scene, w.manifest, w.display_css, w.width, w.height, w.px_per_unit, w.render_frame, owners, w.titles, w.value,
     )
 end
 function Masque.with_titles(w::WebGLWidget, titles)
     return WebGLWidget(
-        w.scene, w.manifest, w.display_css, w.width, w.height, w.px_per_unit, w.render_frame, w.owners, titles,
+        w.scene, w.manifest, w.display_css, w.width, w.height, w.px_per_unit, w.render_frame, w.owners, titles, w.value,
     )
 end
 
@@ -538,7 +539,7 @@ end
 
 # ---- bond plumbing: identical contract to MasqueWidget (same overlay, same events) ----
 APD.Bonds.initial_value(w::WebGLWidget) = Masque.initial_bond(w)
-APD.Bonds.transform_value(w::WebGLWidget, js) = Masque.bond_from_js(w, js)
+APD.Bonds.transform_value(w::WebGLWidget, js) = Masque._note_value!(w, Masque.bond_from_js(w, js))
 
 if Masque._PRECOMPILE_WORKLOAD
     PrecompileTools.@compile_workload Masque._precompile_workload(:webgl)
