@@ -1223,7 +1223,7 @@ end
 # each step, at the step's own x and dodge slot), then the step bars, so the step bars are the
 # last BarPlot child. The total bars stay out of the hit layer: they sit behind every step and
 # would compete with it. Instead each step's payload carries its group's `total` (#624), read
-# from the total bar drawn behind it (the grand total, or the total at its x with `dodge`).
+# from the total bar drawn behind it (the grand total, or its group's total with `dodge`).
 function _waterfall_bars(p)
     bars = filter(c -> c isa Makie.BarPlot, _child_plots(p))
     length(bars) == 1 + p.show_final[] ||

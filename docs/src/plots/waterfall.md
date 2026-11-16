@@ -30,8 +30,8 @@ with `@bind sel masque(fig)`, it is `sel.waterfall`.
 
 With `waterfall!(ax, x, change; show_final = true)`, hovering any bar
 also shows the total drawn behind it, the sum of all your changes. With
-`dodge`, each position has its own total, so a bar shows the total at
-its position.
+`dodge`, each group of bars has its own total, so a bar shows the total
+of its group.
 
 ## Show your own data
 

@@ -27,7 +27,7 @@ All notable changes to this project are documented here. The format is based on
   points. `index` stays, and a click's event carries the same fields. A `contourf!` region's `low`
   and `high` now read as the levels you set (`0.1`, not `0.10000000149011612`) (#623).
 - In a `waterfall!` plot with `show_final = true`, hovering a step also shows the `total` drawn
-  behind it: the total of all the steps, or with `dodge`, the total at the step's position. A
+  behind it: the total of all the steps, or with `dodge`, the total of the step's group. A
   click's event and `@bind` value carry it too (#624).
 
 ### Changed

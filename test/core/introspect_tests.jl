@@ -1365,6 +1365,11 @@ end
         @test [r[4] for r in ri4.data] ≈ [2.0, 1.0, 1.0, 3.0]
         @test [q.x for q in ri4.payloads] == [1.0, 1.0, 2.0, 2.0]       # #613: the step's own x
         @test [q.total for q in ri4.payloads] == [3.0, 3.0, 2.0, 2.0]   # #624: the total at its x
+        # unsorted x: each step still reads its own total bar, not a sorted neighbour's
+        fig5 = Figure(); ax5 = Axis(fig5[1, 1])
+        wf5 = waterfall!(ax5, [2, 1, 2, 1], [-1.0, 2.0, 3.0, 1.0]; dodge = [1, 1, 2, 2], show_final = true)
+        Makie.update_state_before_display!(fig5)
+        @test [q.total for q in RectInteractable(ax5, wf5; id = :waterfall).payloads] == [2.0, 3.0, 2.0, 3.0]
     end
 
     @testset "CrossBar extraction" begin
