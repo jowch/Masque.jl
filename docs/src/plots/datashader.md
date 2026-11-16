@@ -16,8 +16,8 @@ Main.masque_fallback("plots_datashader"; segment = "default")
 
 ## What a click returns
 
-The figures on this page answer hover only. In your notebook, a click
-gives a [`GridCellEvent`](@ref): with `@bind pick masque(fig; bind = ds)`,
+In the figures on this page, hover a pixel to read it; a click works in
+your notebook, where it gives a [`GridCellEvent`](@ref): with `@bind pick masque(fig; bind = ds)`,
 `pick` is that event itself, and with `@bind sel masque(fig)`, it is
 `sel.cells`. Its fields:
 
@@ -30,7 +30,7 @@ The grid is the one in the picture, so `i` and `j` say where you
 clicked, not which of your points are there. To find those, keep the
 points near the click in your own data.
 
-## Show your own text
+## Show your own data
 
 A tooltip template can use `value`, `i` and `j`:
 

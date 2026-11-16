@@ -30,14 +30,14 @@ One level can be several regions, like the ring around each hill here,
 and each region is its own mark with the same `low` and `high`. Inside
 a hole of a region, the pointer reaches the region drawn there, if any.
 
-## Show your own text
+## Show your own data
 
 Makie decides how many regions there are, so give a tooltip template
 rather than payloads. The template can use `low` and `high`:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-plots-contourf-data" data-masque-embed="plots_contourf" data-masque-segment="data" title="The same hills with a tooltip giving each region's height range in metres." style="width:100%;height:560px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-plots-contourf-data" data-masque-embed="plots_contourf" data-masque-segment="data" title="The same hills with a tooltip giving each region's height range in meters." style="width:100%;height:560px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 

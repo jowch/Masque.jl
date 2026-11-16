@@ -51,8 +51,8 @@ begin
     scan = [exp(-((x - 20)^2 + (y - 14)^2) / 60) + 0.6 * exp(-((x - 8)^2 + (y - 22)^2) / 20) + 0.05 * rand(rng) for x in 1:32, y in 1:32]
     fig2 = Figure(size = (520, 320))
     ax2 = Axis(fig2[1, 1]; aspect = DataAspect(), yreversed = true, title = "Scan")
-    im = image!(ax2, scan; colormap = :grays, interpolate = false)
-    masque(fig2, interactables(im; tooltip = masque"pixel $(i), $(j)<br>intensity $(value:.2f)"))
+    img = image!(ax2, scan; colormap = :grays, interpolate = false)
+    masque(fig2, interactables(img; tooltip = masque"pixel $(i), $(j)<br>intensity $(value:.2f)"))
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

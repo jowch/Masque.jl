@@ -47,11 +47,10 @@ Main.masque_fallback("plots_heatmap"; segment = "data")
 
 A click also returns the payload's fields, so `pick.day` is the weekday
 you clicked. A matrix of payloads, the same shape as your data, works
-too. Every payload ships with the page, so on a large grid a template
-that uses only `i`, `j` and `value` keeps the page small. [Tooltips](@ref)
+too. On a large grid, see [Large grids](@ref) first. [Tooltips](@ref)
 lists what a template can do.
 
-## Pick several cells
+## [Select several cells](@id heatmap-select-several)
 
 Pass `select = :many`, and each click adds a cell to the selection or
 takes it out again:
@@ -68,16 +67,18 @@ Main.masque_fallback("plots_heatmap"; segment = "many")
 
 With `@bind sel` in front, `sel.cells` is then a [`GridSelection`](@ref):
 a mask the size of your matrix, so `visits[sel.cells]` is the selected
-values and `findall(sel.cells)` their places. [Heatmaps and images](@ref) shows how to pick a block of
-cells by dragging, and how to treat a group of cells as one region.
+values and `findall(sel.cells)` their places. [Select several
+marks](@ref) says more about `select = :many`, and [Heatmaps and
+images](@ref) shows how to select a block of cells by dragging, and how
+to treat a group of cells as one region.
 
-## Images
+## Read an image
 
 An `image!` responds the same way. A template can format the value:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-plots-heatmap-image" data-masque-embed="plots_heatmap" data-masque-segment="image" title="A grey scan. Hover a pixel to see its place and intensity." style="width:100%;height:420px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-plots-heatmap-image" data-masque-embed="plots_heatmap" data-masque-segment="image" title="A gray scan. Hover a pixel to see its place and intensity." style="width:100%;height:420px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -90,10 +91,10 @@ A color image has no single value per pixel, so it reports only `i` and
 
 ## Supported axes
 
-`heatmap!` and `image!` work on a 2D `Axis`. On a `PolarAxis`, Makie
-draws a polar heatmap as a `surface!`, which responds point by point.
-When a cell is smaller than a screen pixel, hovering reports the cell
-under the pointer, so even a very large matrix stays exact.
+`heatmap!` and `image!` work on a 2D `Axis`. A `heatmap!` on a
+`PolarAxis` is [skipped with a warning](@ref polar-skipped-plots); draw
+the matrix with `surface!(ax, θ, r, values; shading = NoShading)` there
+instead, and it responds point by point.
 
 ## Where to go next
 

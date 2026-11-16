@@ -41,6 +41,8 @@ masque(fig)
 masque(fig, interactables(ds; tooltip = masque"<b>$(value) points</b> in this pixel"))
 
 # ╔═╡ b10f001e-0001-4000-8000-000000000005
+# The player needs a bound widget to record. No page shows this cell: a
+# click on every pixel is too many states, so the players answer hover.
 @bind pick masque(fig; bind = (;))
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

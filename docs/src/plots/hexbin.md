@@ -30,7 +30,7 @@ figure passes the plot as `bind`, so `pick` is that event itself; with
 Only the hexagons Makie draws respond. With `threshold = 0`, Makie
 draws the empty ones too, and they respond with a `count` of `0`.
 
-## Show your own text
+## Show your own data
 
 Makie decides where the hexagons are, so give a tooltip template rather
 than payloads. The template can use `x`, `y` and `count`:

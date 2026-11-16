@@ -139,7 +139,7 @@ types](plots.md) lists every plot that has a page.
   <span>contourf!</span>
 </a>
 <a class="masque-gallery-card" data-dir="plots" data-page="hexbin">
-  <img alt="A hexbin of height and weight, with the fullest hexagon picked" src="assets/gallery/hexbin.png">
+  <img alt="A hexbin of height and weight, with one hexagon picked" src="assets/gallery/hexbin.png">
   <span>hexbin!</span>
 </a>
 <a class="masque-gallery-card" data-dir="plots" data-page="datashader">
