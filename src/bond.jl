@@ -679,13 +679,18 @@ end
 # Pluto reads each value the page sends through `transform_value`; the widget keeps the last
 # one so its text form says what the `@bind` variable holds now (#637).
 function _note_value!(w, v)
-    hasfield(typeof(w), :value) && (w.value[] = Some(v))
+    r = _value_ref(w)
+    r === nothing || (r[] = Some(v))
     return v
 end
 
+# Where a widget keeps that value; a widget type that keeps none returns `nothing`.
+_value_ref(w) = nothing
+
 # The `@bind` value now: the last one Pluto read, else the start.
 function current_bond(w)
-    v = hasfield(typeof(w), :value) ? w.value[] : nothing
+    r = _value_ref(w)
+    v = r === nothing ? nothing : r[]
     return v === nothing ? initial_bond(w) : something(v)
 end
 

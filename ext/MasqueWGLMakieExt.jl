@@ -539,6 +539,7 @@ end
 
 # ---- bond plumbing: identical contract to MasqueWidget (same overlay, same events) ----
 APD.Bonds.initial_value(w::WebGLWidget) = Masque.initial_bond(w)
+Masque._value_ref(w::WebGLWidget) = w.value
 APD.Bonds.transform_value(w::WebGLWidget, js) = Masque._note_value!(w, Masque.bond_from_js(w, js))
 
 if Masque._PRECOMPILE_WORKLOAD

@@ -1814,4 +1814,5 @@ end
 # envelope `mount_envelope` builds, or the browser's mount-time report would overwrite
 # `initial_value`.
 APD.Bonds.initial_value(w::MasqueWidget) = initial_bond(w)
+_value_ref(w::MasqueWidget) = w.value
 APD.Bonds.transform_value(w::MasqueWidget, js) = _note_value!(w, bond_from_js(w, js))

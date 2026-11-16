@@ -102,6 +102,23 @@ can ask a CairoMakie widget for its figure as a PNG,
 the reader's browser draws it; render the figure with CairoMakie for
 one. Both print a short text summary in the REPL: each axis with its
 title, each layer with what it draws and its tooltip fields, and the
-`@bind` value the widget starts with.
+`@bind` value.
+
+Both follow the page. After a pan, a zoom or an `onchange` redraw, the
+PNG is the last picture the page settled on, and the text gives the
+value the `@bind` variable holds now. The output Pluto saved when the
+cell ran, and an export of the notebook, keep the first picture and
+the first value until the cell runs again: a tool sees the new ones
+only when it asks the widget again. With `@bind x masque(fig)` written
+in one cell, that cell's result is Pluto's bond rather than the
+widget, so give the widget a name, `w = masque(fig)`, and bind it in
+another cell, `@bind x w`, for a tool that asks the cell for a PNG.
+
+With the notebook open in two tabs, the PNG is the picture of the tab
+that last settled one, and the value is the last one any tab sent.
+They can come from different tabs: if one tab pans and another then
+clicks a mark, the PNG shows the first tab's view and the value holds
+the second tab's click. A tab opened later starts from the unpanned
+figure, while the PNG keeps the last panned picture.
 
 Next: [Backends](@ref) to choose between CairoMakie and WGLMakie.
