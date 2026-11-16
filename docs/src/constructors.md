@@ -89,7 +89,7 @@ its own, define a method of [`interactables`](@ref) for its type; see
 |---|---|---|---|
 | [`PointInteractable`](@ref) | `(ax, points; radius, radius3d, id=:points)` or `(ax, p::Scatter)` | [`ElementEvent`](@ref): `index`, `x`, `y`[, `z`] | [Getting started](@ref), [What each mark returns](@ref) |
 | [`SegmentInteractable`](@ref) | `(ax, vertices; mode=:polyline, unit=:segment, tol=6, id=:segments)` | [`ElementEvent`](@ref): `segment_index`, or `index` with `unit = :line` | [What each mark returns](@ref) |
-| [`RectInteractable`](@ref) | `(ax, rects; clamp_to_viewport=false, id=:rects)` or `(ax, p::BarPlot)` | [`ElementEvent`](@ref): `index`; bars give `low`, `high`, `value` | [What each mark returns](@ref) |
+| [`RectInteractable`](@ref) | `(ax, rects; clamp_to_viewport=false, id=:rects)` or `(ax, p::BarPlot)` | [`ElementEvent`](@ref): `index`; bars give `x` (their category; `y` when horizontal), `low`, `high`, `value` | [What each mark returns](@ref) |
 | [`GridInteractable`](@ref) | `(ax, xedges, yedges, values; id=:cells)` or `(ax, p::Union{Heatmap,Image})` | [`GridCellEvent`](@ref): `i`, `j`, `value`; with `select = :many`, a [`GridSelection`](@ref) | [Heatmaps and images](@ref) |
 | [`SurfaceInteractable`](@ref) | `(ax, x, y, z; value, id=:surface)` or `(ax, p::Surface)` | [`GridCellEvent`](@ref): `i`, `j`, `value` (the point's `z`) | [Supported plots and axes](@ref) |
 | [`PolygonInteractable`](@ref) | `(ax, rings; holes=nothing, id=:polygons)` or `(ax, p::Poly)` | [`ElementEvent`](@ref): `index` | [What each mark returns](@ref) |
@@ -122,8 +122,8 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 
 | Plot | Constructor | Default fields | id |
 |---|---|---|---|
-| `Scatter` | `PointInteractable` | `index`, `x`, `y`[, `z`] | `:scatter` |
-| `MeshScatter` | `PointInteractable` | `index`, `x`, `y`, `z` | `:meshscatter` |
+| [`Scatter`](plots/scatter.md) | `PointInteractable` | `index`, `x`, `y`[, `z`] | `:scatter` |
+| [`MeshScatter`](plots/meshscatter.md) | `PointInteractable` | `index`, `x`, `y`[, `z`] | `:meshscatter` |
 | [`Lines`](plots/lines.md) / [`Stairs`](plots/stairs.md) | `SegmentInteractable` | `index` (the whole line is one mark); a click, once the line is named in `bind`, picks its nearest data point: `index`, `line`, `x`, `y` | `:lines` / `:stairs` |
 | [`Series`](plots/series.md) | `SegmentInteractable` | `index`; `label` when the series has one; a click, once named in `bind`, picks a data point as for `Lines` | `:series` |
 | `LineSegments` | `SegmentInteractable` | `segment_index`, `x1`, `y1`, `x2`, `y2` (the segment's two ends; `z1`, `z2` on an `Axis3`) | `:segments` |
@@ -134,9 +134,9 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `Wireframe` | `SegmentInteractable` | `segment_index`, `x1`, `y1`, `z1`, `x2`, `y2`, `z2` (the edge's two ends) | `:wireframe` |
 | `Arrows3D` | `SegmentInteractable` | `index`, `x`, `y`, `z`, `u`, `v`, `w` | `:arrows3d` |
 | `Arrows2D` | `SegmentInteractable` | `index`, `x`, `y`, `u`, `v` | `:arrows2d` |
-| [`BarPlot`](plots/barplot.md) | `RectInteractable` | `low`, `high`, `value` | `:bars` |
+| [`BarPlot`](plots/barplot.md) | `RectInteractable` | `x` (`y` when `direction = :x`), `low`, `high`, `value` | `:bars` |
 | [`Hist`](plots/hist.md) | `RectInteractable` | `value`, `low`, `high` | `:hist` |
-| [`Waterfall`](plots/waterfall.md) | `RectInteractable` | `low`, `high`, `value` | `:waterfall` |
+| [`Waterfall`](plots/waterfall.md) | `RectInteractable` | `x`, `low`, `high`, `value` | `:waterfall` |
 | [`CrossBar`](plots/crossbar.md) | `RectInteractable` | `midpoint`, `low`, `high` | `:crossbar` |
 | [`HSpan`](plots/hspan.md) / [`VSpan`](plots/hspan.md) | `RectInteractable` | `low`, `high` | `:hspan` / `:vspan` |
 | `Spy` | `RectInteractable` | `index`, `i`, `j` (the entry's row and column in the matrix), `value` | `:spy` |
@@ -146,11 +146,11 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `Contourf` | `PolygonInteractable` | `low`, `high` | `:contourf` |
 | [`Violin`](plots/violin.md) | `PolygonInteractable` | `x` (`y` when horizontal) | `:violin` |
 | `Hexbin` | `PolygonInteractable` | `x`, `y`, `count` | `:hexbin` |
-| `Text` | `TextInteractable` | `text`, `index`, `x`, `y` | `:text` |
+| [`Text`](plots/text.md) | `TextInteractable` | `text`, `index`, `x`, `y` | `:text` |
 | `Stem` | `interactables(p)` | points, and stems as a second layer | `stem.points`, `stem.stems` |
 | [`ScatterLines`](plots/scatterlines.md) | `interactables(p)` | points, and the line as a second layer that only shows its tooltip | `scatterlines.points`, `scatterlines.line` |
 | [`BoxPlot`](plots/boxplot.md) | `interactables(p)` | `x` (`y` when horizontal), `q1`, `median`, `q3` (the box only) | `:boxplot` |
-| `Annotation` | `interactables(p)` | the text's fields | `:annotation` |
+| [`Annotation`](plots/annotation.md) | `interactables(p)` | the text's fields | `:annotation` |
 
 ## Axes, legends, and draggable tools
 

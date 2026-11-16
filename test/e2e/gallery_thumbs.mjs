@@ -29,6 +29,10 @@ const CARDS = [
   { out: "text", embed: "gallery_text", moves: [["click", 0, 0.53, 0.155], ["leave"]] },
   { out: "boxselect", embed: "gallery_boxselect", moves: [["hover", 0, 0.196, 0.47]] },
   { out: "image", embed: "gallery_image", moves: [["hover", 0, 0.46, 0.57]] },
+  { out: "scatter", embed: "plots_scatter", moves: [["click", 0, 0.723, 0.224], ["leave"]] },
+  { out: "meshscatter", embed: "plots_meshscatter", moves: [["click", 0, 0.596, 0.43], ["leave"]] },
+  { out: "text-plot", embed: "plots_text", moves: [["click", 0, 0.785, 0.15], ["leave"]] },
+  { out: "annotation", embed: "plots_annotation", moves: [["click", 0, 0.76, 0.77], ["leave"]] },
   { out: "violin", embed: "plots_violin", moves: [["click", 0, 0.52, 0.4], ["leave"]] },
   { out: "boxplot", embed: "plots_boxplot", moves: [["click", 0, 0.54, 0.4], ["leave"]] },
   { out: "rainclouds", embed: "plots_rainclouds", moves: [["hover", 0, 0.852, 0.4]] },
@@ -45,6 +49,10 @@ const CARDS = [
   { out: "scatterlines", embed: "plots_scatterlines", moves: [["click", 0, 0.823, 0.084], ["leave"]] },
   { out: "ecdfplot", embed: "plots_ecdfplot", moves: [["click", 0, 0.29, 0.43], ["leave"]] },
   { out: "contour", embed: "plots_contour", moves: [["click", 0, 0.544, 0.11], ["leave"]] },
+  { out: "heatmap", embed: "plots_heatmap", moves: [["click", 0, 0.5, 0.5], ["leave"]] },
+  { out: "contourf", embed: "plots_contourf", moves: [["click", 0, 0.3, 0.45], ["leave"]] },
+  { out: "hexbin", embed: "plots_hexbin", moves: [["click", 0, 0.4, 0.5], ["leave"]] },
+  { out: "datashader", embed: "plots_datashader", moves: [["hover", 0, 0.5, 0.2]] },
 ];
 
 const browser = await chromium.launch({ headless: true });

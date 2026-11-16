@@ -81,6 +81,12 @@ makedocs(;
         ],
         "Plot types" => [
             "All plot types" => "plots.md",
+            "Points and labels" => [
+                "scatter!" => "plots/scatter.md",
+                "meshscatter!" => "plots/meshscatter.md",
+                "text!" => "plots/text.md",
+                "annotation!" => "plots/annotation.md",
+            ],
             "Distributions" => [
                 "violin!" => "plots/violin.md",
                 "boxplot!" => "plots/boxplot.md",
@@ -102,6 +108,12 @@ makedocs(;
                 "scatterlines!" => "plots/scatterlines.md",
                 "ecdfplot!" => "plots/ecdfplot.md",
                 "contour!" => "plots/contour.md",
+            ],
+            "Grids" => [
+                "heatmap! / image!" => "plots/heatmap.md",
+                "contourf!" => "plots/contourf.md",
+                "hexbin!" => "plots/hexbin.md",
+                "datashader!" => "plots/datashader.md",
             ],
         ],
         "Examples" => [

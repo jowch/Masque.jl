@@ -52,5 +52,5 @@ Main.masque_fallback("plots_contour"; segment = "labels")
 
 ## Where to go next
 
-For filled levels, where each level is its own mark, see `contourf!` in
-[What each mark returns](@ref).
+For filled levels, where each region is its own mark, see
+[`contourf!`](contourf.md).

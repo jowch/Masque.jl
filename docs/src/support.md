@@ -83,14 +83,14 @@ and `PolarAxis`. Constructor signatures and default fields are in
 
 | Recipe | Layer `id` | Kind | Axis3 | PolarAxis |
 |---|---|---|---|---|
-| `scatter!` | `:scatter` | `:circles` | yes | yes |
-| `meshscatter!` | `:meshscatter` | `:circles` | yes | — |
+| [`scatter!`](plots/scatter.md) | `:scatter` | `:circles` | yes | yes |
+| [`meshscatter!`](plots/meshscatter.md) | `:meshscatter` | `:circles` | yes | — |
 | [`lines!`](plots/lines.md) | `:lines` | `:lines` | yes | yes |
 | `linesegments!` | `:segments` | `:segments` | yes | yes |
 | `wireframe!` | `:wireframe` | `:segments` | yes | — |
 | `arrows3d!` (`Arrows3D`) | `:arrows3d` | `:segments` | yes | — |
 | `arrows2d!` (`Arrows2D`) | `:arrows2d` | `:segments` | — | — |
-| `heatmap!` / `image!` | `:cells` | `:grid` | — | — |
+| [`heatmap!`](plots/heatmap.md) / [`image!`](plots/heatmap.md) | `:cells` | `:grid` | — | — |
 | `surface!` | `:surface` | `:surface` | yes | yes |
 | [`barplot!`](plots/barplot.md) | `:bars` | `:rects` | — | — |
 | `poly!` | `:poly` | `:polygons` | — | — |
@@ -106,15 +106,15 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | [`hspan!`](plots/hspan.md) / [`vspan!`](plots/hspan.md) | `:hspan` / `:vspan` | `:rects` | — | — |
 | `band!` | `:band` | `:polygons` | — | — |
 | [`density!`](plots/density.md) | `:density` | `:polygons` | — | — |
-| `contourf!` | `:contourf` | `:polygons` | — | — |
+| [`contourf!`](plots/contourf.md) | `:contourf` | `:polygons` | — | — |
 | [`violin!`](plots/violin.md) | `:violin` | `:polygons` | — | — |
 | `voronoiplot!` | `:voronoiplot` | `:polygons` | — | — |
-| `hexbin!` | `:hexbin` | `:polygons` | — | — |
+| [`hexbin!`](plots/hexbin.md) | `:hexbin` | `:polygons` | — | — |
 | `stem!` | `stem.points` + `stem.stems` | `:circles` + `:segments` | — | — |
 | [`scatterlines!`](plots/scatterlines.md) | `scatterlines.points` + `scatterlines.line` | `:circles` + `:lines` | yes | yes |
 | [`boxplot!`](plots/boxplot.md) | `:boxplot` | `:rects` or `:polygons` (body only) | — | — |
-| `text!` | `:text` | `:rects` | yes | — |
-| `annotation!` | `:annotation` | `:rects` | — | — |
+| [`text!`](plots/text.md) | `:text` | `:rects` | yes | — |
+| [`annotation!`](plots/annotation.md) | `:annotation` | `:rects` | — | — |
 | `Colorbar` (block) | `:colorbar` | `:axis` | yes | yes |
 | `Legend` (block) | `:legend` | `:rects` | yes | yes |
 
@@ -135,7 +135,7 @@ One drawn with a `marker_offset` is skipped with a warning.
 
 A recipe not in the table, such as `rainclouds!` or `contour!`, still
 gets each visible part the table knows, under that part's layer id;
-[Plots with several parts](@ref) lists the common ones. A `datashader!`
+[Plots with several parts](@ref) lists the common ones. A [`datashader!`](plots/datashader.md)
 of points gives `:cells`, and hovering a pixel shows how many points
 fell in it. A plot whose `space` is not
 `:data`, such as a `bracket!` label or a `scatter!` placed with

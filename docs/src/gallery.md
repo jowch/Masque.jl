@@ -50,6 +50,22 @@ types](plots.md) lists every plot that has a page.
 
 ```@raw html
 <div class="masque-gallery">
+<a class="masque-gallery-card" data-dir="plots" data-page="scatter">
+  <img alt="Homes by size and price, with one marker picked" src="assets/gallery/scatter.png">
+  <span>scatter!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="meshscatter">
+  <img alt="Spheres scattered on a plane, with one sphere picked" src="assets/gallery/meshscatter.png">
+  <span>meshscatter!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="text">
+  <img alt="City names placed by longitude and latitude, with Berlin picked" src="assets/gallery/text-plot.png">
+  <span>text!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="annotation">
+  <img alt="Visitors by year with two notes, with the pandemic note picked" src="assets/gallery/annotation.png">
+  <span>annotation!</span>
+</a>
 <a class="masque-gallery-card" data-dir="plots" data-page="violin">
   <img alt="Three violins of penguin weight, with the middle one picked" src="assets/gallery/violin.png">
   <span>violin!</span>
@@ -113,6 +129,22 @@ types](plots.md) lists every plot that has a page.
 <a class="masque-gallery-card" data-dir="plots" data-page="contour">
   <img alt="Contours of a hill's height, with a point on the outer contour picked" src="assets/gallery/contour.png">
   <span>contour!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="heatmap">
+  <img alt="A heatmap of shop visits by weekday and hour, with one cell picked" src="assets/gallery/heatmap.png">
+  <span>heatmap! / image!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="contourf">
+  <img alt="Filled contours of two hills, with the top of the higher hill picked" src="assets/gallery/contourf.png">
+  <span>contourf!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="hexbin">
+  <img alt="A hexbin of height and weight, with one hexagon picked" src="assets/gallery/hexbin.png">
+  <span>hexbin!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="datashader">
+  <img alt="A ring of points drawn with datashader, with the pointer's tooltip showing a pixel's count" src="assets/gallery/datashader.png">
+  <span>datashader!</span>
 </a>
 </div>
 ```

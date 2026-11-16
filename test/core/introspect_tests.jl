@@ -237,9 +237,9 @@ end
             ri = RectInteractable(ax, ax.scene.plots[1]; id = :bars)
             pls = ri.payloads
             @test length(pls) == 3
-            @test pls[1] == (; low = 0.0, high = 3.0, value = 3.0)   # bar 1: from-zero, height 3
-            @test pls[2] == (; low = 0.0, high = 1.0, value = 1.0)
-            @test pls[3] == (; low = 0.0, high = 2.0, value = 2.0)
+            @test pls[1] == (; x = 1.0, low = 0.0, high = 3.0, value = 3.0)   # bar 1: from-zero, height 3
+            @test pls[2] == (; x = 2.0, low = 0.0, high = 1.0, value = 1.0)
+            @test pls[3] == (; x = 3.0, low = 0.0, high = 2.0, value = 2.0)
             @test !haskey(pairs(pls[1]), :index)                     # no redundant index
             @test pls[1].value isa Float64                           # semantic values are Float64
 
@@ -248,8 +248,21 @@ end
             barplot!(axh, [1, 2], [3.0, 5.0]; direction = :x)
             Makie.update_state_before_display!(figh)
             plh = RectInteractable(axh, axh.scene.plots[1]; id = :bars).payloads
-            @test plh[1] == (; low = 0.0, high = 3.0, value = 3.0)
-            @test plh[2] == (; low = 0.0, high = 5.0, value = 5.0)
+            @test plh[1] == (; y = 1.0, low = 0.0, high = 3.0, value = 3.0)
+            @test plh[2] == (; y = 2.0, low = 0.0, high = 5.0, value = 5.0)
+
+            # #613: the category is the input's, not the dodged or stacked bar's centre
+            figd = Figure(); axd = Axis(figd[1, 1])
+            barplot!(axd, [1, 1, 2, 2], [3.0, 1.0, 5.0, 2.0]; dodge = [1, 2, 1, 2])
+            barplot!(axd, [1, 1, 2], [1.0, 2.0, 3.0]; stack = [1, 2, 1])
+            Makie.update_state_before_display!(figd)
+            @test [pl.x for pl in RectInteractable(axd, axd.scene.plots[1]).payloads] == [1.0, 1.0, 2.0, 2.0]
+            @test [pl.x for pl in RectInteractable(axd, axd.scene.plots[2]).payloads] == [1.0, 1.0, 2.0]
+            # categorical x gives its labels
+            figc = Figure(); axc = Axis(figc[1, 1])
+            barplot!(axc, Makie.Categorical(["a", "b", "c"]), [1.0, 2.0, 3.0])
+            Makie.update_state_before_display!(figc)
+            @test [pl.x for pl in RectInteractable(axc, axc.scene.plots[1]).payloads] == ["a", "b", "c"]
         end
 
         @testset "poly -> Polygon (single ring and vector of rings)" begin
@@ -1320,6 +1333,7 @@ end
         @test ri2.payloads[1].value == 2.0                             # up-step: positive
         @test ri2.payloads[2].value == -1.0                            # down-step: negative (signed delta)
         @test ri2.payloads[3].value == 3.0                             # up-step: positive
+        @test [pl.x for pl in ri2.payloads] == [1.0, 2.0, 3.0]         # #613: the step's position
         # |value| ≈ bar height (low..high span)
         @test abs(ri2.payloads[2].value) ≈ ri2.payloads[2].high - ri2.payloads[2].low
 
@@ -1343,6 +1357,7 @@ end
         ri4 = RectInteractable(ax4, wf4; id = :waterfall)
         @test [(q.low, q.high) for q in ri4.payloads] == [(0.0, 2.0), (2.0, 3.0), (-1.0, 0.0), (-1.0, 2.0)]
         @test [r[4] for r in ri4.data] ≈ [2.0, 1.0, 1.0, 3.0]
+        @test [q.x for q in ri4.payloads] == [1.0, 1.0, 2.0, 2.0]       # #613: the step's own x
     end
 
     @testset "CrossBar extraction" begin
