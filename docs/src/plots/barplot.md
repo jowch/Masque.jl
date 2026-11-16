@@ -23,11 +23,14 @@ with `@bind sel masque(fig)`, it is `sel.bars`.
 | Field | What it holds |
 |---|---|
 | `index` | the bar's place in your data, so `1` is the first value you passed |
+| `x` | the bar's category: the `x` you passed for it, or its tick label |
 | `value` | the bar's height: `high` minus `low` |
 | `low`, `high` | where the bar starts and ends along its value axis |
 
-For bars drawn with `direction = :x`, `low` and `high` are measured
-along `x`.
+For bars drawn with `direction = :x`, the category is `y`, and `low`
+and `high` are measured along `x`. Makie puts the labels of
+`Categorical` input on the `x` axis even then, so for those bars `y`
+is the bar's number on the `y` axis.
 
 ## Show your own data
 
@@ -52,8 +55,8 @@ of the bar you clicked. [Tooltips](@ref) lists what a template can do.
 ## Stacked and dodged bars
 
 Each segment of a stacked bar, and each bar of a dodged group, is its
-own mark. `index` says which segment was hovered or clicked, and `low` and
-`high` say where it sits on the stack. The payloads follow the order of
+own mark. `index` says which segment was hovered or clicked, `x` names
+its category, and `low` and `high` say where it sits on the stack. The payloads follow the order of
 your data, so one per row:
 
 ```@raw html

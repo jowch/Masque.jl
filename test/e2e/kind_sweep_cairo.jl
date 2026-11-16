@@ -553,6 +553,16 @@ HTML(
         "<span id=\"coords_raincloud_box\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.raincloud_box)))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000551
+@bind ev_barplot_cat sweep.barplot_cat
+
+# ╔═╡ c1000000-0000-0000-0000-000000000552
+HTML(
+    "<span id=\"out_barplot_cat\">BARPLOT_CAT=$(sweep_field("barplot_cat", ev_barplot_cat))</span>" *
+        "<span id=\"bond_barplot_cat\" style=\"display:none\">$(repr(ev_barplot_cat))</span>" *
+        "<span id=\"coords_barplot_cat\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.barplot_cat)))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000616
 @bind ev_qq_tip sweep.qq_tip
 
@@ -1282,6 +1292,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-00000000054e
 # ╠═c1000000-0000-0000-0000-00000000054f
 # ╠═c1000000-0000-0000-0000-000000000550
+# ╠═c1000000-0000-0000-0000-000000000551
+# ╠═c1000000-0000-0000-0000-000000000552
 # ╠═c1000000-0000-0000-0000-000000000616
 # ╠═c1000000-0000-0000-0000-000000000617
 # ╠═c1000000-0000-0000-0000-000000000111

@@ -23,6 +23,7 @@ with `@bind sel masque(fig)`, it is `sel.waterfall`.
 | Field | What it holds |
 |---|---|
 | `index` | the bar's place in your data, so `1` is the first change |
+| `x` | the bar's position on the `x` axis |
 | `value` | the change you passed for this bar, negative for a fall |
 | `low`, `high` | where the bar starts and ends on the `y` axis |
 

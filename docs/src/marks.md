@@ -15,9 +15,9 @@ lists the fields each plot type reports, and
 
 ## Bars
 
-A bar reports its `value`, which is its height, and its `low` and `high`
-ends, so in a stacked or dodged bar plot you can tell which segment was
-clicked:
+A bar reports its category as `x`, its `value`, which is its height, and
+its `low` and `high` ends, so in a stacked or dodged bar plot you can
+tell which segment was clicked:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -36,7 +36,7 @@ these fields:
 
 | Plot | Fields |
 |---|---|
-| [`barplot!`](plots/barplot.md), [`waterfall!`](plots/waterfall.md) | `value`, `low`, `high` |
+| [`barplot!`](plots/barplot.md), [`waterfall!`](plots/waterfall.md) | `x`, the bar's category (`y` for horizontal bars), `value`, `low`, `high` |
 | [`hist!`](plots/hist.md) | `value` (the bin's height, a count with `normalization = :none`), `low`, `high` |
 | [`crossbar!`](plots/crossbar.md) | `midpoint`, `low`, `high` |
 | `poly!`, bands, densities, Voronoi cells | `index` only: the polygon's position in the order you plotted them |

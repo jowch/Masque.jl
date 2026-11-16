@@ -89,7 +89,7 @@ its own, define a method of [`interactables`](@ref) for its type; see
 |---|---|---|---|
 | [`PointInteractable`](@ref) | `(ax, points; radius, radius3d, id=:points)` or `(ax, p::Scatter)` | [`ElementEvent`](@ref): `index`, `x`, `y`[, `z`] | [Getting started](@ref), [What each mark returns](@ref) |
 | [`SegmentInteractable`](@ref) | `(ax, vertices; mode=:polyline, unit=:segment, tol=6, id=:segments)` | [`ElementEvent`](@ref): `segment_index`, or `index` with `unit = :line` | [What each mark returns](@ref) |
-| [`RectInteractable`](@ref) | `(ax, rects; clamp_to_viewport=false, id=:rects)` or `(ax, p::BarPlot)` | [`ElementEvent`](@ref): `index`; bars give `low`, `high`, `value` | [What each mark returns](@ref) |
+| [`RectInteractable`](@ref) | `(ax, rects; clamp_to_viewport=false, id=:rects)` or `(ax, p::BarPlot)` | [`ElementEvent`](@ref): `index`; bars give `x` (their category; `y` when horizontal), `low`, `high`, `value` | [What each mark returns](@ref) |
 | [`GridInteractable`](@ref) | `(ax, xedges, yedges, values; id=:cells)` or `(ax, p::Union{Heatmap,Image})` | [`GridCellEvent`](@ref): `i`, `j`, `value`; with `select = :many`, a [`GridSelection`](@ref) | [Heatmaps and images](@ref) |
 | [`SurfaceInteractable`](@ref) | `(ax, x, y, z; value, id=:surface)` or `(ax, p::Surface)` | [`GridCellEvent`](@ref): `i`, `j`, `value` (the point's `z`) | [Supported plots and axes](@ref) |
 | [`PolygonInteractable`](@ref) | `(ax, rings; holes=nothing, id=:polygons)` or `(ax, p::Poly)` | [`ElementEvent`](@ref): `index` | [What each mark returns](@ref) |
@@ -129,9 +129,9 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `LineSegments` / `Errorbars` / `Rangebars` / `HLines` / `VLines` / `Wireframe` | `SegmentInteractable` | `segment_index` | `:segments`, `:errorbars`, … |
 | `Arrows3D` | `SegmentInteractable` | `index`, `x`, `y`, `z`, `u`, `v`, `w` | `:arrows3d` |
 | `Arrows2D` | `SegmentInteractable` | `index`, `x`, `y`, `u`, `v` | `:arrows2d` |
-| [`BarPlot`](plots/barplot.md) | `RectInteractable` | `low`, `high`, `value` | `:bars` |
+| [`BarPlot`](plots/barplot.md) | `RectInteractable` | `x` (`y` when `direction = :x`), `low`, `high`, `value` | `:bars` |
 | [`Hist`](plots/hist.md) | `RectInteractable` | `value`, `low`, `high` | `:hist` |
-| [`Waterfall`](plots/waterfall.md) | `RectInteractable` | `low`, `high`, `value` | `:waterfall` |
+| [`Waterfall`](plots/waterfall.md) | `RectInteractable` | `x`, `low`, `high`, `value` | `:waterfall` |
 | [`CrossBar`](plots/crossbar.md) | `RectInteractable` | `midpoint`, `low`, `high` | `:crossbar` |
 | [`HSpan`](plots/hspan.md) / [`VSpan`](plots/hspan.md) | `RectInteractable` | `low`, `high` | `:hspan` / `:vspan` |
 | `Spy` | `RectInteractable` | `index` | `:spy` |

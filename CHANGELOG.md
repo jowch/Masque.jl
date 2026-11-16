@@ -40,6 +40,9 @@ All notable changes to this project are documented here. The format is based on
   instead of failing with "Only simple objects can be shared with JS". The tooltip shows each
   value as Julia prints it, including `missing`, `nothing` and `Inf`, and the `@bind` value
   still holds your own values (#607).
+- A bar's tooltip and `@bind` value now say which category the bar is, as `x` (`y` for
+  horizontal bars), the way a box plot's do. With `dodge` or `stack` it is the bar's own
+  category, not its shifted centre. A waterfall step gives its position as `x` too (#613).
 
 ## [0.5.2] - 2026-11-08
 
