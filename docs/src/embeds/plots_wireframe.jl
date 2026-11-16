@@ -17,41 +17,29 @@ macro bind(def, element)
 end
 
 
-# ╔═╡ a1410003-0001-4000-8000-000000000001
+# ╔═╡ b10f002b-0001-4000-8000-000000000001
 using Masque, CairoMakie, Random
 
-# ╔═╡ a1410003-0001-4000-8000-000000000009
-md"""
-Hover over a bar, a band, or a span in any panel, since one `masque` call covers them all.
-"""
-
-# ╔═╡ a1410003-0001-4000-8000-000000000010
-md"""
-Create the panels the way you normally would. You do not need an interactable for each recipe, because `masque` finds the bars and spans on its own.
-"""
-
-# ╔═╡ a1410003-0001-4000-8000-000000000002
+# ╔═╡ b10f002b-0001-4000-8000-000000000002
 begin
-    rng = Xoshiro(1)
-    bf = Figure(size = (760, 520))
-    hist!(Axis(bf[1, 1]; title = "hist"), randn(rng, 300); bins = 12, color = :steelblue)
-    waterfall!(Axis(bf[1, 2]; title = "waterfall"), 1:4, [3.0, -1.0, 2.0, -0.5])
-    crossbar!(
-        Axis(bf[2, 1]; title = "crossbar"),
-        [1, 2, 3],
-        [5.0, 6.0, 4.0],
-        [3.0, 4.0, 2.0],
-        [7.0, 8.0, 6.0],
-    )
-    a4 = Axis(bf[2, 2]; title = "bars + spans")
-    barplot!(a4, 1:3, [2.0, 3.0, 1.0])
-    hspan!(a4, [0.4], [0.8]; color = (:orange, 0.2))
-    vspan!(a4, [1.6], [2.0]; color = (:green, 0.2))
+    xs = range(-2, 2; length = 9)
+    ys = range(-2, 2; length = 9)
+    zs = [exp(-(x^2 + y^2) / 2) for x in xs, y in ys]
+
+    fig = Figure(size = (520, 380))
+    ax = Axis3(fig[1, 1]; xlabel = "x (km)", ylabel = "y (km)", zlabel = "Height (km)")
+    wf = wireframe!(ax, xs, ys, zs; color = :steelblue)
     nothing
 end
 
-# ╔═╡ a1410003-0001-4000-8000-000000000003
-@bind pick masque(bf)
+# ╔═╡ b10f002b-0001-4000-8000-000000000003
+@bind pick masque(fig; bind = wf)
+
+# ╔═╡ b10f002b-0001-4000-8000-000000000004
+pick
+
+# ╔═╡ b10f002b-0001-4000-8000-000000000005
+masque(fig, interactables(wf; tooltip = masque"edge from $(z1:.2f) to $(z2:.2f) km high"))
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
@@ -59,14 +47,18 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 bond = "pick"
 show_code = true
 pluto_html = true
-chip = false
 
 cells = [
-  "a1410003-0001-4000-8000-000000000009",
-  "a1410003-0001-4000-8000-000000000010",
-  "a1410003-0001-4000-8000-000000000002",
-  "a1410003-0001-4000-8000-000000000003",
+  "b10f002b-0001-4000-8000-000000000001",
+  "b10f002b-0001-4000-8000-000000000002",
+  "b10f002b-0001-4000-8000-000000000003",
+  "b10f002b-0001-4000-8000-000000000004",
+  "b10f002b-0001-4000-8000-000000000005",
 ]
+
+[player.segments]
+default = ["b10f002b-0001-4000-8000-000000000001", "b10f002b-0001-4000-8000-000000000002", "b10f002b-0001-4000-8000-000000000003", "b10f002b-0001-4000-8000-000000000004"]
+data = ["b10f002b-0001-4000-8000-000000000005"]
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1713,11 +1705,11 @@ version = "4.1.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═a1410003-0001-4000-8000-000000000001
-# ╟─a1410003-0001-4000-8000-000000000009
-# ╟─a1410003-0001-4000-8000-000000000010
-# ╠═a1410003-0001-4000-8000-000000000002
-# ╠═a1410003-0001-4000-8000-000000000003
+# ╠═b10f002b-0001-4000-8000-000000000001
+# ╠═b10f002b-0001-4000-8000-000000000002
+# ╠═b10f002b-0001-4000-8000-000000000003
+# ╠═b10f002b-0001-4000-8000-000000000004
+# ╠═b10f002b-0001-4000-8000-000000000005
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

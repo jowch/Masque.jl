@@ -87,7 +87,7 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | [`meshscatter!`](plots/meshscatter.md) | `:meshscatter` | `:circles` | yes | — |
 | [`lines!`](plots/lines.md) | `:lines` | `:lines` | yes | yes |
 | [`linesegments!`](plots/linesegments.md) | `:segments` | `:segments` | yes | yes |
-| `wireframe!` | `:wireframe` | `:segments` | yes | — |
+| [`wireframe!`](plots/wireframe.md) | `:wireframe` | `:segments` | yes | — |
 | [`arrows3d!`](plots/arrows3d.md) (`Arrows3D`) | `:arrows3d` | `:segments` | yes | — |
 | [`arrows2d!`](plots/arrows2d.md) (`Arrows2D`) | `:arrows2d` | `:segments` | — | — |
 | [`heatmap!`](plots/heatmap.md) / [`image!`](plots/heatmap.md) | `:cells` | `:grid` | — | — |
@@ -252,4 +252,4 @@ under the id in this table:
 | [`pie!`](plots/pie.md) | `:poly` | one slice, in the order of your values; it reports its `value` and its `share` of the total |
 | [`ablines!`](plots/ablines.md) | `:segments` | one line, in the order you give them |
 | [`ecdfplot!`](plots/ecdfplot.md) | `:stairs` | the whole curve |
-| `arc!` | `:lines` | the whole arc |
+| [`arc!`](plots/arc.md) | `:lines` | the whole arc |

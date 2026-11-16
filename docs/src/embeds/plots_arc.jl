@@ -17,40 +17,26 @@ macro bind(def, element)
 end
 
 
-# ╔═╡ a1410004-0001-4000-8000-000000000001
+# ╔═╡ b10f002c-0001-4000-8000-000000000001
 using Masque, CairoMakie, Random
 
-# ╔═╡ a1410004-0001-4000-8000-000000000009
-md"""
-Hover over a band, a density, a filled contour, a violin, a Voronoi cell, or a box.
-"""
-
-# ╔═╡ a1410004-0001-4000-8000-000000000010
-md"""
-Create the panels the way you normally would, and `masque` makes each filled shape clickable.
-"""
-
-# ╔═╡ a1410004-0001-4000-8000-000000000002
+# ╔═╡ b10f002c-0001-4000-8000-000000000002
 begin
-    rng = Xoshiro(1)
-    pf = Figure(size = (900, 520))
-    band!(Axis(pf[1, 1]; title = "band"), 1:10, (1:10) .- 0.5, (1:10) .+ 1.5)
-    density!(Axis(pf[1, 2]; title = "density"), randn(rng, 400))
-    contourf!(
-        Axis(pf[1, 3]; title = "contourf"),
-        1:20,
-        1:20,
-        [sin(i / 3) * cos(j / 3) for i in 1:20, j in 1:20];
-        levels = 6,
-    )
-    violin!(Axis(pf[2, 1]; title = "violin"), repeat([1, 2, 3], inner = 100), randn(rng, 300))
-    voronoiplot!(Axis(pf[2, 2]; title = "voronoi"), rand(rng, 15), rand(rng, 15))
-    boxplot!(Axis(pf[2, 3]; title = "boxplot"), repeat([1, 2], inner = 120), randn(rng, 240))
+    fig = Figure(size = (520, 320))
+    ax = Axis(fig[1, 1]; aspect = DataAspect(), xlabel = "x (m)", ylabel = "y (m)")
+    a1 = arc!(ax, Point2f(0, 0), 1, 0, π; linewidth = 3)
+    a2 = arc!(ax, Point2f(0, 0), 2, 0, π / 2; linewidth = 3, color = :orange)
     nothing
 end
 
-# ╔═╡ a1410004-0001-4000-8000-000000000003
-@bind pick masque(pf)
+# ╔═╡ b10f002c-0001-4000-8000-000000000003
+@bind pick masque(fig; bind = (inner = a1, outer = a2))
+
+# ╔═╡ b10f002c-0001-4000-8000-000000000004
+pick
+
+# ╔═╡ b10f002c-0001-4000-8000-000000000005
+masque(fig, interactables(a1; payloads = [(name = "Inner track", radius = 1)], tooltip = masque"<b>$(name)</b><br>radius $(radius) m"), interactables(a2; payloads = [(name = "Outer track", radius = 2)], tooltip = masque"<b>$(name)</b><br>radius $(radius) m"))
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
@@ -58,14 +44,18 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 bond = "pick"
 show_code = true
 pluto_html = true
-chip = false
 
 cells = [
-  "a1410004-0001-4000-8000-000000000009",
-  "a1410004-0001-4000-8000-000000000010",
-  "a1410004-0001-4000-8000-000000000002",
-  "a1410004-0001-4000-8000-000000000003",
+  "b10f002c-0001-4000-8000-000000000001",
+  "b10f002c-0001-4000-8000-000000000002",
+  "b10f002c-0001-4000-8000-000000000003",
+  "b10f002c-0001-4000-8000-000000000004",
+  "b10f002c-0001-4000-8000-000000000005",
 ]
+
+[player.segments]
+default = ["b10f002c-0001-4000-8000-000000000001", "b10f002c-0001-4000-8000-000000000002", "b10f002c-0001-4000-8000-000000000003", "b10f002c-0001-4000-8000-000000000004"]
+data = ["b10f002c-0001-4000-8000-000000000005"]
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1712,11 +1702,11 @@ version = "4.1.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═a1410004-0001-4000-8000-000000000001
-# ╟─a1410004-0001-4000-8000-000000000009
-# ╟─a1410004-0001-4000-8000-000000000010
-# ╠═a1410004-0001-4000-8000-000000000002
-# ╠═a1410004-0001-4000-8000-000000000003
+# ╠═b10f002c-0001-4000-8000-000000000001
+# ╠═b10f002c-0001-4000-8000-000000000002
+# ╠═b10f002c-0001-4000-8000-000000000003
+# ╠═b10f002c-0001-4000-8000-000000000004
+# ╠═b10f002c-0001-4000-8000-000000000005
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

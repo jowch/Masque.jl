@@ -108,6 +108,7 @@ makedocs(;
                 "scatterlines!" => "plots/scatterlines.md",
                 "ecdfplot!" => "plots/ecdfplot.md",
                 "contour!" => "plots/contour.md",
+                "arc!" => "plots/arc.md",
             ],
             "Grids" => [
                 "heatmap! / image!" => "plots/heatmap.md",
@@ -120,6 +121,7 @@ makedocs(;
                 "Points and lines on an Axis3" => "plots/points3d.md",
                 "surface!" => "plots/surface.md",
                 "arrows3d!" => "plots/arrows3d.md",
+                "wireframe!" => "plots/wireframe.md",
             ],
             "Segments and arrows" => [
                 "linesegments!" => "plots/linesegments.md",
@@ -151,11 +153,6 @@ makedocs(;
             "From a heatmap cell to its trace" => "gallery/heatmap-trace.md",
             "Box-select scatter" => "gallery/boxselect.md",
             "Image ROI" => "gallery/image.md",
-            "Plot overviews" => [
-                "Bars and areas" => "gallery/bars.md",
-                "Polygons" => "gallery/polygons.md",
-                "Text labels" => "gallery/text.md",
-            ],
         ],
         "Reference" => [
             "Supported plots and axes" => "support.md",

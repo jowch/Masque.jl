@@ -24,9 +24,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // tooltip doesn't cover the pick; `hosts` lists the figures to keep, side by side.
 const CARDS = [
   { out: "heatmap-trace", embed: "example_heatmap_trace", moves: [["click", 0, 0.68, 0.38]] },
-  { out: "bars", embed: "gallery_bars", moves: [["click", 0, 0.257, 0.3]] },
-  { out: "polygons", embed: "gallery_polygons", moves: [["click", 0, 0.515, 0.635], ["leave"]] },
-  { out: "text", embed: "gallery_text", moves: [["click", 0, 0.53, 0.155], ["leave"]] },
   { out: "boxselect", embed: "gallery_boxselect", moves: [["hover", 0, 0.196, 0.47]] },
   { out: "image", embed: "gallery_image", moves: [["hover", 0, 0.46, 0.57]] },
   { out: "scatter", embed: "plots_scatter", moves: [["click", 0, 0.723, 0.224], ["leave"]] },
@@ -49,6 +46,7 @@ const CARDS = [
   { out: "scatterlines", embed: "plots_scatterlines", moves: [["click", 0, 0.823, 0.084], ["leave"]] },
   { out: "ecdfplot", embed: "plots_ecdfplot", moves: [["click", 0, 0.29, 0.43], ["leave"]] },
   { out: "contour", embed: "plots_contour", moves: [["click", 0, 0.544, 0.11], ["leave"]] },
+  { out: "arc", embed: "plots_arc", moves: [["click", 0, 0.62, 0.15], ["leave"]] },
   { out: "heatmap", embed: "plots_heatmap", moves: [["click", 0, 0.5, 0.5], ["leave"]] },
   { out: "contourf", embed: "plots_contourf", moves: [["click", 0, 0.3, 0.45], ["leave"]] },
   { out: "hexbin", embed: "plots_hexbin", moves: [["click", 0, 0.4, 0.5], ["leave"]] },
@@ -56,6 +54,7 @@ const CARDS = [
   { out: "points3d", embed: "plots_points3d", moves: [["click", 0, 0.558, 0.22], ["leave"]] },
   { out: "surface", embed: "plots_surface", moves: [["hover", 0, 0.5, 0.39]] },
   { out: "arrows3d", embed: "plots_arrows3d", moves: [["click", 0, 0.73, 0.47], ["leave"]] },
+  { out: "wireframe", embed: "plots_wireframe", moves: [["click", 0, 0.46, 0.325], ["leave"]] },
   { out: "streamplot", embed: "plots_streamplot", moves: [["click", 0, 0.56, 0.155], ["leave"]] },
   { out: "linesegments", embed: "plots_linesegments", moves: [["click", 0, 0.34, 0.25], ["leave"]] },
   { out: "errorbars", embed: "plots_errorbars", moves: [["click", 0, 0.34, 0.375], ["leave"]] },

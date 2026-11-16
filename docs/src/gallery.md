@@ -130,6 +130,10 @@ types](plots.md) lists every plot that has a page.
   <img alt="Contours of a hill's height, with a point on the outer contour picked" src="assets/gallery/contour.png">
   <span>contour!</span>
 </a>
+<a class="masque-gallery-card" data-dir="plots" data-page="arc">
+  <img alt="Two arcs, an inner half circle and an outer quarter, with a point on the outer arc picked" src="assets/gallery/arc.png">
+  <span>arc!</span>
+</a>
 <a class="masque-gallery-card" data-dir="plots" data-page="heatmap">
   <img alt="A heatmap of shop visits by weekday and hour, with one cell picked" src="assets/gallery/heatmap.png">
   <span>heatmap! / image!</span>
@@ -161,6 +165,10 @@ types](plots.md) lists every plot that has a page.
 <a class="masque-gallery-card" data-dir="plots" data-page="arrows3d">
   <img alt="Nine arrows in 3D, with one arrow picked" src="assets/gallery/arrows3d.png">
   <span>arrows3d!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="wireframe">
+  <img alt="A hill drawn as a wireframe, with one edge picked" src="assets/gallery/wireframe.png">
+  <span>wireframe!</span>
 </a>
 <a class="masque-gallery-card" data-dir="plots" data-page="streamplot">
   <img alt="A swirling streamplot, with one arrowhead picked" src="assets/gallery/streamplot.png">
@@ -221,24 +229,7 @@ types](plots.md) lists every plot that has a page.
 </div>
 ```
 
-These pages show what `masque(fig)` makes interactive on several plots
-at once.
-
 ```@raw html
-<div class="masque-gallery">
-<a class="masque-gallery-card" data-page="bars">
-  <img alt="Histogram, waterfall, crossbar, and bars with spans, with one histogram bar picked and its tooltip showing" src="assets/gallery/bars.png">
-  <span>Bars and areas</span>
-</a>
-<a class="masque-gallery-card" data-page="polygons">
-  <img alt="Band, density, contour, violin, Voronoi, and box plots, with one Voronoi cell picked" src="assets/gallery/polygons.png">
-  <span>Polygons</span>
-</a>
-<a class="masque-gallery-card" data-page="text">
-  <img alt="Scatter points with Alpha, Beta, Gamma, a tilted label, and an annotation, with Beta picked" src="assets/gallery/text.png">
-  <span>Text labels</span>
-</a>
-</div>
 <script>
 (function () {
   var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
