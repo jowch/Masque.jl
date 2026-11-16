@@ -24,7 +24,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     @test occursin("samples (scatter): 4 points; click, hover; tooltip: index, x, y", text)
     @test occursin("lines: 1 line; hover; tooltip: index, x, y", text)
     @test !occursin("ax2", text)                   # an axis with no layers is left out
-    @test occursin("value: ", text) && occursin("ElementEvent(:scatter, 2", text)
+    @test occursin("starts as: ", text) && !occursin("\nvalue: ", text) && occursin("ElementEvent(:scatter, 2", text)
     @test length(lines_) <= 6 && length(text) < 1000
     @test !occursin(w.b64[1:min(end, 40)], text)
 

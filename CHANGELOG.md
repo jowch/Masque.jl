@@ -33,6 +33,10 @@ All notable changes to this project are documented here. The format is based on
   plots. With an older Makie, Pkg keeps the Masque version you have (#614).
 
 ### Fixed
+- A widget's text form, which an AI agent or the REPL reads in place of the figure, labels its
+  `@bind` value `starts as:`, not `value:`. It shows the value the widget starts with, and a
+  click on the page doesn't change it, so `value:` read as the current value when it wasn't
+  (#637).
 - A `voronoiplot!` cell's `index`, its click's `ev.index` and its entry in `payloads` now follow
   the order of your points: cell `j` is the cell around point `j`, and `payloads` takes one entry
   per point. Before, they followed Makie's internal cell order, which on older Makie differs

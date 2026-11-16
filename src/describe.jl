@@ -56,7 +56,7 @@ function _describe(io::IO, name, w)
         end
     end
     fields = get(m, "fields", ())
-    isempty(fields) || print(io, "\nvalue: ", _clip(sprint(show, initial_bond(w); context = :limit => true), 300))
+    isempty(fields) || print(io, "\nstarts as: ", _clip(sprint(show, initial_bond(w); context = :limit => true), 300))
     return nothing
 end
 
