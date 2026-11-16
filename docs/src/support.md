@@ -226,6 +226,21 @@ has no part for, raises an error that lists the plot's parts. On a
 `stem!`, `payloads = (points = rows,)` gives the points your rows and
 leaves the stems as they are.
 
+A `tooltip` template applies to every part of the plot. To give one
+part a template of its own, such as one that names fields only that
+part's payloads have, key `tooltip` by the part's name the same way:
+
+```julia
+q = qqnorm!(ax, wait; qqline = :fitrobust)
+masque(fig, interactables(q;
+    payloads = (scatter = [(customer = c,) for c in sortperm(wait)],),
+    tooltip = (scatter = masque"Customer $(customer), waited $(y) min",),
+))
+```
+
+The reference line keeps the tooltip Masque gives it, as does any part
+you leave out.
+
 Other plots that Masque builds from the marks they draw have one part,
 under the id in this table:
 
