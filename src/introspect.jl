@@ -589,8 +589,34 @@ function PolygonInteractable(ax, p::Makie.Poly; id = :poly, payloads = nothing, 
     els = _poly_elements(_conv(p)[1])
     rings = [first(e) for e in els]
     holes = [last(e) for e in els]
+    d = _recipe_poly_payloads(_plot_parent(p), p, length(rings))
+    d === nothing || (payloads = _merge_payloads(d, payloads, "PolygonInteractable"))
     return PolygonInteractable(ax, rings; id, payloads, holes, tooltip, label)
 end
+_plot_parent(p) = hasfield(typeof(p), :parent) ? getfield(p, :parent) : nothing
+
+# A `Poly` drawn by a recipe Masque reads through its children (`pie!`, `tricontourf!`,
+# `triplot!`) takes its default payload from that recipe, one per element beside its `index`
+# (#623). `nothing` leaves the bare `(; index)`. A count that doesn't match what was drawn
+# means Makie changed how it draws the recipe, so it errors rather than mislabel the marks.
+_recipe_poly_payloads(parent, p, n) = nothing
+function _recipe_poly_payloads(parent::Makie.Pie, p, n)
+    vals = parent.values[]
+    _recipe_count(parent, length(vals), n)
+    total = sum(Float64, vals; init = 0.0)
+    return Any[(; index = k, value = _short64(v), share = Float64(v) / total) for (k, v) in enumerate(vals)]
+end
+# Bands come out as contourf's do, so they get its `low` and `high`.
+_recipe_poly_payloads(parent::Makie.Tricontourf, p, n) = Any[merge((; index = k), pl) for (k, pl) in enumerate(_contourf_payloads(parent, p))]
+# The triangles are a mesh over every point of the triangulation, in your points' order, so a
+# triangle's faces are indices into the points you passed.
+function _recipe_poly_payloads(parent::Makie.Triplot, p, n)
+    faces = parent.triangle_faces[]
+    _recipe_count(parent, length(faces), n)
+    return Any[(; index = k, vertices = (Int(f[1]), Int(f[2]), Int(f[3]))) for (k, f) in enumerate(faces)]
+end
+_recipe_count(parent, m, n) = m == n ||
+    error("$(typeof(parent).name.name) introspection: $m marks but $n drawn polygons (Makie internals changed?)")
 
 # Ring = lower curve followed by the reversed upper curve, in data space. Open ring (last
 # vertex ≠ first); the :polygons even-odd hit-test closes it implicitly.
@@ -818,12 +844,54 @@ function _place_data_markers(i::PolygonInteractable, p, f)
     return PolygonInteractable(i.ax, rings, i.id, i.payloads, i.tooltip, i.label, i.holes, i.tol, i.select)
 end
 
-# Cells come back in tessellation order, not input-site order, so there's no cheap
-# cell→generator mapping; default payload is (; index) only.
+# Cells come back in tessellation order, not input-site order. Each cell holds exactly one
+# site, so a cell's site is the one inside it; its default payload is that site's `x`, `y`
+# and, when the cells are coloured by values (`voronoiplot!(xs, ys, zs)` or a `color`
+# vector), its `value` (#623).
 function PolygonInteractable(ax, p::Makie.Voronoiplot; id = :voronoiplot, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     poly = _descendant(p, Makie.Poly)
     rings = _poly_exterior_rings(_conv(poly)[1])
+    d = _voronoi_payloads(ax, p, rings)
+    d === nothing || (payloads = _merge_payloads(_unconvert_payloads(ax, d), payloads, "PolygonInteractable"))
     return PolygonInteractable(ax, rings; id, payloads, tooltip, label)
+end
+function _voronoi_payloads(ax, p, rings)
+    args = _converted(p)
+    args[1] isa AbstractVector{<:Makie.VecTypes} || return nothing   # a tessellation passed in
+    sites = args[1]
+    vals = if length(eltype(sites)) == 3
+        [s[3] for s in sites]
+    else
+        c = p.color[]
+        c isa AbstractVector{<:Real} && length(c) == length(sites) ? c : nothing
+    end
+    tsites = [Makie.Point2d(_apply_transform(_transform_func(ax.scene), Makie.Point2d(s[1], s[2]))) for s in sites]
+    out = Any[]
+    for (k, ring) in enumerate(rings)
+        j = findfirst(t -> _in_ring(t, ring), tsites)
+        j === nothing && return nothing
+        s = sites[j]
+        pl = (; index = k, x = _short64(s[1]), y = _short64(s[2]))
+        push!(out, vals === nothing ? pl : merge(pl, (; value = _short64(vals[j]))))
+    end
+    return out
+end
+# Even-odd point-in-ring, with a bounding-box test first: most cells are far from a site.
+function _in_ring(pt, ring)
+    x, y = pt[1], pt[2]
+    lo, hi = extrema(q -> q[1], ring)
+    lo <= x <= hi || return false
+    lo, hi = extrema(q -> q[2], ring)
+    lo <= y <= hi || return false
+    inside = false
+    n = length(ring)
+    for i in 1:n
+        a, b = ring[i], ring[mod1(i + 1, n)]
+        if (a[2] > y) != (b[2] > y) && x < (b[1] - a[1]) * (y - a[2]) / (b[2] - a[2]) + a[1]
+            inside = !inside
+        end
+    end
+    return inside
 end
 
 # Stats come from Makie's computed-stats node (converted is a 4-tuple centers/medians/q1s/q3s,

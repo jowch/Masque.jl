@@ -1557,9 +1557,52 @@ end
         pi = PolygonInteractable(ax, p; id = :voronoiplot)
         @test length(pi.rings) == 8                        # one cell per generator site
         @test all(isempty, pi.holes)                       # cells have no interiors; the shared helper stays exterior-only
-        @test pi.payloads == Any[(; index = k) for k in 1:8]   # cell order ≠ site order → index only
+        # Cells come in tessellation order; each names the site inside it (#623).
+        xs, ys = [0.1, 0.4, 0.7, 0.3, 0.9, 0.5, 0.2, 0.8], [0.2, 0.6, 0.1, 0.9, 0.4, 0.5, 0.8, 0.3]
+        @test sort([(pl.x, pl.y) for pl in pi.payloads]) == sort(collect(zip(xs, ys)))
+        @test all(k -> pi.payloads[k].index == k, 1:8)
+        @test all(k -> IP._in_ring(Point2f(pi.payloads[k].x, pi.payloads[k].y), pi.rings[k]), 1:8)
+        @test IP._coord_keys(pi.payloads) == [:x => :x, :y => :y]
         ints = interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
+        # Coloured by values: each cell carries its own site's value.
+        fz = Figure(); az = Axis(fz[1, 1])
+        pz = voronoiplot!(az, xs, ys, 10 .* xs)
+        Makie.update_state_before_display!(fz)
+        @test all(pl -> pl.value ≈ 10 * pl.x, PolygonInteractable(az, pz).payloads)
+        fc = Figure(); ac = Axis(fc[1, 1])
+        pc = voronoiplot!(ac, xs, ys; color = 100 .* ys)
+        Makie.update_state_before_display!(fc)
+        @test all(pl -> pl.value ≈ 100 * pl.y, PolygonInteractable(ac, pc).payloads)
+    end
+
+    @testset "pie, tricontourf and triplot report what they draw (#623)" begin
+        f = Figure(); a = Axis(f[1, 1])
+        pp = pie!(a, [3, 2, 1])
+        Makie.update_state_before_display!(f)
+        ip = only(interactables(f))
+        @test ip.payloads == Any[(; index = 1, value = 3.0, share = 0.5), (; index = 2, value = 2.0, share = 2 / 6), (; index = 3, value = 1.0, share = 1 / 6)]
+        # A user's payload merges onto the slice's fields.
+        iu = only(interactables(a, pp; payloads = [(; name = "a"), (; name = "b"), (; name = "c")]))
+        @test iu.payloads[2] == (; name = "b", value = 2.0, share = 2 / 6)
+
+        ft = Figure(); at = Axis(ft[1, 1])
+        pts = [Point2f(0, 0), Point2f(1, 0), Point2f(0, 1), Point2f(1, 1)]
+        triplot!(at, pts)
+        Makie.update_state_before_display!(ft)
+        it = only(interactables(ft))
+        @test length(it.payloads) == 2
+        # Each triangle's vertices index your points, and its ring is those three points.
+        for (pl, ring) in zip(it.payloads, it.rings)
+            @test Set(Point2f(q[1], q[2]) for q in ring) == Set(pts[collect(pl.vertices)])
+        end
+
+        fc = Figure(); ac = Axis(fc[1, 1])
+        tricontourf!(ac, [0.0, 1.0, 0.0, 1.0, 0.5], [0.0, 0.0, 1.0, 1.0, 0.5], [0.0, 1.0, 1.0, 2.0, 1.0]; levels = [0.0, 1.0, 2.0])
+        Makie.update_state_before_display!(fc)
+        ic = only(interactables(fc))
+        @test all(pl -> haskey(pl, :index) && pl.high > pl.low, ic.payloads)
+        @test sort(unique([(round(pl.low; digits = 4), round(pl.high; digits = 4)) for pl in ic.payloads])) == [(0.0, 1.0), (1.0, 2.0)]
     end
 
     @testset "Hexbin extraction" begin

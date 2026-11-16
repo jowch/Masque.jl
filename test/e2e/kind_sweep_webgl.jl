@@ -604,6 +604,46 @@ HTML(
         "<span id=\"coords_spy\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.spy)))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-00000000a630
+@bind ev_pie sweep.pie
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a631
+HTML(
+    "<span id=\"out_pie\">PIE=$(sweep_field("pie", ev_pie))</span>" *
+        "<span id=\"bond_pie\" style=\"display:none\">$(repr(ev_pie))</span>" *
+        "<span id=\"coords_pie\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.pie)))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a632
+@bind ev_voronoi sweep.voronoi
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a633
+HTML(
+    "<span id=\"out_voronoi\">VORONOI=$(sweep_field("voronoi", ev_voronoi))</span>" *
+        "<span id=\"bond_voronoi\" style=\"display:none\">$(repr(ev_voronoi))</span>" *
+        "<span id=\"coords_voronoi\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.voronoi)))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a634
+@bind ev_triplot sweep.triplot
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a635
+HTML(
+    "<span id=\"out_triplot\">TRIPLOT=$(sweep_field("triplot", ev_triplot))</span>" *
+        "<span id=\"bond_triplot\" style=\"display:none\">$(repr(ev_triplot))</span>" *
+        "<span id=\"coords_triplot\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.triplot)))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a636
+@bind ev_tricontourf sweep.tricontourf
+
+# ╔═╡ d1000000-0000-0000-0000-00000000a637
+HTML(
+    "<span id=\"out_tricontourf\">TRICONTOURF=$(sweep_field("tricontourf", ev_tricontourf))</span>" *
+        "<span id=\"bond_tricontourf\" style=\"display:none\">$(repr(ev_tricontourf))</span>" *
+        "<span id=\"coords_tricontourf\" style=\"display:none\">$(JSON3.write(coords_layers(sweep.tricontourf)))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-00000000a61a
 @bind ev_ablines sweep.ablines
 
@@ -1333,6 +1373,14 @@ HTML(
 # ╟─d1000000-0000-0000-0000-00000000a620
 # ╠═d1000000-0000-0000-0000-00000000a621
 # ╟─d1000000-0000-0000-0000-00000000a622
+# ╠═d1000000-0000-0000-0000-00000000a630
+# ╟─d1000000-0000-0000-0000-00000000a631
+# ╠═d1000000-0000-0000-0000-00000000a632
+# ╟─d1000000-0000-0000-0000-00000000a633
+# ╠═d1000000-0000-0000-0000-00000000a634
+# ╟─d1000000-0000-0000-0000-00000000a635
+# ╠═d1000000-0000-0000-0000-00000000a636
+# ╟─d1000000-0000-0000-0000-00000000a637
 # ╠═d1000000-0000-0000-0000-00000000a61a
 # ╟─d1000000-0000-0000-0000-00000000a61f
 # ╠═d1000000-0000-0000-0000-0000000000b5

@@ -209,7 +209,9 @@ by building the manifest from the plot object and from its bare vertices, which 
 random data, so the layer grows ~2.6× (1 000 segments 37.8 → 98.8 KB, 10 000 segments
 382 → 993 KB). Rounder data writes shorter numbers. A segment carries two points, so this is
 about twice a `scatter!` point (above). `errorbars!`, `rangebars!`, `hlines!`, `vlines!` and
-`ablines!` add two to four numbers per mark and, like bars, are low-N.
+`ablines!` add two to four numbers per mark and, like bars, are low-N. Since #623 a `voronoiplot!` cell adds its site's `x` and `y` (and `value`), two or three
+numbers, so a 1 000-cell plot grows by tens of KB. `pie!`, `triplot!` and `tricontourf!` add two
+or three small numbers per mark (not re-benched).
 
 Bars, spans, and text are low-N by nature (tens to hundreds of elements), so their per-element
 payloads never move the envelope. A high-cell `voronoiplot!` (1 000 cells) would reach
