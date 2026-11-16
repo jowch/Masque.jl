@@ -11,7 +11,7 @@ include("player_segments.jl")
 # JSON.jl 1.9 loads Parsers 3 into this process, and Julia can only bind one
 # Parsers per UUID, so harvest writes through JSON.jl instead.
 const _JSON = Base.require(Base.PkgId(Base.UUID("682c06a0-de6a-54ab-a142-c8b1cf79cde6"), "JSON"))
-json_write(x) = _JSON.json(x)
+json_write(x) = _JSON.json(x; allownan = true)
 json_read(s::AbstractString) = _JSON.parse(s)
 
 const PLAYER_TOML_RE = r"PLUTO_PLAYER_TOML_CONTENTS\s*=\s*\"\"\"(.*?)\"\"\""s

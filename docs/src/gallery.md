@@ -90,6 +90,30 @@ types](plots.md) lists every plot that has a page.
   <img alt="A price line with two shaded spans, the first one picked" src="assets/gallery/hspan.png">
   <span>hspan! / vspan!</span>
 </a>
+<a class="masque-gallery-card" data-dir="plots" data-page="lines">
+  <img alt="Daily temperature in two cities, with the warmest hour picked" src="assets/gallery/lines.png">
+  <span>lines!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="series">
+  <img alt="Weekly sales of three products, with one week of one product picked" src="assets/gallery/series.png">
+  <span>series!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="stairs">
+  <img alt="Staff on shift by day as a staircase, with one step picked" src="assets/gallery/stairs.png">
+  <span>stairs!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="scatterlines">
+  <img alt="Visitors by month as points joined by a line, with the busiest month picked" src="assets/gallery/scatterlines.png">
+  <span>scatterlines!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="ecdfplot">
+  <img alt="The cumulative share of trains by delay, with one step picked" src="assets/gallery/ecdfplot.png">
+  <span>ecdfplot!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="contour">
+  <img alt="Contours of a hill's height, with a point on the outer contour picked" src="assets/gallery/contour.png">
+  <span>contour!</span>
+</a>
 </div>
 ```
 

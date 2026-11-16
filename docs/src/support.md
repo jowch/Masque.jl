@@ -85,7 +85,7 @@ and `PolarAxis`. Constructor signatures and default fields are in
 |---|---|---|---|---|
 | `scatter!` | `:scatter` | `:circles` | yes | yes |
 | `meshscatter!` | `:meshscatter` | `:circles` | yes | — |
-| `lines!` | `:lines` | `:lines` | yes | yes |
+| [`lines!`](plots/lines.md) | `:lines` | `:lines` | yes | yes |
 | `linesegments!` | `:segments` | `:segments` | yes | yes |
 | `wireframe!` | `:wireframe` | `:segments` | yes | — |
 | `arrows3d!` (`Arrows3D`) | `:arrows3d` | `:segments` | yes | — |
@@ -94,8 +94,8 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | `surface!` | `:surface` | `:surface` | yes | yes |
 | [`barplot!`](plots/barplot.md) | `:bars` | `:rects` | — | — |
 | `poly!` | `:poly` | `:polygons` | — | — |
-| `stairs!` | `:stairs` | `:lines` | — | — |
-| `series!` | `:series` | `:lines` | — | yes |
+| [`stairs!`](plots/stairs.md) | `:stairs` | `:lines` | — | — |
+| [`series!`](plots/series.md) | `:series` | `:lines` | — | yes |
 | `errorbars!` | `:errorbars` | `:segments` | — | — |
 | `rangebars!` | `:rangebars` | `:segments` | — | — |
 | `hlines!` / `vlines!` | `:hlines` / `:vlines` | `:segments` | — | — |
@@ -111,7 +111,7 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | `voronoiplot!` | `:voronoiplot` | `:polygons` | — | — |
 | `hexbin!` | `:hexbin` | `:polygons` | — | — |
 | `stem!` | `stem.points` + `stem.stems` | `:circles` + `:segments` | — | — |
-| `scatterlines!` | `scatterlines.points` + `scatterlines.line` | `:circles` + `:lines` | yes | yes |
+| [`scatterlines!`](plots/scatterlines.md) | `scatterlines.points` + `scatterlines.line` | `:circles` + `:lines` | yes | yes |
 | [`boxplot!`](plots/boxplot.md) | `:boxplot` | `:rects` or `:polygons` (body only) | — | — |
 | `text!` | `:text` | `:rects` | yes | — |
 | `annotation!` | `:annotation` | `:rects` | — | — |
@@ -175,12 +175,12 @@ a click reports the mark's place in that order as its `index`, so
 |---|---|---|---|
 | `stem!` | `points` | one point | the order of your data |
 | | `stems` | one stem | the order of your data |
-| `scatterlines!` | `points` | one point | the order of your data |
+| [`scatterlines!`](plots/scatterlines.md) | `points` | one point | the order of your data |
 | | `line` | the whole line | — |
 | [`rainclouds!`](plots/rainclouds.md) | `scatter` | one raindrop, for one observation | the order of your data |
 | | `violin` | one violin per category | left to right along the axis |
 | | `boxplot` | one box per category | left to right along the axis |
-| `contour!` with `labels = true` | `lines` | every contour line together | — |
+| [`contour!`](plots/contour.md) with `labels = true` | `lines` | every contour line together | — |
 | | `text` | one label | the order Makie draws them, which you don't set |
 | [`qqplot!`](plots/qqplot.md) / [`qqnorm!`](plots/qqplot.md) with a `qqline` | `scatter` | one point | smallest quantile first |
 | | `segments` | the reference line | — |
@@ -231,10 +231,10 @@ under the id in this table:
 
 | Plot | Layer `id` | One mark is |
 |---|---|---|
-| `contour!` / `contour3d!` without labels | `:lines` | every contour line together |
+| [`contour!`](plots/contour.md) / `contour3d!` without labels | `:lines` | every contour line together |
 | `tricontourf!` | `:poly` | one filled region, so a level split into pieces gives one mark per piece |
 | `triplot!` | `:poly` | one triangle |
 | `pie!` | `:poly` | one slice, in the order of your values |
 | `ablines!` | `:segments` | one line, in the order you give them |
-| `ecdfplot!` | `:stairs` | the whole curve |
+| [`ecdfplot!`](plots/ecdfplot.md) | `:stairs` | the whole curve |
 | `arc!` | `:lines` | the whole arc |

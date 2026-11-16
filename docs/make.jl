@@ -95,6 +95,14 @@ makedocs(;
                 "crossbar!" => "plots/crossbar.md",
                 "hspan! / vspan!" => "plots/hspan.md",
             ],
+            "Lines" => [
+                "lines!" => "plots/lines.md",
+                "series!" => "plots/series.md",
+                "stairs!" => "plots/stairs.md",
+                "scatterlines!" => "plots/scatterlines.md",
+                "ecdfplot!" => "plots/ecdfplot.md",
+                "contour!" => "plots/contour.md",
+            ],
         ],
         "Examples" => [
             "Examples" => "gallery.md",

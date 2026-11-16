@@ -39,6 +39,12 @@ const CARDS = [
   { out: "waterfall", embed: "plots_waterfall", moves: [["click", 0, 0.6, 0.32], ["leave"]] },
   { out: "crossbar", embed: "plots_crossbar", moves: [["click", 0, 0.4, 0.5], ["leave"]] },
   { out: "hspan", embed: "plots_hspan", moves: [["click", 0, 0.36, 0.5], ["leave"]] },
+  { out: "lines", embed: "plots_lines", moves: [["click", 0, 0.663, 0.088], ["leave"]] },
+  { out: "series", embed: "plots_series", moves: [["click", 0, 0.51, 0.358], ["leave"]] },
+  { out: "stairs", embed: "plots_stairs", moves: [["click", 0, 0.49, 0.36], ["leave"]] },
+  { out: "scatterlines", embed: "plots_scatterlines", moves: [["click", 0, 0.823, 0.084], ["leave"]] },
+  { out: "ecdfplot", embed: "plots_ecdfplot", moves: [["click", 0, 0.29, 0.43], ["leave"]] },
+  { out: "contour", embed: "plots_contour", moves: [["click", 0, 0.544, 0.11], ["leave"]] },
 ];
 
 const browser = await chromium.launch({ headless: true });
