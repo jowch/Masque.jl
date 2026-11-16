@@ -53,6 +53,10 @@ const CARDS = [
   { out: "contourf", embed: "plots_contourf", moves: [["click", 0, 0.3, 0.45], ["leave"]] },
   { out: "hexbin", embed: "plots_hexbin", moves: [["click", 0, 0.4, 0.5], ["leave"]] },
   { out: "datashader", embed: "plots_datashader", moves: [["hover", 0, 0.5, 0.2]] },
+  { out: "points3d", embed: "plots_points3d", moves: [["click", 0, 0.558, 0.22], ["leave"]] },
+  { out: "surface", embed: "plots_surface", moves: [["hover", 0, 0.5, 0.39]] },
+  { out: "arrows3d", embed: "plots_arrows3d", moves: [["click", 0, 0.73, 0.47], ["leave"]] },
+  { out: "streamplot", embed: "plots_streamplot", moves: [["click", 0, 0.56, 0.155], ["leave"]] },
 ];
 
 const browser = await chromium.launch({ headless: true });
