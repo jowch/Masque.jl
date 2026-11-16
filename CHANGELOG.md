@@ -33,6 +33,11 @@ All notable changes to this project are documented here. The format is based on
   plots. With an older Makie, Pkg keeps the Masque version you have (#614).
 
 ### Fixed
+- A `voronoiplot!` cell's `index`, its click's `ev.index` and its entry in `payloads` now follow
+  the order of your points: cell `j` is the cell around point `j`, and `payloads` takes one entry
+  per point. Before, they followed Makie's internal cell order, which on older Makie differs
+  from your points' order, so a label could land on the wrong cell. Duplicate points no longer
+  shift later cells' `index` or make `payloads` one entry too long (#634).
 - In a `waterfall!` plot with `show_final = true`, each bar now answers for its own step, with
   that step's `low` and `high`. Before, every bar took the hit area and values of the
   final-total bar (#618).

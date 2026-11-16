@@ -207,7 +207,8 @@ export function hitLayerByIndex(layer: HitLayer, index: number): Omit<Hit, "laye
 // mouse can never reach.
 // Element k is not on screen: a :polyline edge touching a NaN gap, or, once a zoomed Axis3
 // clips it (#321), a :segments pair, :circles centre, or whole :lines path with no finite spot,
-// or a :rects box (a text label whose anchor an Axis3 clips).
+// or a :rects box (a text label whose anchor an Axis3 clips), or a :polygons element with no
+// vertex (an empty Voronoi cell).
 export function isGapElement(layer: HitLayer, k: number): boolean {
     switch (layer.kind) {
         case "polyline": {
@@ -224,6 +225,8 @@ export function isGapElement(layer: HitLayer, k: number): boolean {
             return Number.isNaN((layer.geometry as number[])[4 * k])
         case "lines":
             return !((layer.geometry as number[][])[k] ?? []).some((v) => Number.isFinite(v))
+        case "polygons": // an empty cell: a voronoiplot! site with no cell (#634) or one a clip emptied
+            return !polygonRings((layer.geometry as (number[] | number[][])[])[k] ?? []).some((r) => r.some((v) => Number.isFinite(v)))
         default:
             return false
     }
