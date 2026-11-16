@@ -19,6 +19,9 @@ All notable changes to this project are documented here. The format is based on
   plots. With an older Makie, Pkg keeps the Masque version you have (#614).
 
 ### Fixed
+- In a `waterfall!` plot with `show_final = true`, each bar now answers for its own step, with
+  that step's `low` and `high`. Before, every bar took the hit area and values of the
+  final-total bar (#618).
 - `masque(fig; payloads = …)`, and any other keyword `masque` doesn't take, raises an error that
   says where the keyword goes, instead of a `MethodError` from inside Masque (#600).
 - A box plot's tooltip and `@bind` value now say which category the box is, as `x` (`y` for a
