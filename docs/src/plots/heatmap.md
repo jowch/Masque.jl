@@ -66,9 +66,9 @@ takes it out again:
 Main.masque_fallback("plots_heatmap"; segment = "many")
 ```
 
-The `@bind` value is then a [`GridSelection`](@ref): a mask the size of
-your matrix, so `visits[sel]` is the selected values and `findall(sel)`
-their places. [Heatmaps and images](@ref) shows how to pick a block of
+With `@bind sel` in front, `sel.cells` is then a [`GridSelection`](@ref):
+a mask the size of your matrix, so `visits[sel.cells]` is the selected
+values and `findall(sel.cells)` their places. [Heatmaps and images](@ref) shows how to pick a block of
 cells by dragging, and how to treat a group of cells as one region.
 
 ## Images

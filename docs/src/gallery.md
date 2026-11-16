@@ -129,6 +129,7 @@ types](plots.md) lists every plot that has a page.
 <a class="masque-gallery-card" data-dir="plots" data-page="contour">
   <img alt="Contours of a hill's height, with a point on the outer contour picked" src="assets/gallery/contour.png">
   <span>contour!</span>
+</a>
 <a class="masque-gallery-card" data-dir="plots" data-page="heatmap">
   <img alt="A heatmap of shop visits by weekday and hour, with one cell picked" src="assets/gallery/heatmap.png">
   <span>heatmap! / image!</span>
