@@ -51,7 +51,7 @@ too. Every payload ships with the page, so on a large grid a template
 that uses only `i`, `j` and `value` keeps the page small. [Tooltips](@ref)
 lists what a template can do.
 
-## Select several cells
+## Pick several cells
 
 Pass `select = :many`, and each click adds a cell to the selection or
 takes it out again:
