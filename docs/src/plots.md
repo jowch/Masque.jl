@@ -26,6 +26,10 @@ add for the parts that don't respond on their own.
 | [`scatterlines!`](plots/scatterlines.md) | lines | each point, and the line's tooltip |
 | [`ecdfplot!`](plots/ecdfplot.md) | lines | the curve, and the step nearest the pointer |
 | [`contour!`](plots/contour.md) | lines | all contours as one line, and each label |
+| [`heatmap!`, `image!`](plots/heatmap.md) | grid | each cell |
+| [`contourf!`](plots/contourf.md) | grid | each filled region |
+| [`hexbin!`](plots/hexbin.md) | grid | each hexagon |
+| [`datashader!`](plots/datashader.md) | grid | each pixel |
 
 For every plot Masque supports, and the axes each one works on, see
 [Supported plots and axes](@ref).

@@ -109,6 +109,12 @@ makedocs(;
                 "ecdfplot!" => "plots/ecdfplot.md",
                 "contour!" => "plots/contour.md",
             ],
+            "Grids" => [
+                "heatmap! / image!" => "plots/heatmap.md",
+                "contourf!" => "plots/contourf.md",
+                "hexbin!" => "plots/hexbin.md",
+                "datashader!" => "plots/datashader.md",
+            ],
         ],
         "Examples" => [
             "Examples" => "gallery.md",

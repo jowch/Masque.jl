@@ -41,8 +41,8 @@ these fields:
 | [`crossbar!`](plots/crossbar.md) | `midpoint`, `low`, `high` |
 | `poly!`, bands, densities, Voronoi cells | `index` only: the polygon's position in the order you plotted them |
 | [`violin!`](plots/violin.md) | `x`, the violin's category (`y` for a horizontal violin) |
-| `contourf!` | `low` and `high` of the level |
-| `hexbin!` | `x` and `y`, the hexagon's center, and `count` |
+| [`contourf!`](plots/contourf.md) | `low` and `high` of the level |
+| [`hexbin!`](plots/hexbin.md) | `x` and `y`, the hexagon's center, and `count` |
 | [`scatter!`](plots/scatter.md) on a `PolarAxis` | `x` is the angle and `y` the radius, in the order you passed them |
 | [`lines!`](plots/lines.md), [`series!`](plots/series.md), [`stairs!`](plots/stairs.md), on an `Axis` or a `PolarAxis` | the plotted point nearest the click, once the line is in `bind` (see Lines below) |
 
