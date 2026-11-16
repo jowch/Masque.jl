@@ -59,7 +59,7 @@ types](plots.md) lists every plot that has a page.
   <span>meshscatter!</span>
 </a>
 <a class="masque-gallery-card" data-dir="plots" data-page="text">
-  <img alt="City names placed by longitude and latitude, with Berlin picked" src="assets/gallery/text-plot.png">
+  <img alt="City names placed by longitude and latitude, with Berlin picked" src="assets/gallery/text.png">
   <span>text!</span>
 </a>
 <a class="masque-gallery-card" data-dir="plots" data-page="annotation">

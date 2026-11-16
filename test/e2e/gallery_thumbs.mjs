@@ -28,7 +28,7 @@ const CARDS = [
   { out: "image", embed: "gallery_image", moves: [["hover", 0, 0.46, 0.57]] },
   { out: "scatter", embed: "plots_scatter", moves: [["click", 0, 0.723, 0.224], ["leave"]] },
   { out: "meshscatter", embed: "plots_meshscatter", moves: [["click", 0, 0.596, 0.43], ["leave"]] },
-  { out: "text-plot", embed: "plots_text", moves: [["click", 0, 0.785, 0.15], ["leave"]] },
+  { out: "text", embed: "plots_text", moves: [["click", 0, 0.785, 0.15], ["leave"]] },
   { out: "annotation", embed: "plots_annotation", moves: [["click", 0, 0.76, 0.77], ["leave"]] },
   { out: "violin", embed: "plots_violin", moves: [["click", 0, 0.52, 0.4], ["leave"]] },
   { out: "boxplot", embed: "plots_boxplot", moves: [["click", 0, 0.54, 0.4], ["leave"]] },
