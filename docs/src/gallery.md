@@ -66,6 +66,54 @@ types](plots.md) lists every plot that has a page.
   <img alt="Two overlapping height densities, with the blue one picked" src="assets/gallery/density.png">
   <span>density!</span>
 </a>
+<a class="masque-gallery-card" data-dir="plots" data-page="qqplot">
+  <img alt="A normal Q-Q plot of wait times, with the highest point picked" src="assets/gallery/qqplot.png">
+  <span>qqplot!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="barplot">
+  <img alt="Four bars of crates sold, with the apples bar picked" src="assets/gallery/barplot.png">
+  <span>barplot!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="hist">
+  <img alt="A histogram of heights, with one bin picked" src="assets/gallery/hist.png">
+  <span>hist!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="waterfall">
+  <img alt="A waterfall of income and costs, with the wages bar picked" src="assets/gallery/waterfall.png">
+  <span>waterfall!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="crossbar">
+  <img alt="Four crossbars of response by dose, with the 10 mg one picked" src="assets/gallery/crossbar.png">
+  <span>crossbar!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="hspan">
+  <img alt="A price line with two shaded spans, the first one picked" src="assets/gallery/hspan.png">
+  <span>hspan! / vspan!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="lines">
+  <img alt="Daily temperature in two cities, with the warmest hour picked" src="assets/gallery/lines.png">
+  <span>lines!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="series">
+  <img alt="Weekly sales of three products, with one week of one product picked" src="assets/gallery/series.png">
+  <span>series!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="stairs">
+  <img alt="Staff on shift by day as a staircase, with one step picked" src="assets/gallery/stairs.png">
+  <span>stairs!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="scatterlines">
+  <img alt="Visitors by month as points joined by a line, with the busiest month picked" src="assets/gallery/scatterlines.png">
+  <span>scatterlines!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="ecdfplot">
+  <img alt="The cumulative share of trains by delay, with one step picked" src="assets/gallery/ecdfplot.png">
+  <span>ecdfplot!</span>
+</a>
+<a class="masque-gallery-card" data-dir="plots" data-page="contour">
+  <img alt="Contours of a hill's height, with a point on the outer contour picked" src="assets/gallery/contour.png">
+  <span>contour!</span>
+</a>
 </div>
 ```
 

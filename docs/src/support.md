@@ -85,34 +85,34 @@ and `PolarAxis`. Constructor signatures and default fields are in
 |---|---|---|---|---|
 | `scatter!` | `:scatter` | `:circles` | yes | yes |
 | `meshscatter!` | `:meshscatter` | `:circles` | yes | — |
-| `lines!` | `:lines` | `:lines` | yes | yes |
+| [`lines!`](plots/lines.md) | `:lines` | `:lines` | yes | yes |
 | `linesegments!` | `:segments` | `:segments` | yes | yes |
 | `wireframe!` | `:wireframe` | `:segments` | yes | — |
 | `arrows3d!` (`Arrows3D`) | `:arrows3d` | `:segments` | yes | — |
 | `arrows2d!` (`Arrows2D`) | `:arrows2d` | `:segments` | — | — |
 | `heatmap!` / `image!` | `:cells` | `:grid` | — | — |
 | `surface!` | `:surface` | `:surface` | yes | yes |
-| `barplot!` | `:bars` | `:rects` | — | — |
+| [`barplot!`](plots/barplot.md) | `:bars` | `:rects` | — | — |
 | `poly!` | `:poly` | `:polygons` | — | — |
-| `stairs!` | `:stairs` | `:lines` | — | — |
-| `series!` | `:series` | `:lines` | — | yes |
+| [`stairs!`](plots/stairs.md) | `:stairs` | `:lines` | — | — |
+| [`series!`](plots/series.md) | `:series` | `:lines` | — | yes |
 | `errorbars!` | `:errorbars` | `:segments` | — | — |
 | `rangebars!` | `:rangebars` | `:segments` | — | — |
 | `hlines!` / `vlines!` | `:hlines` / `:vlines` | `:segments` | — | — |
 | `spy!` | `:spy` | `:rects` | — | — |
-| `hist!` | `:hist` | `:rects` | — | — |
-| `waterfall!` | `:waterfall` | `:rects` | — | — |
-| `crossbar!` | `:crossbar` | `:rects` | — | — |
-| `hspan!` / `vspan!` | `:hspan` / `:vspan` | `:rects` | — | — |
+| [`hist!`](plots/hist.md) | `:hist` | `:rects` | — | — |
+| [`waterfall!`](plots/waterfall.md) | `:waterfall` | `:rects` | — | — |
+| [`crossbar!`](plots/crossbar.md) | `:crossbar` | `:rects` | — | — |
+| [`hspan!`](plots/hspan.md) / [`vspan!`](plots/hspan.md) | `:hspan` / `:vspan` | `:rects` | — | — |
 | `band!` | `:band` | `:polygons` | — | — |
-| `density!` | `:density` | `:polygons` | — | — |
+| [`density!`](plots/density.md) | `:density` | `:polygons` | — | — |
 | `contourf!` | `:contourf` | `:polygons` | — | — |
-| `violin!` | `:violin` | `:polygons` | — | — |
+| [`violin!`](plots/violin.md) | `:violin` | `:polygons` | — | — |
 | `voronoiplot!` | `:voronoiplot` | `:polygons` | — | — |
 | `hexbin!` | `:hexbin` | `:polygons` | — | — |
 | `stem!` | `stem.points` + `stem.stems` | `:circles` + `:segments` | — | — |
-| `scatterlines!` | `scatterlines.points` + `scatterlines.line` | `:circles` + `:lines` | yes | yes |
-| `boxplot!` | `:boxplot` | `:rects` or `:polygons` (body only) | — | — |
+| [`scatterlines!`](plots/scatterlines.md) | `scatterlines.points` + `scatterlines.line` | `:circles` + `:lines` | yes | yes |
+| [`boxplot!`](plots/boxplot.md) | `:boxplot` | `:rects` or `:polygons` (body only) | — | — |
 | `text!` | `:text` | `:rects` | yes | — |
 | `annotation!` | `:annotation` | `:rects` | — | — |
 | `Colorbar` (block) | `:colorbar` | `:axis` | yes | yes |
@@ -121,7 +121,7 @@ and `PolarAxis`. Constructor signatures and default fields are in
 Each `lines!` and `stairs!` plot is one element for its whole line, and
 `series!` has one element per series. Hovering a line shows the point
 you plotted nearest the pointer, and a click on a line named in `bind`
-picks that point. A `stairs!` on an `Axis3` responds as one whole line.
+picks that point.
 Only the body of a `boxplot!` responds, not its whiskers or outliers,
 and an `annotation!` responds on its text. In a `contourf!` plot, hovering inside a hole of a filled
 level reaches nothing unless another level is drawn there. A `scatter!`
@@ -175,14 +175,14 @@ a click reports the mark's place in that order as its `index`, so
 |---|---|---|---|
 | `stem!` | `points` | one point | the order of your data |
 | | `stems` | one stem | the order of your data |
-| `scatterlines!` | `points` | one point | the order of your data |
+| [`scatterlines!`](plots/scatterlines.md) | `points` | one point | the order of your data |
 | | `line` | the whole line | — |
-| `rainclouds!` | `scatter` | one raindrop, for one observation | the order of your data |
+| [`rainclouds!`](plots/rainclouds.md) | `scatter` | one raindrop, for one observation | the order of your data |
 | | `violin` | one violin per category | left to right along the axis |
 | | `boxplot` | one box per category | left to right along the axis |
-| `contour!` with `labels = true` | `lines` | every contour line together | — |
+| [`contour!`](plots/contour.md) with `labels = true` | `lines` | every contour line together | — |
 | | `text` | one label | the order Makie draws them, which you don't set |
-| `qqplot!` / `qqnorm!` with a `qqline` | `scatter` | one point | smallest quantile first |
+| [`qqplot!`](plots/qqplot.md) / [`qqnorm!`](plots/qqplot.md) with a `qqline` | `scatter` | one point | smallest quantile first |
 | | `segments` | the reference line | — |
 | `streamplot!` | `scatter` | one arrowhead | the order Makie draws them, which you don't set |
 | | `lines` | every streamline together | — |
@@ -246,10 +246,10 @@ under the id in this table:
 
 | Plot | Layer `id` | One mark is |
 |---|---|---|
-| `contour!` / `contour3d!` without labels | `:lines` | every contour line together |
+| [`contour!`](plots/contour.md) / `contour3d!` without labels | `:lines` | every contour line together |
 | `tricontourf!` | `:poly` | one filled region, so a level split into pieces gives one mark per piece |
 | `triplot!` | `:poly` | one triangle |
 | `pie!` | `:poly` | one slice, in the order of your values |
 | `ablines!` | `:segments` | one line, in the order you give them |
-| `ecdfplot!` | `:stairs` | the whole curve |
+| [`ecdfplot!`](plots/ecdfplot.md) | `:stairs` | the whole curve |
 | `arc!` | `:lines` | the whole arc |

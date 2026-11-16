@@ -86,6 +86,22 @@ makedocs(;
                 "boxplot!" => "plots/boxplot.md",
                 "rainclouds!" => "plots/rainclouds.md",
                 "density!" => "plots/density.md",
+                "qqplot! / qqnorm!" => "plots/qqplot.md",
+            ],
+            "Bars" => [
+                "barplot!" => "plots/barplot.md",
+                "hist!" => "plots/hist.md",
+                "waterfall!" => "plots/waterfall.md",
+                "crossbar!" => "plots/crossbar.md",
+                "hspan! / vspan!" => "plots/hspan.md",
+            ],
+            "Lines" => [
+                "lines!" => "plots/lines.md",
+                "series!" => "plots/series.md",
+                "stairs!" => "plots/stairs.md",
+                "scatterlines!" => "plots/scatterlines.md",
+                "ecdfplot!" => "plots/ecdfplot.md",
+                "contour!" => "plots/contour.md",
             ],
         ],
         "Examples" => [
