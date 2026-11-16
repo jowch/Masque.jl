@@ -1,0 +1,1 @@
+{"cells":{"c0a10004-0001-4000-8000-000000000004":{"body":{"elements":[["sine",["ElementEvent(:sine, 1, line = 1, x = 0.0, y = 0.0)","text/plain"]],["cosine",["ElementEvent(:cosine, 6, line = 1, x = 2.5, y = -0.801144)","text/plain"]]],"objectid":"1e345a05fc4d16dc","type":"NamedTuple"},"mime":"application/vnd.pluto.tree+object"}}}
