@@ -1,8 +1,8 @@
 # `qqplot!` and `qqnorm!`
 
-A `qqplot!` or `qqnorm!` plot has two parts, and `masque(fig)` makes
-each respond on its own: the points, one per observation, and the
-reference line. Hovering a point shows its two quantiles, and a click
+With a `qqline`, a `qqplot!` or `qqnorm!` plot has two parts, and
+`masque(fig)` makes each respond on its own: the points and the
+reference line. Without one, the plot has only the points. Hovering a point shows its two quantiles, and a click
 selects it and sends it to your notebook. Hover the points below, then
 click one:
 
@@ -36,8 +36,10 @@ The points come smallest first, not in the order of your data.
 To say which observation a point is, give the points a payload each,
 under the part's name, `scatter`. Because the points come smallest
 first, sort your rows the same way: `sortperm(wait)` lists the
-customers from the shortest wait up. The tooltip then shows the
-payload's fields next to the quantiles:
+customers from the shortest wait up. (A `qqplot!` of two samples of
+different lengths draws as many points as the shorter sample has, so
+give it that many payloads.) The tooltip then shows the payload's fields
+next to the quantiles:
 
 ```@raw html
 <div class="masque-embed-wrap">

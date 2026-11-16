@@ -23,7 +23,7 @@ with `@bind sel masque(fig)`, it is `sel.hist`.
 
 | Field | What it holds |
 |---|---|
-| `index` | the bin's place from left to right, so `1` is the leftmost |
+| `index` | the bin's place from left to right (bottom to top for `direction = :x`), so `1` is the first |
 | `value` | the bin's height: a count with the default `normalization = :none`, a density or a fraction with the others |
 | `low`, `high` | the bin's edges |
 

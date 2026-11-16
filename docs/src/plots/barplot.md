@@ -52,8 +52,9 @@ of the bar you clicked. [Tooltips](@ref) lists what a template can do.
 ## Stacked and dodged bars
 
 Each segment of a stacked bar, and each bar of a dodged group, is its
-own mark. `low` and `high` say which segment was hovered or clicked, and
-the payloads follow the order of your data, so one per row:
+own mark. `index` says which segment was hovered or clicked, and `low` and
+`high` say where it sits on the stack. The payloads follow the order of
+your data, so one per row:
 
 ```@raw html
 <div class="masque-embed-wrap">
