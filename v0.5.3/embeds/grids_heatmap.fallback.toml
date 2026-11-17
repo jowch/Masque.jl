@@ -1,0 +1,4 @@
+image = "grids_heatmap.png"
+
+[outputs]
+b15a0001-0001-4000-8000-000000000004 = "click a cell"

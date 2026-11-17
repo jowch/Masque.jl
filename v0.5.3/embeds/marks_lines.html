@@ -1,0 +1,1191 @@
+<!DOCTYPE html><html><head>
+<!-- masque-pluto-export -->
+<script src="shared/3e869b25b91606310eba.js"></script>
+<script>
+function isDocDark() {
+  var c = (window.parent && window.parent.document.documentElement.className) || "";
+  if (!c) return false;
+  if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
+  return /(^|\s)theme--/.test(c);
+}
+(function () {
+  var framed = window.parent && window.parent !== window;
+  var dark = false;
+  if (framed) {
+    try { dark = isDocDark(); } catch (e) { dark = false; }
+  } else if (window.matchMedia) {
+    dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  document.documentElement.classList.toggle("pluto-dark", dark);
+  if (framed && window.matchMedia) {
+    var native = window.matchMedia.bind(window);
+    window.matchMedia = function (q) {
+      var s = String(q);
+      if (s.indexOf("prefers-color-scheme") === -1) return native(q);
+      var wantsDark = s.indexOf("dark") !== -1;
+      var matches = wantsDark ? dark : !dark;
+      return {
+        matches: matches,
+        media: s,
+        onchange: null,
+        addListener: function () {},
+        removeListener: function () {},
+        addEventListener: function () {},
+        removeEventListener: function () {},
+        dispatchEvent: function () { return false; },
+      };
+    };
+  }
+})();
+</script>
+
+
+<script>
+window.masquePlayer = { table: {"controls":[],"initial":{"cosine":null,"sine":null},"keyed":["sine","cosine"],"keys":{"cosine:0@0":1,"cosine:0@1":2,"cosine:0@10":11,"cosine:0@11":12,"cosine:0@12":13,"cosine:0@13":14,"cosine:0@14":15,"cosine:0@15":16,"cosine:0@16":17,"cosine:0@17":18,"cosine:0@18":19,"cosine:0@19":20,"cosine:0@2":3,"cosine:0@20":21,"cosine:0@3":4,"cosine:0@4":5,"cosine:0@5":6,"cosine:0@6":7,"cosine:0@7":8,"cosine:0@8":9,"cosine:0@9":10,"null":0,"sine:0@0":22,"sine:0@0+cosine:0@0":43,"sine:0@0+cosine:0@1":44,"sine:0@0+cosine:0@10":53,"sine:0@0+cosine:0@11":54,"sine:0@0+cosine:0@12":55,"sine:0@0+cosine:0@13":56,"sine:0@0+cosine:0@14":57,"sine:0@0+cosine:0@15":58,"sine:0@0+cosine:0@16":59,"sine:0@0+cosine:0@17":60,"sine:0@0+cosine:0@18":61,"sine:0@0+cosine:0@19":62,"sine:0@0+cosine:0@2":45,"sine:0@0+cosine:0@20":63,"sine:0@0+cosine:0@3":46,"sine:0@0+cosine:0@4":47,"sine:0@0+cosine:0@5":48,"sine:0@0+cosine:0@6":49,"sine:0@0+cosine:0@7":50,"sine:0@0+cosine:0@8":51,"sine:0@0+cosine:0@9":52,"sine:0@1":23,"sine:0@1+cosine:0@0":64,"sine:0@1+cosine:0@1":65,"sine:0@1+cosine:0@10":74,"sine:0@1+cosine:0@11":75,"sine:0@1+cosine:0@12":76,"sine:0@1+cosine:0@13":77,"sine:0@1+cosine:0@14":78,"sine:0@1+cosine:0@15":79,"sine:0@1+cosine:0@16":80,"sine:0@1+cosine:0@17":81,"sine:0@1+cosine:0@18":82,"sine:0@1+cosine:0@19":83,"sine:0@1+cosine:0@2":66,"sine:0@1+cosine:0@20":84,"sine:0@1+cosine:0@3":67,"sine:0@1+cosine:0@4":68,"sine:0@1+cosine:0@5":69,"sine:0@1+cosine:0@6":70,"sine:0@1+cosine:0@7":71,"sine:0@1+cosine:0@8":72,"sine:0@1+cosine:0@9":73,"sine:0@10":32,"sine:0@10+cosine:0@0":253,"sine:0@10+cosine:0@1":254,"sine:0@10+cosine:0@10":263,"sine:0@10+cosine:0@11":264,"sine:0@10+cosine:0@12":265,"sine:0@10+cosine:0@13":266,"sine:0@10+cosine:0@14":267,"sine:0@10+cosine:0@15":268,"sine:0@10+cosine:0@16":269,"sine:0@10+cosine:0@17":270,"sine:0@10+cosine:0@18":271,"sine:0@10+cosine:0@19":272,"sine:0@10+cosine:0@2":255,"sine:0@10+cosine:0@20":273,"sine:0@10+cosine:0@3":256,"sine:0@10+cosine:0@4":257,"sine:0@10+cosine:0@5":258,"sine:0@10+cosine:0@6":259,"sine:0@10+cosine:0@7":260,"sine:0@10+cosine:0@8":261,"sine:0@10+cosine:0@9":262,"sine:0@11":33,"sine:0@11+cosine:0@0":274,"sine:0@11+cosine:0@1":275,"sine:0@11+cosine:0@10":284,"sine:0@11+cosine:0@11":285,"sine:0@11+cosine:0@12":286,"sine:0@11+cosine:0@13":287,"sine:0@11+cosine:0@14":288,"sine:0@11+cosine:0@15":289,"sine:0@11+cosine:0@16":290,"sine:0@11+cosine:0@17":291,"sine:0@11+cosine:0@18":292,"sine:0@11+cosine:0@19":293,"sine:0@11+cosine:0@2":276,"sine:0@11+cosine:0@20":294,"sine:0@11+cosine:0@3":277,"sine:0@11+cosine:0@4":278,"sine:0@11+cosine:0@5":279,"sine:0@11+cosine:0@6":280,"sine:0@11+cosine:0@7":281,"sine:0@11+cosine:0@8":282,"sine:0@11+cosine:0@9":283,"sine:0@12":34,"sine:0@12+cosine:0@0":295,"sine:0@12+cosine:0@1":296,"sine:0@12+cosine:0@10":305,"sine:0@12+cosine:0@11":306,"sine:0@12+cosine:0@12":307,"sine:0@12+cosine:0@13":308,"sine:0@12+cosine:0@14":309,"sine:0@12+cosine:0@15":310,"sine:0@12+cosine:0@16":311,"sine:0@12+cosine:0@17":312,"sine:0@12+cosine:0@18":313,"sine:0@12+cosine:0@19":314,"sine:0@12+cosine:0@2":297,"sine:0@12+cosine:0@20":315,"sine:0@12+cosine:0@3":298,"sine:0@12+cosine:0@4":299,"sine:0@12+cosine:0@5":300,"sine:0@12+cosine:0@6":301,"sine:0@12+cosine:0@7":302,"sine:0@12+cosine:0@8":303,"sine:0@12+cosine:0@9":304,"sine:0@13":35,"sine:0@13+cosine:0@0":316,"sine:0@13+cosine:0@1":317,"sine:0@13+cosine:0@10":326,"sine:0@13+cosine:0@11":327,"sine:0@13+cosine:0@12":328,"sine:0@13+cosine:0@13":329,"sine:0@13+cosine:0@14":330,"sine:0@13+cosine:0@15":331,"sine:0@13+cosine:0@16":332,"sine:0@13+cosine:0@17":333,"sine:0@13+cosine:0@18":334,"sine:0@13+cosine:0@19":335,"sine:0@13+cosine:0@2":318,"sine:0@13+cosine:0@20":336,"sine:0@13+cosine:0@3":319,"sine:0@13+cosine:0@4":320,"sine:0@13+cosine:0@5":321,"sine:0@13+cosine:0@6":322,"sine:0@13+cosine:0@7":323,"sine:0@13+cosine:0@8":324,"sine:0@13+cosine:0@9":325,"sine:0@14":36,"sine:0@14+cosine:0@0":337,"sine:0@14+cosine:0@1":338,"sine:0@14+cosine:0@10":347,"sine:0@14+cosine:0@11":348,"sine:0@14+cosine:0@12":349,"sine:0@14+cosine:0@13":350,"sine:0@14+cosine:0@14":351,"sine:0@14+cosine:0@15":352,"sine:0@14+cosine:0@16":353,"sine:0@14+cosine:0@17":354,"sine:0@14+cosine:0@18":355,"sine:0@14+cosine:0@19":356,"sine:0@14+cosine:0@2":339,"sine:0@14+cosine:0@20":357,"sine:0@14+cosine:0@3":340,"sine:0@14+cosine:0@4":341,"sine:0@14+cosine:0@5":342,"sine:0@14+cosine:0@6":343,"sine:0@14+cosine:0@7":344,"sine:0@14+cosine:0@8":345,"sine:0@14+cosine:0@9":346,"sine:0@15":37,"sine:0@15+cosine:0@0":358,"sine:0@15+cosine:0@1":359,"sine:0@15+cosine:0@10":368,"sine:0@15+cosine:0@11":369,"sine:0@15+cosine:0@12":370,"sine:0@15+cosine:0@13":371,"sine:0@15+cosine:0@14":372,"sine:0@15+cosine:0@15":373,"sine:0@15+cosine:0@16":374,"sine:0@15+cosine:0@17":375,"sine:0@15+cosine:0@18":376,"sine:0@15+cosine:0@19":377,"sine:0@15+cosine:0@2":360,"sine:0@15+cosine:0@20":378,"sine:0@15+cosine:0@3":361,"sine:0@15+cosine:0@4":362,"sine:0@15+cosine:0@5":363,"sine:0@15+cosine:0@6":364,"sine:0@15+cosine:0@7":365,"sine:0@15+cosine:0@8":366,"sine:0@15+cosine:0@9":367,"sine:0@16":38,"sine:0@16+cosine:0@0":379,"sine:0@16+cosine:0@1":380,"sine:0@16+cosine:0@10":389,"sine:0@16+cosine:0@11":390,"sine:0@16+cosine:0@12":391,"sine:0@16+cosine:0@13":392,"sine:0@16+cosine:0@14":393,"sine:0@16+cosine:0@15":394,"sine:0@16+cosine:0@16":395,"sine:0@16+cosine:0@17":396,"sine:0@16+cosine:0@18":397,"sine:0@16+cosine:0@19":398,"sine:0@16+cosine:0@2":381,"sine:0@16+cosine:0@20":399,"sine:0@16+cosine:0@3":382,"sine:0@16+cosine:0@4":383,"sine:0@16+cosine:0@5":384,"sine:0@16+cosine:0@6":385,"sine:0@16+cosine:0@7":386,"sine:0@16+cosine:0@8":387,"sine:0@16+cosine:0@9":388,"sine:0@17":39,"sine:0@17+cosine:0@0":400,"sine:0@17+cosine:0@1":401,"sine:0@17+cosine:0@10":410,"sine:0@17+cosine:0@11":411,"sine:0@17+cosine:0@12":412,"sine:0@17+cosine:0@13":413,"sine:0@17+cosine:0@14":414,"sine:0@17+cosine:0@15":415,"sine:0@17+cosine:0@16":416,"sine:0@17+cosine:0@17":417,"sine:0@17+cosine:0@18":418,"sine:0@17+cosine:0@19":419,"sine:0@17+cosine:0@2":402,"sine:0@17+cosine:0@20":420,"sine:0@17+cosine:0@3":403,"sine:0@17+cosine:0@4":404,"sine:0@17+cosine:0@5":405,"sine:0@17+cosine:0@6":406,"sine:0@17+cosine:0@7":407,"sine:0@17+cosine:0@8":408,"sine:0@17+cosine:0@9":409,"sine:0@18":40,"sine:0@18+cosine:0@0":421,"sine:0@18+cosine:0@1":422,"sine:0@18+cosine:0@10":431,"sine:0@18+cosine:0@11":432,"sine:0@18+cosine:0@12":433,"sine:0@18+cosine:0@13":434,"sine:0@18+cosine:0@14":435,"sine:0@18+cosine:0@15":436,"sine:0@18+cosine:0@16":437,"sine:0@18+cosine:0@17":438,"sine:0@18+cosine:0@18":439,"sine:0@18+cosine:0@19":440,"sine:0@18+cosine:0@2":423,"sine:0@18+cosine:0@20":441,"sine:0@18+cosine:0@3":424,"sine:0@18+cosine:0@4":425,"sine:0@18+cosine:0@5":426,"sine:0@18+cosine:0@6":427,"sine:0@18+cosine:0@7":428,"sine:0@18+cosine:0@8":429,"sine:0@18+cosine:0@9":430,"sine:0@19":41,"sine:0@19+cosine:0@0":442,"sine:0@19+cosine:0@1":443,"sine:0@19+cosine:0@10":452,"sine:0@19+cosine:0@11":453,"sine:0@19+cosine:0@12":454,"sine:0@19+cosine:0@13":455,"sine:0@19+cosine:0@14":456,"sine:0@19+cosine:0@15":457,"sine:0@19+cosine:0@16":458,"sine:0@19+cosine:0@17":459,"sine:0@19+cosine:0@18":460,"sine:0@19+cosine:0@19":461,"sine:0@19+cosine:0@2":444,"sine:0@19+cosine:0@20":462,"sine:0@19+cosine:0@3":445,"sine:0@19+cosine:0@4":446,"sine:0@19+cosine:0@5":447,"sine:0@19+cosine:0@6":448,"sine:0@19+cosine:0@7":449,"sine:0@19+cosine:0@8":450,"sine:0@19+cosine:0@9":451,"sine:0@2":24,"sine:0@2+cosine:0@0":85,"sine:0@2+cosine:0@1":86,"sine:0@2+cosine:0@10":95,"sine:0@2+cosine:0@11":96,"sine:0@2+cosine:0@12":97,"sine:0@2+cosine:0@13":98,"sine:0@2+cosine:0@14":99,"sine:0@2+cosine:0@15":100,"sine:0@2+cosine:0@16":101,"sine:0@2+cosine:0@17":102,"sine:0@2+cosine:0@18":103,"sine:0@2+cosine:0@19":104,"sine:0@2+cosine:0@2":87,"sine:0@2+cosine:0@20":105,"sine:0@2+cosine:0@3":88,"sine:0@2+cosine:0@4":89,"sine:0@2+cosine:0@5":90,"sine:0@2+cosine:0@6":91,"sine:0@2+cosine:0@7":92,"sine:0@2+cosine:0@8":93,"sine:0@2+cosine:0@9":94,"sine:0@20":42,"sine:0@20+cosine:0@0":463,"sine:0@20+cosine:0@1":464,"sine:0@20+cosine:0@10":473,"sine:0@20+cosine:0@11":474,"sine:0@20+cosine:0@12":475,"sine:0@20+cosine:0@13":476,"sine:0@20+cosine:0@14":477,"sine:0@20+cosine:0@15":478,"sine:0@20+cosine:0@16":479,"sine:0@20+cosine:0@17":480,"sine:0@20+cosine:0@18":481,"sine:0@20+cosine:0@19":482,"sine:0@20+cosine:0@2":465,"sine:0@20+cosine:0@20":483,"sine:0@20+cosine:0@3":466,"sine:0@20+cosine:0@4":467,"sine:0@20+cosine:0@5":468,"sine:0@20+cosine:0@6":469,"sine:0@20+cosine:0@7":470,"sine:0@20+cosine:0@8":471,"sine:0@20+cosine:0@9":472,"sine:0@3":25,"sine:0@3+cosine:0@0":106,"sine:0@3+cosine:0@1":107,"sine:0@3+cosine:0@10":116,"sine:0@3+cosine:0@11":117,"sine:0@3+cosine:0@12":118,"sine:0@3+cosine:0@13":119,"sine:0@3+cosine:0@14":120,"sine:0@3+cosine:0@15":121,"sine:0@3+cosine:0@16":122,"sine:0@3+cosine:0@17":123,"sine:0@3+cosine:0@18":124,"sine:0@3+cosine:0@19":125,"sine:0@3+cosine:0@2":108,"sine:0@3+cosine:0@20":126,"sine:0@3+cosine:0@3":109,"sine:0@3+cosine:0@4":110,"sine:0@3+cosine:0@5":111,"sine:0@3+cosine:0@6":112,"sine:0@3+cosine:0@7":113,"sine:0@3+cosine:0@8":114,"sine:0@3+cosine:0@9":115,"sine:0@4":26,"sine:0@4+cosine:0@0":127,"sine:0@4+cosine:0@1":128,"sine:0@4+cosine:0@10":137,"sine:0@4+cosine:0@11":138,"sine:0@4+cosine:0@12":139,"sine:0@4+cosine:0@13":140,"sine:0@4+cosine:0@14":141,"sine:0@4+cosine:0@15":142,"sine:0@4+cosine:0@16":143,"sine:0@4+cosine:0@17":144,"sine:0@4+cosine:0@18":145,"sine:0@4+cosine:0@19":146,"sine:0@4+cosine:0@2":129,"sine:0@4+cosine:0@20":147,"sine:0@4+cosine:0@3":130,"sine:0@4+cosine:0@4":131,"sine:0@4+cosine:0@5":132,"sine:0@4+cosine:0@6":133,"sine:0@4+cosine:0@7":134,"sine:0@4+cosine:0@8":135,"sine:0@4+cosine:0@9":136,"sine:0@5":27,"sine:0@5+cosine:0@0":148,"sine:0@5+cosine:0@1":149,"sine:0@5+cosine:0@10":158,"sine:0@5+cosine:0@11":159,"sine:0@5+cosine:0@12":160,"sine:0@5+cosine:0@13":161,"sine:0@5+cosine:0@14":162,"sine:0@5+cosine:0@15":163,"sine:0@5+cosine:0@16":164,"sine:0@5+cosine:0@17":165,"sine:0@5+cosine:0@18":166,"sine:0@5+cosine:0@19":167,"sine:0@5+cosine:0@2":150,"sine:0@5+cosine:0@20":168,"sine:0@5+cosine:0@3":151,"sine:0@5+cosine:0@4":152,"sine:0@5+cosine:0@5":153,"sine:0@5+cosine:0@6":154,"sine:0@5+cosine:0@7":155,"sine:0@5+cosine:0@8":156,"sine:0@5+cosine:0@9":157,"sine:0@6":28,"sine:0@6+cosine:0@0":169,"sine:0@6+cosine:0@1":170,"sine:0@6+cosine:0@10":179,"sine:0@6+cosine:0@11":180,"sine:0@6+cosine:0@12":181,"sine:0@6+cosine:0@13":182,"sine:0@6+cosine:0@14":183,"sine:0@6+cosine:0@15":184,"sine:0@6+cosine:0@16":185,"sine:0@6+cosine:0@17":186,"sine:0@6+cosine:0@18":187,"sine:0@6+cosine:0@19":188,"sine:0@6+cosine:0@2":171,"sine:0@6+cosine:0@20":189,"sine:0@6+cosine:0@3":172,"sine:0@6+cosine:0@4":173,"sine:0@6+cosine:0@5":174,"sine:0@6+cosine:0@6":175,"sine:0@6+cosine:0@7":176,"sine:0@6+cosine:0@8":177,"sine:0@6+cosine:0@9":178,"sine:0@7":29,"sine:0@7+cosine:0@0":190,"sine:0@7+cosine:0@1":191,"sine:0@7+cosine:0@10":200,"sine:0@7+cosine:0@11":201,"sine:0@7+cosine:0@12":202,"sine:0@7+cosine:0@13":203,"sine:0@7+cosine:0@14":204,"sine:0@7+cosine:0@15":205,"sine:0@7+cosine:0@16":206,"sine:0@7+cosine:0@17":207,"sine:0@7+cosine:0@18":208,"sine:0@7+cosine:0@19":209,"sine:0@7+cosine:0@2":192,"sine:0@7+cosine:0@20":210,"sine:0@7+cosine:0@3":193,"sine:0@7+cosine:0@4":194,"sine:0@7+cosine:0@5":195,"sine:0@7+cosine:0@6":196,"sine:0@7+cosine:0@7":197,"sine:0@7+cosine:0@8":198,"sine:0@7+cosine:0@9":199,"sine:0@8":30,"sine:0@8+cosine:0@0":211,"sine:0@8+cosine:0@1":212,"sine:0@8+cosine:0@10":221,"sine:0@8+cosine:0@11":222,"sine:0@8+cosine:0@12":223,"sine:0@8+cosine:0@13":224,"sine:0@8+cosine:0@14":225,"sine:0@8+cosine:0@15":226,"sine:0@8+cosine:0@16":227,"sine:0@8+cosine:0@17":228,"sine:0@8+cosine:0@18":229,"sine:0@8+cosine:0@19":230,"sine:0@8+cosine:0@2":213,"sine:0@8+cosine:0@20":231,"sine:0@8+cosine:0@3":214,"sine:0@8+cosine:0@4":215,"sine:0@8+cosine:0@5":216,"sine:0@8+cosine:0@6":217,"sine:0@8+cosine:0@7":218,"sine:0@8+cosine:0@8":219,"sine:0@8+cosine:0@9":220,"sine:0@9":31,"sine:0@9+cosine:0@0":232,"sine:0@9+cosine:0@1":233,"sine:0@9+cosine:0@10":242,"sine:0@9+cosine:0@11":243,"sine:0@9+cosine:0@12":244,"sine:0@9+cosine:0@13":245,"sine:0@9+cosine:0@14":246,"sine:0@9+cosine:0@15":247,"sine:0@9+cosine:0@16":248,"sine:0@9+cosine:0@17":249,"sine:0@9+cosine:0@18":250,"sine:0@9+cosine:0@19":251,"sine:0@9+cosine:0@2":234,"sine:0@9+cosine:0@20":252,"sine:0@9+cosine:0@3":235,"sine:0@9+cosine:0@4":236,"sine:0@9+cosine:0@5":237,"sine:0@9+cosine:0@6":238,"sine:0@9+cosine:0@7":239,"sine:0@9+cosine:0@8":240,"sine:0@9+cosine:0@9":241},"snaps":["shared/162ecbcebe371e099b22.json","shared/c294904805c38470be61.json","shared/3014e52f29e5e71b5a99.json","shared/1f3433a6f9639bf094e1.json","shared/80cb2e8529ee201fa759.json","shared/3f8981e1d1ae43c26c17.json","shared/24e2fe94cc20c0eebaba.json","shared/63b17cedc7403d254561.json","shared/c318d6691483c9373e96.json","shared/6f054dc5edd9d6685503.json","shared/ee1067395b1188fa4654.json","shared/0cd19de90cdb64450b85.json","shared/e60d8e5f3a08d1bc8230.json","shared/5bca469ce028f9a816db.json","shared/0ed068590cdcc2fc23e5.json","shared/78c27bd1c30253035639.json","shared/74785f02785544cee5d4.json","shared/9bd43411339106e88618.json","shared/04b5b5d7058cc48f1512.json","shared/d1a9fad48163d78d7837.json","shared/365b1f0e4d82da0558f6.json","shared/eaa4fea90512f84b0b1c.json","shared/87b0062d475d2f8fda21.json","shared/2bf3803597ff8b5163b6.json","shared/70dcedf00764613e41ee.json","shared/a2c3fbff5a1efc4cb63e.json","shared/aae37322f6abd98a33fa.json","shared/21c4377f5a02b4ddb855.json","shared/fe4ebfa483e6333dcb40.json","shared/d4a4550065b918c90c60.json","shared/5e807466f28633fe8339.json","shared/d4a5e291ecc1c7ad2ed5.json","shared/94dfb58c1e72fe0129a7.json","shared/ba79edd4c26a4ce11d10.json","shared/cb339adb550b94b5cdbd.json","shared/cdfcbe197dc0730908af.json","shared/12b3ba91e0cf5845085f.json","shared/90cdc94391cb12bbfa44.json","shared/a00b315ac0cd9a904da4.json","shared/b3eadf75b42f6a56b243.json","shared/68ae36ff2e08b2ce1713.json","shared/616fddfb36012edca124.json","shared/9fe11d535882663eb34e.json","shared/583ed36ef003a6ae6000.json","shared/8fb082542fa74ad168c1.json","shared/44be45cdbeb63e79e9b6.json","shared/36c8aaaf8fb04e803548.json","shared/d5b20335405e95fc86d8.json","shared/5908f9ae300db56b2bfb.json","shared/0f3931b11b3ba36fd29d.json","shared/8ca9fb90790e4f1c67d2.json","shared/e6289f186e18496dcbd3.json","shared/7bfa418704e990678c3d.json","shared/4b94442b9a085aaab2fd.json","shared/52a989434f807e0aeda9.json","shared/164e2f5295dcdd0ae73c.json","shared/1d246eaeaa8c32331c5c.json","shared/b25ba96954d132b7deb7.json","shared/cd0360c09deecd96f303.json","shared/27bec365580e07285c58.json","shared/54bca0c77720b5bb91c0.json","shared/58d72c892682db04ccbd.json","shared/0850f52174932cb97e94.json","shared/9fe7aa9fbf714b75e8fb.json","shared/3ed4816bc9bb23a5bc79.json","shared/1ccaadf0605238d7acff.json","shared/46beadb11a8e0d94733a.json","shared/9a19f4335584a890484e.json","shared/41b41e6d618a21901a58.json","shared/266b1280ff8efa46191d.json","shared/5abf1fdd77ff6b8d6939.json","shared/ad99d8c754f59c98e3d9.json","shared/80178ad57814759fdb4a.json","shared/1701d725b7e55d6a06ee.json","shared/83eda4f2d57d029a8db9.json","shared/5b287f47bfcddbf0c846.json","shared/c9eac8e49c91403759f4.json","shared/afb871caa553d6adafa3.json","shared/e66fa2f252da024d114c.json","shared/b61a739bf0e061a67a04.json","shared/530db38ffff958e14094.json","shared/d9cb4800f7a69aa4739c.json","shared/14d2523708f7f265676e.json","shared/92e7a76f25b7752c313a.json","shared/8e0258f07ee6bec70aa9.json","shared/e0f78383a7464928c089.json","shared/c33558156b254c5203bd.json","shared/7fb68611cee9b8b09424.json","shared/6beca1aac7ff1c1de4c0.json","shared/97f80817104f57d7f0c4.json","shared/2170a6f28e1f91a5e66e.json","shared/abbd7c1afbce1a9f6b56.json","shared/c88c3578cb34b8154ee3.json","shared/315d39bf6cf7eb9b025e.json","shared/72e32e4254732249dc55.json","shared/730ec44f72ff5d75dae9.json","shared/a5546c9edd2aba19f447.json","shared/c9765c71d95282ab75da.json","shared/61acb92e3bba6071fd68.json","shared/e61238fc890b99c1ef06.json","shared/2c34a95ebba96b1d1a88.json","shared/7665095ca911cc08a4cc.json","shared/7ab56bf9ae38cdc024fd.json","shared/1f4856dae72de8ca7813.json","shared/35f52f6d5681dd823bc3.json","shared/40e815cc97aeddcd9c7a.json","shared/c15631b704622b50acb5.json","shared/6e13f115ce4cb3d1997d.json","shared/9f9aafefd18a58c79d15.json","shared/091aafef153696819551.json","shared/213163e00d5c793b3a85.json","shared/15623a146e2946ab01d4.json","shared/1d1033c771410d817311.json","shared/2d63456c70f717054872.json","shared/63423b6b399d9c218896.json","shared/ddeb3c29f448fffeec5c.json","shared/19b509e8002e4db6302c.json","shared/9cdc2e9517dff52bf507.json","shared/422f5f736e063f8d91c5.json","shared/cd1d876b6f462e5aeb38.json","shared/31346c2636aa482db54a.json","shared/ff34c8596b505afc81b5.json","shared/495121caf739c2c31ffb.json","shared/4b5b2ce9f249a7a1a436.json","shared/41c53d5abac960a0bc87.json","shared/27285a40ae65a707ce07.json","shared/d644e5ab39bbb9946e29.json","shared/822a2806c8e660bfd808.json","shared/b37a525723cfeaf6ad2c.json","shared/54a0c260d340c7d85710.json","shared/68af3d1c1daa144a3d13.json","shared/4aec58a35967ed7b029e.json","shared/91f4f3eb8d5d1d890205.json","shared/c405e602ed562aeb7a3a.json","shared/6764a3d9aea825dbcddf.json","shared/290865a172e70953e9e7.json","shared/d3e92d5d475b2319f9fd.json","shared/7f77d67a7520be6a2343.json","shared/41cd9f3523fad44237ec.json","shared/4b8863ee451e5aca0c1f.json","shared/91a561a2a06f3fbea003.json","shared/249708d930ea842d30f3.json","shared/0edf1cb9a214444168e4.json","shared/c14f818122ff4666f433.json","shared/59e81065571d925dc1b6.json","shared/1b09a0c0a7c7c7d1472f.json","shared/1cf928c63928a37ec0f9.json","shared/3bcd284cd225d406527d.json","shared/c424ebd48f641743854d.json","shared/dcf0fa0d349ded4b4676.json","shared/50a671de5a891480cd9a.json","shared/1b6a74277940bac4469f.json","shared/91202537d9acffed93f3.json","shared/ed788f167bcc7c4c6c04.json","shared/58a1e5ddfee1e69132a2.json","shared/05e85ad7b47a6bc0d35c.json","shared/279727aa997f36a2f9a5.json","shared/490e0447ea12bea6d5ee.json","shared/ca61c40a1341e8308614.json","shared/bb6d4696d51c1a1ab411.json","shared/4919a7ebeb4845b14bb2.json","shared/e40571722062cffd37ca.json","shared/60e53053ddde95f7dd4b.json","shared/02ab6be653bd70865fca.json","shared/39f979ec006c9d9afdb8.json","shared/16364e8d17ce510061b9.json","shared/c392dbbdd4fefc991573.json","shared/8674f3f0ac7c6e52aa66.json","shared/9f13fc6e281e5ce0eef3.json","shared/bcce3af46f7349ebd9b0.json","shared/456ad58d886fc90debeb.json","shared/bfdad47ada333dd67eb4.json","shared/543ba620589a20011547.json","shared/3484cc0f48b8d270b48e.json","shared/f10bcbaefe4beeea1aec.json","shared/14d397448e098790aaa7.json","shared/97b3fd3d3b2ca9ccce90.json","shared/567ebd4eab4114a63274.json","shared/1fc38c9e272793739acc.json","shared/dd5ee391a456eb5aedbd.json","shared/3579397b22b0301b1387.json","shared/21fbf32953503107049e.json","shared/8c928c1fa84c825e9182.json","shared/9387320bea62e2a2d7fa.json","shared/09c7d464210c790a4c31.json","shared/fb16fd779fce54346bf0.json","shared/27006a1970b3140ea1e7.json","shared/7385827add319d7992e1.json","shared/511a385ef6c1f0e3350e.json","shared/c496d662cb5e08662f6a.json","shared/9f5f431cc5cb8b3de358.json","shared/833ca1f06929c9d90b4b.json","shared/95aa4e01af3a613251bf.json","shared/cd9d525fb282c788904c.json","shared/7b8111946666bf1d5b15.json","shared/30b19a3c2801a09b5e96.json","shared/dd6e79d6a3ded831b1b2.json","shared/256bbb0d9f88aebd6b6a.json","shared/aa0b9dd30706a4723e4f.json","shared/d56fe323941a45a1d8b7.json","shared/6ad390df9c01e26377d6.json","shared/25a90a46763b406f391f.json","shared/771a6c47c0d4f220bef3.json","shared/fbc6c5af21315da5d413.json","shared/400ae3db149af0542e18.json","shared/7f6e5aa8f6554e0fb978.json","shared/b77ce3682911c323e97a.json","shared/c81d0724f91f3e982e47.json","shared/e9f191ae84a630675bc2.json","shared/a12ac1f430c9e04af887.json","shared/dfa734ba8c2b49b43c39.json","shared/9f6cb0d33b824f3b27d6.json","shared/a45f9f3322145dcc60ea.json","shared/82a9d467f672ce10836d.json","shared/bd66df905619b78acbd9.json","shared/863d54f9006ed920d8f5.json","shared/705dcd160b8fcadaf66c.json","shared/647a0537c9e57f932ed5.json","shared/a8d4308b0b8ee4f11399.json","shared/7fad959b1d1bbb3828fe.json","shared/309422bbc0860b39c7a0.json","shared/035e78e8032ccb82798b.json","shared/fa404f5ad479db43a074.json","shared/6d57fbea8aa821fab41f.json","shared/093edf8a448aadd63f8e.json","shared/77be501bbf61ec38db57.json","shared/03b7758fbd145fb9ae48.json","shared/0b67055497d053582486.json","shared/39f499c4ee1c8ccb2e47.json","shared/da314f064c8c4511790e.json","shared/7ddd3065a5135e008a9d.json","shared/4a0d207ae27c81078214.json","shared/42831bc24e081a1aa033.json","shared/42ee4ad5f6c093c847a5.json","shared/c0b65694179cdd38c9df.json","shared/0f82a043c280503af51e.json","shared/6f9c29a3f2a3a09590f3.json","shared/eba030c8fde36d288cb3.json","shared/1738987c09cfe70c7c85.json","shared/1cc5fd6fcb19ddeed510.json","shared/80923726689e5c255ba1.json","shared/e0a299d33f3435514f12.json","shared/faf5d571d30395f3afc4.json","shared/de6a24f71c6477ba421b.json","shared/1874fff17496d544f869.json","shared/42ec500ba9e0bee6c010.json","shared/e7bc40fa1ea89412e2b6.json","shared/6f87e207e7b7291f1289.json","shared/1e09f7b4d5b7ba8ec7aa.json","shared/fbe191abe05d114ea57d.json","shared/3ff9456ec521b920b853.json","shared/89c61fcafccafac5cbd2.json","shared/46bde6718e502540b0cb.json","shared/97537bc29f48797896ab.json","shared/2f03caeb20cc6867069c.json","shared/d47e76aa35a7d0b24ceb.json","shared/92c2b30fe0bd77beddaa.json","shared/00739c7276eb497889f4.json","shared/3c2479ddd93384f3340f.json","shared/6c7e71f03c0e17875512.json","shared/c355dd63aa223e97eee6.json","shared/6e74051c7e56bc158229.json","shared/285b655969136cdcea6f.json","shared/819694afb76e48184bd7.json","shared/e4ba8a324516318cdb97.json","shared/300faba4247b8a343f78.json","shared/76fd4ade8efc571ea33d.json","shared/90c53e096f0c8da89a86.json","shared/57f4ef707b74c36d6b56.json","shared/eab79da31e0a24f85b26.json","shared/63f10d21890caf6f9b9f.json","shared/89c5d9dc52182e6504a3.json","shared/71ba01d2bc72e8556f2a.json","shared/fd33f0ce6b526ec8ad31.json","shared/147515e6fb77d96a121a.json","shared/5a7c9f33275da759ac78.json","shared/1f429822d617fbe30f19.json","shared/e0dfe5fdeebdd928cb6b.json","shared/8f3970f49e09bdc58a3c.json","shared/bc64f9edba1d896f6952.json","shared/3cdc5cdad12e5e1aa320.json","shared/bd94d88df9eeed1e6109.json","shared/8817c952477955420774.json","shared/37e77e5af0a1ded4326b.json","shared/e29151e591b86c41f367.json","shared/315922a41fbfae6945bf.json","shared/ebbb3739f03101b73cff.json","shared/8d682e4e2d9b68cefede.json","shared/177657c66d79e335b1f7.json","shared/02cfad17e96a1a776a76.json","shared/98f2a0330c7bf0d7122a.json","shared/34a83e22e61650c64eb7.json","shared/e870ed1d3048c142c10e.json","shared/64b3cadbed6fc3b1a988.json","shared/8435e3f33dfccdc68181.json","shared/7ee0c804f31e2b2f58d1.json","shared/5ec75c5d1288301eee75.json","shared/30faed2c086ccb10ef32.json","shared/7f4aa037a8c538de2abf.json","shared/88edf6d510513f145973.json","shared/cbc829f0d9b0a41a7e79.json","shared/323692c8a17c8956353c.json","shared/00086b1c670336baa842.json","shared/6e3313f0d673c8829980.json","shared/336222bc878f140a9be2.json","shared/5ffbff3645f5f6e83d16.json","shared/8503aebc7c93cb139fe2.json","shared/eacbc40b8234c4ce71a8.json","shared/d3b47eeefe5fa14378eb.json","shared/e29f4414c30b4434ca99.json","shared/77bcb2e8ba5ebe402b2d.json","shared/574541ea9e4d8d8ff1fd.json","shared/0b0a582faeba6d6f72a7.json","shared/5a9ead889f494a015438.json","shared/ff1073abd842378d6823.json","shared/877da61fbbf2eb3fc1fb.json","shared/674978c6eea67a825ab4.json","shared/38e5994967f2523efaf2.json","shared/fc61e5d8dce9eb3e0db0.json","shared/46e3d756a9fcb898651f.json","shared/729fc0d3eca72267fe05.json","shared/50ef318041efcbd3a6e9.json","shared/6d9f19909ada149ffcae.json","shared/b9a30b939adaa736e54e.json","shared/545a9b11b7da79f70e91.json","shared/57a53c1adca5334003ff.json","shared/86ce9b0b08738283e616.json","shared/6299508be4be880f6a27.json","shared/619f42a634cc1916132a.json","shared/9236d77ae20dd9c09f2a.json","shared/abcd066e5e4c5822464e.json","shared/577727a524462281c348.json","shared/105485786fba7bae2738.json","shared/8601766394a3e91db3db.json","shared/f5f7a5e44344d1a2ff8f.json","shared/087c5c4c7cea258aa3a8.json","shared/aac2143133865eaac933.json","shared/90731372ff7471ef246d.json","shared/847daac6e8a1d32fe521.json","shared/a45b48b352d158dcde75.json","shared/f7b83f91649db5885863.json","shared/b50212859b214f0e98cd.json","shared/348815c49aa14d328782.json","shared/775d9b3ad525ef48cbc3.json","shared/9e7ae4062040352bb0a1.json","shared/8a107296e1d217da8c38.json","shared/b2998750c41bf3c3126f.json","shared/70d67ff77e2feda78bc8.json","shared/c9a5af103a62e130021d.json","shared/d603a709593ebd786976.json","shared/1c475918e909eef4d3e2.json","shared/a48e40faa663e89bd217.json","shared/d2c3820ececc4f00e14f.json","shared/068f730ff21d7dca4147.json","shared/55ecfd2b20245aa4392a.json","shared/0099ffe79bc20b05dd8d.json","shared/67df0fd47335b690a705.json","shared/6b9381c34a77af676f57.json","shared/13de77440be2b1d32bd3.json","shared/df4c1ef3db21d010398f.json","shared/bbb39394cfa907191811.json","shared/0e37ba39dc00f5e360c4.json","shared/834a74f33795dcb0cad9.json","shared/b0eab27d64346932f056.json","shared/ee179e7d88ca6e1fe042.json","shared/3dd132b480efb7e12892.json","shared/b3e2f9c5509fa4fd6ddf.json","shared/865405f1a04f44fda9a2.json","shared/156b54a4d20ea17b0021.json","shared/650b580db61be6ff3c48.json","shared/45ca0d791c32e24c2225.json","shared/a54e4ebc77b32fe0dd1f.json","shared/9fbbc3e56ce3cf7fafe3.json","shared/fa77f9d6ffe6e9b9bc58.json","shared/0dd68a25e9596e7a7242.json","shared/c37ce9dfc9fbae12b4fc.json","shared/06eea2f3f5feaf3e534b.json","shared/498072c102843d84bf7f.json","shared/2c3d59cd7c66228e0830.json","shared/4c18b7cbfb9a10bc5701.json","shared/1aa329f40b660c40a0a5.json","shared/ce2866a55f34d77986c0.json","shared/b08992dc225b542ba665.json","shared/2a5c2207aaa1e6bc329a.json","shared/5bec21f7c25dd8fcc7b0.json","shared/306132e4638252f23924.json","shared/4818622c9156ec6a071d.json","shared/7024cb976fc9ed1b9fd9.json","shared/941ec3c4401c90220475.json","shared/41842725e3f12ac171da.json","shared/b82b9a05738b6a4c765b.json","shared/40b5efdf61ef32fbab19.json","shared/e9d53a567d337f230fb9.json","shared/b1a565a1cf0db5ec7851.json","shared/ab1bbee8cf60be0435cd.json","shared/45abf62ae31f243c6cad.json","shared/6a253fefb11354e9ae03.json","shared/d1d5f7f0f09a408bed21.json","shared/1610694ae84f0678321c.json","shared/8d2e5865df241b0470bf.json","shared/a3e1f6ff1dfebf7a87aa.json","shared/32f8b4401dae2626195b.json","shared/d279ecd29df796e499ef.json","shared/57829e596c7f6bc9f64f.json","shared/a4e63fe5f84c205975d6.json","shared/1c9e0234a407b486991f.json","shared/0b2a3904a9b7c7d2aa69.json","shared/e854b6f034e15115988c.json","shared/fb584e4613332dc8d4f9.json","shared/9a6b318573657779037a.json","shared/f916437cb55322d7737c.json","shared/7dd6bb7717feb8408d2d.json","shared/fb3095ee0fcc465b37dd.json","shared/44811a7456fc26cac8b7.json","shared/2837f955f0bbc26a0864.json","shared/530d29966e3220b4078c.json","shared/a11b902124d2164f1f2e.json","shared/5e20f026824c619974cd.json","shared/10756ec1f34f21008dfb.json","shared/7cc83720bc0fa35d389e.json","shared/5a9061811bc6572abc23.json","shared/c5e87b254bfffaa855bd.json","shared/345e68bff3e835d9e663.json","shared/979dc585656b91ffa27d.json","shared/5780028389b373c6ce53.json","shared/9dba665eb6997c2c3292.json","shared/2924497f62b4006c5e86.json","shared/0f72ac6ccb5ffdfb86b1.json","shared/4ffb5596914a11b997e1.json","shared/d7cb733d8f4190470c05.json","shared/bbbdebe7d6384423aef5.json","shared/9929d1b3868a4d6b6787.json","shared/04d7ac2a15aca255d5f1.json","shared/154674a94b51cffed07c.json","shared/62c1e467024cdd732a88.json","shared/78656a56eab49b40628d.json","shared/b96d27266c12a258f65b.json","shared/4dde600252ae118f05ab.json","shared/cf301c36b11a242687a2.json","shared/7485133ec993b2d8f229.json","shared/557d4d06cc3c9df8fd3a.json","shared/5fbdc81a45ab2d2021f5.json","shared/6d16379e7e7504d02c5e.json","shared/58bfb2536bcc3284ee17.json","shared/bb2995a8ecd5ac9a643c.json","shared/a4a0d43bdb3047091ff1.json","shared/042f6981c655ce9be8c6.json","shared/2cb3c59487fb5c3c5138.json","shared/cf21be389e31c965c48b.json","shared/8fd68cb44332f0661f2c.json","shared/a62db9d51a846823485b.json","shared/405930e4bb797fb728dc.json","shared/81ed47cd86c418ce2082.json","shared/6aad3705a65cd85ee0ce.json","shared/8787a195ce51a9162b62.json","shared/2958c527bf791be97b0e.json","shared/62659d37ea0bdc045f83.json","shared/6012495b6ef778d779fc.json","shared/193da8443188a67bc945.json","shared/d86e2a00a825ae22933e.json","shared/fc0bc12ee69c4c40808a.json","shared/e2485f1b6a876cdf10d0.json","shared/b431a6978ec7f9a3cbcd.json","shared/d4938a67434e269616ec.json","shared/96a10e837d2d05457606.json","shared/c04c0af21691450ae1dc.json","shared/4f3122e5153c1c68a431.json","shared/22204115c7a0a46dfa16.json","shared/4592dc701ea2152ace41.json","shared/dff67a0cba11cf3c81f8.json","shared/307d143a7ddc46698b52.json","shared/bda851aa66cc73db154b.json","shared/868769f095d26fc0be02.json","shared/325e4ab78b4d4a63fa3d.json","shared/11bbd4d7afc46841ccfb.json","shared/9587968f8790944af284.json","shared/9c6677c8ae23b998c10c.json","shared/3f4452b5763938b1a027.json","shared/00a1f432b25469192cad.json","shared/170f8baacd6f7e9c7744.json","shared/98ba2374c645e5ce0b6d.json","shared/f83ffba1062ced7653aa.json","shared/a8a0418ed0e8d7d02f49.json","shared/872b33e015b0934afa74.json"]} };
+(function () {
+  const TABLE = window.masquePlayer.table;
+  const FRAMES = TABLE.frames;
+  if (!FRAMES) return;
+  function layerIndexKey(layer, index) {
+  return String(layer) + ":" + String(Number(index));
+}
+function pickKey(v) {
+  const k = layerIndexKey(v.layer, v.index);
+  return v.sample == null ? k : k + "@" + String(Number(v.sample));
+}
+function itemKey(it) {
+  const k = pickKey(it);
+  const p = it.payload;
+  if (!p || p.i0 == null) return k;
+  return k + "@" + p.i0 + "-" + p.i1 + "/" + p.j0 + "-" + p.j1;
+}
+function envKey(v) {
+  if (v == null) return "null";
+  if (Array.isArray(v.items)) return "items:" + v.items.map(itemKey).join(",");
+  if (v.layer != null && v.index != null && v.index !== "") {
+    return pickKey(v);
+  }
+  return JSON.stringify(v);
+}
+function stable(x) {
+  if (x === undefined) x = null;
+  if (x === null || typeof x !== "object") return JSON.stringify(x);
+  if (Array.isArray(x)) return "[" + x.map(stable).join(",") + "]";
+  return "{" + Object.keys(x).sort().map(function (k) { return JSON.stringify(k) + ":" + stable(x[k]); }).join(",") + "}";
+}
+// A field keys the same as its starting value when it shows the same thing: a box released
+// where it started keeps its cells though its edges differ in the last float digit.
+function changed(table, v) {
+  const out = [];
+  const init = table.initial || {};
+  (table.keyed || []).forEach(function (f) {
+    const cur = v[f] === undefined ? null : v[f];
+    const start = init[f] === undefined ? null : init[f];
+    if (stable(cur) !== stable(start) && fieldKey(table, f, cur) !== fieldKey(table, f, start)) out.push([f, cur]);
+  });
+  return out;
+}
+function fieldKey(table, f, cur) {
+  if (cur == null) return "null@" + f;
+  if ((table.controls || []).indexOf(f) !== -1) return f + "=" + JSON.stringify(cur.payload);
+  return envKey(cur);
+}
+function keyOf(table, v) {
+  if (v == null) return "null";
+  const d = changed(table, v);
+  if (!d.length) return "null";
+  return d.map(function (p) { return fieldKey(table, p[0], p[1]); }).join("+");
+}
+function keysFor(table, v) {
+  const keys = [keyOf(table, v)];
+  const d = v == null ? [] : changed(table, v);
+  const one = d.length === 1 ? d[0][1] : null;
+  if (one && one.layer != null && one.index != null && one.index !== "") {
+    keys.push(String(one.layer) + ":" + String(one.index));
+    keys.push(String(one.layer) + ":" + String(one.index | 0));
+  }
+  return keys;
+}
+function find(table, keys) {
+  for (let i = 0; i < keys.length; i++) {
+    if (Object.prototype.hasOwnProperty.call(table.keys, keys[i])) {
+      return table.snaps[table.keys[keys[i]]];
+    }
+  }
+  return null;
+}
+// Fetches each state file once and keeps it; a failed fetch is tried again next time.
+function jsonFiles() {
+  const loaded = new Map();
+  return function (file) {
+    if (!loaded.has(file)) {
+      loaded.set(file, fetch(file).then(function (r) {
+        if (!r.ok) throw new Error(file + ": " + r.status);
+        return r.json();
+      }).catch(function (e) {
+        loaded.delete(file);
+        throw e;
+      }));
+    }
+    return loaded.get(file);
+  };
+}
+// Shows each value's cells once its file loads, unless the reader reached a newer value first,
+// a miss included: a slow file never lands over a newer value's cells or its note.
+function latestOnly(load, apply, miss) {
+  let latest = 0;
+  return function (file) {
+    const n = ++latest;
+    miss(!file);
+    if (!file) return;
+    load(file).then(function (snap) {
+      if (n === latest) apply(snap);
+    }, function (e) {
+      console.warn("masque player: snapshot", e);
+      if (n === latest) miss(true);
+    });
+  };
+}
+// A reader who clicks one plot and then another changes two fields, a value the harvest never
+// recorded. Show the latest change on its own: the field that differs from the last value.
+function lookup(table, v) {
+  const prev = table.last_;
+  table.last_ = v;
+  let hit = find(table, keysFor(table, v));
+  // A moved control changes what every other field's snapshot would show, so a value the
+  // harvest skipped stays a miss rather than showing a snapshot taken at other settings.
+  const controlMoved = v != null && changed(table, v).some(function (p) { return (table.controls || []).indexOf(p[0]) !== -1; });
+  if (!hit && v != null && prev != null && !controlMoved) {
+    const moved = (table.keyed || []).filter(function (f) { return stable(v[f]) !== stable(prev[f]); });
+    if (moved.length === 0) return table.shown_ || null;
+    if (moved.length === 1) {
+      const alone = Object.assign({}, table.initial || {});
+      alone[moved[0]] = v[moved[0]];
+      hit = find(table, keysFor(table, alone));
+    }
+  }
+  if (hit) table.shown_ = hit;
+  return hit;
+}
+
+  const cache = new Map();
+  function get(url, read) {
+    if (!cache.has(url)) {
+      cache.set(url, fetch(url).then(function (r) {
+        if (!r.ok) throw new Error(url + ": " + r.status);
+        return r[read]();
+      }).catch(function (e) {
+        cache.delete(url);
+        throw e;
+      }));
+    }
+    return cache.get(url);
+  }
+  window.masqueReplayFrame = function (input) {
+    if (!input || input.onchange !== true) return Promise.resolve({});
+    const keys = keysFor(TABLE, input.state);
+    let hit = null;
+    for (let i = 0; i < keys.length && !hit; i++) {
+      if (Object.prototype.hasOwnProperty.call(FRAMES.keys, keys[i])) hit = FRAMES.keys[keys[i]];
+    }
+    if (!hit) return Promise.resolve({ error: "This wasn't computed for the docs. Download the notebook to try it." });
+    return Promise.all([get(FRAMES.dir + hit[0] + ".png", "arrayBuffer"), get(FRAMES.dir + hit[1] + ".json", "json")])
+      .then(function (r) { return Object.assign({}, r[1], { png: new Uint8Array(r[0]) }); })
+      .catch(function (e) {
+        console.warn("masque player: frame", e);
+        return { error: "This wasn't computed for the docs. Download the notebook to try it." };
+      });
+  };
+})();
+</script>
+
+<style>
+html:not(.pluto-dark) {
+        --image-filters: none;
+        --out-of-focus-opacity: 0.25;
+
+        /* Color scheme */
+        --main-bg-color: white;
+        --rule-color: rgba(0, 0, 0, 0.15);
+        --kbd-border-color: #b3b3b3;
+        --header-bg-color: white;
+        --header-border-color: rgba(0, 0, 0, 0.1);
+        --ui-button-color: #2a2a2b;
+        --cursor-color: black;
+
+        /* Cells */
+        --normal-cell: 0, 0, 0;
+        --code-differs: 160, 130, 28;
+        --error-color: 240, 168, 168;
+        --normal-cell-color: rgba(var(--normal-cell), 0.1);
+        --dark-normal-cell-color: rgba(var(--normal-cell), 0.2);
+        --selected-cell-color: rgba(40, 78, 189, 0.4);
+        --code-differs-cell-color: rgba(var(--code-differs), 0.68);
+        --error-cell-color: rgba(var(--error-color), 0.7);
+        --bright-error-cell-color: rgb(var(--error-color));
+        --light-error-cell-color: rgba(var(--error-color), 0.05);
+
+        /*Export styling*/
+        --export-bg-color: rgb(60, 67, 101);
+        --export-color: rgb(228, 228, 228);
+        --export-card-bg-color: rgba(255, 255, 255, 0.8);
+        --export-card-title-color: rgba(0, 0, 0, 0.7);
+        --export-card-text-color: rgba(0, 0, 0, 0.5);
+        --export-card-shadow-color: #00000029;
+
+        /*Frontmatter styling*/
+        --frontmatter-button-bg-color: white;
+        --frontmatter-outline-color: hsl(230, 14%, 11%);
+        --frontmatter-input-bg-color: #fbfbfb;
+        --frontmatter-input-border-color: hsl(207deg 24% 87%);
+
+        /* PlutoLand upload styling */
+        --plutoland-bg-color: white;
+        --plutoland-bigbutton-bg-color: white;
+        --plutoland-url-fg: #375bbd;
+        --plutoland-url-bg: #f7fbff;
+        --plutoland-or-bg-color: hsl(210 20% 83% / 1);
+
+        /*Pluto output styling */
+        --pluto-schema-types-color: rgba(0, 0, 0, 0.4);
+        --pluto-schema-types-border-color: rgba(0, 0, 0, 0.2);
+        /* --pluto-dim-output-color */
+        --pluto-output-color: hsl(0, 0%, 25%);
+        --pluto-output-h-color: hsl(0, 0%, 12%);
+        --pluto-output-bg-color: white;
+        --a-underline: #00000059;
+        --blockquote-color: #555;
+        --blockquote-bg: #f2f2f2;
+        --admonition-title-color: white;
+        --jl-message-color: rgb(219 233 212);
+        --jl-message-accent-color: rgb(158, 200, 137);
+        --jl-info-color: rgb(214 227 244);
+        --jl-info-accent-color: rgb(148, 182, 226);
+        --jl-warn-color: rgb(236 234 213);
+        --jl-warn-accent-color: rgb(207, 199, 138);
+        --jl-danger-color: rgb(245 218 215);
+        --jl-danger-accent-color: rgb(226, 157, 148);
+        --jl-debug-color: rgb(245 218 215);
+        --jl-debug-accent-color: rgb(226, 157, 148);
+        --footnote-border-color: rgba(23, 115, 119, 0.15);
+        --table-border-color: rgba(0, 0, 0, 0.2);
+        --table-bg-hover-color: rgba(159, 158, 224, 0.15);
+        --pluto-tree-color: rgb(0 0 0 / 38%);
+
+        /*pluto cell styling*/
+        --disabled-cell-bg-color: rgba(139, 139, 139, 0.25);
+        --selected-cell-bg-color: rgba(40, 78, 189, 0.24);
+        --hover-scrollbar-color-1: rgba(0, 0, 0, 0.15);
+        --hover-scrollbar-color-2: rgba(0, 0, 0, 0.05);
+        --skip-as-script-background-color: #ccc;
+        --depends-on-skip-as-script-background-color: #eee;
+
+        /* Pluto shoulders */
+        --shoulder-hover-bg-color: rgba(0, 0, 0, 0.05);
+
+        /* Logs */
+        --pluto-logs-bg-color: hsl(0deg 0% 98%);
+        --pluto-logs-key-color: rgb(0 0 0 / 51%);
+        --pluto-logs-progress-fill: #ffffff;
+        --pluto-logs-progress-bg: #e7e7e7;
+        --pluto-logs-progress-border: hsl(210deg 16% 74%);
+        --pluto-logs-info-color: white;
+        --pluto-logs-info-accent-color: inherit;
+        --pluto-logs-warn-color: rgb(236 234 213);
+        --pluto-logs-warn-accent-color: #665f26;
+        --pluto-logs-danger-color: rgb(245 218 215);
+        --pluto-logs-danger-accent-color: rgb(172 66 52);
+        --pluto-logs-debug-color: rgb(236 223 247);
+        --pluto-logs-debug-accent-color: rgb(100 50 179);
+
+        /*Top navbar styling*/
+        --nav-h1-text-color: black;
+        --nav-filepicker-color: #6f6f6f;
+        --nav-filepicker-border-color: #b2b2b2;
+        --nav-filepicker-suggest-color: rgba(129, 146, 160, 0.5);
+        --nav-process-status-bg-color: white;
+        --nav-process-status-color: var(--pluto-output-h-color);
+
+        /*header*/
+        --restart-recc-header-color: rgba(114, 192, 255, 0.56);
+        --restart-recc-accent-color: rgba(114, 192, 255);
+        --restart-req-header-color: rgba(170, 41, 32, 0.56);
+        --dead-process-header-color: rgb(230 88 46 / 38%);
+        --loading-header-color: hsla(290, 10%, 80%, 0.5);
+        --disconnected-header-color: rgba(255, 169, 114, 0.56);
+        --binder-loading-header-color: hsl(51deg 64% 90% / 50%);
+
+        /*loading bar*/
+        --loading-grad-color-1: #f1dba9;
+        --loading-grad-color-2: #d7d7d0;
+
+        /*saveall container*/
+        --overlay-button-bg: #ffffff;
+        --overlay-button-border: hsl(0 4% 91% / 1);
+        --overlay-button-border-save: #f3f2f2;
+        /* --overlay-button-color */
+
+        /*input_context_menu*/
+        --input-context-menu-border-color: rgba(0, 0, 0, 0.1);
+        --input-context-menu-bg-color: white;
+        --input-context-menu-soon-color: #55555544;
+        --input-context-menu-hover-bg-color: rgba(0, 0, 0, 0.1);
+        --input-context-menu-li-color: #1e1e1e;
+
+        /* ai features */
+        --ai-gradient-bg: linear-gradient(20deg, #f9ecff, #fff4f2);
+        --ai-prompt-bg: #fbffff;
+
+        /*Pkg status*/
+        --pkg-popup-bg: white;
+        --pkg-popup-border-color: #f0e4ee;
+        --pkg-popup-buttons-bg-color: white;
+        --pkg-version-color: #666;
+        --black: black;
+        --white: white;
+        --pkg-terminal-bg-color: #232433;
+        --pkg-terminal-border-color: #c3c3c3;
+
+        /* run area*/
+        --pluto-runarea-bg-color: hsl(0, 0, 97%);
+        --pluto-runarea-span-color: hsl(353, 5%, 64%);
+
+        /*drop ruler*/
+        --dropruler-bg-color: rgba(0, 0, 0, 0.5);
+
+        /* jlerror */
+        --jlerror-header-color: #4f1616;
+        --jlerror-mark-bg-color: rgb(243 243 243);
+        --jlerror-a-bg-color: #f5efd9;
+        --jlerror-a-border-left-color: #704141;
+        --jlerror-mark-color: black;
+
+        /* helpbox */
+        --helpbox-bg-color: white;
+        --helpbox-box-shadow-color: #00000010;
+        --helpbox-header-bg-color: hsl(0deg 0% 92%);
+        --helpbox-header-tab-bg-color: white;
+        --helpbox-header-color: hsl(230, 14%, 11%);
+        --helpbox-search-bg-color: #fbfbfb;
+        --helpbox-search-border-color: hsl(207deg 24% 87%);
+        --helpbox-notfound-search-color: rgb(139, 139, 139);
+        --helpbox-text-color: black;
+        --code-section-bg-color: whitesmoke;
+        --code-section-bg-color: #f3f3f3; /* TODO: Should this be `-border-color`? */
+        --process-item-bg: #f2f2f2;
+        --process-busy: #ffcd70;
+        --process-finished: hsl(126deg 30% 60%);
+        --process-undefined: rgb(151, 151, 151);
+        --process-failed: hsl(0deg 72.62% 64.6%);
+        --process-notify-bg: hsl(44.86deg 50% 94%);
+
+        /*footer*/
+        --footer-color: #333333;
+        --footer-bg-color: #d7dcd3;
+        --footer-atag-color: black;
+        --footer-input-border-color: #818181;
+        --footer-filepicker-button-color: white;
+        --footer-filepicker-focus-color: #896c6c;
+        --footnote-border-color: rgba(23, 115, 119, 0.15);
+        --settings-bg-color: hsl(328 100% 98% / 1);
+        --settings-p2-color: #717070;
+        --settings-header-bg-color: #f9dadf;
+
+        /* undo delete cell*/
+        --undo-delete-box-shadow-color: #0000000f;
+
+        /*codemirror hints*/
+        --cm-color-editor-tooltip-border: rgba(0, 0, 0, 0.2);
+        --cm-color-editor-li-aria-selected-bg: #16659d;
+        --cm-color-editor-li-aria-selected: white;
+        --cm-color-editor-li-notexported: rgba(0, 0, 0, 0.5);
+        --code-background: hsla(46, 90%, 98%, 1);
+        --cm-color-code-differs-gutters: rgba(214, 172, 35, 0.2);
+        --cm-color-line-numbers: #8d86875e;
+        --cm-selection-background: hsl(214deg 100% 73% / 48%);
+        --cm-selection-background-blurred: hsl(214deg 0% 73% / 48%);
+        --cm-highlighted: #cbceb668;
+
+        /* code highlighting */
+        --cm-color-editor-text: oklch(30% 0% 0deg);
+        --cm-color-comment: oklch(45% 60% 0deg);
+        --cm-color-keyword: oklch(45% 80% 30deg);
+        --cm-color-definition: oklch(28.455% 0.11677 29.223);
+        --cm-color-control-operator: oklch(56.456% 0.23502 350.694);
+        --cm-color-symbol: oklch(45% 80% 90deg);
+        --cm-color-command: oklch(35% 100% 120deg);
+        --cm-color-macro: oklch(45% 80% 150deg);
+        --cm-color-string: oklch(35% 100% 180deg);
+        --cm-color-variable: oklch(45% 40% 270deg);
+        --cm-color-typedef-shadow: oklch(0.91 0.09 72.03);
+        --cm-color-literal: oklch(45% 60% 330deg);
+        --cm-filter-type: brightness(150%) saturate(50%);
+        --cm-color-builtin: #5e7ad3;
+        --cm-color-function: #cc80ac;
+        --cm-color-link: #815ba4;
+        --cm-color-bracket: #41323f;
+        --cm-color-matchingBracket: black;
+        --cm-color-matchingBracket-bg: #1b4bbb21;
+        --cm-color-placeholder-text: rgba(0, 0, 0, 0.2);
+        --cm-color-clickable-underline: #ced2ef;
+
+        /* Mixed parsers */
+        --cm-color-html: #48b685;
+        --cm-color-html-accent: #00ab85;
+        --cm-color-css: #876800;
+        --cm-color-css-accent: #696200;
+        --cm-css-why-doesnt-codemirror-highlight-all-the-text-aaa: #3b3700;
+        --cm-color-md: #005a9b;
+        --cm-color-md-accent: #00a9d1;
+
+        /*autocomplete menu*/
+        --autocomplete-menu-bg-color: white;
+
+        /* Landing colors */
+        --index-text-color: hsl(0, 0, 60);
+        --index-light-text-color: #838383;
+        --index-clickable-text-color: black;
+        --docs-binding-bg: #8383830a;
+        --index-card-bg: white;
+        --welcome-mywork-bg: hsl(35deg 66% 93%);
+        --welcome-newnotebook-bg: whitesmoke;
+        --welcome-recentnotebook-bg: white;
+        --welcome-recentnotebook-border: #dfdfdf;
+        --welcome-open-bg: #fbfbfb;
+        --welcome-card-author-backdrop: #ffffffb0;
+
+        /* confirm-before-long-runtime dialog */
+        --confirm-runtime-bg: linear-gradient(180deg, #ffffff, #fdf8e9);
+        --confirm-runtime-bonus-bg: #ffffff;
+        --confirm-runtime-bonus-border: #dadaf1;
+        --confirm-runtime-button-bg: #f4f4f4;
+        --confirm-runtime-button-border: #c1c1c1;
+        --confirm-runtime-yes-bg: black;
+        --confirm-runtime-yes-color: #fff;
+        --confirm-runtime-yes-border: #9b9b9b;
+        --confirm-runtime-yes-progress: linear-gradient(90deg, black, #757575);
+    }
+html.pluto-dark {
+        --image-filters: invert(1) hue-rotate(180deg) contrast(0.8);
+        --out-of-focus-opacity: 0.5;
+
+        /* Color scheme */
+        --main-bg-color: hsl(0deg 0% 12%);
+        --rule-color: rgba(255, 255, 255, 0.15);
+        --kbd-border-color: #a3a1a1;
+        --header-bg-color: hsl(30deg 3% 16%);
+        --header-border-color: transparent;
+        --ui-button-color: rgb(255, 255, 255);
+        --cursor-color: white;
+
+        /* Cells */
+        --normal-cell: 100, 100, 100;
+        /* --code-differs */
+        --error-color: 255, 125, 125;
+        --normal-cell-color: rgba(var(--normal-cell), 0.2);
+        --dark-normal-cell-color: rgba(var(--normal-cell), 0.4);
+        --selected-cell-color: rgb(40 147 189 / 65%);
+        --code-differs-cell-color: #9b906c;
+        --error-cell-color: rgba(var(--error-color), 0.6);
+        --bright-error-cell-color: rgba(var(--error-color), 0.9);
+        --light-error-cell-color: rgba(var(--error-color), 0);
+
+        /*Export styling*/
+        --export-bg-color: hsl(225deg 17% 18%);
+        --export-color: rgb(255 255 255 / 84%);
+        --export-card-bg-color: rgb(73 73 73);
+        --export-card-title-color: rgba(255, 255, 255, 0.85);
+        --export-card-text-color: rgb(255 255 255 / 70%);
+        --export-card-shadow-color: #0000001c;
+
+        /*Frontmatter styling*/
+        --frontmatter-button-bg-color: #554e4e;
+        --frontmatter-outline-color: rgb(255 248 235);
+        --frontmatter-input-bg-color: #2c2c2c;
+        --frontmatter-input-border-color: #757575;
+
+        /* PlutoLand upload styling */
+        --plutoland-bg-color: var(--main-bg-color);
+        --plutoland-bigbutton-bg-color: #5b5858;
+        --plutoland-url-fg: #c0cdee;
+        --plutoland-url-bg: #02376f;
+        --plutoland-or-bg-color: #323334;
+
+        /*Pluto output styling */
+        --pluto-schema-types-color: hsl(0deg 0% 63%);
+        --pluto-schema-types-border-color: rgba(255, 255, 255, 0.2);
+        --pluto-dim-output-color: hsl(0, 0, 70%);
+        --pluto-output-color: hsl(0deg 0% 77%);
+        --pluto-output-h-color: hsl(0, 0%, 90%);
+        --pluto-output-bg-color: var(--main-bg-color);
+        --a-underline: #ffffff69;
+        --blockquote-color: inherit;
+        --blockquote-bg: #2e2e2e;
+        --admonition-title-color: black;
+        --jl-message-color: rgb(38 90 32);
+        --jl-message-accent-color: rgb(131 191 138);
+        --jl-info-color: rgb(42 73 115);
+        --jl-info-accent-color: rgb(92 140 205);
+        --jl-warn-color: rgb(96 90 34);
+        --jl-warn-accent-color: rgb(221 212 100);
+        --jl-danger-color: rgb(100 47 39);
+        --jl-danger-accent-color: rgb(255, 117, 98);
+        --jl-debug-color: hsl(288deg 33% 27%);
+        --jl-debug-accent-color: hsl(283deg 59% 69%);
+        /* --footnote-border-color */
+        --table-border-color: rgba(255, 255, 255, 0.2);
+        --table-bg-hover-color: rgba(193, 192, 235, 0.15);
+        --pluto-tree-color: rgb(209 207 207 / 61%);
+
+        /*pluto cell styling*/
+        --disabled-cell-bg-color: rgba(139, 139, 139, 0.25);
+        --selected-cell-bg-color: rgb(42 115 205 / 78%);
+        --hover-scrollbar-color-1: rgba(0, 0, 0, 0.15);
+        --hover-scrollbar-color-2: rgba(0, 0, 0, 0.05);
+        --skip-as-script-background-color: #888;
+        --depends-on-skip-as-script-background-color: #666;
+
+        /* Pluto shoulders */
+        --shoulder-hover-bg-color: rgba(255, 255, 255, 0.05);
+
+        /* Logs */
+        --pluto-logs-bg-color: hsl(0deg 0% 17%);
+        --pluto-logs-key-color: rgba(255, 255, 255, 0.6);
+        --pluto-logs-progress-fill: #5f7f5b;
+        --pluto-logs-progress-bg: #3d3d3d;
+        --pluto-logs-progress-border: hsl(210deg 35% 72%);
+        --pluto-logs-info-color: #484848;
+        --pluto-logs-info-accent-color: inherit;
+        --pluto-logs-warn-color: rgb(80 76 38);
+        --pluto-logs-warn-accent-color: rgb(239 231 135);
+        --pluto-logs-danger-color: rgb(100 47 39);
+        --pluto-logs-danger-accent-color: rgb(255 147 132);
+        --pluto-logs-debug-color: hsl(288deg 19% 25%);
+        --pluto-logs-debug-accent-color: hsl(283deg 56% 79%);
+
+        /*Top navbar styling*/
+        --nav-h1-text-color: white;
+        --nav-filepicker-color: #b6b6b6;
+        --nav-filepicker-border-color: #c7c7c7;
+        --nav-filepicker-suggest-color: rgba(107, 125, 140, 0.796);
+        --nav-process-status-bg-color: rgb(82, 82, 82);
+        --nav-process-status-color: var(--pluto-output-h-color);
+
+        /*header*/
+        --restart-recc-header-color: rgb(44 106 157 / 56%);
+        --restart-recc-accent-color: rgb(44 106 157);
+        --restart-req-header-color: rgb(145 66 60 / 56%);
+        --dead-process-header-color: rgba(250, 75, 21, 0.473);
+        --loading-header-color: hsl(0deg 0% 20% / 50%);
+        --disconnected-header-color: rgba(255, 169, 114, 0.56);
+        --binder-loading-header-color: hsl(51deg 64% 90% / 50%);
+
+        /*loading bar*/
+        --loading-grad-color-1: #a9d4f1;
+        --loading-grad-color-2: #d0d4d7;
+
+        /*saveall container*/
+        --overlay-button-bg: #2c2c2c;
+        --overlay-button-border: #9e9e9e70;
+        --overlay-button-border-save: #c7a74670;
+        --overlay-button-color: white;
+
+        /*input_context_menu*/
+        --input-context-menu-border-color: rgba(255, 255, 255, 0.1);
+        --input-context-menu-bg-color: rgb(39, 40, 47);
+        --input-context-menu-soon-color: #b1b1b144;
+        --input-context-menu-hover-bg-color: rgba(255, 255, 255, 0.1);
+        --input-context-menu-li-color: #c7c7c7;
+
+        /* ai features */
+        --ai-gradient-bg: linear-gradient(20deg, #371d43, #613c35);
+        --ai-prompt-bg: #3a3a3a;
+
+        /*Pkg status*/
+        --pkg-popup-bg: #3d2f44;
+        --pkg-popup-border-color: #574f56;
+        --pkg-popup-buttons-bg-color: var(--input-context-menu-bg-color);
+        --pkg-version-color: #bbb;
+        --black: white;
+        --white: black;
+        --pkg-terminal-bg-color: #252627;
+        --pkg-terminal-border-color: #c3c3c388;
+
+        /* run area*/
+        --pluto-runarea-bg-color: rgb(43, 43, 43);
+        --pluto-runarea-span-color: hsl(353, 5%, 64%);
+
+        /*drop ruler*/
+        --dropruler-bg-color: rgba(255, 255, 255, 0.1);
+
+        /* jlerror */
+        --jlerror-header-color: #d9baba;
+        --jlerror-mark-bg-color: rgb(0 0 0 / 18%);
+        --jlerror-a-bg-color: hsl(65.82deg 17.14% 27.45%);
+        --jlerror-a-border-left-color: hsl(66 27% 35% / 1);
+        --jlerror-mark-color: #b1a9a9;
+
+        /* helpbox */
+        --helpbox-bg-color: rgb(30 34 31);
+        --helpbox-box-shadow-color: #00000017;
+        --helpbox-header-bg-color: #2c3e36;
+        --helpbox-header-tab-bg-color: #554e4e;
+        --helpbox-header-color: rgb(255 248 235);
+        --helpbox-search-bg-color: #2c2c2c;
+        --helpbox-search-border-color: #757575;
+        --helpbox-notfound-search-color: rgb(139, 139, 139);
+        --helpbox-text-color: rgb(230, 230, 230);
+        --code-section-bg-color: rgb(44, 44, 44);
+        --code-section-border-color: #555a64;
+        --process-item-bg: #443d44;
+        --process-busy: #ffcd70;
+        --process-finished: hsl(126deg 30% 60%);
+        --process-undefined: rgb(151, 151, 151);
+        --process-failed: hsl(4, 30%, 60%);
+        --process-notify-bg: hsl(0 0% 21%);
+
+        /*footer*/
+        --footer-color: #cacaca;
+        --footer-bg-color: var(--header-bg-color);
+        --footer-atag-color: rgb(114, 161, 223);
+        --footer-input-border-color: #6c6c6c;
+        --footer-filepicker-button-color: black;
+        --footer-filepicker-focus-color: #c1c1c1;
+        --footnote-border-color: rgba(114, 225, 231, 0.15);
+        --settings-bg-color: rgb(30 34 31);
+        --settings-p2-color: #898989;
+        --settings-header-bg-color: #f9dadf;
+
+        /* undo delete cell*/
+        --undo-delete-box-shadow-color: rgb(0 0 0 / 6%);
+
+        /*codemirror hints*/
+        --cm-color-editor-tooltip-border: rgba(0, 0, 0, 0.2);
+        --cm-color-editor-li-aria-selected-bg: #3271e7;
+        --cm-color-editor-li-aria-selected: white;
+        --cm-color-editor-li-notexported: rgba(255, 255, 255, 0.5);
+        --code-background: hsl(222deg 16% 19%);
+        --cm-color-code-differs-gutters: rgb(235 213 28 / 11%);
+        --cm-color-line-numbers: #8d86875e;
+        --cm-selection-background: hsl(215deg 64% 59% / 48%);
+        --cm-selection-background-blurred: hsl(215deg 0% 59% / 48%);
+        --cm-highlighted: #cbceb629;
+
+        /* code highlighting */
+        --cm-color-editor-text: oklch(90% 3% 0deg);
+        --cm-color-comment: oklch(80% 30% 0deg);
+        --cm-color-keyword: oklch(70% 40% 30deg);
+        --cm-color-definition: oklch(72.266% 0.04982 26.319);
+        --cm-color-control-operator: oklch(0.72 0.19 353.17);
+        --cm-color-symbol: oklch(80% 30% 60deg);
+        --cm-color-macro: oklch(80% 30% 150deg);
+        --cm-color-command: oklch(80% 10% 120deg);
+        --cm-color-string: oklch(80% 10% 180deg);
+        --cm-color-variable: oklch(80% 10% 270deg);
+        --cm-color-typedef-shadow: oklch(0.44 0.11 63.6);
+        --cm-color-literal: oklch(80% 30% 330deg);
+        --cm-filter-type: brightness(80%) saturate(80%);
+        --cm-color-builtin: #5e7ad3;
+        --cm-color-function: #f99b15;
+        --cm-color-link: #815ba4;
+        --cm-color-bracket: #b8ab87;
+        --cm-color-matchingBracket: white;
+        --cm-color-matchingBracket-bg: #c58c237a;
+        --cm-color-placeholder-text: rgb(255 255 255 / 20%);
+        --cm-color-clickable-underline: #5d5f70;
+
+        /* Mixed parsers */
+        --cm-color-html: #00ab85;
+        --cm-color-html-accent: #00e7b4;
+        --cm-color-css: #ebd073;
+        --cm-color-css-accent: #fffed2;
+        --cm-css-why-doesnt-codemirror-highlight-all-the-text-aaa: #ffffea;
+        --cm-color-md: #a2c9d5;
+        --cm-color-md-accent: #00a9d1;
+
+        /*autocomplete menu*/
+        --autocomplete-menu-bg-color: var(--input-context-menu-bg-color);
+
+        /* Landing colors */
+        --index-text-color: rgb(199, 199, 199);
+        --index-light-text-color: rgb(199, 199, 199);
+        --index-clickable-text-color: rgb(235, 235, 235);
+        --docs-binding-bg: #323431;
+        --index-card-bg: #313131;
+        --welcome-mywork-bg: var(--header-bg-color);
+        --welcome-newnotebook-bg: rgb(68 72 102);
+        --welcome-recentnotebook-bg: #3b3b3b;
+        --welcome-recentnotebook-border: #6e6e6e;
+        --welcome-open-bg: hsl(233deg 20% 33%);
+        --welcome-card-author-backdrop: #0000006b;
+
+        /* confirm-before-long-runtime dialog */
+        --confirm-runtime-bg: linear-gradient(180deg, hsl(0 0% 19% / 1), hsl(243 14% 23% / 1));
+        --confirm-runtime-bonus-bg: hsl(0deg 0% 12.85%);
+        --confirm-runtime-bonus-border: #636363;
+        --confirm-runtime-button-bg: #3a3a3a;
+        --confirm-runtime-button-border: #5a5a5a;
+        --confirm-runtime-yes-bg: #ddd1d6;
+        --confirm-runtime-yes-color: #000;
+        --confirm-runtime-yes-border: #9f9f9f;
+        --confirm-runtime-yes-progress: linear-gradient(90deg, #f0f0f0, #9a9a9a);
+    }
+
+    @media (prefers-contrast: more) {
+        html.pluto-dark {
+            --cm-color-line-numbers: #b3b3b3;
+        }
+    }
+header#pluto-nav,
+footer,
+pluto-runarea,
+pluto-shoulder,
+pluto-cell > button,
+#helpbox-wrapper,
+.floating_back_button,
+.loading-bar,
+#binder_spinners,
+nav#undo_delete,
+.edit_or_run,
+preamble,
+.present_one_cell_at_a_time {
+  display: none !important;
+}
+body > div:not(.masque-bar):not(.masque-miss) {
+  min-height: 0 !important;
+  display: block !important;
+}
+pluto-editor,
+pluto-editor.fullscreen,
+pluto-editor.loading {
+  min-height: 0 !important;
+  height: auto !important;
+}
+pluto-editor > main,
+pluto-editor.disable_ui > main {
+  margin-top: 0 !important;
+  padding-top: 10px !important;
+  padding-bottom: 14px !important;
+}
+/* The bar sits top right over the first cell: start the cells below it. */
+body:has(.masque-bar) pluto-editor > main,
+body:has(.masque-bar) pluto-editor.disable_ui > main {
+  padding-top: 40px !important;
+}
+html, body {
+  background: var(--main-bg-color);
+}
+.masque-bar {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.masque-download,
+.masque-sim-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--pluto-output-color) 28%, transparent);
+  background: color-mix(in srgb, var(--main-bg-color) 82%, transparent);
+  color: var(--pluto-output-color);
+  font-family: var(--lato-ui-font-stack, system-ui, sans-serif);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  cursor: help;
+  user-select: none;
+}
+.masque-download {
+  cursor: pointer;
+  text-decoration: none;
+}
+.masque-download:hover,
+.masque-download:focus-visible {
+  border-color: color-mix(in srgb, var(--pluto-output-color) 55%, transparent);
+}
+.masque-miss {
+  margin: 0 8px 10px 25px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--pluto-output-color) 28%, transparent);
+  background: var(--pluto-output-bg-color, var(--main-bg-color));
+  color: var(--pluto-output-color);
+  font-family: var(--lato-ui-font-stack, system-ui, sans-serif);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+.masque-miss[hidden] { display: none; }
+.masque-miss a { color: inherit; }
+.masque-sim-chip-icon { width: 13px; height: 13px; flex: 0 0 auto; }
+.masque-sim-chip-label code {
+  font-family: var(--julia-mono-font-stack, ui-monospace, monospace);
+  font-size: 0.92em;
+  font-weight: 600;
+}
+.masque-sim-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: max-content;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--pluto-output-color) 22%, transparent);
+  background: var(--pluto-output-bg-color, var(--main-bg-color));
+  color: var(--pluto-output-color);
+  box-shadow: 0 6px 18px color-mix(in srgb, #000 16%, transparent);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-align: left;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.masque-sim-chip:hover .masque-sim-tip,
+.masque-sim-chip:focus-visible .masque-sim-tip {
+  opacity: 1;
+  visibility: visible;
+}
+
+</style>
+<script type="importmap">{"imports":{"aVc6E":"./firebase-firestore.7f842f36.js","bEDS4":"./firebase-app.b603aaa4.js"}}</script><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/editor.ca0dbe6e.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/editor.a7d04aac.css"><script type="module" src="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/frontend.4541b03a.js"></script>
+    <meta name="viewport" content="width=device-width">
+    <meta charset="utf-8">
+
+    
+<meta name="pluto-insertion-spot-meta">
+
+
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="white">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#2a2928">
+    <meta name="color-scheme" content="light dark">
+
+    <link rel="icon" type="image/png" sizes="16x16" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/favicon-16x16.fe7feca6.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/favicon-32x32.4cb27571.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/favicon-96x96.d3e6b4f5.png">
+    <link rel="pluto-external-source" id="pluto-logo-big" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/logo.103597bc.svg">
+    <link rel="pluto-external-source" id="pluto-logo-small" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/favicon_unsaturated.9ed3a6f6.svg">
+
+    <script defer="">console.log("Pluto.jl, by Fons van der Plas (https://github.com/fonsp), Mikołaj Bochenski (https://github.com/malyvsen), Michiel Dral (https://github.com/dralletje), Παναγιώτης (Panagiotis) Γεωργακόπουλος (https://github.com/pankgeorg), Paul Berg (https://github.com/Pangoraw) and friends 🌈");</script>
+
+    <script src="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/editor.2f9fc277.js" defer=""></script>
+
+    <!-- This doesn't do anything unless activated, and it makes sure parcel bundles this -->
+    <script id="iframe-resizer-content-window-script" src="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/editor.7a04a462.js" crossorigin="anonymous" defer=""></script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/editor.f6933b66.css" type="text/css">
+
+    <meta rel="pluto-cdn-root" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/">
+    <script data-pluto-file="launch-parameters">
+window.pluto_notebook_id = undefined;
+window.pluto_isolated_cell_ids = undefined;
+window.pluto_notebookfile = undefined;
+window.pluto_disable_ui = true;
+window.pluto_slider_server_url = undefined;
+window.pluto_binder_url = undefined;
+window.pluto_statefile = "data:;base64,3gATpHBhdGjZRC9ob21lL3J1bm5lci93b3JrL01hc3F1ZS5qbC9NYXNxdWUuamwvZG9jcy9zcmMvZW1iZWRzL21hcmtzX2xpbmVzLmpsqG1ldGFkYXRhgKxjZWxsX3Jlc3VsdHOG2SRjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDKKp3J1bm5pbmfCp3J1bnRpbWXOAJUnVbhkZXBlbmRzX29uX3NraXBwZWRfY2VsbHPCtXB1Ymxpc2hlZF9vYmplY3Rfa2V5c5CnZXJyb3JlZMKnY2VsbF9pZNkkYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAyuWRlcGVuZHNfb25fZGlzYWJsZWRfY2VsbHPCpnF1ZXVlZMKkbG9nc5Cmb3V0cHV0hqRib2R5oKRtaW1lqnRleHQvcGxhaW6scm9vdGFzc2lnbmVlwLJsYXN0X3J1bl90aW1lc3RhbXDLQdq/LfcdE/2wcGVyc2lzdF9qc19zdGF0ZcK3aGFzX3BsdXRvX2hvb2tfZmVhdHVyZXPC2SRlMWJlMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDGKp3J1bm5pbmfCp3J1bnRpbWXNJOS4ZGVwZW5kc19vbl9za2lwcGVkX2NlbGxzwrVwdWJsaXNoZWRfb2JqZWN0X2tleXOQp2Vycm9yZWTCp2NlbGxfaWTZJGUxYmUwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMblkZXBlbmRzX29uX2Rpc2FibGVkX2NlbGxzwqZxdWV1ZWTCpGxvZ3OQpm91dHB1dIakYm9kedoBGiJbcGxheWVyXVxuYm9uZCA9IFwic2VsXCJcbnNob3dfY29kZSA9IHRydWVcbnBsdXRvX2h0bWwgPSB0cnVlXG5wYWlycyA9IHRydWVcblxuY2VsbHMgPSBbXG4gICAgXCJjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMjBcIixcbiAgICBcImMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwMlwiLFxuICAgIFwiYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAzXCIsXG4gICAgXCJjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDRcIlxuXVxuIqRtaW1lqnRleHQvcGxhaW6scm9vdGFzc2lnbmVlulBMVVRPX1BMQVlFUl9UT01MX0NPTlRFTlRTsmxhc3RfcnVuX3RpbWVzdGFtcMtB2r8t9zt/2LBwZXJzaXN0X2pzX3N0YXRlwrdoYXNfcGx1dG9faG9va19mZWF0dXJlc8LZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwNIqncnVubmluZ8KncnVudGltZR64ZGVwZW5kc19vbl9za2lwcGVkX2NlbGxzwrVwdWJsaXNoZWRfb2JqZWN0X2tleXOQp2Vycm9yZWTCp2NlbGxfaWTZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwNLlkZXBlbmRzX29uX2Rpc2FibGVkX2NlbGxzwqZxdWV1ZWTCpGxvZ3OQpm91dHB1dIakYm9keYOoZWxlbWVudHOSkqRzaW5lkqdub3RoaW5nqnRleHQvcGxhaW6SpmNvc2luZZKnbm90aGluZ6p0ZXh0L3BsYWlupHR5cGWqTmFtZWRUdXBsZahvYmplY3RpZLBmZmZmZmZmZmJhY2M0MjJkpG1pbWXZIWFwcGxpY2F0aW9uL3ZuZC5wbHV0by50cmVlK29iamVjdKxyb290YXNzaWduZWXAsmxhc3RfcnVuX3RpbWVzdGFtcMtB2r8t97gl5bBwZXJzaXN0X2pzX3N0YXRlw7doYXNfcGx1dG9faG9va19mZWF0dXJlc8LZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAyMIqncnVubmluZ8KncnVudGltZc4AAlYBuGRlcGVuZHNfb25fc2tpcHBlZF9jZWxsc8K1cHVibGlzaGVkX29iamVjdF9rZXlzkKdlcnJvcmVkwqdjZWxsX2lk2SRjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMjC5ZGVwZW5kc19vbl9kaXNhYmxlZF9jZWxsc8KmcXVldWVkwqRsb2dzkKZvdXRwdXSGpGJvZHnZhzxkaXYgY2xhc3M9Im1hcmtkb3duIj48cD5DbGljayBuZWFyIGVpdGhlciBsaW5lIHRvIHBpY2sgaXRzIG5lYXJlc3QgcG9pbnQuIEVhY2ggbGluZSBrZWVwcyBpdHMgb3duIHBpY2sgaW4gPGNvZGU+c2VsPC9jb2RlPi48L3A+CjwvZGl2PqRtaW1lqXRleHQvaHRtbKxyb290YXNzaWduZWXAsmxhc3RfcnVuX3RpbWVzdGFtcMtB2r8t9xjB47BwZXJzaXN0X2pzX3N0YXRlwrdoYXNfcGx1dG9faG9va19mZWF0dXJlc8LZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwMYqncnVubmluZ8KncnVudGltZc4ABWcMuGRlcGVuZHNfb25fc2tpcHBlZF9jZWxsc8K1cHVibGlzaGVkX29iamVjdF9rZXlzkKdlcnJvcmVkwqdjZWxsX2lk2SRjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDG5ZGVwZW5kc19vbl9kaXNhYmxlZF9jZWxsc8KmcXVldWVkwqRsb2dzkKZvdXRwdXSGpGJvZHmgpG1pbWWqdGV4dC9wbGFpbqxyb290YXNzaWduZWXAsmxhc3RfcnVuX3RpbWVzdGFtcMtB2r8t9xiSzbBwZXJzaXN0X2pzX3N0YXRlwrdoYXNfcGx1dG9faG9va19mZWF0dXJlc8LZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwM4qncnVubmluZ8KncnVudGltZc4Ax08IuGRlcGVuZHNfb25fc2tpcHBlZF9jZWxsc8K1cHVibGlzaGVkX29iamVjdF9rZXlzkdk1ZDA3MGRiOTgtZTJjNC0xMWYxLTk4MjgtNzE4YTUzNDZjNGU2LzRhMDMzM2JmMjI1NDQ0NTanZXJyb3JlZMKnY2VsbF9pZNkkYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAzuWRlcGVuZHNfb25fZGlzYWJsZWRfY2VsbHPCpnF1ZXVlZMKkbG9nc5Cmb3V0cHV0hqRib2R52gJFPGJvbmQgZGVmPSJzZWwiIHVuaXF1ZV9pZD0idmptdXh4Z2xhemZxIj48ZGl2IGNsYXNzPSJpcC1ob3N0IiBzdHlsZT0icG9zaXRpb246cmVsYXRpdmU7IGRpc3BsYXk6aW5saW5lLWJsb2NrOyB3aWR0aDoxMDAlOyBtYXgtd2lkdGg6NTYwcHg7Ij4KICA8aW1nIHNyYz0ic2hhcmVkLzBiOWI4NDY4NDJlZGVjNDZiOTQzLnBuZyIgc3R5bGU9ImRpc3BsYXk6YmxvY2s7IHdpZHRoOjEwMCU7IGhlaWdodDphdXRvOyIgZHJhZ2dhYmxlPSJmYWxzZSI+CiAgPHNjcmlwdD4KICAgIAogICAgY29uc3QgbWFuaWZlc3QgPSAvKiBTZWUgdGhlIGRvY3VtZW50YXRpb24gZm9yIEFic3RyYWN0UGx1dG9EaW5nZXRqZXMuRGlzcGxheS5wdWJsaXNoZWRfdG9fanMgKi8gZ2V0UHVibGlzaGVkT2JqZWN0KCJkMDcwZGI5OC1lMmM0LTExZjEtOTgyOC03MThhNTM0NmM0ZTYvNGEwMzMzYmYyMjU0NDQ1NiIpOwogICAgY29uc3QgcmVxdWVzdEZyYW1lID0gbnVsbDsKICAgIHdpbmRvdy5NYXNxdWUubW91bnQoY3VycmVudFNjcmlwdCwgbWFuaWZlc3QsIGludmFsaWRhdGlvbiwgcmVxdWVzdEZyYW1lKTsKICA8L3NjcmlwdD4KPC9kaXY+CjwvYm9uZD6kbWltZal0ZXh0L2h0bWyscm9vdGFzc2lnbmVlwLJsYXN0X3J1bl90aW1lc3RhbXDLQdq/Lfe4G5OwcGVyc2lzdF9qc19zdGF0ZcK3aGFzX3BsdXRvX2hvb2tfZmVhdHVyZXPCsXB1Ymxpc2hlZF9vYmplY3Rzgdk1ZDA3MGRiOTgtZTJjNC0xMWYxLTk4MjgtNzE4YTUzNDZjNGU2LzRhMDMzM2JmMjI1NDQ0NTaJpmhlaWdodM0C0KZsYXllcnOSjKZwb2ludHORx6gXAAAAAAAAgD8AAAA/QKlgPwAAgD9AUQo/AADAP6rekD0AAABAMxHVvgAAIEC/F02/AABAQCZwfb8AAGBAoLtvvwAAgEAwVSe/AACQQNvaV74AAKBALDyRPgAAsEBiazU/AADAQLjNdT8AANBApgF6PwAA4EC9/0A/AADwQC96sT4AAABB9v0UvgAACEF0HRq/AAAQQdU/ab8AABhBrUZ/vwAAIEFkzVa/o3RvbAypbGluZXdpZHRoy0AIAAAAAAAApGF4aXOjYXgxpXN0eWxlgaV3aWR0aAKmZXZlbnRzkqVjbGlja6Vob3ZlcqRraW5kpWxpbmVzomlkpmNvc2luZahnZW9tZXRyeZHcACrMlzzMw17M8My7zQEdzQE+zQFJzQHFzQF2zQIwzQGizQJkzQHPzQJVzQH8zQIHzQIozQGMzQJVzQEDzQKCzI3NAq5HzQLbQs0DCMyAzQM0zPHNA2HNAXrNA43NAfnNA7rNAk7NA+fNAmbNBBPNAjqkZHJhdxSocGF5bG9hZHORgaVpbmRleAGkYm9uZKdlbGVtZW50jKZwb2ludHORx6gXAAAAAAAAAAAAAAA/RHf1PgAAgD+kalc/AADAP9Vbfz8AAABAt8doPwAAIEB4NRk/AABAQMOBED4AAGBA3JmzvgAAgEDPvUG/AACQQGo/er8AAKBAEHx1vwAAsEBKnjS/AADAQIwPj74AANBAakhcPgAA4EBGMCg/AADwQMQgcD8AAABBlUZ9PwAACEGnaUw/AAAQQTIB0z4AABhB1eiZvQAAIEH4RAu/o3RvbAypbGluZXdpZHRoy0AIAAAAAAAApGF4aXOjYXgxpXN0eWxlgaV3aWR0aAKmZXZlbnRzkqVjbGlja6Vob3ZlcqRraW5kpWxpbmVzomlkpHNpbmWoZ2VvbWV0cnmR3AAqzJfNAVHMw8zMzPBozQEdPM0BSVXNAXbMq80Bos0BKs0Bz80Bs80B/M0CJM0CKM0CYc0CVc0CXM0Cgs0CFc0Crs0Bn80C280BFs0DCMybzQM0Tc0DYT/NA410zQO6zN/NA+fNAWbNBBPNAeikZHJhdxOocGF5bG9hZHORgaVpbmRleAGkYm9uZKdlbGVtZW50p2luaXRpYWyCpHNpbmXApmNvc2luZcCoY3NzV2lkdGjNAjCqdHJhbnNmb3Jtc4GjYXgxjaZ4c2NhbGWoaWRlbnRpdHmleWxpbXPYGC8OyCFwjfG/C4hSVwWZ8T+leGxpbXPYGAAAAAQAAOC/AABAAAAAJUCpdmFsdWVheGlzwKVwb2xhcsCkaXMzZMKpeHJldmVyc2VkwqV5Y2F0c8CleGNhdHPAqXlyZXZlcnNlZMKmeXNjYWxlqGlkZW50aXR5qHZpZXdwb3J0xyAYAAAAAACAWkAAAAAAAABAQAAAAAAAsI5AAAAAAAAQg0CnaXNwb2xhcsKld2lkdGjNBGCnc2NhbGluZ8tAAAAAAAAAAKpiYWNrZ3JvdW5ksHJnYigyNTUsMjU1LDI1NSmmZmllbGRzkqRzaW5lpmNvc2luZaVib25kc4C0Y2VsbF9leGVjdXRpb25fb3JkZXKW2SRjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDHZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAyMNkkYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAy2SRjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDPZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwNNkkZTFiZTAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxrnByb2Nlc3Nfc3RhdHVzpXJlYWR5rWp1bGlhX3ZlcnNpb26ndjEuMTMuNKtzdGF0dXNfdHJlZYWoc3VidGFza3ODqXdvcmtzcGFjZYWoc3VidGFza3OCrGluaXRfcHJvY2Vzc4Woc3VidGFza3OEoTOFqHN1YnRhc2tzgKRuYW1loTOrZmluaXNoZWRfYXTLQdq/LfcYWpunc3VjY2Vzc8Oqc3RhcnRlZF9hdMtB2r8t9xhalqE0hahzdWJ0YXNrc4CkbmFtZaE0q2ZpbmlzaGVkX2F0y0Havy33GHEAp3N1Y2Nlc3PDqnN0YXJ0ZWRfYXTLQdq/LfcYWp+hMYWoc3VidGFza3OApG5hbWWhMatmaW5pc2hlZF9hdMtB2r8t9xhXbadzdWNjZXNzw6pzdGFydGVkX2F0y0Havy33GEdjoTKFqHN1YnRhc2tzgKRuYW1loTKrZmluaXNoZWRfYXTLQdq/LfcYWpanc3VjY2Vzc8Oqc3RhcnRlZF9hdMtB2r8t9xhXcaRuYW1lrGluaXRfcHJvY2Vzc6tmaW5pc2hlZF9hdMtB2r8t9xhxAKdzdWNjZXNzw6pzdGFydGVkX2F0y0Havy33GEdSrmNyZWF0ZV9wcm9jZXNzhahzdWJ0YXNrc4CkbmFtZa5jcmVhdGVfcHJvY2Vzc6tmaW5pc2hlZF9hdMtB2r8t9xhHTqdzdWNjZXNzw6pzdGFydGVkX2F0y0Havy33GEOFpG5hbWWpd29ya3NwYWNlq2ZpbmlzaGVkX2F0y0Havy33GHEEp3N1Y2Nlc3PDqnN0YXJ0ZWRfYXTLQdq/LfcYQ4WjcGtnhahzdWJ0YXNrc4GoYW5hbHlzaXOFqHN1YnRhc2tzgKRuYW1lqGFuYWx5c2lzq2ZpbmlzaGVkX2F0y0Havy33txOpp3N1Y2Nlc3PDqnN0YXJ0ZWRfYXTLQdq/Lfe29/CkbmFtZaNwa2erZmluaXNoZWRfYXTLQdq/Lfe3E62nc3VjY2Vzc8Oqc3RhcnRlZF9hdMtB2r8t97b38KNydW6FqHN1YnRhc2tzgqhldmFsdWF0ZYWoc3VidGFza3OCoTGFqHN1YnRhc2tzgKRuYW1loTGrZmluaXNoZWRfYXTLQdq/Lfe4G6ync3VjY2Vzc8Oqc3RhcnRlZF9hdMtB2r8t97cuXqEyhahzdWJ0YXNrc4CkbmFtZaEyq2ZpbmlzaGVkX2F0y0Havy33uCXyp3N1Y2Nlc3PDqnN0YXJ0ZWRfYXTLQdq/Lfe4G72kbmFtZahldmFsdWF0ZatmaW5pc2hlZF9hdMtB2r8t97gl+qdzdWNjZXNzw6pzdGFydGVkX2F0y0Havy33txyPsHJlc29sdmVfdG9wb2xvZ3mFqHN1YnRhc2tzgKRuYW1lsHJlc29sdmVfdG9wb2xvZ3mrZmluaXNoZWRfYXTLQdq/Lfe3HI+nc3VjY2Vzc8Oqc3RhcnRlZF9hdMtB2r8t97cadqRuYW1lo3J1bqtmaW5pc2hlZF9hdMtB2r8t97gl+qdzdWNjZXNzw6pzdGFydGVkX2F0y0Havy33txp2pG5hbWWobm90ZWJvb2urZmluaXNoZWRfYXTAp3N1Y2Nlc3PAqnN0YXJ0ZWRfYXTLQdq/LfcXz+qqY2VsbF9vcmRlcpTZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAyMNkkYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAy2SRjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDPZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwNKtjZWxsX2lucHV0c4bZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwMoSobWV0YWRhdGGDqGRpc2FibGVkwqlzaG93X2xvZ3PDrnNraXBfYXNfc2NyaXB0wqdjZWxsX2lk2SRjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDKrY29kZV9mb2xkZWTCpGNvZGXZqGJlZ2luCiAgICBmaWcgPSBGaWd1cmUoc2l6ZSA9ICg1NjAsIDM2MCkpCiAgICBheCA9IEF4aXMoZmlnWzEsIDFdKQogICAgeHMgPSAwOjAuNToxMAogICAgbDEgPSBsaW5lcyEoYXgsIHhzLCBzaW4uKHhzKSkKICAgIGwyID0gbGluZXMhKGF4LCB4cywgY29zLih4cykpCiAgICBub3RoaW5nCmVuZNkkZTFiZTAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxhKhtZXRhZGF0YYOoZGlzYWJsZWTCqXNob3dfbG9nc8Ouc2tpcF9hc19zY3JpcHTCp2NlbGxfaWTZJGUxYmUwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMatjb2RlX2ZvbGRlZMOkY29kZdoBJlBMVVRPX1BMQVlFUl9UT01MX0NPTlRFTlRTID0gIiIiCltwbGF5ZXJdCmJvbmQgPSAic2VsIgpzaG93X2NvZGUgPSB0cnVlCnBsdXRvX2h0bWwgPSB0cnVlCnBhaXJzID0gdHJ1ZQoKY2VsbHMgPSBbCiAgICAiYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDIwIiwKICAgICJjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDIiLAogICAgImMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwMyIsCiAgICAiYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDA0IgpdCiIiItkkYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDA0hKhtZXRhZGF0YYOoZGlzYWJsZWTCqXNob3dfbG9nc8Ouc2tpcF9hc19zY3JpcHTCp2NlbGxfaWTZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwNKtjb2RlX2ZvbGRlZMKkY29kZaNzZWzZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAyMISobWV0YWRhdGGDqGRpc2FibGVkwqlzaG93X2xvZ3PDrnNraXBfYXNfc2NyaXB0wqdjZWxsX2lk2SRjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMjCrY29kZV9mb2xkZWTDpGNvZGXZYm1kIiIiCkNsaWNrIG5lYXIgZWl0aGVyIGxpbmUgdG8gcGljayBpdHMgbmVhcmVzdCBwb2ludC4gRWFjaCBsaW5lIGtlZXBzIGl0cyBvd24gcGljayBpbiBgc2VsYC4KIiIi2SRjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDGEqG1ldGFkYXRhg6hkaXNhYmxlZMKpc2hvd19sb2dzw65za2lwX2FzX3NjcmlwdMKnY2VsbF9pZNkkYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAxq2NvZGVfZm9sZGVkwqRjb2RluHVzaW5nIENhaXJvTWFraWUsIE1hc3F1ZdkkYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAzhKhtZXRhZGF0YYOoZGlzYWJsZWTCqXNob3dfbG9nc8Ouc2tpcF9hc19zY3JpcHTCp2NlbGxfaWTZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwM6tjb2RlX2ZvbGRlZMKkY29kZdk2QGJpbmQgc2VsIG1hc3F1ZShmaWc7IGJpbmQgPSAoc2luZSA9IGwxLCBjb3NpbmUgPSBsMikptGxhc3RfaG90X3JlbG9hZF90aW1lywAAAAAAAAAAsWNlbGxfZGVwZW5kZW5jaWVzhtkkYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAyhLRwcmVjZWRlbmNlX2hldXJpc3RpYwmnY2VsbF9pZNkkYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAytGRvd25zdHJlYW1fY2VsbHNfbWFwhaJsMZHZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwM6JsMpHZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwM6J4c5CjZmlnkdkkYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAzomF4kLJ1cHN0cmVhbV9jZWxsc19tYXCHoTqQpkZpZ3VyZZCmbGluZXMhkKRBeGlzkKNjb3OQo3NpbpCnbm90aGluZ5DZJGUxYmUwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMYS0cHJlY2VkZW5jZV9oZXVyaXN0aWMJp2NlbGxfaWTZJGUxYmUwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMbRkb3duc3RyZWFtX2NlbGxzX21hcIG6UExVVE9fUExBWUVSX1RPTUxfQ09OVEVOVFOQsnVwc3RyZWFtX2NlbGxzX21hcIDZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwNIS0cHJlY2VkZW5jZV9oZXVyaXN0aWMJp2NlbGxfaWTZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwNLRkb3duc3RyZWFtX2NlbGxzX21hcICydXBzdHJlYW1fY2VsbHNfbWFwgaNzZWyR2SRjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDPZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAyMIS0cHJlY2VkZW5jZV9oZXVyaXN0aWMJp2NlbGxfaWTZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAyMLRkb3duc3RyZWFtX2NlbGxzX21hcICydXBzdHJlYW1fY2VsbHNfbWFwgqdAbWRfc3RykKhnZXRpbmRleJDZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwMYS0cHJlY2VkZW5jZV9oZXVyaXN0aWMHp2NlbGxfaWTZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwMbRkb3duc3RyZWFtX2NlbGxzX21hcIKqQ2Fpcm9NYWtpZZCmTWFzcXVlkLJ1cHN0cmVhbV9jZWxsc19tYXCA2SRjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDOEtHByZWNlZGVuY2VfaGV1cmlzdGljCadjZWxsX2lk2SRjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDO0ZG93bnN0cmVhbV9jZWxsc19tYXCBo3NlbJHZJGMwYTEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwNLJ1cHN0cmVhbV9jZWxsc19tYXCLq1BsdXRvUnVubmVykK9Db3JlLmFwcGxpY2FibGWQpENvcmWQpEJhc2WQomwykdkkYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAyomwxkdkkYzBhMTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAyqEJhc2UuZ2V0kKVAYmluZJCmbWFzcXVlkKNmaWeR2SRjMGExMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDK3UGx1dG9SdW5uZXIuY3JlYXRlX2JvbmSQqXNob3J0cGF0aK5tYXJrc19saW5lcy5qbK5sYXN0X3NhdmVfdGltZctB2r8t9xfP8qtub3RlYm9va19pZNkkZDA3MGRiOTgtZTJjNC0xMWYxLTk4MjgtNzE4YTUzNDZjNGU2pW5icGtniq1idXN5X3BhY2thZ2VzkNksd2FpdGluZ19mb3JfcGVybWlzc2lvbl9idXRfcHJvYmFibHlfZGlzYWJsZWTCp2VuYWJsZWTDsHRlcm1pbmFsX291dHB1dHOAtndhaXRpbmdfZm9yX3Blcm1pc3Npb27Ct3Jlc3RhcnRfcmVjb21tZW5kZWRfbXNnwLRyZXN0YXJ0X3JlcXVpcmVkX21zZ8CyaW5zdGFsbGVkX3ZlcnNpb25zhKpDYWlyb01ha2llp25vdGhpbme4X19pbnRlcm5hbF9qdWxpYV92ZXJzaW9upjEuMTMuNKZNYXNxdWWnbm90aGluZ9khX19pbnRlcm5hbF9qdWxpYV9tYW5pZmVzdF92ZXJzaW9upzEuMTAuMTKvaW5zdGFsbF90aW1lX25zAKxpbnN0YW50aWF0ZWTDrXBsdXRvX3ZlcnNpb26mdjEuMC4zq2luX3RlbXBfZGlywg==";
+window.pluto_preamble_html = undefined;
+window.pluto_recording_url = undefined;
+window.pluto_recording_audio_url = undefined;
+</script>
+
+<meta name="pluto-insertion-spot-parameters">
+
+    <script src="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/editor.9e3719ed.js" type="module" defer=""></script>
+    <script src="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/frontend.ae6e0116.js"></script>
+
+    <link rel="pluto-external-source" id="vmsg-wasm" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/vmsg.56bb9389.wasm">
+    <!-- This script will be enabled by JS after the notebook has initialized to prevent taking up bandwidth during the initial load. -->
+    <link rel="pluto-external-source" id="MathJax-script" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/tex-svg-full.b78c0ac1.js" type="text/javascript">
+    
+    
+<meta name="pluto-insertion-spot-preload">
+
+</head>
+
+<body class="no-MαθJax">
+    <div style="min-height:100vh;display:flex">
+        <pluto-editor class="loading fullscreen" translate="no">
+            <progress style="filter:grayscale()" class="statefile-fetch-progress delete-me-when-live" max="100"></progress>
+        </pluto-editor>
+    </div>
+
+
+
+<div class="masque-bar">
+<a class="masque-download" href="downloads/marks_lines.jl" download="marks_lines.jl">Download notebook</a>
+<div class="masque-sim-chip" tabindex="0" aria-describedby="masque-sim-tip">
+  <svg class="masque-sim-chip-icon" viewBox="0 0 16 16" aria-hidden="true">
+    <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <circle cx="8" cy="5.15" r="1" fill="currentColor"/>
+    <path d="M8 7.4v4.1" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+  </svg>
+  <span class="masque-sim-chip-label">Simulating <code>@bind</code></span>
+  <span id="masque-sim-tip" class="masque-sim-tip" role="tooltip">Precomputed snapshots, not a live Julia process.</span>
+</div>
+</div>
+<div class="masque-miss" role="status" hidden>This wasn't computed for the docs. <a href="downloads/marks_lines.jl" download="marks_lines.jl">Download the notebook</a> to try it.</div>
+<script>
+{
+  const TABLE = window.masquePlayer.table;
+  const WIDGET_ID = "c0a10004-0001-4000-8000-000000000003";
+  function layerIndexKey(layer, index) {
+  return String(layer) + ":" + String(Number(index));
+}
+function pickKey(v) {
+  const k = layerIndexKey(v.layer, v.index);
+  return v.sample == null ? k : k + "@" + String(Number(v.sample));
+}
+function itemKey(it) {
+  const k = pickKey(it);
+  const p = it.payload;
+  if (!p || p.i0 == null) return k;
+  return k + "@" + p.i0 + "-" + p.i1 + "/" + p.j0 + "-" + p.j1;
+}
+function envKey(v) {
+  if (v == null) return "null";
+  if (Array.isArray(v.items)) return "items:" + v.items.map(itemKey).join(",");
+  if (v.layer != null && v.index != null && v.index !== "") {
+    return pickKey(v);
+  }
+  return JSON.stringify(v);
+}
+function stable(x) {
+  if (x === undefined) x = null;
+  if (x === null || typeof x !== "object") return JSON.stringify(x);
+  if (Array.isArray(x)) return "[" + x.map(stable).join(",") + "]";
+  return "{" + Object.keys(x).sort().map(function (k) { return JSON.stringify(k) + ":" + stable(x[k]); }).join(",") + "}";
+}
+// A field keys the same as its starting value when it shows the same thing: a box released
+// where it started keeps its cells though its edges differ in the last float digit.
+function changed(table, v) {
+  const out = [];
+  const init = table.initial || {};
+  (table.keyed || []).forEach(function (f) {
+    const cur = v[f] === undefined ? null : v[f];
+    const start = init[f] === undefined ? null : init[f];
+    if (stable(cur) !== stable(start) && fieldKey(table, f, cur) !== fieldKey(table, f, start)) out.push([f, cur]);
+  });
+  return out;
+}
+function fieldKey(table, f, cur) {
+  if (cur == null) return "null@" + f;
+  if ((table.controls || []).indexOf(f) !== -1) return f + "=" + JSON.stringify(cur.payload);
+  return envKey(cur);
+}
+function keyOf(table, v) {
+  if (v == null) return "null";
+  const d = changed(table, v);
+  if (!d.length) return "null";
+  return d.map(function (p) { return fieldKey(table, p[0], p[1]); }).join("+");
+}
+function keysFor(table, v) {
+  const keys = [keyOf(table, v)];
+  const d = v == null ? [] : changed(table, v);
+  const one = d.length === 1 ? d[0][1] : null;
+  if (one && one.layer != null && one.index != null && one.index !== "") {
+    keys.push(String(one.layer) + ":" + String(one.index));
+    keys.push(String(one.layer) + ":" + String(one.index | 0));
+  }
+  return keys;
+}
+function find(table, keys) {
+  for (let i = 0; i < keys.length; i++) {
+    if (Object.prototype.hasOwnProperty.call(table.keys, keys[i])) {
+      return table.snaps[table.keys[keys[i]]];
+    }
+  }
+  return null;
+}
+// Fetches each state file once and keeps it; a failed fetch is tried again next time.
+function jsonFiles() {
+  const loaded = new Map();
+  return function (file) {
+    if (!loaded.has(file)) {
+      loaded.set(file, fetch(file).then(function (r) {
+        if (!r.ok) throw new Error(file + ": " + r.status);
+        return r.json();
+      }).catch(function (e) {
+        loaded.delete(file);
+        throw e;
+      }));
+    }
+    return loaded.get(file);
+  };
+}
+// Shows each value's cells once its file loads, unless the reader reached a newer value first,
+// a miss included: a slow file never lands over a newer value's cells or its note.
+function latestOnly(load, apply, miss) {
+  let latest = 0;
+  return function (file) {
+    const n = ++latest;
+    miss(!file);
+    if (!file) return;
+    load(file).then(function (snap) {
+      if (n === latest) apply(snap);
+    }, function (e) {
+      console.warn("masque player: snapshot", e);
+      if (n === latest) miss(true);
+    });
+  };
+}
+// A reader who clicks one plot and then another changes two fields, a value the harvest never
+// recorded. Show the latest change on its own: the field that differs from the last value.
+function lookup(table, v) {
+  const prev = table.last_;
+  table.last_ = v;
+  let hit = find(table, keysFor(table, v));
+  // A moved control changes what every other field's snapshot would show, so a value the
+  // harvest skipped stays a miss rather than showing a snapshot taken at other settings.
+  const controlMoved = v != null && changed(table, v).some(function (p) { return (table.controls || []).indexOf(p[0]) !== -1; });
+  if (!hit && v != null && prev != null && !controlMoved) {
+    const moved = (table.keyed || []).filter(function (f) { return stable(v[f]) !== stable(prev[f]); });
+    if (moved.length === 0) return table.shown_ || null;
+    if (moved.length === 1) {
+      const alone = Object.assign({}, table.initial || {});
+      alone[moved[0]] = v[moved[0]];
+      hit = find(table, keysFor(table, alone));
+    }
+  }
+  if (hit) table.shown_ = hit;
+  return hit;
+}
+
+  // A value the harvest didn't record leaves the cells as they were, and says so in each part
+  // that shows one of those cells. The widget's own part has the overlay's note for its picture.
+  const miss = window.masqueSegment && !window.masqueSegment.some(function (id) { return id !== WIDGET_ID; })
+    ? null : document.querySelector(".masque-miss");
+  function showMiss(on) {
+    if (!miss || miss.hidden === !on) return;
+    miss.hidden = !on;
+    sizeFrame();
+  }
+  // Until Pluto draws the notebook, the page is as tall as the iframe, so sizing then grew the
+  // iframe a few px each frame. Keep the height the page reserved until the notebook and its
+  // pictures are in.
+  function sizeFrame() {
+    if (!window.frameElement) return;
+    const nb = document.querySelector("pluto-notebook");
+    if (!nb) return;
+    const loading = Array.prototype.filter.call(nb.querySelectorAll("img"), function (img) {
+      return !img.complete && img.offsetParent !== null;
+    });
+    if (loading.length) {
+      loading.forEach(function (img) {
+        img.addEventListener("load", sizeFrame, { once: true });
+        img.addEventListener("error", sizeFrame, { once: true });
+      });
+      return;
+    }
+    let bottom = nb.getBoundingClientRect().bottom;
+    if (miss && !miss.hidden) bottom = Math.max(bottom, miss.getBoundingClientRect().bottom);
+    window.frameElement.style.height = Math.max(1, Math.ceil(bottom + 8)) + "px";
+  }
+  // The segments of one notebook share its value: the iframe showing the widget posts each
+  // value to the page, and the page passes it to the notebook's other iframes
+  // (`assets/masque-embed.js`), which patch their own cells.
+  const framed = window.parent && window.parent !== window;
+  const showsWidget = !window.masqueSegment || window.masqueSegment.indexOf(WIDGET_ID) !== -1;
+  function announce(v) {
+    if (framed && showsWidget) window.parent.postMessage({ masque: "bond", value: v }, "*");
+  }
+  let pending;
+  let hasPending = false;
+  window.addEventListener("message", function (e) {
+    const d = e.data;
+    if (e.source !== window.parent || !d || d.masque !== "bond-relay") return;
+    if (armed) patch(d.value);
+    else {
+      pending = d.value;
+      hasPending = true;
+    }
+  });
+  let stamp = Date.now();
+  function nextStamp() {
+    stamp = Math.max(Date.now(), stamp + 1);
+    return stamp;
+  }
+  // Each state's cells are a file the page fetches the first time the reader reaches it.
+  const load = jsonFiles();
+  const show = latestOnly(load, apply, showMiss);
+  function patch(v) {
+    if (!window.editor_state_set) return;
+    const file = lookup(TABLE, v);
+    if (!file) console.warn("masque player: no snapshot for", keyOf(TABLE, v));
+    show(file);
+  }
+  function apply(snap) {
+    const t = nextStamp();
+    window.editor_state_set(function (state) {
+      const nb = state.notebook;
+      const cell_results = Object.assign({}, nb.cell_results);
+      Object.keys(snap.cells).forEach(function (id) {
+        const prev = cell_results[id];
+        if (!prev || !prev.output) return;
+        const next = snap.cells[id];
+        cell_results[id] = Object.assign({}, prev, {
+          output: Object.assign({}, prev.output, {
+            body: next.body,
+            mime: next.mime,
+            last_run_timestamp: t,
+            persist_js_state: false,
+          }),
+        });
+      });
+      return { notebook: Object.assign({}, nb, { cell_results: cell_results }) };
+    }).then(sizeFrame);
+  }
+  let armed = null;
+  function tryArm() {
+    const cell = document.getElementById(WIDGET_ID);
+    const host = cell && cell.querySelector(".ip-host");
+    if (!host || typeof window.editor_state_set !== "function") return false;
+    if (armed === host) return true;
+    armed = host;
+    let cur = host.value;
+    Object.defineProperty(host, "value", {
+      configurable: true,
+      enumerable: true,
+      get: function () { return cur; },
+      set: function (v) {
+        cur = v;
+        patch(v);
+        announce(v);
+      },
+    });
+    host.addEventListener("input", function () {
+      patch(host.value);
+      announce(host.value);
+    });
+    // A widget built with `selected=` starts with a value; the export shows the idle
+    // (`nothing`) outputs, so swap in that value's snapshot now.
+    if (cur != null) patch(cur);
+    if (hasPending) patch(pending);
+    // Ask the page for a value another segment set before this one loaded.
+    if (framed) window.parent.postMessage({ masque: "ready" }, "*");
+    return true;
+  }
+  function boot() {
+    if (!tryArm()) {
+      setTimeout(boot, 80);
+      return;
+    }
+    sizeFrame();
+  }
+  boot();
+  window.addEventListener("load", sizeFrame);
+  new ResizeObserver(sizeFrame).observe(document.documentElement);
+}
+</script>
+
+</body></html>
