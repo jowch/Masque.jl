@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-17
+
 ### Added
 - A plot with several layers takes `payloads` for each of its parts, keyed by the part's name:
   `interactables(rc; payloads = (scatter = df, violin = per_group))` for a `rainclouds!`, or
@@ -1015,7 +1017,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/jowch/Masque.jl/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/jowch/Masque.jl/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/jowch/Masque.jl/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/jowch/Masque.jl/compare/v0.4.5...v0.5.0
