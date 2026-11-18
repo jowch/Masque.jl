@@ -1400,20 +1400,21 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const g = layer.geometry as ViewGeometry
         const wheel: NonNullable<ViewGeometry["wheel"]> = g.wheel ?? "modifier"
         // An Axis3 view's limits, on screen now.
-        if (g.mode === "orbit") return { id: layer.id, axis: "", limits3: (g.limits ?? null) as Limits3 | null, wheel, layout }
-        return { id: layer.id, axis: layer.axis, limits3: null as Limits3 | null, wheel, layout }
+        if (g.mode === "orbit") return { id: layer.id, axis: "", limits3: (g.limits ?? null) as Limits3 | null, wheel, layout, g }
+        return { id: layer.id, axis: layer.axis, limits3: null as Limits3 | null, wheel, layout, g }
     }
 
     // Zoom a view by `k` (above 1 zooms in) about the point `viewAt` found, through the
     // photograph and the idle settle a wheel notch uses. A Safari pinch comes here too (#541).
     const zoomView = (hit: NonNullable<ReturnType<typeof viewAt>>, k: number) => {
-        const { id, axis, limits3, layout } = hit
+        const { id, axis, limits3, layout, g } = hit
         if (!limits3 && photoHeldByOther(state, id)) return
         if (limits3) {
             const shown = limits3
             // Axis3 (#321): no photograph to scale. Each notch asks for limits scaled about
-            // their center; the idle timer settles the last ones at full resolution.
-            const lim = viewDrag.zoom3(state, id, shown, k)
+            // the data under the pointer (#641); the idle timer settles the last ones at full
+            // resolution.
+            const lim = viewDrag.zoom3(state, id, shown, k, { g, x: layout.x, y: layout.y })
             ctx.gesture_.request({ id, limits: lim, settle: false })
             showViewReadout(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
             if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
@@ -1540,6 +1541,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         window.addEventListener("blur", viewsTouchCancel)
     }
     surface.addEventListener("pointerdown", down)
+    // A middle press that started a pan (#642) is no autoscroll: some browsers start it from
+    // the mousedown, which a cancelled pointerdown doesn't always hold back.
+    const middleDown = (e: MouseEvent) => {
+        if (e.button === 1 && state.drag_?.kind === "view") e.preventDefault()
+    }
+    surface.addEventListener("mousedown", middleDown)
     surface.addEventListener("wheel", onWheel, { passive: false })
     surface.addEventListener("gesturestart", onGestureStart)
     surface.addEventListener("gesturechange", onGestureChange)
@@ -1587,6 +1594,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         viewButtons?.remove_()
         surface.removeEventListener("pointerdown", down)
+        surface.removeEventListener("mousedown", middleDown)
         surface.removeEventListener("wheel", onWheel)
         surface.removeEventListener("gesturestart", onGestureStart)
         surface.removeEventListener("gesturechange", onGestureChange)

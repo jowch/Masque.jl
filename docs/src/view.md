@@ -90,7 +90,8 @@ directions they share. Only the axes you want to drag from need a
 ```
 
 If the same axis has a threshold line or a brushing box, a plain drag
-moves the line or box, and Shift+drag pans.
+moves the line or box, and Shift+drag pans. A drag with the middle
+mouse button always pans.
 
 To pan from the keyboard, press Tab until the view has focus, then use
 the arrow keys, and `+` / `-` to zoom. See
@@ -169,10 +170,11 @@ end
 @bind pick masque(fig, orbit)
 ```
 
-Ctrl+scroll (Cmd+scroll on a Mac) to zoom in or out around the middle of
-the axis box, and Shift+drag to pan. `wheel` works as it does on a 2D
-axis. On a touch screen, drag with two fingers to turn the view and
-pinch to zoom; one finger scrolls the page. The box keeps its size while
+Ctrl+scroll (Cmd+scroll on a Mac) to zoom in or out around the pointer,
+and Shift+drag, or drag with the middle mouse button, to pan. `wheel`
+works as it does on a 2D axis. On a touch screen, drag with two fingers
+to turn the view and pinch to zoom around your fingers; one finger
+scrolls the page. The box keeps its size while
 the data grows or slides inside it, and marks that leave the box are
 hidden and no longer respond to hover or clicks. A line that crosses the
 edge of the box still responds along the part you can see. A sphere from

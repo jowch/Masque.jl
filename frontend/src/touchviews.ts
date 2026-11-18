@@ -12,7 +12,7 @@
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import { layoutImagePx } from "./state"
 import type { HitLayer, Limits3, Manifest, ViewGeometry } from "./types"
-import { hitTestAt, innermostView, matrixLimits, slopScale, zoomLimits3 } from "./geometry"
+import { hitTestAt, innermostView, matrixLimits, slopScale, zoomAnchor3, zoomLimits3 } from "./geometry"
 import { touchReach } from "./state"
 import { clearWheelTimer, photoHeldByOther, settleCurrentPan, shownViewTransform } from "./bond"
 import { hideTip, hideViewReadout, showViewReadout } from "./hover"
@@ -52,6 +52,8 @@ interface Pair {
     d_: number // the last finger spread, CSS px
     // Axis3: the limits the gesture started from, the pinch so far, and the last limits asked.
     base3_?: Limits3
+    // Axis3: the data under the fingers' starting midpoint, which a pinch zooms about (#641).
+    anchor3_?: number[]
     k3_: number
     zoomed3_?: boolean
     lim3_?: Limits3
@@ -93,7 +95,10 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
         } else if (clearWheelTimer(state)) drag.settleOwed_ = true
         state.drag_ = drag
         pair = { drag_: drag, d_: Math.max(m.d, 1), k3_: 1 }
-        if (g.mode === "orbit" && g.limits) pair.base3_ = viewDrag.view3Base(state, layer.id, g.limits)
+        if (g.mode === "orbit" && g.limits) {
+            pair.base3_ = viewDrag.view3Base(state, layer.id, g.limits)
+            pair.anchor3_ = zoomAnchor3(g, pair.base3_, layout.x, layout.y)
+        }
         hideTip(ctx, state)
         hideCross(ctx, state)
         ctx.surface_.classList.add("grabbing")
@@ -126,7 +131,8 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
             showViewReadout(ctx, state, viewDrag.limitsTip(lim, ctx.tipDigits_, d.t_, ctx.tipExplicit_))
             return
         }
-        // Axis3: the midpoint orbits; the spread zooms the limits about their center. Once a
+        // Axis3: the midpoint orbits; the spread zooms the limits about the data under the
+        // fingers where they started (#641), else about their center. Once a
         // pinch zooms, every later request carries limits, so the settle and the remembered
         // view match what was last asked.
         p.d_ = Math.max(m.d, 1)
@@ -136,7 +142,7 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
         const zoomed = p.zoomed3_ === true
         if (zoomed) {
             const home = state.view3_.get(d.id_)?.home ?? (d.g_.limits as Limits3)
-            p.lim3_ = zoomLimits3(p.base3_ as Limits3, p.k3_, home)
+            p.lim3_ = zoomLimits3(p.base3_ as Limits3, p.k3_, home, p.anchor3_)
             input.limits = p.lim3_
         }
         ctx.gesture_.request(input)

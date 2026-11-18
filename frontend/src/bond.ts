@@ -252,10 +252,18 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
     if (state.drag_) return
     cancelPendingMove(state)
     state.justDragged_ = false
-    // preventDefault here suppresses the native menu.
-    if (e.button !== 0 || isMacContextClick(e)) {
+    // A middle-button drag pans the view under it, as Shift+drag does (#642). Any other button
+    // but the main one leaves the press to the browser; preventDefault here would suppress the
+    // native menu.
+    const middle = e.button === 1 && !isMacContextClick(e)
+    if ((e.button !== 0 && !middle) || isMacContextClick(e)) {
         if (e.button === 2 || isMacContextClick(e)) passContextToBase(ctx.surface_, e.pointerId)
         return
+    }
+    // A middle press off every view is the browser's (autoscroll, paste): no focus moved.
+    if (middle) {
+        const at = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+        if (!innermostView(ctx.manifest_, at.x, at.y)) return
     }
     // A press focuses the surface, so Escape and the arrows work after a click (#380). The
     // browser would do this itself, but the preventDefault calls below (marquee, pan, drags)
@@ -266,8 +274,9 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
     ctx.surface_.focus({ preventScroll: true })
     const { layout, content } = pointerSpace(ctx, state, e)
     const slop = slopScale(ctx.manifest_, ctx.base_.getBoundingClientRect().width)
-    // Shift+drag forces view (arbitration vs box-select / ROI / threshold).
-    if (e.shiftKey) {
+    // Shift+drag and a middle-button drag force view (arbitration vs box-select / ROI /
+    // threshold).
+    if (e.shiftKey || middle) {
         // The innermost view under the press, as for a plain drag (#559).
         const viewLayer = innermostView(ctx.manifest_, layout.x, layout.y)
         if (viewLayer) {

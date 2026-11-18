@@ -2106,9 +2106,10 @@ end
     ViewInteractable(ax; id=:view, wheel=nothing, controls=:hover)
 
 Drag-to-pan and wheel zoom (2D `Axis`), or drag-to-orbit, wheel zoom and Shift+drag pan
-(`Axis3`). Produces one `:view` [`HitLayer`](@ref)
-covering `ax`'s whole viewport; it sorts after Tier-0 `:threshold`/`:roi` layers so an ordinary
-drag on those wins without a modifier — **Shift+drag** forces the view gesture even over a
+(`Axis3`). A drag with the middle mouse button pans either. Produces one `:view`
+[`HitLayer`](@ref) covering `ax`'s whole viewport; it sorts after Tier-0 `:threshold`/`:roi`
+layers so an ordinary drag on those wins without a modifier — **Shift+drag** (or a
+middle-button drag) forces the view gesture even over a
 `ThresholdInteractable`/`ROIInteractable` hit.
 
 # Arguments
@@ -2133,10 +2134,12 @@ on an `Axis3`) and pinch-zoom it, whatever `wheel` says; a tap still clicks.
 (docs/dev/architecture/12-gesture-channel.md §12.3) — the bond `masque` returns never carries a
 `:view` [`InteractionEvent`](@ref). Drag frames stream over a `with_js_link` gesture channel
 instead, on both backends: Julia mutates `ax.limits[]` (pan, zoom) or `ax.azimuth[]`/`ax.elevation[]`
-(orbit) and ships a hit manifest for every frame the camera moves. On an `Axis3`, zoom (wheel,
-`+`/`-`) scales the limits about their center and pan (Shift+drag, Shift+arrows) shifts them
-in the screen plane, as Makie's own `Axis3` zoom and translation do; the box keeps its size and
-marks outside the new limits are clipped, so they no longer hover or click. `:cairo` ships that frame as
+(orbit) and ships a hit manifest for every frame the camera moves. On an `Axis3`, the wheel
+and a pinch scale the limits about the data under the pointer (or the fingers), as Makie's
+`zoommode = :cursor` does, `+`/`-` and the corner buttons about their center, and pan
+(Shift+drag, a middle-button drag, Shift+arrows) shifts them in the screen plane, as Makie's
+own `Axis3` translation does; the box keeps its size and marks outside the new limits are
+clipped, so they no longer hover or click. `:cairo` ships that frame as
 a PNG; `:webgl` ships a freshly serialized scene applied to the canvas already on the page.
 In-drag frames render at `px_per_unit = 1`; the release frame renders at the widget's own
 resolution. Because nothing commits, `ax`'s camera stays wherever the gesture left it until the
@@ -2308,13 +2311,18 @@ function hitlayers(i::ViewInteractable, ctx)
         geom["azimuth"] = Float64(i.ax.azimuth[])
         geom["elevation"] = Float64(i.ax.elevation[])
         # Zoom and pan (#321) move the limits, as Makie's own Axis3 scroll zoom and translation
-        # do: JS scales them about their center, or shifts them by `panx`/`pany` per image px.
+        # do: JS scales them about a data point (under the pointer, #641, or their center), or
+        # shifts them by `panx`/`pany` per image px.
         fl = _finallimits(i.ax)
         lo = Float64.(Tuple(fl.origin)); w = Float64.(Tuple(fl.widths))
         geom["limits"] = Float64[lo[1], lo[1] + w[1], lo[2], lo[2] + w[2], lo[3], lo[3] + w[3]]
         panx, pany = _axis3_pan_basis(ctx, i.ax, lo, w)
         geom["panx"] = panx
         geom["pany"] = pany
+        # The limits' center in image px: the wheel and a pinch zoom about the point under the
+        # pointer in the plane facing the camera through it (#641), `center + panx·dx + pany·dy`.
+        c = _proj(ctx, i.ax, lo .+ w ./ 2, nothing)
+        all(isfinite, c) && (geom["center"] = Float64[c[1], c[2]])
     end
     return [HitLayer(i.id, :view, geom, Any[], axis_id(ctx, i.ax), events(i))]
 end

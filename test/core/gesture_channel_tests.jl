@@ -214,6 +214,22 @@ end
         @test qx[2] - q0[2] ≈ 0 atol = 0.5
         @test qy[1] - q0[1] ≈ 0 atol = 0.5
         @test qy[2] - q0[2] ≈ 20 atol = 0.5
+        # `center` is where the limits' center lands (#641).
+        @test g["center"] ≈ [q0[1], q0[2]] atol = 1.0e-3
+
+        # Pointer zoom (#641): limits scaled about the data under a pixel, in the plane through
+        # the center, keep that data at that pixel (the frontend's zoomAnchor3 + zoomLimits3).
+        t = c .+ 30 .* Point3d(g["panx"]...) .- 20 .* Point3d(g["pany"]...)
+        za = Float64[]
+        for i in 1:3
+            lo, hi = lim[2i - 1], lim[2i]
+            push!(za, t[i] + (lo - t[i]) / 2, t[i] + (hi - t[i]) / 2)
+        end
+        w.render_frame(Dict("id" => "view", "limits" => za, "settle" => true))
+        qt = data_to_image_px(ctx, ax, t)
+        @test qt[1] ≈ q0[1] + 30 atol = 0.5
+        @test qt[2] ≈ q0[2] - 20 atol = 0.5
+        w.render_frame(Dict("id" => "view", "limits" => Float64.(lim), "settle" => true))
 
         # Zoom: limits around the middle point. The corners fall outside and stop hitting.
         zl = Float64[0.4, 0.6, 0.4, 0.6, 0.4, 0.6]
