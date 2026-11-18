@@ -3061,7 +3061,11 @@ try {
         const span = document.querySelector(`#coords_${k}`);
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        // Real mouse input lands only inside the window, so bring the plot into it first.
+        const img = host.querySelector("img, canvas");
+        const r0 = img.getBoundingClientRect();
+        if (r0.top < 0 || r0.bottom > window.innerHeight) img.scrollIntoView({ block: "center" });
+        const b = img.getBoundingClientRect();
         const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
         return { x: b.left + ix * s, y: b.top + iy * s };
       }, [key, x, y]);
