@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
-    hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, panLimits3,
+    hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, zoomAnchor3, panLimits3,
     anchorFor, axisFrame, computeAnchoredPlacement, layerPoint, occludedAt, previewWindows, lineReadout, readoutAt, samplePoint,
     closestPointOnPath, slopScale, innermostView,
 } from "../src/geometry"
@@ -796,6 +796,36 @@ describe("view pan / orbit math", () => {
         const deep = zoomLimits3(l, 1e6, l)
         expect(deep[1] - deep[0]).toBeCloseTo(10 / 64)
         expect(zoomLimits3(l, 0)).toEqual(l)
+    })
+    it("zoomLimits3 about an anchor keeps the anchor's share of each range (#641)", () => {
+        const l: [number, number, number, number, number, number] = [0, 10, -1, 1, 100, 200]
+        const a = [8, 0.5, 150]
+        const z = zoomLimits3(l, 2, undefined, a)
+        expect(z).toEqual([4, 9, -0.25, 0.75, 125, 175])
+        for (let i = 0; i < 3; i++) {
+            expect((a[i] - z[2 * i]) / (z[2 * i + 1] - z[2 * i])).toBeCloseTo((a[i] - l[2 * i]) / (l[2 * i + 1] - l[2 * i]))
+        }
+        // The home bound still caps the width; the anchor keeps its share.
+        const deep = zoomLimits3(l, 1e6, l, a)
+        expect(deep[1] - deep[0]).toBeCloseTo(10 / 64)
+        expect((8 - deep[0]) / (deep[1] - deep[0])).toBeCloseTo(0.8)
+        // A non-finite anchor coordinate falls back to the center on that axis.
+        expect(zoomLimits3(l, 2, undefined, [NaN, 0.5, 150])[0]).toBe(2.5)
+    })
+    it("zoomAnchor3 finds the data under a pixel in the plane through the center (#641)", () => {
+        const g = {
+            x: 0, y: 0, w: 1000, h: 500, mode: "orbit" as const,
+            limits: [0, 10, 0, 10, 0, 10] as [number, number, number, number, number, number],
+            panx: [0.01, 0, 0] as [number, number, number], pany: [0, 0, -0.02] as [number, number, number],
+            center: [500, 250] as [number, number],
+        }
+        expect(zoomAnchor3(g, g.limits, 500, 250)).toEqual([5, 5, 5])
+        const a = zoomAnchor3(g, g.limits, 600, 200) as number[]
+        expect(a[0]).toBeCloseTo(6); expect(a[1]).toBeCloseTo(5); expect(a[2]).toBeCloseTo(6)
+        // Limits asked for since the frame: the same pixel, at the same share of the new ranges.
+        const b = zoomAnchor3(g, [10, 20, 0, 10, 0, 20], 600, 200) as number[]
+        expect(b[0]).toBeCloseTo(16); expect(b[2]).toBeCloseTo(12)
+        expect(zoomAnchor3({ ...g, center: undefined }, g.limits, 600, 200)).toBeUndefined()
     })
     it("panLimits3 moves the limits against the drag, scaled by any zoom since the basis", () => {
         const g = {

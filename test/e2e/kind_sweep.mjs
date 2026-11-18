@@ -2978,9 +2978,11 @@ try {
     }
 
     if (key === "view3d") {
-      // Axis3 zoom and pan (#321). The wheel scales the limits about their center, so the
-      // middle point stays put on screen and the corner leaves the limits: it is clipped from
-      // the picture and must stop hitting. Shift+drag then pans the limits; a plain drag orbits.
+      // Axis3 zoom and pan (#321). A wheel over the limits' center (#641) scales them about it,
+      // so the middle point stays put on screen and the corner leaves the limits: it is clipped
+      // from the picture and must stop hitting. Shift+drag then pans the limits, and so does a
+      // real middle-button drag (#642); a plain drag orbits. After the reset, a wheel over the
+      // line's vertex zooms about it: the vertex stays under the pointer.
       const stamp3 = async () => {
         const raw = await page.evaluate((k) => {
           const span = document.querySelector(`#coords_${k}`);
@@ -3031,7 +3033,7 @@ try {
         const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -600, ctrlKey: true });
         sr.querySelector(".surface").dispatchEvent(ev);
         return ev.defaultPrevented;
-      }, [key, g.x + g.w / 2, g.y + g.h / 2]);
+      }, [key, ...(Array.isArray(g.center) ? g.center : (() => { throw new Error(`${key}: view geometry has no Axis3 center (#641): ${JSON.stringify(g)}`); })())]);
       if (!prevented) throw new Error(`${key}-wheel: the Ctrl+wheel was not taken by the Axis3 view`);
       const w = (l, i) => l[2 * i + 1] - l[2 * i];
       const zs = await waitStamp(s0, "wheel", (st) => Array.isArray(st.limits) && [0, 1, 2].every((i) => w(st.limits, i) < 0.75 * w(lim0, i)));
@@ -3054,8 +3056,30 @@ try {
         [0, 1, 2].every((i) => Math.abs(w(st.limits, i) - w(zs.limits, i)) < 1e-6 * Math.abs(w(zs.limits, i)) + 1e-9) &&
         Math.abs(st.azimuth - zs.azimuth) < 1e-9);
       passed.push(`${key}/shift-drag-pan`);
+      // #642: a real middle-button drag pans as Shift+drag does, and the page doesn't scroll.
+      const toClient = (x, y) => page.evaluate(([k, ix, iy]) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        return { x: b.left + ix * s, y: b.top + iy * s };
+      }, [key, x, y]);
+      const mA = await toClient(inP.x, inP.y), mB = await toClient(inP.x + 80, inP.y);
+      const scroll0 = await page.evaluate(() => [window.scrollX, window.scrollY]);
+      await page.mouse.move(mA.x, mA.y);
+      await page.mouse.down({ button: "middle" });
+      for (let t = 0.25; t <= 1.0; t += 0.25) await page.mouse.move(mA.x + (mB.x - mA.x) * t, mA.y);
+      await page.mouse.up({ button: "middle" });
+      const pm = await waitStamp(ps, "middle-drag", (st) => Array.isArray(st.limits) &&
+        st.limits.some((v, i) => Math.abs(v - ps.limits[i]) > 1e-3 * w(ps.limits, Math.floor(i / 2))) &&
+        [0, 1, 2].every((i) => Math.abs(w(st.limits, i) - w(ps.limits, i)) < 1e-6 * Math.abs(w(ps.limits, i)) + 1e-9) &&
+        Math.abs(st.azimuth - ps.azimuth) < 1e-9);
+      const scroll1 = await page.evaluate(() => [window.scrollX, window.scrollY]);
+      if (scroll1[0] !== scroll0[0] || scroll1[1] !== scroll0[1]) throw new Error(`${key}-middle-drag: the page scrolled from ${scroll0} to ${scroll1}`);
+      passed.push(`${key}/middle-drag-pan`);
       await drag(key, inP.x, inP.y, inP.x + 80, inP.y, false);
-      await waitStamp(ps, "orbit", (st) => Math.abs(st.azimuth - ps.azimuth) > 0.05);
+      await waitStamp(pm, "orbit", (st) => Math.abs(st.azimuth - pm.azimuth) > 0.05);
       passed.push(`${key}/drag-orbit`);
       const after = await textOf(`#out_${key}`);
       if (after !== before) throw new Error(`${key}: a view gesture must not commit (${before} -> ${after})`);
@@ -3066,7 +3090,24 @@ try {
         throw new Error(`${key}-reset: the view came back at ${JSON.stringify(rs)}, not its mount camera ${JSON.stringify({ azimuth: g3.azimuth, elevation: g3.elevation, limits: g3.limits })}`);
       }
       passed.push(`${key}/reset-dblclick`);
-      console.error(`OK  ${key} — wheel zoom ${JSON.stringify(zs.limits)}, clipped corner, pan, orbit, reset`);
+      // #641: a wheel over the line's vertex, away from the center, zooms about the data there,
+      // so the same vertex still answers under the pointer. A center zoom would carry it
+      // (k − 1) times its distance from the center away.
+      const rV0 = await dispatchAt(key, lineP.x, lineP.y, "pointermove");
+      if (!rV0.show || !/2\.6/.test(rV0.text)) throw new Error(`${key}-pointer-zoom: the line's vertex doesn't answer before the zoom (${JSON.stringify(rV0)})`);
+      const at0 = await toClient(lineP.x, lineP.y);
+      await page.mouse.move(at0.x, at0.y);
+      const mod = process.platform === "darwin" ? "Meta" : "Control";
+      await page.keyboard.down(mod);
+      await page.mouse.wheel(0, -300);
+      await page.keyboard.up(mod);
+      const pz = await waitStamp(rs, "pointer-zoom", (st) => Array.isArray(st.limits) && w(st.limits, 0) < 0.9 * w(g3.limits, 0));
+      const kz = w(g3.limits, 0) / w(pz.limits, 0);
+      const drift = Math.hypot(lineP.x - inP.x, lineP.y - inP.y) * (kz - 1);
+      const rV1 = await dispatchAt(key, lineP.x, lineP.y, "pointermove");
+      if (!rV1.show || rV1.text !== rV0.text) throw new Error(`${key}-pointer-zoom: after a ${kz.toFixed(2)}x zoom over the vertex (a center zoom would move it ${drift.toFixed(1)} px) it answers ${JSON.stringify(rV1)}, not ${JSON.stringify(rV0.text)}`);
+      passed.push(`${key}/pointer-zoom`);
+      console.error(`OK  ${key} — wheel zoom ${JSON.stringify(zs.limits)}, clipped corner, pan, middle-drag pan, orbit, reset, pointer zoom ${kz.toFixed(2)}x keeps the vertex`);
       continue;
     }
 

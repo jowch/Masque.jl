@@ -2315,6 +2315,10 @@ function hitlayers(i::ViewInteractable, ctx)
         panx, pany = _axis3_pan_basis(ctx, i.ax, lo, w)
         geom["panx"] = panx
         geom["pany"] = pany
+        # The limits' center in image px: the wheel and a pinch zoom about the point under the
+        # pointer in the plane facing the camera through it (#641), `center + panx·dx + pany·dy`.
+        c = _proj(ctx, i.ax, lo .+ w ./ 2, nothing)
+        all(isfinite, c) && (geom["center"] = Float64[c[1], c[2]])
     end
     return [HitLayer(i.id, :view, geom, Any[], axis_id(ctx, i.ax), events(i))]
 end

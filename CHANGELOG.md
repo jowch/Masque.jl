@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A drag with the middle mouse button pans a view, on a 2D `Axis` and on an `Axis3`, as
+  Shift+drag does (#642).
+
+### Changed
+- On an `Axis3`, Ctrl/Cmd+scroll and a pinch zoom around the pointer (or your fingers), as they
+  do on a 2D axis, instead of around the middle of the box. `+`, `-` and the corner buttons
+  still zoom around the middle (#641).
+
 ## [0.5.3] - 2026-11-17
 
 ### Added

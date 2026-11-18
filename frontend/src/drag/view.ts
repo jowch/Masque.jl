@@ -1,4 +1,4 @@
-import { panLimits, orbitAngles, panLimits3, zoomLimits3 } from "../geometry"
+import { panLimits, orbitAngles, panLimits3, zoomLimits3, zoomAnchor3 } from "../geometry"
 import { fmt, VIEW_MIN_PX } from "../state"
 import { fmtCoord } from "../template"
 import type { Drag, OverlayState } from "../state"
@@ -58,9 +58,12 @@ export function seedView3Homes(state: OverlayState, layers: { id: string; kind: 
     }
 }
 
-// One Axis3 zoom step from the remembered limits.
-export function zoom3(state: OverlayState, id: string, shown: Limits3, k: number): Limits3 {
-    const next = zoomLimits3(view3Base(state, id, shown), k, state.view3_.get(id)?.home ?? shown)
+// One Axis3 zoom step from the remembered limits: about the data under image px `at` of the
+// frame `g` (the wheel and a pinch, #641), else about the limits' center (`+`, `-`, buttons).
+export function zoom3(state: OverlayState, id: string, shown: Limits3, k: number, at?: { g: ViewGeometry; x: number; y: number }): Limits3 {
+    const base = view3Base(state, id, shown)
+    const anchor = at ? zoomAnchor3(at.g, base, at.x, at.y) : undefined
+    const next = zoomLimits3(base, k, state.view3_.get(id)?.home ?? shown, anchor)
     rememberView3(state, id, shown, next)
     return next
 }

@@ -784,21 +784,53 @@ export function matrixLimits(
     return { xmin, xmax, ymin, ymax }
 }
 
-// Axis3 zoom (#321): scale the limits about their center by 1/k, as Makie's own Axis3 scroll
-// zoom does with `zoommode = :center`. k > 1 zooms in. `home` bounds the total zoom both ways.
+// Axis3 zoom (#321): scale the limits by 1/k about `anchor` (a data point), else about their
+// center as Makie's own Axis3 scroll zoom does with `zoommode = :center`. The point at `anchor`
+// keeps its place on screen: an Axis3 draws a point where its share of each limit range puts
+// it, and scaling about it leaves that share alone. k > 1 zooms in. `home` bounds the total
+// zoom both ways.
 const ZOOM3_MAX = 64
-export function zoomLimits3(l: Limits3, k: number, home?: Limits3): Limits3 {
+export function zoomLimits3(l: Limits3, k: number, home?: Limits3, anchor?: readonly number[]): Limits3 {
     const out = [...l] as Limits3
     if (!(k > 0) || !Number.isFinite(k)) return out
     for (let i = 0; i < 3; i++) {
-        const c = (l[2 * i] + l[2 * i + 1]) / 2
-        let h = (l[2 * i + 1] - l[2 * i]) / 2 / k
+        const lo = l[2 * i], hi = l[2 * i + 1]
+        let h = (hi - lo) / 2 / k
         if (home) {
             const hh = (home[2 * i + 1] - home[2 * i]) / 2
             h = Math.min(hh * ZOOM3_MAX, Math.max(hh / ZOOM3_MAX, h))
         }
-        out[2 * i] = c - h
-        out[2 * i + 1] = c + h
+        const a = anchor?.[i]
+        if (a === undefined || !Number.isFinite(a) || !(hi > lo)) {
+            const c = (lo + hi) / 2
+            out[2 * i] = c - h
+            out[2 * i + 1] = c + h
+            continue
+        }
+        const s = 2 * h / (hi - lo)
+        out[2 * i] = a + s * (lo - a)
+        out[2 * i + 1] = out[2 * i] + 2 * h
+    }
+    return out
+}
+
+// The data point under image px (x, y) that an Axis3 zoom keeps in place (#641), on the plane
+// facing the camera through the limits' center (Makie's `zoommode = :cursor` falls back to the
+// same plane). `panx`/`pany`/`center` were measured at `g.limits`, the frame on screen; the
+// point is returned in `base`, the limits the zoom starts from, at the same share of each range.
+// Undefined when the frame carries no center.
+export function zoomAnchor3(g: ViewGeometry, base: Limits3, x: number, y: number): number[] | undefined {
+    const ref = g.limits, px = g.panx, py = g.pany, c = g.center
+    if (!ref || !px || !py || !c) return undefined
+    const dx = x - c[0], dy = y - c[1]
+    const out: number[] = []
+    for (let i = 0; i < 3; i++) {
+        const lo = ref[2 * i], w = ref[2 * i + 1] - lo
+        const t = lo + w / 2 + px[i] * dx + py[i] * dy
+        const u = w > 0 ? (t - lo) / w : 0.5
+        const a = base[2 * i] + u * (base[2 * i + 1] - base[2 * i])
+        if (!Number.isFinite(a)) return undefined
+        out.push(a)
     }
     return out
 }
