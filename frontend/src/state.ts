@@ -156,6 +156,8 @@ export type Drag =
         kind: "view"; id_: string; g_: ViewGeometry; t_: AxisTransform; x0_: number; y0_: number; pointerId_: number
         // Axis3 Shift+drag (#321): pan the limits instead of orbiting, starting from `base_`.
         slide_?: boolean
+        // A press on the pan handle (#644): its click and double-click are the handle's, never the plot's.
+        handle_?: boolean
         base_?: Limits3
         // The last gesture-channel request payload actually sent for this drag — `undefined`
         // until the first one past VIEW_MIN_PX. bond.ts's terminal handlers

@@ -250,13 +250,14 @@ function marqueeMode(manifest: Manifest, state: OverlayState, under: Hit | null,
 // start: Shift+drag, a middle-button drag (#642), or a press on the corner pan handle (#644).
 // On an Axis3 it pans the limits instead of orbiting (#321). The pointer is captured by the
 // surface, so the rest of the drag runs through onMove and onUp as any view drag does.
-export function beginPan(ctx: OverlayCtx, state: OverlayState, e: PointerEvent, viewLayer: HitLayer, at: { x: number; y: number }): boolean {
+export function beginPan(ctx: OverlayCtx, state: OverlayState, e: PointerEvent, viewLayer: HitLayer, at: { x: number; y: number }, handle = false): boolean {
     e.preventDefault()
     if (state.drag_) return false
     const g = viewLayer.geometry as ViewGeometry
     if (g.mode === "pan" && photoHeldByOther(state, viewLayer.id)) return false
     const base = g.mode === "orbit" && g.limits ? viewDrag.view3Base(state, viewLayer.id, g.limits) : undefined
     state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], at.x, at.y, e.pointerId, true, base)
+    if (handle && state.drag_.kind === "view") state.drag_.handle_ = true
     if (g.mode === "pan") armPan(ctx, state, e, viewLayer.id)
     hideCross(ctx, state)
     ctx.surface_.classList.add("grabbing")
@@ -427,7 +428,9 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     hideTip(ctx, state); hideViewReadout(ctx); ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     if (d.kind === "view") {
         const dist = Math.hypot(layout.x - d.x0_, layout.y - d.y0_)
-        state.justDragged_ = dist >= viewDrag.VIEW_MIN_PX
+        // The pointer is captured to the surface, so the click after a press on the pan handle lands
+        // here: counting it as a drag keeps it (and a double-click) off the plot.
+        state.justDragged_ = d.handle_ === true || dist >= viewDrag.VIEW_MIN_PX
     } else {
         state.justDragged_ = true
     }

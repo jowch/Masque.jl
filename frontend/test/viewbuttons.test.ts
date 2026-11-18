@@ -474,4 +474,48 @@ describe("the corner buttons on a live widget", () => {
         expect(lim[1]).toBeCloseTo(1.1)
         expect(w.inputs).toHaveLength(0)
     })
+
+    it("the pan handle's click and double-click never reach the plot: no clear, no reset (#644)", async () => {
+        const w = setup(manifestOf({ mode: "orbit" }))
+        const { shadow, surface, requestFrame } = w
+        // Pick the point at (50, 50) CSS px.
+        pointer(surface, "pointerdown", 50, 50)
+        pointer(surface, "pointerup", 50, 50)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true, cancelable: true }))
+        await tick()
+        expect(w.inputs).toHaveLength(1)
+        const grip = shadow.querySelector(".masque-vbp button") as HTMLElement
+        pointer(surface, "pointermove", 300, 200)
+        // The surface holds the capture, so the click after each press lands on it.
+        for (let i = 1; i <= 2; i++) {
+            pointer(grip, "pointerdown", 580, 70, "mouse", { button: 0 })
+            pointer(surface, "pointerup", 580, 70)
+            window.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }))
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 580, clientY: 70, bubbles: true, cancelable: true, detail: i }))
+        }
+        surface.dispatchEvent(new MouseEvent("dblclick", { clientX: 580, clientY: 70, bubbles: true, cancelable: true }))
+        await tick()
+        expect(w.inputs).toHaveLength(1)
+        expect(calls(requestFrame).some((c) => c.reset === true)).toBe(false)
+    })
+
+    it("one finger on the pan handle pans the view (#644)", async () => {
+        const w = setup(manifestOf({ mode: "orbit" }))
+        const { shadow, surface, requestFrame } = w
+        const grip = shadow.querySelector(".masque-vbp button") as HTMLElement
+        pointer(grip, "pointerdown", 580, 70, "touch")
+        expect(shadow.querySelector(".masque-vbp")!.classList.contains("held")).toBe(true)
+        pointer(surface, "pointermove", 555, 70, "touch")
+        pointer(surface, "pointermove", 530, 70, "touch")
+        pointer(surface, "pointerup", 530, 70, "touch")
+        window.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1, pointerType: "touch" }))
+        await tick()
+        const cs = calls(requestFrame); const last = cs[cs.length - 1]
+        expect(last).toMatchObject({ id: "view", settle: true })
+        expect(last.azimuth).toBeUndefined()
+        const lim = last.limits as number[]
+        expect(lim[0]).toBeCloseTo(0.1)
+        expect(lim[1]).toBeCloseTo(1.1)
+        expect(w.inputs).toHaveLength(0)
+    })
 })

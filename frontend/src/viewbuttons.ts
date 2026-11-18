@@ -17,8 +17,7 @@ import { hitLayer, innermostView, layoutSpaceLayer, matrixLimits, polygonRings, 
 import { hideTip } from "./hover"
 import { unmapPoint, wheelScale, zoomAt, ZOOM_NOTCH } from "./photo"
 import * as viewDrag from "./drag/view"
-import { MOTION_MS } from "./state"
-import { layoutImagePx } from "./state"
+import { layoutImagePx, MOTION_MS } from "./state"
 import type { OverlayCtx, OverlayState } from "./state"
 import type { HitLayer, Manifest, ViewGeometry } from "./types"
 
@@ -430,7 +429,7 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
             e.stopPropagation()
             const layer = ctx.manifest_.layers.find((x) => x.id === l.id && x.kind === "view")
             if (!layer || (e.pointerType === "mouse" && e.button !== 0)) return
-            if (!beginPan(ctx, state, e, layer, layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY))) return
+            if (!beginPan(ctx, state, e, layer, layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY), true)) return
             hideTip(ctx, state)
             box.held = true
             paint()

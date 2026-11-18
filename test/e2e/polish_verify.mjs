@@ -1423,9 +1423,15 @@ try {
     await page.mouse.move(h3.rect.x + h3.rect.w / 2, h3.rect.y + h3.rect.h / 2);
     await new Promise((r) => setTimeout(r, 300));
     await page.mouse.down();
-    await new Promise((r) => setTimeout(r, 300));
-    h3 = await read3();
-    const press3 = [0, 1, 2].map((c) => h3.bg[c] * 0.8 + h3.ink[c] * 0.2);
+    // The tint eases in over the stack's 100 ms; a WebGL page's busy main thread can start that
+    // late, so give it up to 2 s to arrive.
+    let press3 = null;
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      h3 = await read3();
+      press3 = [0, 1, 2].map((c) => h3.bg[c] * 0.8 + h3.ink[c] * 0.2);
+      if ([0, 1, 2].every((c) => Math.abs(h3.btnBg[c] - press3[c]) <= 3)) break;
+    }
     if (!h3.held || h3.opacity < 0.99 || h3.cursor !== "grabbing") fail3("held: not full, held, with the grabbing cursor");
     if (![0, 1, 2].every((c) => Math.abs(h3.btnBg[c] - press3[c]) <= 3)) fail3(`the held handle reads ${h3.btnBg}, not the 20% tint ${press3.map(Math.round)}`);
     await page.mouse.up();
@@ -1542,9 +1548,14 @@ try {
       return new Function("box", "rgb", `return (${f})(box, rgb)`)(box, rgb);
     }, [key, fn.toString()]);
     await page.mouse.down();
-    await new Promise((r) => setTimeout(r, 300));
-    const pressed = await vb((box, rgb) => rgb(getComputedStyle(box.querySelector(".masque-vb-out")).backgroundColor));
+    // As for the pan handle below: allow up to 2 s for the tint on a busy WebGL page.
     const press = [0, 1, 2].map((c) => on.bg[c] * 0.8 + on.ink[c] * 0.2);
+    let pressed = null;
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      pressed = await vb((box, rgb) => rgb(getComputedStyle(box.querySelector(".masque-vb-out")).backgroundColor));
+      if ([0, 1, 2].every((c) => Math.abs(pressed[c] - press[c]) <= 3)) break;
+    }
     if (![0, 1, 2].every((c) => Math.abs(pressed[c] - press[c]) <= 3)) fail(`the pressed button reads ${pressed}, not the 20% tint ${press.map(Math.round)}`);
     await page.mouse.up();
     const waitMoved = async (want) => {
