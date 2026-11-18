@@ -9,6 +9,9 @@ All notable changes to this project are documented here. The format is based on
 ### Added
 - A drag with the middle mouse button pans a view, on a 2D `Axis` and on an `Axis3`, as
   Shift+drag does (#642).
+- An `Axis3` view's corner buttons have a round pan handle beside them: press on it and drag,
+  with the mouse or one finger, to pan the view. On a small plot zoom out and zoom in make room
+  for it first (#644).
 
 ### Changed
 - On an `Axis3`, Ctrl/Cmd+scroll and a pinch zoom around the pointer (or your fingers), as they

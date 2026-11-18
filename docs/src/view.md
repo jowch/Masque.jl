@@ -114,7 +114,9 @@ a single pick, as any click there does.
 
 While the pointer is over a plot you can pan or orbit, small buttons
 show in a corner: zoom in, zoom out, and, once you have moved the
-view, reset. On an `Axis3` they zoom only. They stay faint until the
+view, reset. On an `Axis3` they zoom around the middle of the box, and
+a round handle beside them pans: press on it and drag, with the mouse or
+one finger. They stay faint until the
 pointer reaches them, so the data under them still shows. They also
 show while the view has keyboard focus, and after you touch the plot
 on a touch screen. They take a corner a legend leaves free, the one
@@ -173,7 +175,8 @@ end
 Ctrl+scroll (Cmd+scroll on a Mac) to zoom in or out around the pointer,
 and Shift+drag, or drag with the middle mouse button, to pan. `wheel`
 works as it does on a 2D axis. On a touch screen, drag with two fingers
-to turn the view and pinch to zoom around your fingers; one finger
+to turn the view and pinch to zoom around your fingers, or drag the
+round handle beside the corner buttons to pan; one finger elsewhere
 scrolls the page. The box keeps its size while
 the data grows or slides inside it, and marks that leave the box are
 hidden and no longer respond to hover or clicks. A line that crosses the

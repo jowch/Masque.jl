@@ -6,13 +6,19 @@
 // axis; always with `controls = :always`; never with `:none`. Reset joins the stack only once
 // the view has moved (`state.viewMoved_`, #524). A press goes over the gesture channel as one
 // settled request, like a released key, and never reaches the plot's own click handling.
+//
+// An Axis3 view also gets the pan handle (#644): a round box of its own beside the stack, on the
+// side away from the corner. A press on it and a drag pan the view, as Shift+drag does; a click
+// alone does nothing. It is the one way to pan with a finger, so when space runs out zoom out
+// drops first, then zoom in, then reset, and the handle last.
 
-import { resetView } from "./bond"
+import { beginPan, resetView } from "./bond"
 import { hitLayer, innermostView, layoutSpaceLayer, matrixLimits, polygonRings, SEG_TOL } from "./geometry"
 import { hideTip } from "./hover"
 import { unmapPoint, wheelScale, zoomAt, ZOOM_NOTCH } from "./photo"
 import * as viewDrag from "./drag/view"
 import { MOTION_MS } from "./state"
+import { layoutImagePx } from "./state"
 import type { OverlayCtx, OverlayState } from "./state"
 import type { HitLayer, Manifest, ViewGeometry } from "./types"
 
@@ -25,18 +31,32 @@ const BUTTONS = 3
 export type Corner = "tr" | "tl" | "br"
 export const CORNERS: readonly Corner[] = ["tr", "tl", "br"]
 
+export type ButtonKey = "in" | "out" | "reset"
+const ALL_BUTTONS: readonly ButtonKey[] = ["in", "out", "reset"]
+// What an Axis3 corner keeps as space runs out (#644): zoom out goes first, the handle last.
+const PAN_SETS: readonly (readonly ButtonKey[])[] = [ALL_BUTTONS, ["in", "reset"], ["reset"], []]
+export const PAN_GAP = 4 // CSS px between the stack and the pan handle
+
 export interface Placement {
     corner: Corner
     row: boolean // the buttons side by side: the axis is too short for the stack
     size: number // button side, CSS px
+    buttons: readonly ButtonKey[] // the stack's buttons; reset among them shows once the view moved
+    pan: boolean // the pan handle beside the stack (Axis3 views, #644)
 }
 
 type Rect = [number, number, number, number] // x, y, w, h
 
-// The box's long side and short side, CSS px: the buttons, a 1 px divider between each, and
-// the 1 px border. Sized for all three buttons, so reset joining never moves the box.
-export function boxLength(size: number, n = BUTTONS): number { return n * size + (n - 1) + 2 }
+// The box's long side and short side, CSS px: the buttons and the 1 px border. The 1 px divider
+// between buttons sits inside each button (border-box), so it adds nothing. Sized for all three
+// buttons, so reset joining never moves the box.
+export function boxLength(size: number, n = BUTTONS): number { return n > 0 ? n * size + 2 : 0 }
 export function boxBreadth(size: number): number { return size + 2 }
+// The stack and the pan handle together along the long side, CSS px.
+export function cornerLength(size: number, n: number, pan: boolean): number {
+    if (!pan) return boxLength(size, n)
+    return n > 0 ? boxLength(size, n) + PAN_GAP + boxBreadth(size) : boxBreadth(size)
+}
 
 function intersect(a: Rect, b: Rect): Rect | null {
     const x0 = Math.max(a[0], b[0]), y0 = Math.max(a[1], b[1])
@@ -199,22 +219,25 @@ export function placeButtons(m: Manifest, layer: HitLayer, k: number, coarse: bo
     if (!vp || !(k > 0)) return null
     const vw = vp[2] / k, vh = vp[3] / k
     const covers = coversOf(m, layer.axis, vp)
+    const pan = g.mode === "orbit"
     for (const size of coarse ? [COARSE, FINE] : [FINE]) {
-        const len = boxLength(size), br = boxBreadth(size)
-        const fitsStack = len <= vh / 2 && br + 2 * INSET <= vw
-        const fitsRow = !fitsStack && len <= vw / 2 && br + 2 * INSET <= vh
-        if (!fitsStack && !fitsRow) continue
-        const [w, h] = fitsStack ? [br, len] : [len, br]
-        let best: Corner = CORNERS[0], least = Infinity, leastData = Infinity
-        for (const c of CORNERS) {
-            const box = boxAt(vp, c, w, h, k)
-            const a = coverage(box, covers)
-            if (a > least) continue
-            const d = keep ? (c === keep ? 0 : 1) : dataUnder(m, layer, box, k)
-            if (a < least || d < leastData) { least = a; leastData = d; best = c }
-            if (a === 0 && d === 0) break
+        for (const buttons of pan ? PAN_SETS : [ALL_BUTTONS]) {
+            const len = cornerLength(size, buttons.length, pan), br = boxBreadth(size)
+            const fitsStack = len <= vh / 2 && br + 2 * INSET <= vw
+            const fitsRow = !fitsStack && len <= vw / 2 && br + 2 * INSET <= vh
+            if (!fitsStack && !fitsRow) continue
+            const [w, h] = fitsStack ? [br, len] : [len, br]
+            let best: Corner = CORNERS[0], least = Infinity, leastData = Infinity
+            for (const c of CORNERS) {
+                const box = boxAt(vp, c, w, h, k)
+                const a = coverage(box, covers)
+                if (a > least) continue
+                const d = keep ? (c === keep ? 0 : 1) : dataUnder(m, layer, box, k)
+                if (a < least || d < leastData) { least = a; leastData = d; best = c }
+                if (a === 0 && d === 0) break
+            }
+            return { corner: best, row: fitsRow, size, buttons, pan }
         }
-        return { corner: best, row: fitsRow, size }
     }
     return null
 }
@@ -267,44 +290,53 @@ const ICONS = {
     in: '<path d="M12 6v12M6 12h12"/>',
     out: '<path d="M6 12h12"/>',
     reset: '<path d="M5.5 9.5A7 7 0 1 1 5 13.5"/><path d="M5 5v4.5h4.5"/>',
+    pan: '<path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12"/><path d="M11 11.5V5a1.5 1.5 0 0 1 3 0v6.5"/><path d="M14 11.5V6.5a1.5 1.5 0 0 1 3 0V14"/><path d="M8 12.5l-1.3-1.4a1.5 1.5 0 0 0-2.3 1.9L8 18a4.5 4.5 0 0 0 3.7 2h1.8A4.5 4.5 0 0 0 18 15.5V9.5a1.5 1.5 0 0 1 3 0"/>',
 }
-const LABELS = { in: "Zoom in", out: "Zoom out", reset: "Reset view" }
+const LABELS = { in: "Zoom in", out: "Zoom out", reset: "Reset view", pan: "Drag to pan" }
+const PAN_TITLE = "Drag to pan (or Shift+drag)"
 // The box's opacity while the pointer is on the plot but not on the box: quiet over the data,
 // with the icon still about 4:1 against its own box on a white backdrop (3:1 is the floor for a
 // control). The pointer on the box, a touch or the keyboard stop brings it to full.
 export const VB_IDLE_OPACITY = 0.6
 
 export const VIEW_BUTTONS_STYLE = `
-.masque-vb { position: absolute; display: flex; flex-direction: column; box-sizing: border-box;
+:is(.masque-vb, .masque-vbp) { position: absolute; display: flex; flex-direction: column; box-sizing: border-box;
        opacity: 0; pointer-events: none; z-index: 12; overflow: hidden;
        background: var(--masque-tip-bg-resolved); color: var(--masque-tip-color-resolved);
        border: 1px solid var(--masque-tip-border-resolved); border-radius: var(--masque-tip-radius, 4px);
        box-shadow: var(--masque-tip-shadow, 0 2px 4px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08));
        transition: opacity ${MOTION_MS}ms ease-out; }
-.masque-vb { touch-action: manipulation; }
-.masque-vb.row { flex-direction: row; }
-.masque-vb[hidden] { display: none; }
-.masque-vb.show { opacity: ${VB_IDLE_OPACITY}; pointer-events: auto; }
-.masque-vb.show:hover, .masque-vb.show.full { opacity: 1; }
-.masque-vb button { all: unset; box-sizing: border-box; width: var(--masque-vb-size, 24px); height: var(--masque-vb-size, 24px);
+:is(.masque-vb, .masque-vbp) { touch-action: manipulation; }
+:is(.masque-vb, .masque-vbp).row { flex-direction: row; }
+:is(.masque-vb, .masque-vbp)[hidden] { display: none; }
+:is(.masque-vb, .masque-vbp).show { opacity: ${VB_IDLE_OPACITY}; pointer-events: auto; }
+:is(.masque-vb, .masque-vbp).show:hover, :is(.masque-vb, .masque-vbp).show.full { opacity: 1; }
+:is(.masque-vb, .masque-vbp) button { all: unset; box-sizing: border-box; width: var(--masque-vb-size, 24px); height: var(--masque-vb-size, 24px);
        display: grid; place-items: center; cursor: pointer; color: inherit;
        transition: background-color ${MOTION_MS}ms ease-out; }
 @media (hover: hover) {
-  .masque-vb button:hover { background: color-mix(in srgb, var(--masque-tip-bg-resolved), var(--masque-tip-color-resolved) 12%); }
+  :is(.masque-vb, .masque-vbp) button:hover { background: color-mix(in srgb, var(--masque-tip-bg-resolved), var(--masque-tip-color-resolved) 12%); }
 }
-.masque-vb button:active { background: color-mix(in srgb, var(--masque-tip-bg-resolved), var(--masque-tip-color-resolved) 20%); }
-.masque-vb button + button { border-top: 1px solid var(--masque-tip-border-resolved); }
-.masque-vb.row button + button { border-top: none; border-left: 1px solid var(--masque-tip-border-resolved); }
-.masque-vb button svg { width: var(--masque-vb-icon, 14px); height: var(--masque-vb-icon, 14px); pointer-events: none; }
-.masque-vb .masque-vb-reset { display: none; }
-.masque-vb.moved .masque-vb-reset { display: grid; animation: masque-vb-join ${MOTION_MS}ms ease-out; }
+:is(.masque-vb, .masque-vbp) button:active { background: color-mix(in srgb, var(--masque-tip-bg-resolved), var(--masque-tip-color-resolved) 20%); }
+:is(.masque-vb, .masque-vbp) button + button { border-top: 1px solid var(--masque-tip-border-resolved); }
+:is(.masque-vb, .masque-vbp).row button + button { border-top: none; border-left: 1px solid var(--masque-tip-border-resolved); }
+:is(.masque-vb, .masque-vbp) button svg { width: var(--masque-vb-icon, 14px); height: var(--masque-vb-icon, 14px); pointer-events: none; }
+:is(.masque-vb, .masque-vbp) .masque-vb-reset { display: none; }
+:is(.masque-vb, .masque-vbp) button.dropped { display: none !important; }
+/* Only reset is left, and it hasn't joined: the box holds its place, empty and unseen. */
+:is(.masque-vb, .masque-vbp).bare:not(.moved) { visibility: hidden; }
+/* The pan handle (#644): a round box of its own; a press and a drag pan the view. */
+.masque-vbp { border-radius: 999px; }
+.masque-vbp button { cursor: grab; touch-action: none; }
+.masque-vbp.held button { cursor: grabbing; background: color-mix(in srgb, var(--masque-tip-bg-resolved), var(--masque-tip-color-resolved) 20%); }
+:is(.masque-vb, .masque-vbp).moved .masque-vb-reset { display: grid; animation: masque-vb-join ${MOTION_MS}ms ease-out; }
 @keyframes masque-vb-join { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-color-scheme: dark) {
-  .masque-vb { box-shadow: var(--masque-tip-shadow, 0 2px 4px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.3)); }
+  :is(.masque-vb, .masque-vbp) { box-shadow: var(--masque-tip-shadow, 0 2px 4px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.3)); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .masque-vb, .masque-vb button { transition: none; }
-  .masque-vb.moved .masque-vb-reset { animation: none; }
+  :is(.masque-vb, .masque-vbp), :is(.masque-vb, .masque-vbp) button { transition: none; }
+  :is(.masque-vb, .masque-vbp).moved .masque-vb-reset { animation: none; }
 }
 `
 
@@ -326,6 +358,9 @@ export interface ViewButtons {
 interface Box {
     id: string
     el: HTMLDivElement
+    pan: HTMLDivElement // the pan handle's box; hidden on 2D views
+    hasPan: boolean
+    held: boolean // the handle is being dragged
     vp: [number, number, number, number] | null
     always: boolean
     home?: Corner // the corner picked at the view's home, kept while it is moved
@@ -343,11 +378,27 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
     const shown = (b: Box) => !dead && (b.always || b.id === hovered || b.id === touched || b.id === focused)
     const paint = () => {
         for (const b of boxes.values()) {
-            b.el.classList.toggle("show", shown(b) && b.vp !== null)
+            const on = shown(b) && b.vp !== null
             // A finger has no hover and the keyboard stop means use: neither waits at the idle level.
-            b.el.classList.toggle("full", b.id === touched || b.id === focused)
+            const full = b.id === touched || b.id === focused || b.held
+            b.el.classList.toggle("show", on)
+            b.el.classList.toggle("full", full)
             b.el.classList.toggle("moved", state.viewMoved_.has(b.id))
+            b.pan.classList.toggle("show", on || b.held)
+            b.pan.classList.toggle("full", full)
+            b.pan.classList.toggle("held", b.held)
         }
+    }
+
+    const button = (key: keyof typeof ICONS): HTMLButtonElement => {
+        const b = document.createElement("button")
+        b.type = "button"
+        b.className = `masque-vb-${key}`
+        b.setAttribute("aria-label", LABELS[key])
+        // Not tab stops: the view's own stop has +, -, 0 and Shift+arrows for these.
+        b.tabIndex = -1
+        b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key]}</svg>`
+        return b
     }
 
     const make = (l: HitLayer): Box => {
@@ -356,14 +407,8 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
         el.dataset.view = l.id
         el.setAttribute("role", "group")
         el.setAttribute("aria-label", "View controls")
-        for (const key of ["in", "out", "reset"] as const) {
-            const b = document.createElement("button")
-            b.type = "button"
-            b.className = `masque-vb-${key}`
-            b.setAttribute("aria-label", LABELS[key])
-            // Not tab stops: the view's own stop has +, - and 0 for these.
-            b.tabIndex = -1
-            b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key]}</svg>`
+        for (const key of ALL_BUTTONS) {
+            const b = button(key)
             b.addEventListener("click", (e) => {
                 e.preventDefault(); e.stopPropagation()
                 if (key === "reset") resetView(ctx, state, l.id)
@@ -372,6 +417,44 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
             })
             el.appendChild(b)
         }
+        const pan = document.createElement("div")
+        pan.className = "masque-vbp"
+        pan.dataset.view = l.id
+        pan.hidden = true
+        const grip = button("pan")
+        grip.title = PAN_TITLE
+        pan.appendChild(grip)
+        const box: Box = { id: l.id, el, pan, hasPan: false, held: false, vp: null, always: false }
+        // A press on the handle pans the view from wherever the pointer goes, until it lifts.
+        grip.addEventListener("pointerdown", (e) => {
+            e.stopPropagation()
+            const layer = ctx.manifest_.layers.find((x) => x.id === l.id && x.kind === "view")
+            if (!layer || (e.pointerType === "mouse" && e.button !== 0)) return
+            if (!beginPan(ctx, state, e, layer, layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY))) return
+            hideTip(ctx, state)
+            box.held = true
+            paint()
+            const id = e.pointerId
+            const done = (ev: PointerEvent) => {
+                if (ev.pointerId !== id) return
+                window.removeEventListener("pointerup", done, true)
+                window.removeEventListener("pointercancel", done, true)
+                box.held = false
+                paint()
+            }
+            window.addEventListener("pointerup", done, true)
+            window.addEventListener("pointercancel", done, true)
+        })
+        grip.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation() })
+        listen(el, l.id)
+        listen(pan, l.id)
+        shadow.appendChild(el)
+        shadow.appendChild(pan)
+        return box
+    }
+
+    // What both boxes do with the events that aren't their buttons'.
+    const listen = (el: HTMLDivElement, id: string) => {
         // A press is the box's, not the plot's: no pick, no clear, no pan, no focus moved.
         const own = (e: Event) => { e.stopPropagation() }
         el.addEventListener("pointerdown", own)
@@ -392,11 +475,11 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
             if (f.defaultPrevented) e.preventDefault()
         }, { passive: false })
         el.addEventListener("pointerleave", (e) => {
-            if (e.pointerType !== "touch" && hovered === l.id && !(e.relatedTarget === ctx.surface_)) { hovered = null; paint() }
+            if (e.pointerType !== "touch" && hovered === id && !(e.relatedTarget === ctx.surface_) && !owns(e.relatedTarget)) { hovered = null; paint() }
         })
-        shadow.appendChild(el)
-        return { id: l.id, el, vp: null, always: false }
     }
+    const owns = (target: EventTarget | null) =>
+        [...boxes.values()].some((b) => target instanceof Node && (b.el.contains(target) || b.pan.contains(target)))
 
     const layout = () => {
         if (dead) return
@@ -410,7 +493,7 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
         if (key === lastKey) { paint(); return }
         lastKey = key
         const keep = new Set(views.map((l) => l.id))
-        for (const [id, b] of boxes) if (!keep.has(id)) { b.el.remove(); boxes.delete(id) }
+        for (const [id, b] of boxes) if (!keep.has(id)) { b.el.remove(); b.pan.remove(); boxes.delete(id) }
         for (const l of views) {
             const b = boxes.get(l.id) ?? make(l)
             boxes.set(l.id, b)
@@ -422,12 +505,19 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
             if (p && !moved) b.home = p.corner
             const vp = p ? visibleViewport(m, g) : null
             b.vp = vp
-            b.el.hidden = !p
+            b.hasPan = p?.pan === true
+            b.el.hidden = !p || p.buttons.length === 0
+            b.pan.hidden = !b.hasPan
             if (!p || !vp) continue
             b.el.classList.toggle("row", p.row)
             b.el.dataset.corner = p.corner
-            b.el.style.setProperty("--masque-vb-size", `${p.size}px`)
-            b.el.style.setProperty("--masque-vb-icon", `${p.size === COARSE ? 24 : 14}px`)
+            b.pan.dataset.corner = p.corner
+            for (const el of [b.el, b.pan]) {
+                el.style.setProperty("--masque-vb-size", `${p.size}px`)
+                el.style.setProperty("--masque-vb-icon", `${p.size === COARSE ? 24 : 14}px`)
+            }
+            for (const key of ALL_BUTTONS) b.el.querySelector(`.masque-vb-${key}`)?.classList.toggle("dropped", !p.buttons.includes(key))
+            b.el.classList.toggle("bare", p.buttons.length === 1 && p.buttons[0] === "reset")
             // Percentages of the figure, so the box follows the widget's width without a re-place;
             // the inset is CSS px. Always placed by its top-left corner, where the box of all three
             // buttons starts: reset joins or leaves at the far end, and + and - never move under the
@@ -435,14 +525,28 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
             // further in from the corner until reset joins.
             const W = m.width, H = m.height
             const [x, y, w, h] = vp
-            const across = p.row ? boxLength(p.size) : boxBreadth(p.size)
-            const down = p.row ? boxBreadth(p.size) : boxLength(p.size)
+            const n = p.buttons.length
+            const across = p.row ? boxLength(p.size, n) : boxBreadth(p.size)
+            const down = p.row ? boxBreadth(p.size) : boxLength(p.size, n)
             b.el.style.left = p.corner === "tl"
                 ? `calc(${(x / W) * 100}% + ${INSET}px)`
                 : `calc(${((x + w) / W) * 100}% - ${INSET + across}px)`
             b.el.style.top = p.corner === "br"
                 ? `calc(${((y + h) / H) * 100}% - ${INSET + down}px)`
                 : `calc(${(y / H) * 100}% + ${INSET}px)`
+            if (!p.pan) continue
+            // The handle sits on the stack's inner side: below it in a top corner, above it at the
+            // bottom right; in a row, toward the middle. With no stack it takes the corner itself.
+            const br = boxBreadth(p.size)
+            const gap = n > 0 ? PAN_GAP : 0
+            const innerX = p.row ? across + gap : 0 // CSS px from the corner, along x
+            const innerY = p.row ? 0 : down + gap
+            b.pan.style.left = p.corner === "tl"
+                ? `calc(${(x / W) * 100}% + ${INSET + innerX}px)`
+                : `calc(${((x + w) / W) * 100}% - ${INSET + innerX + br}px)`
+            b.pan.style.top = p.corner === "br"
+                ? `calc(${((y + h) / H) * 100}% - ${INSET + innerY + br}px)`
+                : `calc(${(y / H) * 100}% + ${INSET + innerY}px)`
         }
         paint()
     }
@@ -508,14 +612,14 @@ export function buildViewButtons(ctx: OverlayCtx, state: OverlayState, shadow: S
             else hovered = id
             paint()
         },
-        owns_: (target) => [...boxes.values()].some((b) => target instanceof Node && b.el.contains(target)),
+        owns_: owns,
         dead_: () => { dead = true; paint() },
         remove_: () => {
             shadow.removeEventListener("focusin", onFocusIn)
             shadow.removeEventListener("focusout", onFocusOut as EventListener)
             coarseQuery?.removeEventListener?.("change", onCoarse)
             document.removeEventListener("pointerdown", onDocDown, true)
-            for (const b of boxes.values()) b.el.remove()
+            for (const b of boxes.values()) { b.el.remove(); b.pan.remove() }
             boxes.clear()
         },
     }

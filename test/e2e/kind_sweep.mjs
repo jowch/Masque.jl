@@ -3119,7 +3119,37 @@ try {
       const moved = Math.hypot(d1.x - d0.x, d1.y - d0.y);
       if (moved > 4) throw new Error(`${key}-pointer-zoom: the vertex moved ${moved.toFixed(1)} px under the pointer (${JSON.stringify(d0)} -> ${JSON.stringify(d1)}); a center zoom moves it ${drift.toFixed(1)}`);
       passed.push(`${key}/pointer-zoom`);
-      console.error(`OK  ${key} — wheel zoom ${JSON.stringify(zs.limits)}, clipped corner, pan, middle-drag pan, orbit, reset, pointer zoom ${kz.toFixed(2)}x keeps the vertex within ${moved.toFixed(1)} px (center zoom: ${drift.toFixed(1)})`);
+      // #644: the round pan handle beside the corner buttons. A real press on it and a drag pan
+      // the limits (widths and camera kept), whatever is under the pointer as it moves; a click
+      // alone does nothing.
+      const handle = async () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const box = sr.querySelector(".masque-vbp"), stack = sr.querySelector(".masque-vb");
+        if (!box || box.hidden) return null;
+        const r = box.getBoundingClientRect(), q = stack.getBoundingClientRect();
+        return { x: r.left, y: r.top, w: r.width, h: r.height, stackBottom: q.bottom, stackLeft: q.left, held: box.classList.contains("held"), radius: getComputedStyle(box).borderTopLeftRadius };
+      }, key);
+      const ph0 = await handle();
+      if (!ph0) throw new Error(`${key}-pan-handle: no pan handle on the Axis3 view`);
+      const hc = { x: ph0.x + ph0.w / 2, y: ph0.y + ph0.h / 2 };
+      await page.mouse.move(hc.x, hc.y);
+      const st0 = await stamp3();
+      await page.mouse.click(hc.x, hc.y);
+      await new Promise((r) => setTimeout(r, 600));
+      if ((await stamp3())?.n !== st0?.n) throw new Error(`${key}-pan-handle: a click on the handle sent a frame`);
+      await page.mouse.down();
+      if (!(await handle()).held) throw new Error(`${key}-pan-handle: the handle doesn't show held while pressed`);
+      for (let t = 0.25; t <= 1.0; t += 0.25) await page.mouse.move(hc.x - 60 * t, hc.y + 20 * t);
+      await page.mouse.up();
+      const ph = await waitStamp(st0, "pan-handle", (st) => Array.isArray(st.limits) &&
+        st.limits.some((v, i) => Math.abs(v - pz.limits[i]) > 1e-3 * w(pz.limits, Math.floor(i / 2))) &&
+        [0, 1, 2].every((i) => Math.abs(w(st.limits, i) - w(pz.limits, i)) < 1e-6 * Math.abs(w(pz.limits, i)) + 1e-9) &&
+        Math.abs(st.azimuth - pz.azimuth) < 1e-9);
+      if ((await handle()).held) throw new Error(`${key}-pan-handle: the handle still shows held after release`);
+      passed.push(`${key}/pan-handle`);
+      console.error(`OK  ${key} — wheel zoom ${JSON.stringify(zs.limits)}, clipped corner, pan, middle-drag pan, orbit, reset, pointer zoom ${kz.toFixed(2)}x keeps the vertex within ${moved.toFixed(1)} px (center zoom: ${drift.toFixed(1)}), pan handle moved x by ${(ph.limits[0] - pz.limits[0]).toFixed(3)}`);
       continue;
     }
 
