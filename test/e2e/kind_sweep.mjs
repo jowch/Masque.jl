@@ -3099,15 +3099,23 @@ try {
       await page.mouse.move(at0.x, at0.y);
       const mod = process.platform === "darwin" ? "Meta" : "Control";
       await page.keyboard.down(mod);
-      await page.mouse.wheel(0, -300);
+      await page.mouse.wheel(0, -1200);
       await page.keyboard.up(mod);
       const pz = await waitStamp(rs, "pointer-zoom", (st) => Array.isArray(st.limits) && w(st.limits, 0) < 0.9 * w(g3.limits, 0));
       const kz = w(g3.limits, 0) / w(pz.limits, 0);
       const drift = Math.hypot(lineP.x - inP.x, lineP.y - inP.y) * (kz - 1);
+      if (!(drift > 12)) throw new Error(`${key}-pointer-zoom: a ${kz.toFixed(2)}x zoom would move the vertex only ${drift.toFixed(1)} px under a center zoom, too little to tell the two apart`);
       const rV1 = await dispatchAt(key, lineP.x, lineP.y, "pointermove");
       if (!rV1.show || rV1.text !== rV0.text) throw new Error(`${key}-pointer-zoom: after a ${kz.toFixed(2)}x zoom over the vertex (a center zoom would move it ${drift.toFixed(1)} px) it answers ${JSON.stringify(rV1)}, not ${JSON.stringify(rV0.text)}`);
+      // The hover dot marks the vertex where it is drawn now: still under the pointer, give or
+      // take the whole-pixel rounding of the hit geometry on each frame.
+      const dot = (r) => { const h = r.hi.fill ?? r.hi.edge ?? r.hi.plain; return h && h.cx !== null ? { x: +h.cx, y: +h.cy } : null; };
+      const d0 = dot(rV0), d1 = dot(rV1);
+      if (!d0 || !d1) throw new Error(`${key}-pointer-zoom: no hover dot on the line's vertex (${JSON.stringify({ before: rV0.hi, after: rV1.hi })})`);
+      const moved = Math.hypot(d1.x - d0.x, d1.y - d0.y);
+      if (moved > 4) throw new Error(`${key}-pointer-zoom: the vertex moved ${moved.toFixed(1)} px under the pointer (${JSON.stringify(d0)} -> ${JSON.stringify(d1)}); a center zoom moves it ${drift.toFixed(1)}`);
       passed.push(`${key}/pointer-zoom`);
-      console.error(`OK  ${key} — wheel zoom ${JSON.stringify(zs.limits)}, clipped corner, pan, middle-drag pan, orbit, reset, pointer zoom ${kz.toFixed(2)}x keeps the vertex`);
+      console.error(`OK  ${key} — wheel zoom ${JSON.stringify(zs.limits)}, clipped corner, pan, middle-drag pan, orbit, reset, pointer zoom ${kz.toFixed(2)}x keeps the vertex within ${moved.toFixed(1)} px (center zoom: ${drift.toFixed(1)})`);
       continue;
     }
 
