@@ -5014,6 +5014,34 @@ describe("photographic pan / wheel zoom", () => {
         }
     })
 
+    it("a middle-button drag pans a 2D view; a middle press off every view leaves the focus alone (#642)", async () => {
+        vi.useFakeTimers()
+        try {
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1]) }))
+            mount(script, withLine(viewManifest("pan")), undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            // Off the image: no view, so the press stays the browser's and the surface keeps no focus.
+            const off = new PointerEvent("pointerdown", { clientX: 700, clientY: 100, bubbles: true, cancelable: true, button: 1 })
+            surface.dispatchEvent(off)
+            expect(off.defaultPrevented).toBe(false)
+            expect(surface.classList.contains("pointer-focus")).toBe(false)
+            // 50 CSS px right = 100 image px = a tenth of the 1200 px axis, which spans x 0–10.
+            const down = new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true, cancelable: true, button: 1 })
+            surface.dispatchEvent(down)
+            expect(down.defaultPrevented).toBe(true)
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 150, clientY: 100, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 150, clientY: 100, bubbles: true, button: 1 }))
+            await vi.advanceTimersByTimeAsync(10)
+            const last = requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0]
+            expect(last).toMatchObject({ id: "view", settle: true })
+            expect(last.xmin as number).toBeLessThan(0)
+            expect((last.xmax as number) - (last.xmin as number)).toBeCloseTo(10)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it("an Axis3 frame stamps its limits; a cancelled Shift+drag settles the panned limits", async () => {
         vi.useFakeTimers()
         try {

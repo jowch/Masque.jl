@@ -260,6 +260,11 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         if (e.button === 2 || isMacContextClick(e)) passContextToBase(ctx.surface_, e.pointerId)
         return
     }
+    // A middle press off every view is the browser's (autoscroll, paste): no focus moved.
+    if (middle) {
+        const at = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+        if (!innermostView(ctx.manifest_, at.x, at.y)) return
+    }
     // A press focuses the surface, so Escape and the arrows work after a click (#380). The
     // browser would do this itself, but the preventDefault calls below (marquee, pan, drags)
     // cancel it. preventScroll: a click on a plot half off-screen must not jump the page.
@@ -288,8 +293,6 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             return
         }
     }
-    // A middle press off every view is the browser's (autoscroll, paste).
-    if (middle) return
     // A finger grabs a handle by its larger grab area (#530).
     const finger = touchReach(ctx.base_, ctx.manifest_, e.pointerType)
     const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_, slop, finger)
