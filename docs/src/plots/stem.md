@@ -29,12 +29,13 @@ there. With `@bind sel masque(fig)`, they are `sel.stem.points` and
 
 ## Show your own data
 
-Key payloads and tooltips by part name. Here the points get a payload
-each and their own template, and the stems keep their default tooltip:
+Key payloads and tooltips by part name. Here both parts carry the
+sample number, and each gets its own template, since a point's value is
+`y` and a stem's is its top end, `y2`. Hover a point or a stem:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-plots-stem-data" data-masque-embed="plots_stem" data-masque-segment="data" title="The same signal with a tooltip naming each sample." style="width:100%;height:560px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-plots-stem-data" data-masque-embed="plots_stem" data-masque-segment="data" title="The same signal, where hovering a point or a stem names its sample." style="width:100%;height:560px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
