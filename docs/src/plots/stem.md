@@ -25,13 +25,13 @@ there. With `@bind sel masque(fig)`, they are `sel.stem.points` and
 | Part | Fields |
 |---|---|
 | `points` | `index`, the point's place in your data, and `x`, `y`, the point |
-| `stems` | `segment_index`, the stem's place in your data, and `x1`, `y1`, `x2`, `y2`, its two ends |
+| `stems` | `segment_index`, the stem's place in your data, and its two ends: `x1`, `y1` on the baseline and `x2`, `y2` at the point |
 
 ## Show your own data
 
 Key payloads and tooltips by part name. Here both parts carry the
 sample number, and each gets its own template, since a point's value is
-`y` and a stem's is its top end, `y2`. Hover a point or a stem:
+`y` and a stem's is `y2`, its end at the point. Hover a point or a stem:
 
 ```@raw html
 <div class="masque-embed-wrap">
