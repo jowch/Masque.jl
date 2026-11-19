@@ -215,7 +215,16 @@ one list per part, keyed by the part's name in the table above:
 
 ```julia
 rc = rainclouds!(ax, groups, values)
-masque(fig, interactables(rc; payloads = (scatter = rows, violin = per_group)))
+masque(
+    fig,
+    interactables(
+        rc;
+        payloads = (
+            scatter = rows,
+            violin = per_group,
+        ),
+    ),
+)
 ```
 
 Each list has one entry per mark of its part, in the order the table

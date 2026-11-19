@@ -56,9 +56,16 @@ adds two blocks of its own. Each lays out one button and label per
 option, and is one field in `masque`:
 
 ```julia
-scale = RadioGroup(fig[1, 2]; options = ["linear", ("sqrt", sqrt), ("log", log1p)])
-series = CheckboxGroup(fig[2, 1]; options = ["a", "b", "c"], default = ["a", "b"],
-    orientation = :horizontal)
+scale = RadioGroup(
+    fig[1, 2];
+    options = ["linear", ("sqrt", sqrt), ("log", log1p)],
+)
+series = CheckboxGroup(
+    fig[2, 1];
+    options = ["a", "b", "c"],
+    default = ["a", "b"],
+    orientation = :horizontal,
+)
 @bind opts masque(fig, (; scale, series))
 ```
 

@@ -90,8 +90,14 @@ cell the id of its region. Cells that share an id then act as one.
 Hovering outlines the whole region, and a click picks all of it:
 
 ```julia
-labels = label_components(mask)   # ImageMorphology: 0 for the background, 1, 2, … for the objects
-@bind sel masque(fig, (objects = interactables(hm; select = :many, regions = labels),))
+# ImageMorphology: 0 for the background, 1, 2, … for the objects
+labels = label_components(mask)
+@bind sel masque(
+    fig,
+    (
+        objects = interactables(hm; select = :many, regions = labels),
+    ),
+)
 ```
 
 A click adds a region or takes it out, and a box adds every region it

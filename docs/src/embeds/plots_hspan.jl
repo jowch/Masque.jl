@@ -41,11 +41,12 @@ pick
 
 # ╔═╡ b10f0009-0001-4000-8000-000000000005
 masque(
-    fig, interactables(
+    fig,
+    interactables(
         s;
         payloads = [(event = "Recall",), (event = "Strike",)],
         tooltip = masque"<b>$(event)</b><br>day $(low) to day $(high)",
-    )
+    ),
 )
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

@@ -36,8 +36,13 @@ begin
     mpg = 48 .- 0.0085 .* weight .+ 2.5 .* randn(90)
     accel = 24 .- 0.06 .* hp .+ 1.2 .* randn(90)
     cars = [
-        (id = i, origin = origin[i], mpg = round(mpg[i]; digits = 1), hp = round(Int, hp[i]), weight = round(Int, weight[i]))
-            for i in 1:90
+        (
+            id = i,
+            origin = origin[i],
+            mpg = round(mpg[i]; digits = 1),
+            hp = round(Int, hp[i]),
+            weight = round(Int, weight[i]),
+        ) for i in 1:90
     ]
 end
 ```
@@ -50,24 +55,54 @@ in its payload:
 
 ```julia
 begin
-    colors = Dict("USA" => :steelblue, "Europe" => :darkorange, "Japan" => :seagreen)
+    colors = Dict(
+        "USA" => :steelblue,
+        "Europe" => :darkorange,
+        "Japan" => :seagreen,
+    )
     fig = Figure(size = (760, 340))
-    ax1 = Axis(fig[1, 1]; xlabel = "weight (lb)", ylabel = "mpg", title = "drag a box, or click a legend entry")
+    ax1 = Axis(
+        fig[1, 1];
+        xlabel = "weight (lb)",
+        ylabel = "mpg",
+        title = "drag a box, or click a legend entry",
+    )
     parts = map(origins) do o
         rows = findall(==(o), origin)
-        p = scatter!(ax1, weight[rows], mpg[rows]; color = colors[o], label = o, markersize = 9)
+        p = scatter!(
+            ax1, weight[rows], mpg[rows];
+            color = colors[o],
+            label = o,
+            markersize = 9,
+        )
         interactables(p; payloads = cars[rows])
     end
     axislegend(ax1; position = :rt)
-    ax2 = Axis(fig[1, 2]; xlabel = "horsepower", ylabel = "seconds to 60 mph", title = "the same cars")
-    s2 = scatter!(ax2, hp, accel; color = [colors[o] for o in origin], markersize = 9)
+    ax2 = Axis(
+        fig[1, 2];
+        xlabel = "horsepower",
+        ylabel = "seconds to 60 mph",
+        title = "the same cars",
+    )
+    s2 = scatter!(
+        ax2, hp, accel;
+        color = [colors[o] for o in origin],
+        markersize = 9,
+    )
     nothing
 end
 ```
 
 ```julia
-@bind picked masque(fig, parts..., interactables(s2; payloads = cars),
-    (picked = linked(ax1, ax2; key = :id, select = :many),); bind = :picked)
+@bind picked masque(
+    fig,
+    parts...,
+    interactables(s2; payloads = cars),
+    (
+        picked = linked(ax1, ax2; key = :id, select = :many),
+    );
+    bind = :picked,
+)
 ```
 
 Finally, filter the cars by the ids picked:
@@ -79,8 +114,14 @@ let
         Base.Text("no cars picked")
     else
         mean(f) = round(sum(f, chosen) / length(chosen); digits = 1)
-        counts = join(("$(count(c -> c.origin == o, chosen)) $o" for o in origins), ", ")
-        Base.Text("$(length(chosen)) cars picked ($counts)\nmean $(mean(c -> c.mpg)) mpg, $(mean(c -> c.hp)) hp")
+        counts = join(
+            ("$(count(c -> c.origin == o, chosen)) $o" for o in origins),
+            ", ",
+        )
+        Base.Text(
+            "$(length(chosen)) cars picked ($counts)\n" *
+                "mean $(mean(c -> c.mpg)) mpg, $(mean(c -> c.hp)) hp",
+        )
     end
 end
 ```

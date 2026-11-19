@@ -72,7 +72,11 @@ tooltip or payloads for one plot passes them with the plot:
 
 ```julia
 d = dumbbell!(ax, before, after)
-@bind pick masque(fig, interactables(d; tooltip = masque"change $(change)"); bind = d)
+@bind pick masque(
+    fig,
+    interactables(d; tooltip = masque"change $(change)");
+    bind = d,
+)
 ```
 
 Those keywords reach your method, so without `kwargs...` in its
@@ -95,8 +99,12 @@ not draw as a plot of its own. Then you give the hit size yourself, as
 ```julia
 function Masque.interactables(ax, p::Dumbbell; kwargs...)
     before, after = p.before[], p.after[]
-    pairs = [Point2f(x, k) for k in eachindex(before) for x in (before[k], after[k])]
-    return [SegmentInteractable(ax, pairs; mode = :pairs, tol = 6, kwargs...)]
+    pairs = [
+        Point2f(x, k) for k in eachindex(before) for x in (before[k], after[k])
+    ]
+    return [
+        SegmentInteractable(ax, pairs; mode = :pairs, tol = 6, kwargs...),
+    ]
 end
 ```
 

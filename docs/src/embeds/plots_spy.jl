@@ -23,10 +23,18 @@ using Masque, CairoMakie, Random
 # ╔═╡ b10f0024-0001-4000-8000-000000000002
 begin
     rng = Xoshiro(5)
-    links = [rand(rng) < 0.08 ? round(rand(rng); digits = 2) : 0.0 for _ in 1:20, _ in 1:20]
+    links = [
+        rand(rng) < 0.08 ? round(rand(rng); digits = 2) : 0.0
+            for _ in 1:20, _ in 1:20
+    ]
 
     fig = Figure(size = (520, 360))
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), yreversed = true, title = "Links between 20 pages")
+    ax = Axis(
+        fig[1, 1];
+        aspect = DataAspect(),
+        yreversed = true,
+        title = "Links between 20 pages",
+    )
     sp = spy!(ax, links; colormap = :viridis)
     nothing
 end
@@ -38,7 +46,13 @@ end
 pick
 
 # ╔═╡ b10f0024-0001-4000-8000-000000000005
-masque(fig, interactables(sp; tooltip = masque"page $(i) → page $(j)<br>weight $(value:.2f)"))
+masque(
+    fig,
+    interactables(
+        sp;
+        tooltip = masque"page $(i) → page $(j)<br>weight $(value:.2f)",
+    ),
+)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
