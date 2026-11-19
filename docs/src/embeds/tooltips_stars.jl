@@ -28,7 +28,11 @@ Hover over a star to see its name, type and distance. Click one and the last cel
 # ╔═╡ c0e1a001-0001-4000-8000-000000000005
 begin
     fig2, sc2 = hr_diagram()
-    tips = interactables(sc2; payloads = info, tooltip = masque"<b>$(name)</b><br>$(type)<br>$(dist) light years")
+    tips = interactables(
+        sc2;
+        payloads = info,
+        tooltip = masque"<b>$(name)</b><br>$(type)<br>$(dist) light years",
+    )
     nothing
 end
 
@@ -66,8 +70,12 @@ end
 function hr_diagram()
     fig = Figure(size = (560, 360))
     ax = Axis(
-        fig[1, 1]; xreversed = true, xticks = 4000:4000:20000, xtickformat = "{:.0f}",
-        xlabel = "surface temperature (K)", ylabel = "log₁₀ luminosity (Sun = 0)",
+        fig[1, 1];
+        xreversed = true,
+        xticks = 4000:4000:20000,
+        xtickformat = "{:.0f}",
+        xlabel = "surface temperature (K)",
+        ylabel = "log₁₀ luminosity (Sun = 0)",
     )
     sc = scatter!(
         ax, [s.teff for s in stars], log10.([s.lum for s in stars]);

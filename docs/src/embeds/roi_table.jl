@@ -38,9 +38,19 @@ begin
         (name = "South-3", x = 7.2, y = 2.0, group = "South"),
         (name = "East", x = 9.0, y = 6.5, group = "East"),
     ]
-    group_color = Dict("North" => "#4363d8", "Mid" => "#f58231", "South" => "#3cb44b", "East" => "#911eb4")
+    group_color = Dict(
+        "North" => "#4363d8",
+        "Mid" => "#f58231",
+        "South" => "#3cb44b",
+        "East" => "#911eb4",
+    )
     fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y", limits = (0.5, 10.0, 0.5, 10.0))
+    ax = Axis(
+        fig[1, 1];
+        xlabel = "x",
+        ylabel = "y",
+        limits = (0.5, 10.0, 0.5, 10.0),
+    )
     s = scatter!(
         ax, [r.x for r in samples], [r.y for r in samples];
         color = [group_color[r.group] for r in samples], markersize = 18,

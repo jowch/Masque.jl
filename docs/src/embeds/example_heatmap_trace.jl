@@ -37,7 +37,12 @@ begin
     temp(d, s, h) = 12 + 4 * sin(2π * (h - 9) / 24) + 0.6 * d * (s == 3 ? 1 : 0.3) + 1.5 * cos(d / 2 + s)
     daily = [round(sum(temp(d, s, h) for h in hours) / 24; digits = 1) for d in 1:7, s in eachindex(stations)]
     fig = Figure(size = (560, 320))
-    ax = Axis(fig[1, 1]; xlabel = "day", yticks = (eachindex(stations), stations), title = "daily mean temperature: click a cell")
+    ax = Axis(
+        fig[1, 1];
+        xlabel = "day",
+        yticks = (eachindex(stations), stations),
+        title = "daily mean temperature: click a cell",
+    )
     hm = heatmap!(ax, 1:7, eachindex(stations), daily; colormap = :thermal)
     Colorbar(fig[1, 2], hm; label = "°C")
     nothing
@@ -60,7 +65,12 @@ This cell responds to the click: it plots that day's hourly readings, with the d
 begin
     trace = Figure(size = (560, 240))
     if isnothing(pick)
-        Axis(trace[1, 1]; xlabel = "hour", ylabel = "°C", title = "click a cell to see that day")
+        Axis(
+            trace[1, 1];
+            xlabel = "hour",
+            ylabel = "°C",
+            title = "click a cell to see that day",
+        )
     else
         tax = Axis(
             trace[1, 1]; xlabel = "hour", ylabel = "°C",

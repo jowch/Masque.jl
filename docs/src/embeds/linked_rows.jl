@@ -30,8 +30,14 @@ begin
     ys = [2.0, 1.5, 3.0, 2.2]
     zs = [0.8, 2.5, 1.2, 3.1]
     fig = Figure(size = (640, 300))
-    p_xy = scatter!(Axis(fig[1, 1]; xlabel = "x", ylabel = "y", title = "xy"), xs, ys; markersize = 18)
-    p_xz = scatter!(Axis(fig[1, 2]; xlabel = "x", ylabel = "z", title = "xz"), xs, zs; markersize = 18)
+    p_xy = scatter!(
+        Axis(fig[1, 1]; xlabel = "x", ylabel = "y", title = "xy"), xs, ys;
+        markersize = 18,
+    )
+    p_xz = scatter!(
+        Axis(fig[1, 2]; xlabel = "x", ylabel = "z", title = "xz"), xs, zs;
+        markersize = 18,
+    )
     nothing
 end
 

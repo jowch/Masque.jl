@@ -40,11 +40,12 @@ pick
 
 # ╔═╡ b10f000c-0001-4000-8000-000000000005
 masque(
-    fig, interactables(
+    fig,
+    interactables(
         s;
         payloads = [(manager = "Ana",), (manager = "Ben",), (manager = "Chloé",)],
         tooltip = masque"<b>$(label)</b>, run by $(manager)<br>$(y) units by week $(x)",
-    )
+    ),
 )
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

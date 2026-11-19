@@ -41,7 +41,16 @@ end
 pick
 
 # ╔═╡ b10f001a-0001-4000-8000-000000000005
-masque(fig, interactables(ar; payloads = [(speed = round(hypot(a, b) * 20; digits = 1),) for (a, b) in zip(u, v)], tooltip = masque"<b>$(speed) m/s</b><br>at $(x), $(y) km"))
+masque(
+    fig,
+    interactables(
+        ar;
+        payloads = [
+            (speed = round(hypot(a, b) * 20; digits = 1),) for (a, b) in zip(u, v)
+        ],
+        tooltip = masque"<b>$(speed) m/s</b><br>at $(x), $(y) km",
+    ),
+)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """

@@ -48,8 +48,12 @@ end
 function hr_diagram()
     fig = Figure(size = (560, 360))
     ax = Axis(
-        fig[1, 1]; xreversed = true, xticks = 4000:4000:20000, xtickformat = "{:.0f}",
-        xlabel = "surface temperature (K)", ylabel = "log₁₀ luminosity (Sun = 0)",
+        fig[1, 1];
+        xreversed = true,
+        xticks = 4000:4000:20000,
+        xtickformat = "{:.0f}",
+        xlabel = "surface temperature (K)",
+        ylabel = "log₁₀ luminosity (Sun = 0)",
     )
     sc = scatter!(
         ax, [s.teff for s in stars], log10.([s.lum for s in stars]);

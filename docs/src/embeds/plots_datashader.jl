@@ -38,7 +38,10 @@ end
 masque(fig)
 
 # ╔═╡ b10f001e-0001-4000-8000-000000000004
-masque(fig, interactables(ds; tooltip = masque"<b>$(value) points</b> in this pixel"))
+masque(
+    fig,
+    interactables(ds; tooltip = masque"<b>$(value) points</b> in this pixel"),
+)
 
 # ╔═╡ b10f001e-0001-4000-8000-000000000005
 # The player needs a bound widget to record. No page shows this cell: a

@@ -1224,8 +1224,11 @@ p = heatmap!(ax, X, Y, Z)
 GridInteractable(ax, p)
 
 xs = ["a", "b", "c", "d"]; ys = ["p", "q", "r"]  # i runs along x, j along y
-GridInteractable(ax, xedges, yedges, vals; payloads = (i, j) -> (; x = xs[i], y = ys[j]),
-    tooltip = masque"(\$(x), \$(y)) = \$(value)")
+GridInteractable(
+    ax, xedges, yedges, vals;
+    payloads = (i, j) -> (; x = xs[i], y = ys[j]),
+    tooltip = masque"(\$(x), \$(y)) = \$(value)",
+)
 ```
 """
 struct GridInteractable <: AbstractInteractable
@@ -2055,7 +2058,13 @@ l2 = lines!(ax, xs, ys2; label = "b")
 leg = axislegend(ax)
 LegendInteractable(leg)   # `masque` fills in the links
 
-LegendInteractable(leg; targets = Dict("a" => :lines, "b" => [:lines_2, :scatter]))
+LegendInteractable(
+    leg;
+    targets = Dict(
+        "a" => :lines,
+        "b" => [:lines_2, :scatter],
+    ),
+)
 ```
 """
 struct LegendInteractable <: AbstractInteractable
@@ -2918,7 +2927,13 @@ categorical, or if the figure already has a slice on this axis.
 
 # Examples
 ```julia
-SliceInteractable(ax; series = [(; id = :wide, x = xs, y = ys), (; id = :narrow, x = xs, y = zs)])
+SliceInteractable(
+    ax;
+    series = [
+        (; id = :wide, x = xs, y = ys),
+        (; id = :narrow, x = xs, y = zs),
+    ],
+)
 
 d1 = density!(ax, randn(200))
 d2 = density!(ax, randn(200) .+ 2)
@@ -3099,7 +3114,16 @@ Vector{HitLayer}` is called at manifest-build time and its result is used verbat
 ```julia
 FunctionInteractable() do ctx
     q = data_to_image_px(ctx, ax, (1.0, 2.0))
-    [HitLayer(:custom, :circles, [q[1], q[2], 10], [(; label = "manual")], Masque.axis_id(ctx, ax), (:click, :hover))]
+    [
+        HitLayer(
+            :custom,
+            :circles,
+            [q[1], q[2], 10],
+            [(; label = "manual")],
+            Masque.axis_id(ctx, ax),
+            (:click, :hover),
+        ),
+    ]
 end
 ```
 """

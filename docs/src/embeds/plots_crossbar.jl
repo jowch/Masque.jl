@@ -27,7 +27,11 @@ begin
     spread = [0.8, 0.6, 0.9, 0.7]
 
     fig = Figure(size = (520, 320))
-    ax = Axis(fig[1, 1]; xticks = (1:4, ["0 mg", "10 mg", "20 mg", "40 mg"]), ylabel = "Response")
+    ax = Axis(
+        fig[1, 1];
+        xticks = (1:4, ["0 mg", "10 mg", "20 mg", "40 mg"]),
+        ylabel = "Response",
+    )
     c = crossbar!(ax, dose, mid, mid .- spread, mid .+ spread)
     nothing
 end
@@ -40,11 +44,15 @@ pick
 
 # ╔═╡ b10f0008-0001-4000-8000-000000000005
 masque(
-    fig, interactables(
+    fig,
+    interactables(
         c;
-        payloads = [(dose = d, patients = n) for (d, n) in zip(["0 mg", "10 mg", "20 mg", "40 mg"], [24, 22, 25, 21])],
+        payloads = [
+            (dose = d, patients = n)
+                for (d, n) in zip(["0 mg", "10 mg", "20 mg", "40 mg"], [24, 22, 25, 21])
+        ],
         tooltip = masque"<b>$(dose)</b><br>mean $(midpoint), $(patients) patients",
-    )
+    ),
 )
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

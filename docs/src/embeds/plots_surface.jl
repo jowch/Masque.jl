@@ -27,7 +27,12 @@ begin
     zs = [exp(-(x^2 + y^2)) + 0.5 * exp(-((x - 1)^2 + (y + 1)^2) * 2) for x in xs, y in ys]
 
     fig = Figure(size = (520, 380))
-    ax = Axis3(fig[1, 1]; xlabel = "x (km)", ylabel = "y (km)", zlabel = "Height (km)")
+    ax = Axis3(
+        fig[1, 1];
+        xlabel = "x (km)",
+        ylabel = "y (km)",
+        zlabel = "Height (km)",
+    )
     sf = surface!(ax, xs, ys, zs; colormap = :viridis)
     nothing
 end
@@ -36,7 +41,13 @@ end
 masque(fig)
 
 # ╔═╡ b10f0020-0001-4000-8000-000000000004
-masque(fig, interactables(sf; tooltip = masque"<b>$(z:.2f) km</b> high at $(x:.1f), $(y:.1f)"))
+masque(
+    fig,
+    interactables(
+        sf;
+        tooltip = masque"<b>$(z:.2f) km</b> high at $(x:.1f), $(y:.1f)",
+    ),
+)
 
 # ╔═╡ b10f0020-0001-4000-8000-000000000005
 # The player needs a bound widget to record. No page shows this cell: a
