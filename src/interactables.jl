@@ -2123,7 +2123,8 @@ middle-button drag) forces the view gesture even over a
   is turned off in Makie (`deregister_interaction!(ax, :scrollzoom)`,
   `deactivate_interaction!(ax, :scrollzoom)`, or both `xzoomlock` and `yzoomlock`), which
   gets `:none`.
-- `controls` — the zoom in, zoom out and reset buttons in a corner of the plot: `:hover`
+- `controls` — the zoom in, zoom out and reset buttons in a corner of the plot, and on an
+  `Axis3` the round pan handle beside them (press on it and drag to pan): `:hover`
   (default) shows them while the pointer is over the plot, while the view has keyboard focus,
   and after a touch on the plot; `:always` keeps them shown; `:none` leaves them out.
 
