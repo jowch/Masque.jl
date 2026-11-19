@@ -186,6 +186,26 @@ describe("touch on a view (#537)", () => {
         touchEvent(surface, "touchend", [])
     })
 
+    it("Axis3: a pinch over a mark zooms at the mark's depth (#643)", async () => {
+        vi.useFakeTimers()
+        const m = viewManifest("orbit")
+        Object.assign(m.layers[0].geometry as object, { panx: [0.01, 0, 0], pany: [0, 0, -0.01], center: [300, 400] })
+        // A point at (7, 2, 3) drawn 10 image px from the midpoint (image 500, 400): in a finger's reach.
+        m.layers.push({ id: "pts", kind: "circles", axis: "ax1", events: ["hover"], payloads: [{}], geometry: [510, 400, 4], xyz: [7, 2, 3] } as HitLayer)
+        const { surface, requestFrame } = setup(m)
+        touchEvent(surface, "touchstart", [[200, 200]])
+        touchEvent(surface, "touchstart", [[200, 200], [300, 200]])
+        touchEvent(surface, "touchmove", [[150, 200], [350, 200]])
+        await vi.advanceTimersByTimeAsync(0)
+        const lim = (requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0] as Record<string, unknown>).limits as number[]
+        expect(lim[1] - lim[0]).toBeCloseTo(5)
+        // The midpoint's data is at the point's depth: x = 6.9 (10 px left of it), y = 2, z = 3.
+        expect((6.9 - lim[0]) / (lim[1] - lim[0])).toBeCloseTo(0.69)
+        expect((2 - lim[2]) / (lim[3] - lim[2])).toBeCloseTo(0.2)
+        expect((3 - lim[4]) / (lim[5] - lim[4])).toBeCloseTo(0.3)
+        touchEvent(surface, "touchend", [])
+    })
+
     it("Axis3: a pinch that comes back to its start still sends and settles the limits", async () => {
         vi.useFakeTimers()
         const { surface, requestFrame } = setup(viewManifest("orbit"))

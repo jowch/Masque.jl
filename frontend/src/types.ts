@@ -379,6 +379,10 @@ export interface HitLayer {
     // points p with (p - c)ᵀ S⁻¹ (p - c) ≤ 1 around the circle's centre c. A sphere's outline,
     // which its hit circle reaches past. Absent → the circles alone.
     ellipses?: number[]
+    // :circles on an Axis3: per element, its data position [x0, y0, z0, x1, …], which a pointer
+    // zoom keeps at the mark's depth (#643). Absent when the payloads' x, y and z (`coords`)
+    // already hold it, or off an Axis3.
+    xyz?: number[]
     // A field's envelope: a `selects` target's or a `many` field holds { items: [...] }; a
     // click or a box's bounds hold { layer, index, payload }.
 }

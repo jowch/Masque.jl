@@ -3089,11 +3089,46 @@ try {
       if (after !== before) throw new Error(`${key}: a view gesture must not commit (${before} -> ${after})`);
       // #524: a double-click on empty plot area turns the camera back and zooms back out.
       const g3 = layer.geometry;
-      const rs = await resetByDoubleClick(key, g3);
+      let rs = await resetByDoubleClick(key, g3);
       if (Math.abs(rs.azimuth - g3.azimuth) > 1e-9 || Math.abs(rs.elevation - g3.elevation) > 1e-9 || !sameLims(rs.limits ?? [], g3.limits)) {
         throw new Error(`${key}-reset: the view came back at ${JSON.stringify(rs)}, not its mount camera ${JSON.stringify({ azimuth: g3.azimuth, elevation: g3.elevation, limits: g3.limits })}`);
       }
       passed.push(`${key}/reset-dblclick`);
+      // #643: a real Ctrl+wheel over the point far from the plane through the middle zooms at
+      // its depth, so it stays inside the box and still answers under the pointer. A zoom about
+      // that plane (#641 alone) would carry it out of the box: checked from the frame's own
+      // geometry, so the check can tell the two apart.
+      const mod = process.platform === "darwin" ? "Meta" : "Control";
+      const front = layers.find((l) => l.id === "front");
+      if (!front) throw new Error(`${key}: no front layer`);
+      const fP = hitPoint(front, 0), fData = [3.5, 1.0, 3.5];
+      const rF0 = await dispatchAt(key, fP.x, fP.y, "pointermove");
+      if (!rF0.show) throw new Error(`${key}-mark-zoom: the front point doesn't answer before the zoom (${JSON.stringify(rF0)})`);
+      const atF = await toClient(fP.x, fP.y);
+      await page.mouse.move(atF.x, atF.y);
+      await page.keyboard.down(mod);
+      await page.mouse.wheel(0, -2400);
+      await page.keyboard.up(mod);
+      const fz = await waitStamp(rs, "mark-zoom", (st) => Array.isArray(st.limits) && w(st.limits, 0) < 0.9 * w(g3.limits, 0));
+      const kf = w(g3.limits, 0) / w(fz.limits, 0);
+      const share = (l, i, v) => (v - l[2 * i]) / w(l, i);
+      const centerShare = [0, 1, 2].map((i) => {
+        const t = g3.limits[2 * i] + w(g3.limits, i) / 2 + g3.panx[i] * (fP.x - g3.center[0]) + g3.pany[i] * (fP.y - g3.center[1]);
+        const nt = share(g3.limits, i, t);
+        return nt + kf * (share(g3.limits, i, fData[i]) - nt);
+      });
+      if (centerShare.every((n) => n > -0.1 && n < 1.1)) throw new Error(`${key}-mark-zoom: a ${kf.toFixed(2)}x zoom about the middle plane would keep the point in or near the box too (shares ${centerShare.map((n) => n.toFixed(2))}), too little to tell the two apart`);
+      const kept = [0, 1, 2].map((i) => share(fz.limits, i, fData[i]));
+      const mount = [0, 1, 2].map((i) => share(g3.limits, i, fData[i]));
+      // The pointer lands within a px of the point's center, not on it, so its place in the box
+      // shifts by that px times the zoom, a small part of what the middle plane would move it.
+      const shift = (n) => Math.max(...n.map((v, i) => Math.abs(v - mount[i])));
+      if (!kept.every((n) => n > 0 && n < 1) || shift(kept) > 0.2 * shift(centerShare)) throw new Error(`${key}-mark-zoom: the point's place in the box moved from ${mount.map((n) => n.toFixed(3))} to ${kept.map((n) => n.toFixed(3))}; about the middle plane it would be ${centerShare.map((n) => n.toFixed(2))}`);
+      const rF1 = await dispatchAt(key, fP.x, fP.y, "pointermove");
+      if (!rF1.show || rF1.text !== rF0.text) throw new Error(`${key}-mark-zoom: after a ${kf.toFixed(2)}x zoom over the front point (about the middle plane it would leave the box, shares ${centerShare.map((n) => n.toFixed(2))}) it answers ${JSON.stringify(rF1)}, not ${JSON.stringify(rF0.text)}`);
+      passed.push(`${key}/mark-zoom`);
+      console.error(`OK  ${key} — a ${kf.toFixed(2)}x zoom over the front point kept it at ${kept.map((n) => n.toFixed(3))} in the box (from ${mount.map((n) => n.toFixed(3))}); about the middle plane it would sit at ${centerShare.map((n) => n.toFixed(2))}`);
+      rs = await resetByDoubleClick(key, g3);
       // #641: a wheel over the line's vertex, away from the center, zooms about the data there,
       // so the same vertex still answers under the pointer. A center zoom would carry it
       // (k − 1) times its distance from the center away.
@@ -3101,7 +3136,6 @@ try {
       if (!rV0.show || !/2\.6/.test(rV0.text)) throw new Error(`${key}-pointer-zoom: the line's vertex doesn't answer before the zoom (${JSON.stringify(rV0)})`);
       const at0 = await toClient(lineP.x, lineP.y);
       await page.mouse.move(at0.x, at0.y);
-      const mod = process.platform === "darwin" ? "Meta" : "Control";
       await page.keyboard.down(mod);
       await page.mouse.wheel(0, -1200);
       await page.keyboard.up(mod);

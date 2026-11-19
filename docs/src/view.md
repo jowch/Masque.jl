@@ -172,15 +172,16 @@ end
 @bind pick masque(fig, orbit)
 ```
 
-Ctrl+scroll (Cmd+scroll on a Mac) to zoom in or out around the pointer,
-and Shift+drag, or drag with the middle mouse button, to pan. `wheel`
-works as it does on a 2D axis. On a touch screen, drag with two fingers
-to turn the view and pinch to zoom around your fingers, or drag the
-round handle beside the corner buttons to pan; one finger elsewhere
-scrolls the page. The box keeps its size while
-the data grows or slides inside it, and marks that leave the box are
-hidden and no longer respond to hover or clicks. A line that crosses the
-edge of the box still responds along the part you can see. A sphere from
+Ctrl+scroll (Cmd+scroll on a Mac) to zoom in or out around the pointer.
+With the pointer on a point, a line or a surface, that mark stays inside
+the box as you zoom in. Shift+drag, or drag with the middle mouse
+button, pans. `wheel` works as it does on a 2D axis. On a touch screen,
+drag with two fingers to turn the view and pinch to zoom around your
+fingers, or drag the round handle beside the corner buttons to pan; one
+finger elsewhere scrolls the page. The box keeps its size while the data
+grows or slides inside it, and marks that leave the box are hidden and
+no longer respond to hover or clicks. A line that crosses the edge of
+the box still responds along the part you can see. A sphere from
 `meshscatter` stops responding once its center leaves the box, even if
 part of it is still showing. From the keyboard, `+` / `-` zoom and Shift
 with an arrow key pans.

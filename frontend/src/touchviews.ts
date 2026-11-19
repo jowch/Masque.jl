@@ -12,7 +12,7 @@
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import { layoutImagePx } from "./state"
 import type { HitLayer, Limits3, Manifest, ViewGeometry } from "./types"
-import { hitTestAt, innermostView, matrixLimits, slopScale, zoomAnchor3, zoomLimits3 } from "./geometry"
+import { hitTestAt, innermostView, markAt3, matrixLimits, slopScale, zoomAnchor3, zoomLimits3 } from "./geometry"
 import { touchReach } from "./state"
 import { clearWheelTimer, photoHeldByOther, settleCurrentPan, shownViewTransform } from "./bond"
 import { hideTip, hideViewReadout, showViewReadout } from "./hover"
@@ -97,7 +97,11 @@ export function touchViews(ctx: OverlayCtx, state: OverlayState, showHint: () =>
         pair = { drag_: drag, d_: Math.max(m.d, 1), k3_: 1 }
         if (g.mode === "orbit" && g.limits) {
             pair.base3_ = viewDrag.view3Base(state, layer.id, g.limits)
-            pair.anchor3_ = zoomAnchor3(g, pair.base3_, layout.x, layout.y)
+            // At the depth of the mark nearest the fingers' midpoint, in a finger's reach (#643).
+            const slop = slopScale(ctx.manifest_, ctx.base_.getBoundingClientRect().width)
+            const reach = touchReach(ctx.base_, ctx.manifest_, "touch")
+            const mark = markAt3(ctx.manifest_, layer.axis, layout.x, layout.y, state.photo_, state.photoViewId_, slop, reach)
+            pair.anchor3_ = zoomAnchor3(g, pair.base3_, layout.x, layout.y, mark)
         }
         hideTip(ctx, state)
         hideCross(ctx, state)

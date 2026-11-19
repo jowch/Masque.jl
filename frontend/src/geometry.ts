@@ -1,6 +1,6 @@
 // All coordinates here are image pixels.
 import { isIdentity, type PhotoMatrix } from "./photo"
-import { hitSurface, surfaceVertex } from "./surface"
+import { hitSurface, surfaceFields, surfaceVertex } from "./surface"
 import { withRegion } from "./regions"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, SpanGeometry, ROIGeometry, ViewGeometry, SliceGeometry, Limits3, Readout } from "./types"
 
@@ -814,19 +814,79 @@ export function zoomLimits3(l: Limits3, k: number, home?: Limits3, anchor?: read
     return out
 }
 
-// The data point under image px (x, y) that an Axis3 zoom keeps in place (#641), on the plane
-// facing the camera through the limits' center (Makie's `zoommode = :cursor` falls back to the
-// same plane). `panx`/`pany`/`center` were measured at `g.limits`, the frame on screen; the
-// point is returned in `base`, the limits the zoom starts from, at the same share of each range.
-// Undefined when the frame carries no center.
-export function zoomAnchor3(g: ViewGeometry, base: Limits3, x: number, y: number): number[] | undefined {
+// A mark on an Axis3: its data position `p` and where it is drawn, `at` (image px). An Axis3
+// zoom keeps the pointer at the mark's depth (#643).
+export interface Mark3 {
+    p: [number, number, number]
+    at: [number, number]
+}
+
+// The mark `hit` is on, if its kind knows where it is in data: a point (`:circles`, from the
+// layer's `xyz`, else the payload fields Masque filled with its x, y and z), the sample a line's
+// readout snapped to, or a surface vertex. Null for any other hit, and for one whose position
+// isn't finite.
+export function mark3(hit: Hit): Mark3 | null {
+    const { layer, index: k } = hit
+    let p: unknown[] | undefined, at: [number, number] | null | undefined
+    if (layer.kind === "circles") {
+        const g = layer.geometry as number[]
+        at = [g[3 * k], g[3 * k + 1]]
+        if (layer.xyz) p = layer.xyz.slice(3 * k, 3 * k + 3)
+        else {
+            const pl = layer.payloads[k], c = layer.coords
+            if (pl && typeof pl === "object" && c) {
+                // The field named for the axis when Masque filled it, else any it filled along it.
+                const key = (d: "x" | "y" | "z") => (c[d] === d ? d : Object.keys(c).find((f) => c[f] === d))
+                const ks = [key("x"), key("y"), key("z")]
+                if (ks.every((f) => f !== undefined)) p = ks.map((f) => (pl as Record<string, unknown>)[f as string])
+            }
+        }
+    } else if (layer.kind === "lines" && hit.pt_?.length === 4) {
+        p = hit.pt_.slice(1)
+        const s = samplePoint(layer, k, hit.pt_[0])
+        at = s && [s.x, s.y]
+    } else if (layer.kind === "surface") {
+        const f = surfaceFields(layer, k)
+        p = [f.x, f.y, f.z]
+        at = surfaceVertex(layer, k)
+    }
+    if (!p || p.length !== 3 || !at || !p.every((v) => typeof v === "number" && Number.isFinite(v))) return null
+    if (!Number.isFinite(at[0]) || !Number.isFinite(at[1])) return null
+    return { p: p as [number, number, number], at }
+}
+
+// The mark under image px (x, y) on the Axis3 `axis`, as `mark3` reads it: what a hover there
+// would land on (with `touch`, the nearest mark in a finger's reach). Null off every mark, or on
+// a mark another axis owns.
+export function markAt3(
+    manifest: Manifest, axis: string, x: number, y: number, photo: PhotoMatrix, viewId: string | null, slop = 1,
+    touch: TouchReach | null = null,
+): Mark3 | null {
+    const hit = hitTestAt(manifest, x, y, photo, "hover", viewId, slop, touch)
+    return hit && hit.layer.axis === axis ? mark3(hit) : null
+}
+
+// The data point under image px (x, y) that an Axis3 zoom keeps in place (#641). Every point on
+// the ray under the pointer stays under it, but only the anchor keeps its depth: the rest move
+// toward or away from the camera and can leave the box. With `mark`, the anchor is at that
+// mark's depth, so the mark stays inside the box (#643), as Makie's `zoommode = :cursor` does
+// with what it picks. Otherwise it is on the plane facing the camera through the limits'
+// center, Makie's fallback. `panx`/`pany`/`center` were measured at
+// `g.limits`, the frame on screen, and `mark` was read off that frame; the point is returned in
+// `base`, the limits the zoom starts from, at the same share of each range. Undefined when the
+// frame carries no center and there is no mark.
+export function zoomAnchor3(g: ViewGeometry, base: Limits3, x: number, y: number, mark?: Mark3 | null): number[] | undefined {
     const ref = g.limits, px = g.panx, py = g.pany, c = g.center
-    if (!ref || !px || !py || !c) return undefined
-    const dx = x - c[0], dy = y - c[1]
+    if (!ref || !px || !py || (!c && !mark)) return undefined
+    // `panx`/`pany` step along the plane through the center. With Axis3's default orthographic
+    // camera every plane facing it has the same step; with `perspectiveness` above 0 a mark's
+    // plane steps a little differently, which only matters a few px from the mark.
+    const from = mark ? mark.at : c as [number, number]
+    const dx = x - from[0], dy = y - from[1]
     const out: number[] = []
     for (let i = 0; i < 3; i++) {
         const lo = ref[2 * i], w = ref[2 * i + 1] - lo
-        const t = lo + w / 2 + px[i] * dx + py[i] * dy
+        const t = (mark ? mark.p[i] : lo + w / 2) + px[i] * dx + py[i] * dy
         const u = w > 0 ? (t - lo) / w : 0.5
         const a = base[2 * i] + u * (base[2 * i + 1] - base[2 * i])
         if (!Number.isFinite(a)) return undefined
