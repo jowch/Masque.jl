@@ -38,7 +38,23 @@ end
 pick
 
 # ╔═╡ b10f0023-0001-4000-8000-000000000005
-masque(fig, interactables(st; payloads = (points = [(sample = k,) for k in eachindex(t)],), tooltip = (points = masque"<b>Sample $(sample)</b><br>$(y) at $(x) s",)))
+samples = [(sample = k,) for k in eachindex(t)]
+
+# ╔═╡ b10f0023-0001-4000-8000-000000000006
+masque(
+    fig,
+    interactables(
+        st;
+        payloads = (
+            points = samples,
+            stems = samples,
+        ),
+        tooltip = (
+            points = masque"<b>Sample $(sample)</b><br>$(y) at $(x) s",
+            stems = masque"<b>Sample $(sample)</b><br>$(y2) at $(x2) s",
+        ),
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -53,4 +69,5 @@ Masque = "82b01fb5-7eeb-4559-83ea-8d75f85d4328"
 # ╠═b10f0023-0001-4000-8000-000000000003
 # ╠═b10f0023-0001-4000-8000-000000000004
 # ╠═b10f0023-0001-4000-8000-000000000005
+# ╠═b10f0023-0001-4000-8000-000000000006
 # ╟─00000000-0000-0000-0000-000000000001
