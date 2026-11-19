@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-19
+
 ### Added
 - A drag with the middle mouse button pans a view, on a 2D `Axis` and on an `Axis3`, as
   Shift+drag does (#642).
@@ -1031,7 +1033,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/jowch/Masque.jl/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/jowch/Masque.jl/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/jowch/Masque.jl/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/jowch/Masque.jl/compare/v0.5.0...v0.5.1
