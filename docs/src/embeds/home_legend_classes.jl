@@ -38,9 +38,21 @@ begin
         return xs, ys
     end
     classes = [
-        (name = "Adelie", cx = 38.8, cy = 18.3, sx = 2.2, sy = 1.0, seed = 11, color = "#e07a3d"),
-        (name = "Chinstrap", cx = 48.8, cy = 18.4, sx = 2.6, sy = 0.95, seed = 23, color = "#3d5a80"),
-        (name = "Gentoo", cx = 47.5, cy = 15.0, sx = 2.4, sy = 0.85, seed = 41, color = "#2a9d8f"),
+        (
+            name = "Adelie",
+            cx = 38.8, cy = 18.3, sx = 2.2, sy = 1.0, seed = 11,
+            color = "#e07a3d",
+        ),
+        (
+            name = "Chinstrap",
+            cx = 48.8, cy = 18.4, sx = 2.6, sy = 0.95, seed = 23,
+            color = "#3d5a80",
+        ),
+        (
+            name = "Gentoo",
+            cx = 47.5, cy = 15.0, sx = 2.4, sy = 0.85, seed = 41,
+            color = "#2a9d8f",
+        ),
     ]
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "Bill length (mm)", ylabel = "Bill depth (mm)")

@@ -133,7 +133,11 @@ security model, wire format).
 # Examples
 ```julia
 tooltip = masque"<b>\$(name)</b> — \$(population:,) people"
-PointInteractable(ax, pts; payloads = [(; name = "a", population = 1200)], tooltip)
+PointInteractable(
+    ax, pts;
+    payloads = [(; name = "a", population = 1200)],
+    tooltip,
+)
 ```
 """
 macro masque_str(s)

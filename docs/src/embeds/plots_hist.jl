@@ -38,10 +38,20 @@ end
 pick
 
 # ╔═╡ b10f0006-0001-4000-8000-000000000005
-in_bin = pick === nothing ? Float64[] : filter(x -> pick.low <= x < pick.high, heights)
+in_bin = if pick === nothing
+    Float64[]
+else
+    filter(x -> pick.low <= x < pick.high, heights)
+end
 
 # ╔═╡ b10f0006-0001-4000-8000-000000000006
-masque(fig, interactables(h; tooltip = masque"<b>$(value) people</b><br>$(low:.0f) to $(high:.0f) cm"))
+masque(
+    fig,
+    interactables(
+        h;
+        tooltip = masque"<b>$(value) people</b><br>$(low:.0f) to $(high:.0f) cm",
+    ),
+)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """

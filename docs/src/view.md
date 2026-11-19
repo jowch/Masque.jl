@@ -156,7 +156,12 @@ hover over and click the marks as the view turns.
 ```julia
 begin
     fig = Figure(size = (500, 380))
-    ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "drag to orbit")
+    ax = Axis3(
+        fig[1, 1];
+        azimuth = 0.4,
+        elevation = 0.5,
+        title = "drag to orbit",
+    )
     s = scatter!(
         ax,
         Makie.Point3f[(1, 2, 3), (4, 5, 6), (7, 8, 2)];
