@@ -356,9 +356,6 @@ function _resolve_plot_targets(interactables, pairs)
     return Any[get(swap, i, i) for i in interactables], Tuple{Any, HitLayer}[(get(swap, i, i), L) for (i, L) in pairs]
 end
 
-# A slice from plots covers the layers `_assemble` found for them unless told otherwise. Keep
-# the coverable ones in this call. Covers the caller named stay, so `_validate_slices` still
-# reports a missing or uncoverable one.
 # A point's data position (`xyz`) serves only a wheel or pinch zoom over it (#643), so a layer
 # on an axis with no view in this manifest drops it.
 function _drop_unviewed_xyz!(built)
@@ -369,6 +366,9 @@ function _drop_unviewed_xyz!(built)
     return built
 end
 
+# A slice from plots covers the layers `_assemble` found for them unless told otherwise. Keep
+# the coverable ones in this call. Covers the caller named stay, so `_validate_slices` still
+# reports a missing or uncoverable one.
 function _drop_absent_default_covers!(built)
     kinds = Dict(d["id"] => d["kind"] for (_, _, d) in built)
     for (i, _, d) in built
