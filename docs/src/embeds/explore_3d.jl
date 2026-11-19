@@ -59,7 +59,8 @@ begin
     )
     sc = scatter!(
         ax, [s.x for s in stations], [s.y for s in stations], elevation;
-        color = :black, markersize = 14,
+        color = :black,
+        markersize = 14,
     )
     sites = interactables(
         sc;

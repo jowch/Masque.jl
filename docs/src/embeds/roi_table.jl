@@ -53,7 +53,8 @@ begin
     )
     s = scatter!(
         ax, [r.x for r in samples], [r.y for r in samples];
-        color = [group_color[r.group] for r in samples], markersize = 18,
+        color = [group_color[r.group] for r in samples],
+        markersize = 18,
     )
     pts = interactables(s; payloads = samples)
     roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = s)

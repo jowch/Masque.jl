@@ -79,7 +79,8 @@ function hr_diagram()
     )
     sc = scatter!(
         ax, [s.teff for s in stars], log10.([s.lum for s in stars]);
-        color = [spectral[s.type[1]] for s in stars], markersize = 16,
+        color = [spectral[s.type[1]] for s in stars],
+        markersize = 16,
     )
     return fig, sc
 end;
