@@ -3,9 +3,10 @@
 //
 // A player's height depends on the column: its picture scales with the width and its code
 // cells rewrap. So this opens every page with players once, widens the window through several
-// widths, waits at each for every iframe to settle at its own height, and writes the heights into the page as container
-// queries on the iframe's `.masque-embed-wrap`, joined by straight lines between the measured
-// widths. The iframe's `height:` in the Markdown is dropped: it was one number for every width.
+// widths, waits at each for every iframe to settle at its own height, and writes the heights
+// into the page as container queries on the iframe's `.masque-embed-wrap`, joined by straight
+// lines between the measured widths. The iframe's `height:` in the Markdown is dropped: it was
+// one number for every width.
 //
 //   node measure_players.mjs <docs/build>
 
@@ -158,9 +159,9 @@ function record(file, width, got) {
 
 // Load the page once at the narrowest window, then widen it one width at a time and let the
 // players settle again at each: booting Pluto's frontend is most of a measurement, and a
-// resize only rewraps. Widening, not narrowing: a Pluto-export player's frame grows with its
-// content but doesn't shrink back. Heights match a fresh load at each width (checked against the
-// one-load-per-width method on every docs page when this changed).
+// resize only rewraps. Every player refits when its column changes width, so the heights match
+// a fresh load at each width (checked against the one-load-per-width method on every docs page
+// when this changed).
 async function measure(file, widths) {
   const order = [...widths].sort((a, b) => a - b);
   const context = await browser.newContext({ viewport: { width: order[0], height: 900 }, locale: "en-US", timezoneId: "UTC" });
