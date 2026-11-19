@@ -27,8 +27,17 @@ begin
     finish = [5, 11, 13, 14, 15]
 
     fig = Figure(size = (520, 320))
-    ax = Axis(fig[1, 1]; xlabel = "Day", yticks = (1:5, tasks), yreversed = true)
-    ls = linesegments!(ax, [Point2f(p) for i in 1:5 for p in ((start[i], i), (finish[i], i))]; linewidth = 12)
+    ax = Axis(
+        fig[1, 1];
+        xlabel = "Day",
+        yticks = (1:5, tasks),
+        yreversed = true,
+    )
+    ls = linesegments!(
+        ax,
+        [Point2f(p) for i in 1:5 for p in ((start[i], i), (finish[i], i))];
+        linewidth = 12,
+    )
     nothing
 end
 
@@ -39,7 +48,16 @@ end
 pick
 
 # ╔═╡ b10f0015-0001-4000-8000-000000000005
-masque(fig, interactables(ls; payloads = [(task = tasks[i], from = start[i], to = finish[i]) for i in 1:5], tooltip = masque"<b>$(task)</b><br>day $(from) to day $(to)"))
+masque(
+    fig,
+    interactables(
+        ls;
+        payloads = [
+            (task = tasks[i], from = start[i], to = finish[i]) for i in 1:5
+        ],
+        tooltip = masque"<b>$(task)</b><br>day $(from) to day $(to)",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

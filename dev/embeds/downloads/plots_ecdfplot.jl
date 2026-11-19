@@ -38,7 +38,13 @@ end
 pick
 
 # ╔═╡ b10f000f-0001-4000-8000-000000000005
-masque(fig, interactables(e; tooltip = masque"$(y:.0%) of trains were $(x) min late or less"))
+masque(
+    fig,
+    interactables(
+        e;
+        tooltip = masque"$(y:.0%) of trains were $(x) min late or less",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

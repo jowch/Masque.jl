@@ -38,7 +38,11 @@ begin
     grp = [iseven(i) ? "A" : "B" for i in 1:npts]
     fig = Figure(size = (560, 380))
     ax = Axis(fig[1, 1]; title = "drag the box")
-    s = scatter!(ax, xs, ys; color = map(g -> g == "A" ? :steelblue : :darkorange, grp), markersize = 14)
+    s = scatter!(
+        ax, xs, ys;
+        color = map(g -> g == "A" ? :steelblue : :darkorange, grp),
+        markersize = 14,
+    )
     pts = interactables(s; payloads = [(; group = g) for g in grp])
     roi = ROIInteractable(ax; bounds = (3.0, 6.0, 1.5, 5.5), selects = s)
     nothing

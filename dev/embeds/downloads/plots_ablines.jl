@@ -29,7 +29,11 @@ begin
     fig = Figure(size = (520, 320))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
     scatter!(ax, x, y; color = :gray60)
-    ab = ablines!(ax, [1.5, 0.0], [0.8, 1.0]; color = [:steelblue, :orange], linewidth = 2)
+    ab = ablines!(
+        ax, [1.5, 0.0], [0.8, 1.0];
+        color = [:steelblue, :orange],
+        linewidth = 2,
+    )
     nothing
 end
 
@@ -40,7 +44,17 @@ end
 pick
 
 # ╔═╡ b10f0019-0001-4000-8000-000000000005
-masque(fig, interactables(ab; payloads = [(fit = "Fitted", intercept = 1.5, slope = 0.8), (fit = "y = x", intercept = 0.0, slope = 1.0)], tooltip = masque"<b>$(fit)</b><br>intercept $(intercept), slope $(slope)"))
+masque(
+    fig,
+    interactables(
+        ab;
+        payloads = [
+            (fit = "Fitted", intercept = 1.5, slope = 0.8),
+            (fit = "y = x", intercept = 0.0, slope = 1.0),
+        ],
+        tooltip = masque"<b>$(fit)</b><br>intercept $(intercept), slope $(slope)",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

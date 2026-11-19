@@ -39,11 +39,12 @@ pick
 
 # ╔═╡ b10f000d-0001-4000-8000-000000000005
 masque(
-    fig, interactables(
+    fig,
+    interactables(
         st;
         payloads = [(team = "Kitchen",)],
         tooltip = masque"<b>$(team)</b><br>$(y) on shift from day $(x)",
-    )
+    ),
 )
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

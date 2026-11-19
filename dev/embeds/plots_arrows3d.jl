@@ -27,7 +27,13 @@ begin
 
     fig = Figure(size = (520, 380))
     ax = Axis3(fig[1, 1]; xlabel = "x (m)", ylabel = "y (m)", zlabel = "z (m)")
-    ar = arrows3d!(ax, ps, ds; color = :steelblue, shaftradius = 0.03, tipradius = 0.07, tiplength = 0.15)
+    ar = arrows3d!(
+        ax, ps, ds;
+        color = :steelblue,
+        shaftradius = 0.03,
+        tipradius = 0.07,
+        tiplength = 0.15,
+    )
     nothing
 end
 
@@ -38,7 +44,16 @@ end
 pick
 
 # ╔═╡ b10f0021-0001-4000-8000-000000000005
-masque(fig, interactables(ar; payloads = [(speed = round(sqrt(sum(abs2, d)) * 10; digits = 1),) for d in ds], tooltip = masque"<b>$(speed) m/s</b><br>from $(x), $(y), $(z)"))
+masque(
+    fig,
+    interactables(
+        ar;
+        payloads = [
+            (speed = round(sqrt(sum(abs2, d)) * 10; digits = 1),) for d in ds
+        ],
+        tooltip = masque"<b>$(speed) m/s</b><br>from $(x), $(y), $(z)",
+    ),
+)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """

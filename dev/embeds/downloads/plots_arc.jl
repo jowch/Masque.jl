@@ -23,7 +23,12 @@ using Masque, CairoMakie, Random
 # ╔═╡ b10f002c-0001-4000-8000-000000000002
 begin
     fig = Figure(size = (520, 320))
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), xlabel = "x (m)", ylabel = "y (m)")
+    ax = Axis(
+        fig[1, 1];
+        aspect = DataAspect(),
+        xlabel = "x (m)",
+        ylabel = "y (m)",
+    )
     a1 = arc!(ax, Point2f(0, 0), 1, 0, π; linewidth = 3)
     a2 = arc!(ax, Point2f(0, 0), 2, 0, π / 2; linewidth = 3, color = :orange)
     nothing
@@ -36,7 +41,19 @@ end
 pick
 
 # ╔═╡ b10f002c-0001-4000-8000-000000000005
-masque(fig, interactables(a1; payloads = [(name = "Inner track", radius = 1)], tooltip = masque"<b>$(name)</b><br>radius $(radius) m"), interactables(a2; payloads = [(name = "Outer track", radius = 2)], tooltip = masque"<b>$(name)</b><br>radius $(radius) m"))
+masque(
+    fig,
+    interactables(
+        a1;
+        payloads = [(name = "Inner track", radius = 1)],
+        tooltip = masque"<b>$(name)</b><br>radius $(radius) m",
+    ),
+    interactables(
+        a2;
+        payloads = [(name = "Outer track", radius = 2)],
+        tooltip = masque"<b>$(name)</b><br>radius $(radius) m",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

@@ -46,7 +46,14 @@ stalls = [
 ]
 
 # ╔═╡ b10f0005-0001-4000-8000-000000000006
-masque(fig, interactables(b; payloads = stalls, tooltip = masque"<b>$(fruit)</b><br>$(value) crates at $(stall)"))
+masque(
+    fig,
+    interactables(
+        b;
+        payloads = stalls,
+        tooltip = masque"<b>$(fruit)</b><br>$(value) crates at $(stall)",
+    ),
+)
 
 # ╔═╡ b10f0005-0001-4000-8000-000000000007
 begin
@@ -55,18 +62,23 @@ begin
     sales = [5, 7, 6, 8, 3, 2, 4, 3]
 
     fig2 = Figure(size = (520, 320))
-    ax2 = Axis(fig2[1, 1]; xticks = (1:4, ["Q1", "Q2", "Q3", "Q4"]), ylabel = "Sales")
+    ax2 = Axis(
+        fig2[1, 1];
+        xticks = (1:4, ["Q1", "Q2", "Q3", "Q4"]),
+        ylabel = "Sales",
+    )
     b2 = barplot!(ax2, quarter, sales; stack = product, color = product)
     nothing
 end
 
 # ╔═╡ b10f0005-0001-4000-8000-000000000008
 masque(
-    fig2, interactables(
+    fig2,
+    interactables(
         b2;
         payloads = [(product = p == 1 ? "Tea" : "Coffee",) for p in product],
         tooltip = masque"<b>$(product)</b><br>$(value) sold, from $(low) to $(high)",
-    )
+    ),
 )
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

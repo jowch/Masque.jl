@@ -27,7 +27,12 @@ begin
     zs = [exp(-(x^2 + y^2) / 2) for x in xs, y in ys]
 
     fig = Figure(size = (520, 380))
-    ax = Axis3(fig[1, 1]; xlabel = "x (km)", ylabel = "y (km)", zlabel = "Height (km)")
+    ax = Axis3(
+        fig[1, 1];
+        xlabel = "x (km)",
+        ylabel = "y (km)",
+        zlabel = "Height (km)",
+    )
     wf = wireframe!(ax, xs, ys, zs; color = :steelblue)
     nothing
 end
@@ -39,7 +44,13 @@ end
 pick
 
 # ╔═╡ b10f002b-0001-4000-8000-000000000005
-masque(fig, interactables(wf; tooltip = masque"edge from $(z1:.2f) to $(z2:.2f) km high"))
+masque(
+    fig,
+    interactables(
+        wf;
+        tooltip = masque"edge from $(z1:.2f) to $(z2:.2f) km high",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

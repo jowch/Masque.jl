@@ -24,7 +24,12 @@ using Masque, CairoMakie, Random
 begin
     days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     hours = 8:20
-    visits = [round(Int, 40 + 30 * sin((h - 8) / 4) + (d >= 6 ? 25 : 0) + 8 * sin(3d + h)) for d in 1:7, h in hours]
+    visits = [
+        round(
+            Int,
+            40 + 30 * sin((h - 8) / 4) + (d >= 6 ? 25 : 0) + 8 * sin(3d + h),
+        ) for d in 1:7, h in hours
+    ]
 
     fig = Figure(size = (520, 320))
     ax = Axis(fig[1, 1]; xticks = (1:7, days), ylabel = "Hour")
@@ -40,7 +45,14 @@ end
 pick
 
 # ╔═╡ b10f001b-0001-4000-8000-000000000005
-masque(fig, interactables(hm; payloads = (i, j) -> (day = days[i], hour = hours[j]), tooltip = masque"<b>$(day), $(hour):00</b><br>$(value) visits"))
+masque(
+    fig,
+    interactables(
+        hm;
+        payloads = (i, j) -> (day = days[i], hour = hours[j]),
+        tooltip = masque"<b>$(day), $(hour):00</b><br>$(value) visits",
+    ),
+)
 
 # ╔═╡ b10f001b-0001-4000-8000-000000000006
 masque(fig, interactables(hm; select = :many))
@@ -48,11 +60,27 @@ masque(fig, interactables(hm; select = :many))
 # ╔═╡ b10f001b-0001-4000-8000-000000000007
 begin
     rng = Xoshiro(3)
-    scan = [exp(-((x - 20)^2 + (y - 14)^2) / 60) + 0.6 * exp(-((x - 8)^2 + (y - 22)^2) / 20) + 0.05 * rand(rng) for x in 1:32, y in 1:32]
+    scan = [
+        exp(-((x - 20)^2 + (y - 14)^2) / 60) +
+            0.6 * exp(-((x - 8)^2 + (y - 22)^2) / 20) +
+            0.05 * rand(rng)
+            for x in 1:32, y in 1:32
+    ]
     fig2 = Figure(size = (520, 320))
-    ax2 = Axis(fig2[1, 1]; aspect = DataAspect(), yreversed = true, title = "Scan")
+    ax2 = Axis(
+        fig2[1, 1];
+        aspect = DataAspect(),
+        yreversed = true,
+        title = "Scan",
+    )
     img = image!(ax2, scan; colormap = :grays, interpolate = false)
-    masque(fig2, interactables(img; tooltip = masque"pixel $(i), $(j)<br>intensity $(value:.2f)"))
+    masque(
+        fig2,
+        interactables(
+            img;
+            tooltip = masque"pixel $(i), $(j)<br>intensity $(value:.2f)",
+        ),
+    )
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

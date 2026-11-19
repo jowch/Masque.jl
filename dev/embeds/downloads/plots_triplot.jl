@@ -38,7 +38,10 @@ end
 pick
 
 # ╔═╡ b10f002a-0001-4000-8000-000000000005
-masque(fig, interactables(tp; tooltip = masque"triangle of points $(vertices)"))
+masque(
+    fig,
+    interactables(tp; tooltip = masque"triangle of points $(vertices)"),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

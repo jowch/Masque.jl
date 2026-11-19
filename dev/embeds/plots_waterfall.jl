@@ -39,11 +39,12 @@ pick
 
 # ╔═╡ b10f0007-0001-4000-8000-000000000005
 masque(
-    fig, interactables(
+    fig,
+    interactables(
         w;
         payloads = [(step = s, balance = b) for (s, b) in zip(steps, cumsum(change))],
-        tooltip = masque"<b>$(step)</b><br>$(value) thousand, balance $(balance) thousand",
-    )
+        tooltip = masque"<b>$(step)</b><br>$(value), balance $(balance) thousand",
+    ),
 )
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

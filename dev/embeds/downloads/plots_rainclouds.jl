@@ -42,7 +42,16 @@ sel
 begin
     students = [(student = "S$(i)",) for i in 1:80]
     regions = [(region = "North", schools = 4), (region = "South", schools = 6)]
-    masque(fig, interactables(rc; payloads = (scatter = students, violin = regions)))
+    masque(
+        fig,
+        interactables(
+            rc;
+            payloads = (
+                scatter = students,
+                violin = regions,
+            ),
+        ),
+    )
 end
 
 # ╔═╡ b10f0003-0001-4000-8000-000000000006

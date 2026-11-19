@@ -54,7 +54,8 @@ md"""
 if isnothing(pick)
     "click a segment"
 else
-    "Q$(quarter[pick.index]) $(products[product[pick.index]]): $(pick.low) to $(pick.high)"
+    "Q$(quarter[pick.index]) $(products[product[pick.index]]): " *
+        "$(pick.low) to $(pick.high)"
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

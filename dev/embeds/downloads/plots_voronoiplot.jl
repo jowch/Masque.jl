@@ -28,7 +28,12 @@ begin
     rain = round.(20 .+ 30 .* rand(rng, 18))
 
     fig = Figure(size = (520, 320))
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), xlabel = "East (km)", ylabel = "North (km)")
+    ax = Axis(
+        fig[1, 1];
+        aspect = DataAspect(),
+        xlabel = "East (km)",
+        ylabel = "North (km)",
+    )
     vp = voronoiplot!(ax, sx, sy, rain; colormap = :Blues, strokecolor = :white)
     nothing
 end
@@ -40,7 +45,14 @@ end
 pick
 
 # ╔═╡ b10f0028-0001-4000-8000-000000000005
-masque(fig, interactables(vp; payloads = [(station = "Station $(k)",) for k in 1:18], tooltip = masque"<b>$(station)</b><br>$(value) mm of rain"))
+masque(
+    fig,
+    interactables(
+        vp;
+        payloads = [(station = "Station $(k)",) for k in 1:18],
+        tooltip = masque"<b>$(station)</b><br>$(value) mm of rain",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

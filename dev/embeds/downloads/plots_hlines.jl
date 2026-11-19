@@ -30,7 +30,12 @@ begin
     ax = Axis(fig[1, 1]; xlabel = "Day", ylabel = "Load (%)")
     lines!(ax, day, load; color = :gray40)
     h = hlines!(ax, [50, 65]; color = [:orange, :red], linewidth = 2)
-    v = vlines!(ax, [20, 45]; color = :steelblue, linestyle = :dash, linewidth = 2)
+    v = vlines!(
+        ax, [20, 45];
+        color = :steelblue,
+        linestyle = :dash,
+        linewidth = 2,
+    )
     nothing
 end
 
@@ -41,7 +46,22 @@ end
 pick
 
 # ╔═╡ b10f0018-0001-4000-8000-000000000005
-masque(fig, interactables(h; payloads = [(name = "Warning", level = 50), (name = "Limit", level = 65)], tooltip = masque"<b>$(name)</b><br>$(level)%"), interactables(v; payloads = [(event = "Upgrade",), (event = "Outage",)], tooltip = masque"<b>$(event)</b>"))
+masque(
+    fig,
+    interactables(
+        h;
+        payloads = [
+            (name = "Warning", level = 50),
+            (name = "Limit", level = 65),
+        ],
+        tooltip = masque"<b>$(name)</b><br>$(level)%",
+    ),
+    interactables(
+        v;
+        payloads = [(event = "Upgrade",), (event = "Outage",)],
+        tooltip = masque"<b>$(event)</b>",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

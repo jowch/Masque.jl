@@ -48,12 +48,17 @@ end
 function hr_diagram()
     fig = Figure(size = (560, 360))
     ax = Axis(
-        fig[1, 1]; xreversed = true, xticks = 4000:4000:20000, xtickformat = "{:.0f}",
-        xlabel = "surface temperature (K)", ylabel = "log₁₀ luminosity (Sun = 0)",
+        fig[1, 1];
+        xreversed = true,
+        xticks = 4000:4000:20000,
+        xtickformat = "{:.0f}",
+        xlabel = "surface temperature (K)",
+        ylabel = "log₁₀ luminosity (Sun = 0)",
     )
     sc = scatter!(
         ax, [s.teff for s in stars], log10.([s.lum for s in stars]);
-        color = [spectral[s.type[1]] for s in stars], markersize = 16,
+        color = [spectral[s.type[1]] for s in stars],
+        markersize = 16,
     )
     return fig, sc
 end;
@@ -67,7 +72,14 @@ Hover over a star to see its tooltip on the dark figure.
 fig, sc = with_theme(hr_diagram, theme_dark());
 
 # ╔═╡ c0e1a003-0001-4000-8000-000000000005
-@bind pick masque(fig, interactables(sc; payloads = info, tooltip = masque"<b>$(name)</b><br>$(type)<br>$(dist) light years"))
+@bind pick masque(
+    fig,
+    interactables(
+        sc;
+        payloads = info,
+        tooltip = masque"<b>$(name)</b><br>$(type)<br>$(dist) light years",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

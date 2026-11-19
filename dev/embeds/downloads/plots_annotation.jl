@@ -23,12 +23,18 @@ using Masque, CairoMakie
 # ╔═╡ b10f0014-0001-4000-8000-000000000002
 begin
     year = 2000:2020
-    visitors = [3.1, 3.3, 3.2, 3.6, 3.9, 4.4, 4.1, 4.8, 5.2, 4.0, 4.6, 5.0, 5.5, 5.9, 6.3, 6.1, 6.8, 7.2, 7.5, 7.9, 3.4]
+    visitors = [
+        3.1, 3.3, 3.2, 3.6, 3.9, 4.4, 4.1, 4.8, 5.2, 4.0, 4.6,
+        5.0, 5.5, 5.9, 6.3, 6.1, 6.8, 7.2, 7.5, 7.9, 3.4,
+    ]
 
     fig = Figure(size = (520, 320))
     ax = Axis(fig[1, 1]; xlabel = "Year", ylabel = "Visitors (million)")
     lines!(ax, year, visitors; color = :gray40)
-    a = annotation!(ax, [-70, -90], [70, -10], [2009, 2020], [4.0, 3.4]; text = ["Recession", "Pandemic"])
+    a = annotation!(
+        ax, [-70, -90], [70, -10], [2009, 2020], [4.0, 3.4];
+        text = ["Recession", "Pandemic"],
+    )
     nothing
 end
 
@@ -39,7 +45,17 @@ end
 pick
 
 # ╔═╡ b10f0014-0001-4000-8000-000000000005
-masque(fig, interactables(a; payloads = [(note = "Visitors fell 23%",), (note = "Visitors fell 57%",)], tooltip = masque"<b>$(text)</b><br>$(note)"))
+masque(
+    fig,
+    interactables(
+        a;
+        payloads = [
+            (note = "Visitors fell 23%",),
+            (note = "Visitors fell 57%",),
+        ],
+        tooltip = masque"<b>$(text)</b><br>$(note)",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

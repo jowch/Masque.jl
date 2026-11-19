@@ -28,7 +28,11 @@ begin
     minutes[[5, 70, 94, 150]] = [15.0, 20.0, 19.5, 4.0]
 
     fig = Figure(size = (520, 320))
-    ax = Axis(fig[1, 1]; xticks = (1:3, ["Route A", "Route B", "Route C"]), ylabel = "Minutes")
+    ax = Axis(
+        fig[1, 1];
+        xticks = (1:3, ["Route A", "Route B", "Route C"]),
+        ylabel = "Minutes",
+    )
     b = boxplot!(ax, route, minutes; show_outliers = true)
     nothing
 end
@@ -41,13 +45,20 @@ pick
 
 # ╔═╡ b10f0002-0001-4000-8000-000000000005
 routes = [
-    (route = "A", stops = 12),
-    (route = "B", stops = 18),
-    (route = "C", stops = 9),
+    (route = "Route A", stops = 12),
+    (route = "Route B", stops = 18),
+    (route = "Route C", stops = 9),
 ]
 
 # ╔═╡ b10f0002-0001-4000-8000-000000000006
-masque(fig, interactables(b; payloads = routes, tooltip = masque"<b>Route $(route)</b><br>$(stops) stops, median $(median:.1f) min"))
+masque(
+    fig,
+    interactables(
+        b;
+        payloads = routes,
+        tooltip = masque"<b>$(route)</b><br>$(stops) stops, median $(median:.1f) min",
+    ),
+)
 
 # ╔═╡ b10f0002-0001-4000-8000-000000000007
 begin
@@ -64,7 +75,15 @@ begin
             end
         end
     end
-    masque(fig, PointInteractable(ax, outliers; radius = 6, payloads = trips, id = :outliers))
+    masque(
+        fig,
+        PointInteractable(
+            ax, outliers;
+            radius = 6,
+            payloads = trips,
+            id = :outliers,
+        ),
+    )
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

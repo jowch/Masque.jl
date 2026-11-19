@@ -27,7 +27,12 @@ begin
     oslo = round.(8 .+ 4 .* sin.((hour .- 9) .* π ./ 12); digits = 1)
 
     fig = Figure(size = (520, 320))
-    ax = Axis(fig[1, 1]; xlabel = "Hour", ylabel = "Temperature (°C)", xticks = 0:6:24)
+    ax = Axis(
+        fig[1, 1];
+        xlabel = "Hour",
+        ylabel = "Temperature (°C)",
+        xticks = 0:6:24,
+    )
     l1 = lines!(ax, hour, berlin; label = "Berlin")
     l2 = lines!(ax, hour, oslo; label = "Oslo")
     nothing
@@ -42,8 +47,16 @@ sel
 # ╔═╡ b10f000b-0001-4000-8000-000000000005
 masque(
     fig,
-    interactables(l1; payloads = [(city = "Berlin",)], tooltip = masque"<b>$(city)</b><br>$(y) °C at $(x):00"),
-    interactables(l2; payloads = [(city = "Oslo",)], tooltip = masque"<b>$(city)</b><br>$(y) °C at $(x):00"),
+    interactables(
+        l1;
+        payloads = [(city = "Berlin",)],
+        tooltip = masque"<b>$(city)</b><br>$(y) °C at $(x):00",
+    ),
+    interactables(
+        l2;
+        payloads = [(city = "Oslo",)],
+        tooltip = masque"<b>$(city)</b><br>$(y) °C at $(x):00",
+    ),
 )
 
 # ╔═╡ b10f000b-0001-4000-8000-000000000006

@@ -35,7 +35,8 @@ begin
     end
 
     function Makie.plot!(p::Dumbbell)
-        map!(p.attributes, [:before, :after], [:bars, :starts, :ends]) do before, after
+        outputs = [:bars, :starts, :ends]
+        map!(p.attributes, [:before, :after], outputs) do before, after
             starts = [Point2f(x, k) for (k, x) in enumerate(before)]
             ends = [Point2f(x, k) for (k, x) in enumerate(after)]
             bars = [q for k in eachindex(starts) for q in (starts[k], ends[k])]
@@ -52,8 +53,12 @@ end
 function Masque.interactables(ax, p::Dumbbell; payloads = nothing, kwargs...)
     before, after = p.before[], p.after[]
     rows = [
-        (; row = k, before = before[k], after = after[k], change = after[k] - before[k])
-            for k in eachindex(before)
+        (;
+            row = k,
+            before = before[k],
+            after = after[k],
+            change = after[k] - before[k],
+        ) for k in eachindex(before)
     ]
     bars = p.plots[1]
     return interactables(ax, bars; payloads = something(payloads, rows), kwargs...)

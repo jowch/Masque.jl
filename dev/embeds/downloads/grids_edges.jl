@@ -29,7 +29,10 @@ begin
     z = [i + 10j for i in 1:4, j in 1:3]
     fig = Figure(size = (480, 320))
     ax = Axis(fig[1, 1])
-    image!(ax, 0.5 .. 4.5, 0.5 .. 3.5, get(cgrad(:viridis), z ./ maximum(z)); interpolate = false)
+    image!(
+        ax, 0.5 .. 4.5, 0.5 .. 3.5, get(cgrad(:viridis), z ./ maximum(z));
+        interpolate = false,
+    )
     nothing
 end
 

@@ -27,7 +27,9 @@ Hover the surface to read its height, or a station to see its name, then click a
 
 # ╔═╡ b3d00001-0001-4000-8000-000000000002
 begin
-    hill(x, y) = 900 + 600 * exp(-((x - 1)^2 + (y - 0.5)^2)) + 400 * exp(-((x + 1.2)^2 + (y + 1)^2) / 0.8)
+    hill(x, y) = 900 +
+        600 * exp(-((x - 1)^2 + (y - 0.5)^2)) +
+        400 * exp(-((x + 1.2)^2 + (y + 1)^2) / 0.8)
     xs = range(-3, 3; length = 25)
     ys = range(-3, 3; length = 25)
     stations = [
@@ -44,13 +46,30 @@ end
 # ╔═╡ b3d00001-0001-4000-8000-000000000003
 begin
     fig = Figure(size = (560, 460))
-    ax = Axis3(fig[1, 1]; azimuth = 0.9, elevation = 0.45, xlabel = "east (km)", ylabel = "north (km)", zlabel = "height (m)")
-    surface!(ax, xs, ys, [hill(x, y) for x in xs, y in ys]; colormap = :terrain, alpha = 0.9)
+    ax = Axis3(
+        fig[1, 1];
+        azimuth = 0.9,
+        elevation = 0.45,
+        xlabel = "east (km)",
+        ylabel = "north (km)",
+        zlabel = "height (m)",
+    )
+    surface!(
+        ax, xs, ys, [hill(x, y) for x in xs, y in ys];
+        colormap = :terrain,
+        alpha = 0.9,
+    )
     sc = scatter!(
         ax, [s.x for s in stations], [s.y for s in stations], elevation;
-        color = :black, markersize = 14,
+        color = :black,
+        markersize = 14,
     )
-    sites = interactables(sc; payloads = [(; name = s.name, height = h) for (s, h) in zip(stations, elevation)])
+    sites = interactables(
+        sc;
+        payloads = [
+            (; name = s.name, height = h) for (s, h) in zip(stations, elevation)
+        ],
+    )
     nothing
 end
 

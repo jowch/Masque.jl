@@ -55,7 +55,12 @@ if isnothing(at)
     "click a wavelength"
 else
     i = argmin(abs.(λ .- at.x))
-    (; wavelength = λ[i], control = control[i], treated = treated[i], washed = washed[i])
+    (;
+        wavelength = λ[i],
+        control = control[i],
+        treated = treated[i],
+        washed = washed[i],
+    )
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

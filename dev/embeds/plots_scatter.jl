@@ -41,13 +41,23 @@ pick
 # ╔═╡ b10f0011-0001-4000-8000-000000000005
 homes = [
     (street = s, rooms = r) for (s, r) in zip(
-            repeat(["Elm St", "Oak Ave", "Pine Rd", "Lake Dr", "Hill Ln", "Park Way"]; outer = 5),
+            repeat(
+                ["Elm St", "Oak Ave", "Pine Rd", "Lake Dr", "Hill Ln", "Park Way"];
+                outer = 5,
+            ),
             round.(Int, size_m2 ./ 25),
         )
 ]
 
 # ╔═╡ b10f0011-0001-4000-8000-000000000006
-masque(fig, interactables(sc; payloads = homes, tooltip = masque"<b>$(street)</b><br>$(rooms) rooms, $(x) m², $(y) thousand"))
+masque(
+    fig,
+    interactables(
+        sc;
+        payloads = homes,
+        tooltip = masque"<b>$(street)</b><br>$(rooms) rooms, $(x) m², $(y) thousand",
+    ),
+)
 
 # ╔═╡ b10f0011-0001-4000-8000-000000000007
 masque(fig, interactables(sc; select = :many))

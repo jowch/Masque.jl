@@ -41,7 +41,18 @@ sel
 customer = sortperm(wait)
 
 # ╔═╡ b10f000a-0001-4000-8000-000000000006
-masque(fig, interactables(q; payloads = (scatter = [(customer = c,) for c in customer],), tooltip = (scatter = masque"<b>Customer $(customer)</b><br>waited $(y) min",)))
+masque(
+    fig,
+    interactables(
+        q;
+        payloads = (
+            scatter = [(customer = c,) for c in customer],
+        ),
+        tooltip = (
+            scatter = masque"<b>Customer $(customer)</b><br>waited $(y) min",
+        ),
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

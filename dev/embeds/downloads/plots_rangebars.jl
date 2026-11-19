@@ -39,7 +39,16 @@ end
 pick
 
 # ╔═╡ b10f0017-0001-4000-8000-000000000005
-masque(fig, interactables(rb; payloads = [(month = m, low = l, high = h) for (m, l, h) in zip(months, low, high)], tooltip = masque"<b>$(month)</b><br>$(low) to $(high) °C"))
+masque(
+    fig,
+    interactables(
+        rb;
+        payloads = [
+            (month = m, low = l, high = h) for (m, l, h) in zip(months, low, high)
+        ],
+        tooltip = masque"<b>$(month)</b><br>$(low) to $(high) °C",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

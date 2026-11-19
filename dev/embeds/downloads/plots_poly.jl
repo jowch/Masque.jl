@@ -31,8 +31,19 @@ begin
     crop = ["Wheat", "Barley", "Oats", "Fallow"]
 
     fig = Figure(size = (520, 320))
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), xlabel = "East (km)", ylabel = "North (km)")
-    pl = poly!(ax, fields; color = 1:4, colormap = :Set2_4, strokecolor = :white, strokewidth = 2)
+    ax = Axis(
+        fig[1, 1];
+        aspect = DataAspect(),
+        xlabel = "East (km)",
+        ylabel = "North (km)",
+    )
+    pl = poly!(
+        ax, fields;
+        color = 1:4,
+        colormap = :Set2_4,
+        strokecolor = :white,
+        strokewidth = 2,
+    )
     nothing
 end
 
@@ -43,7 +54,14 @@ end
 pick
 
 # ╔═╡ b10f0025-0001-4000-8000-000000000005
-masque(fig, interactables(pl; payloads = [(crop = c,) for c in crop], tooltip = masque"<b>$(crop)</b>"))
+masque(
+    fig,
+    interactables(
+        pl;
+        payloads = [(crop = c,) for c in crop],
+        tooltip = masque"<b>$(crop)</b>",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

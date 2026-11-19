@@ -28,7 +28,12 @@ begin
     fig = Figure(size = (520, 320))
     ax = Axis(fig[1, 1]; aspect = DataAspect())
     hidedecorations!(ax); hidespines!(ax)
-    pc = pie!(ax, sales; color = Makie.wong_colors()[1:4], strokecolor = :white, strokewidth = 2)
+    pc = pie!(
+        ax, sales;
+        color = Makie.wong_colors()[1:4],
+        strokecolor = :white,
+        strokewidth = 2,
+    )
     nothing
 end
 
@@ -39,7 +44,14 @@ end
 pick
 
 # ╔═╡ b10f0027-0001-4000-8000-000000000005
-masque(fig, interactables(pc; payloads = [(region = r,) for r in region], tooltip = masque"<b>$(region)</b><br>$(value) sales, $(share:.0%)"))
+masque(
+    fig,
+    interactables(
+        pc;
+        payloads = [(region = r,) for r in region],
+        tooltip = masque"<b>$(region)</b><br>$(value) sales, $(share:.0%)",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

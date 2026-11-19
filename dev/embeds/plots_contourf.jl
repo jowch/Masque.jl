@@ -24,7 +24,12 @@ using Masque, CairoMakie, Random
 begin
     xs = range(0, 10; length = 80)
     ys = range(0, 6; length = 50)
-    height = [400 + 300 * exp(-((x - 3)^2 + (y - 3)^2) / 4) + 200 * exp(-((x - 7.5)^2 + (y - 2)^2) / 2) for x in xs, y in ys]
+    height = [
+        400 +
+            300 * exp(-((x - 3)^2 + (y - 3)^2) / 4) +
+            200 * exp(-((x - 7.5)^2 + (y - 2)^2) / 2)
+            for x in xs, y in ys
+    ]
 
     fig = Figure(size = (520, 320))
     ax = Axis(fig[1, 1]; xlabel = "x (km)", ylabel = "y (km)")
@@ -40,7 +45,10 @@ end
 pick
 
 # ╔═╡ b10f001c-0001-4000-8000-000000000005
-masque(fig, interactables(cf; tooltip = masque"<b>$(low:.0f) to $(high:.0f) m</b>"))
+masque(
+    fig,
+    interactables(cf; tooltip = masque"<b>$(low:.0f) to $(high:.0f) m</b>"),
+)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """

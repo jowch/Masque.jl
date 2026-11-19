@@ -33,7 +33,10 @@ end
 # ╔═╡ a1b2c3d4-0002-4000-8000-000000000003
 @bind w masque(
     fig, (freq = freq, dots = dots);
-    onchange = state -> update!(wave, xs, sin.(state.freq .* xs); linestyle = state.dots ? :dot : :solid)
+    onchange = state -> update!(
+        wave, xs, sin.(state.freq .* xs);
+        linestyle = state.dots ? :dot : :solid,
+    ),
 )
 
 # ╔═╡ a1b2c3d4-0002-4000-8000-000000000004

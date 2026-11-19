@@ -39,8 +39,16 @@ sel
 # ╔═╡ b10f0004-0001-4000-8000-000000000005
 masque(
     fig,
-    interactables(d1; payloads = [(group = "Women", n = 200)], tooltip = masque"<b>$(group)</b>, $(n) people"),
-    interactables(d2; payloads = [(group = "Men", n = 200)], tooltip = masque"<b>$(group)</b>, $(n) people"),
+    interactables(
+        d1;
+        payloads = [(group = "Women", n = 200)],
+        tooltip = masque"<b>$(group)</b>, $(n) people",
+    ),
+    interactables(
+        d2;
+        payloads = [(group = "Men", n = 200)],
+        tooltip = masque"<b>$(group)</b>, $(n) people",
+    ),
 )
 
 # ╔═╡ b10f0004-0001-4000-8000-000000000006

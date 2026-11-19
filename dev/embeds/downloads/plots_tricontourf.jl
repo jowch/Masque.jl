@@ -41,7 +41,13 @@ end
 pick
 
 # ╔═╡ b10f0029-0001-4000-8000-000000000005
-masque(fig, interactables(tc; tooltip = masque"<b>$(low:.0f) to $(high:.0f) m</b> deep"))
+masque(
+    fig,
+    interactables(
+        tc;
+        tooltip = masque"<b>$(low:.0f) to $(high:.0f) m</b> deep",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

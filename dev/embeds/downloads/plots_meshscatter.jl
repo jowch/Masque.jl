@@ -27,7 +27,12 @@ begin
     y = rand(rng, 12) .* 6
 
     fig = Figure(size = (520, 320))
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), xlabel = "x (mm)", ylabel = "y (mm)")
+    ax = Axis(
+        fig[1, 1];
+        aspect = DataAspect(),
+        xlabel = "x (mm)",
+        ylabel = "y (mm)",
+    )
     ms = meshscatter!(ax, x, y; markersize = 0.4)
     nothing
 end
@@ -39,7 +44,14 @@ end
 pick
 
 # ╔═╡ b10f0012-0001-4000-8000-000000000005
-masque(fig, interactables(ms; payloads = [(cell = "C$(i)",) for i in 1:12], tooltip = masque"<b>$(cell)</b><br>at $(x:.1f), $(y:.1f) mm"))
+masque(
+    fig,
+    interactables(
+        ms;
+        payloads = [(cell = "C$(i)",) for i in 1:12],
+        tooltip = masque"<b>$(cell)</b><br>at $(x:.1f), $(y:.1f) mm",
+    ),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

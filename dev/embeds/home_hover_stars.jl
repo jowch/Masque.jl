@@ -22,18 +22,54 @@ using Masque, CairoMakie
 # ╔═╡ c0e10001-0001-4000-8000-000000000002
 begin
     stars = [
-        (name = "Sirius", type = "A1V", teff = 9940, lum = 25.4, dist = 8.6, color = "#cfe8ff"),
-        (name = "Canopus", type = "A9II", teff = 7280, lum = 10700.0, dist = 310.0, color = "#fff4cc"),
-        (name = "Arcturus", type = "K1.5III", teff = 4286, lum = 170.0, dist = 36.7, color = "#fd8d3c"),
-        (name = "Vega", type = "A0V", teff = 9602, lum = 40.0, dist = 25.0, color = "#dcecff"),
-        (name = "Capella", type = "G8III", teff = 4970, lum = 78.7, dist = 42.9, color = "#fde725"),
-        (name = "Rigel", type = "B8Ia", teff = 12100, lum = 1.2e5, dist = 860.0, color = "#9ecae1"),
-        (name = "Procyon", type = "F5IV", teff = 6530, lum = 6.9, dist = 11.5, color = "#fff7ae"),
-        (name = "Betelgeuse", type = "M1Ia", teff = 3600, lum = 9.0e4, dist = 548.0, color = "#d94801"),
-        (name = "Altair", type = "A7V", teff = 7765, lum = 10.6, dist = 16.7, color = "#eef6ff"),
-        (name = "Aldebaran", type = "K5III", teff = 3910, lum = 439.0, dist = 65.3, color = "#e6550d"),
-        (name = "Spica", type = "B1V", teff = 22400, lum = 12100.0, dist = 250.0, color = "#6baed6"),
-        (name = "Pollux", type = "K0III", teff = 4666, lum = 32.7, dist = 33.8, color = "#fdae6b"),
+        (
+            name = "Sirius", type = "A1V",
+            teff = 9940, lum = 25.4, dist = 8.6, color = "#cfe8ff",
+        ),
+        (
+            name = "Canopus", type = "A9II",
+            teff = 7280, lum = 10700.0, dist = 310.0, color = "#fff4cc",
+        ),
+        (
+            name = "Arcturus", type = "K1.5III",
+            teff = 4286, lum = 170.0, dist = 36.7, color = "#fd8d3c",
+        ),
+        (
+            name = "Vega", type = "A0V",
+            teff = 9602, lum = 40.0, dist = 25.0, color = "#dcecff",
+        ),
+        (
+            name = "Capella", type = "G8III",
+            teff = 4970, lum = 78.7, dist = 42.9, color = "#fde725",
+        ),
+        (
+            name = "Rigel", type = "B8Ia",
+            teff = 12100, lum = 1.2e5, dist = 860.0, color = "#9ecae1",
+        ),
+        (
+            name = "Procyon", type = "F5IV",
+            teff = 6530, lum = 6.9, dist = 11.5, color = "#fff7ae",
+        ),
+        (
+            name = "Betelgeuse", type = "M1Ia",
+            teff = 3600, lum = 9.0e4, dist = 548.0, color = "#d94801",
+        ),
+        (
+            name = "Altair", type = "A7V",
+            teff = 7765, lum = 10.6, dist = 16.7, color = "#eef6ff",
+        ),
+        (
+            name = "Aldebaran", type = "K5III",
+            teff = 3910, lum = 439.0, dist = 65.3, color = "#e6550d",
+        ),
+        (
+            name = "Spica", type = "B1V",
+            teff = 22400, lum = 12100.0, dist = 250.0, color = "#6baed6",
+        ),
+        (
+            name = "Pollux", type = "K0III",
+            teff = 4666, lum = 32.7, dist = 33.8, color = "#fdae6b",
+        ),
     ]
     xs = Float64[s.teff for s in stars]
     ys = log10.(Float64[s.lum for s in stars])
