@@ -334,14 +334,16 @@ end
 println("\n=== L. points on Axis3 — data positions (`xyz`) beside bare payloads ===")
 # A wheel or pinch zoom over a point on an Axis3 keeps it at its depth (#643), so the overlay
 # needs each point's data position. The default payloads' `x`, `y`, `z` carry it; a payload that
-# replaces them (a bare value) makes the layer ship `xyz`, three Float32s per point.
+# replaces them (a bare value) makes the layer ship `xyz`, three Float32s per point, when a view
+# is on the axis.
 let
     n = 1_000
     f = Figure(size = (600, 450)); ax = Axis3(f[1, 1])
     sc = scatter!(ax, rand(n), rand(n), rand(n))
-    for (what, pl) in (("default payloads", nothing), ("bare payloads", ["p$k" for k in 1:n]))
-        w = masque(f, interactables(sc; payloads = pl))
-        layer = only(w.manifest["layers"])
+    bare = ["p$k" for k in 1:n]
+    for (what, pl, view) in (("default payloads", nothing, true), ("bare, with a view", bare, true), ("bare, no view", bare, false))
+        w = masque(f, interactables(sc; payloads = pl), (view ? [ViewInteractable(ax)] : [])...)
+        layer = only(l for l in w.manifest["layers"] if l["kind"] == "circles")
         x = get(layer, "xyz", nothing)
         @printf(
             "  scatter %d, %-17s  manifest=%6s KB   xyz=%6s KB\n", n, what, kb(mp(w.manifest)),

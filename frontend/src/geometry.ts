@@ -835,7 +835,8 @@ export function mark3(hit: Hit): Mark3 | null {
         else {
             const pl = layer.payloads[k], c = layer.coords
             if (pl && typeof pl === "object" && c) {
-                const key = (d: "x" | "y" | "z") => Object.keys(c).find((f) => c[f] === d)
+                // The field named for the axis when Masque filled it, else any it filled along it.
+                const key = (d: "x" | "y" | "z") => (c[d] === d ? d : Object.keys(c).find((f) => c[f] === d))
                 const ks = [key("x"), key("y"), key("z")]
                 if (ks.every((f) => f !== undefined)) p = ks.map((f) => (pl as Record<string, unknown>)[f as string])
             }

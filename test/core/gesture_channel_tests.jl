@@ -277,21 +277,30 @@ end
         pts = Makie.Point3f[(0, 0, 0), (1, 2, 3)]
         p = scatter!(ax, pts)
         circles(w) = only(l for l in w.manifest["layers"] if l["kind"] == "circles")
-        @test !haskey(circles(masque(fig, [PointInteractable(ax, pts)]; auto = false)), "xyz")
-        @test !haskey(circles(masque(fig, [PointInteractable(ax, p)]; auto = false)), "xyz")
+        built(pl; view = true) = circles(
+            masque(fig, [PointInteractable(ax, pts; payloads = pl); view ? [ViewInteractable(ax)] : []]; auto = false),
+        )
+        @test !haskey(built(nothing), "xyz")
+        @test !haskey(circles(masque(fig, [PointInteractable(ax, p), ViewInteractable(ax)]; auto = false)), "xyz")
         # A named tuple keeps Masque's x, y and z beside its own fields.
-        nt = [(; name = "a"), (; name = "b")]
-        @test !haskey(circles(masque(fig, [PointInteractable(ax, pts; payloads = nt)]; auto = false)), "xyz")
+        @test !haskey(built([(; name = "a"), (; name = "b")]), "xyz")
         # A bare value has none, and a field of the user's own named x is not the point's x.
         for pl in (["a", "b"], [(; x = 1, name = "a"), (; x = 1, name = "b")])
-            L = circles(masque(fig, [PointInteractable(ax, pts; payloads = pl)]; auto = false))
-            @test L["xyz"] == Float32[0, 0, 0, 1, 2, 3]
+            @test built(pl)["xyz"] == Float32[0, 0, 0, 1, 2, 3]
+            # Only a zoom reads them: without a view on the axis, nothing ships.
+            @test !haskey(built(pl; view = false), "xyz")
         end
+        # A view on another axis doesn't count.
+        ax2 = Axis3(fig[1, 2])
+        scatter!(ax2, pts)
+        w = masque(fig, [PointInteractable(ax, pts; payloads = ["a", "b"]), ViewInteractable(ax2)]; auto = false)
+        @test !haskey(circles(w), "xyz")
         # Off an Axis3, never.
         fig2 = Figure()
-        ax2 = Axis(fig2[1, 1])
-        scatter!(ax2, [1, 2], [3, 4])
-        @test !haskey(circles(masque(fig2, [PointInteractable(ax2, [(1, 3), (2, 4)]; payloads = ["a", "b"])]; auto = false)), "xyz")
+        ax3 = Axis(fig2[1, 1])
+        scatter!(ax3, [1, 2], [3, 4])
+        w2 = masque(fig2, [PointInteractable(ax3, [(1, 3), (2, 4)]; payloads = ["a", "b"]), ViewInteractable(ax3)]; auto = false)
+        @test !haskey(circles(w2), "xyz")
     end
 
     @testset "linkcameras! turns the other panels with the dragged one (#362)" begin

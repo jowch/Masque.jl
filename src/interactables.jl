@@ -82,8 +82,8 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
 - `xyz` — `:circles` on an `Axis3` only, optional: per element, its data position, a flat
   `Float32[]` of `(x, y, z)`. A wheel or pinch zoom over the point keeps the pointer at its
   depth. The manifest leaves it out when the payloads' `x`, `y` and `z` fields already hold
-  it. `nothing` (default): the zoom stays on the plane through the limits' center. Built by
-  [`PointInteractable`](@ref).
+  it, and when no [`ViewInteractable`](@ref) is on the axis. `nothing` (default): the zoom
+  stays on the plane through the limits' center. Built by [`PointInteractable`](@ref).
 """
 struct HitLayer
     id::Symbol

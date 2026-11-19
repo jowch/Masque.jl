@@ -859,6 +859,9 @@ describe("view pan / orbit math", () => {
             coords: { a: "x", b: "y", c: "z" },
         }
         expect(mark3({ layer: byPayload, index: 0 })).toEqual({ p: [1, 2, 3], at: [10, 20] })
+        // The field named for the axis wins over another one measured along it.
+        const named: HitLayer = { ...byPayload, payloads: [{ v: 9, x: 1, y: 2, z: 3 }], coords: { v: "x", x: "x", y: "y", z: "z" } }
+        expect(mark3({ layer: named, index: 0 })).toEqual({ p: [1, 2, 3], at: [10, 20] })
         // A user's own payload, no z: no mark, so the zoom falls back to the center plane.
         const user: HitLayer = { ...base, id: "p", kind: "circles", geometry: [10, 20, 5], payloads: [{ x: 1, y: 2 }], coords: { x: "x", y: "y" } }
         expect(mark3({ layer: user, index: 0 })).toBeNull()
