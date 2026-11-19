@@ -50,7 +50,10 @@ begin
     fig = Figure()
     ax = Axis(fig[1, 1])
     s = scatter!(ax, [1.0, 2.0], [1.0, 2.0]; markersize = 16)
-    p = poly!(ax, Point2f[(0, 0), (3, 0), (3, 3), (0, 3)]; color = (:gray, 0.3))
+    p = poly!(
+        ax, Point2f[(0, 0), (3, 0), (3, 3), (0, 3)];
+        color = (:gray, 0.3),
+    )
     nothing
 end
 ```

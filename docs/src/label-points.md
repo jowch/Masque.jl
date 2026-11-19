@@ -17,12 +17,27 @@ point's color, as [Change the plots you already have](@ref) describes.
 
 ```julia
 begin
-    xs = Float64[1.2, 1.6, 2.1, 1.4, 2.4, 1.9, 2.8, 5.1, 5.6, 6.2, 5.4, 6.0, 6.6, 5.8, 3.9, 4.3, 8.4, 0.6]
-    ys = Float64[2.0, 2.9, 2.3, 3.4, 3.1, 1.6, 2.6, 6.1, 5.4, 6.4, 7.0, 7.4, 5.9, 6.6, 4.6, 1.2, 4.4, 7.5]
+    xs = Float64[
+        1.2, 1.6, 2.1, 1.4, 2.4, 1.9, 2.8, 5.1, 5.6,
+        6.2, 5.4, 6.0, 6.6, 5.8, 3.9, 4.3, 8.4, 0.6,
+    ]
+    ys = Float64[
+        2.0, 2.9, 2.3, 3.4, 3.1, 1.6, 2.6, 6.1, 5.4,
+        6.4, 7.0, 7.4, 5.9, 6.6, 4.6, 1.2, 4.4, 7.5,
+    ]
     fig = Figure(size = (560, 420))
     ax = Axis(fig[1, 1])
-    sc = scatter!(ax, xs, ys; color = fill(:gray70, length(xs)), markersize = 16)
-    class = Menu(fig[2, 1]; options = ["good", "bad", "unsure"], width = 160, tellwidth = false)
+    sc = scatter!(
+        ax, xs, ys;
+        color = fill(:gray70, length(xs)),
+        markersize = 16,
+    )
+    class = Menu(
+        fig[2, 1];
+        options = ["good", "bad", "unsure"],
+        width = 160,
+        tellwidth = false,
+    )
     colors = Dict("good" => :seagreen, "bad" => :crimson, "unsure" => :orange)
     nothing
 end
@@ -43,7 +58,12 @@ takes the label off a point that is no longer selected, and colors the
 points:
 
 ```julia
-@bind w masque(fig, (class = class, pts = interactables(sc; select = :many));
+@bind w masque(
+    fig,
+    (
+        class = class,
+        pts = interactables(sc; select = :many),
+    );
     onchange = state -> begin
         picked = [e.index for e in state.pts]
         # A point that is no longer picked loses its label
@@ -54,7 +74,9 @@ points:
         for i in picked
             get!(labels, i, state.class)
         end
-        pointcolors = [haskey(labels, i) ? colors[labels[i]] : :gray70 for i in eachindex(xs)]
+        pointcolors = [
+            haskey(labels, i) ? colors[labels[i]] : :gray70 for i in eachindex(xs)
+        ]
         update!(sc; color = pointcolors)
     end,
 )
@@ -116,7 +138,12 @@ selected. Add `selected` to the `masque` call, as
 [Start with a mark selected](@ref) describes:
 
 ```julia
-@bind w masque(fig, (class = class, pts = interactables(sc; select = :many));
+@bind w masque(
+    fig,
+    (
+        class = class,
+        pts = interactables(sc; select = :many),
+    );
     selected = (pts = collect(keys(labels)),),
     onchange = state -> begin
         # as above

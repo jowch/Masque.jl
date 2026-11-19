@@ -34,10 +34,23 @@ The heatmap shows one daily mean per station and day, and `temp` gives the hourl
 begin
     stations = ["North", "East", "South", "West"]
     hours = 0:23
-    temp(d, s, h) = 12 + 4 * sin(2π * (h - 9) / 24) + 0.6 * d * (s == 3 ? 1 : 0.3) + 1.5 * cos(d / 2 + s)
-    daily = [round(sum(temp(d, s, h) for h in hours) / 24; digits = 1) for d in 1:7, s in eachindex(stations)]
+    # The temperature at station s, on day d, at hour h
+    function temp(d, s, h)
+        daily_cycle = 4 * sin(2π * (h - 9) / 24)
+        warming = 0.6 * d * (s == 3 ? 1 : 0.3)
+        return 12 + daily_cycle + warming + 1.5 * cos(d / 2 + s)
+    end
+    daily = [
+        round(sum(temp(d, s, h) for h in hours) / 24; digits = 1)
+            for d in 1:7, s in eachindex(stations)
+    ]
     fig = Figure(size = (560, 320))
-    ax = Axis(fig[1, 1]; xlabel = "day", yticks = (eachindex(stations), stations), title = "daily mean temperature: click a cell")
+    ax = Axis(
+        fig[1, 1];
+        xlabel = "day",
+        yticks = (eachindex(stations), stations),
+        title = "daily mean temperature: click a cell",
+    )
     hm = heatmap!(ax, 1:7, eachindex(stations), daily; colormap = :thermal)
     Colorbar(fig[1, 2], hm; label = "°C")
     nothing
@@ -60,13 +73,23 @@ This cell responds to the click: it plots that day's hourly readings, with the d
 begin
     trace = Figure(size = (560, 240))
     if isnothing(pick)
-        Axis(trace[1, 1]; xlabel = "hour", ylabel = "°C", title = "click a cell to see that day")
+        Axis(
+            trace[1, 1];
+            xlabel = "hour",
+            ylabel = "°C",
+            title = "click a cell to see that day",
+        )
     else
         tax = Axis(
-            trace[1, 1]; xlabel = "hour", ylabel = "°C",
-            title = "$(stations[pick.j]), day $(pick.i): mean $(pick.value) °C"
+            trace[1, 1];
+            xlabel = "hour",
+            ylabel = "°C",
+            title = "$(stations[pick.j]), day $(pick.i): mean $(pick.value) °C",
         )
-        lines!(tax, hours, [temp(pick.i, pick.j, h) for h in hours]; linewidth = 2)
+        lines!(
+            tax, hours, [temp(pick.i, pick.j, h) for h in hours];
+            linewidth = 2,
+        )
         hlines!(tax, [pick.value]; linestyle = :dash, color = :gray)
     end
     trace

@@ -28,7 +28,11 @@ begin
 
     fig = Figure(size = (520, 320))
     ax = Axis(fig[1, 1]; xlabel = "Dose (mg)", ylabel = "Response")
-    eb = errorbars!(ax, doses, mean_response, sem; whiskerwidth = 10, linewidth = 2)
+    eb = errorbars!(
+        ax, doses, mean_response, sem;
+        whiskerwidth = 10,
+        linewidth = 2,
+    )
     scatter!(ax, doses, mean_response; color = :black, markersize = 8)
     nothing
 end
@@ -40,7 +44,17 @@ end
 pick
 
 # ╔═╡ b10f0016-0001-4000-8000-000000000005
-masque(fig, interactables(eb; payloads = [(dose = d, mean = m, sem = s) for (d, m, s) in zip(doses, mean_response, sem)], tooltip = masque"<b>$(dose) mg</b><br>$(mean) ± $(sem)"))
+masque(
+    fig,
+    interactables(
+        eb;
+        payloads = [
+            (dose = d, mean = m, sem = s)
+                for (d, m, s) in zip(doses, mean_response, sem)
+        ],
+        tooltip = masque"<b>$(dose) mg</b><br>$(mean) ± $(sem)",
+    ),
+)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """

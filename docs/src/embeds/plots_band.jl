@@ -40,7 +40,19 @@ end
 pick
 
 # ╔═╡ b10f0026-0001-4000-8000-000000000005
-masque(fig, interactables(ba; payloads = [(model = "Model A", spread = "±0.6")], tooltip = masque"<b>$(model)</b><br>spread $(spread)"), interactables(bb; payloads = [(model = "Model B", spread = "±0.9")], tooltip = masque"<b>$(model)</b><br>spread $(spread)"))
+masque(
+    fig,
+    interactables(
+        ba;
+        payloads = [(model = "Model A", spread = "±0.6")],
+        tooltip = masque"<b>$(model)</b><br>spread $(spread)",
+    ),
+    interactables(
+        bb;
+        payloads = [(model = "Model B", spread = "±0.9")],
+        tooltip = masque"<b>$(model)</b><br>spread $(spread)",
+    ),
+)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """

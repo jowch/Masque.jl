@@ -63,7 +63,13 @@ same named tuple:
 
 ```julia
 class = Menu(fig[2, 1]; options = ["good", "bad", "unsure"])
-@bind w masque(fig, (class = class, pts = interactables(sc; select = :many)))
+@bind w masque(
+    fig,
+    (
+        class = class,
+        pts = interactables(sc; select = :many),
+    ),
+)
 ```
 
 `w.class` is then the option chosen, and changing it leaves the selection as

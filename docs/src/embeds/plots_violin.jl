@@ -27,7 +27,11 @@ begin
     weights = [randn(rng, 100) .+ 4; randn(rng, 100) .+ 5; randn(rng, 100) .+ 4.5]
 
     fig = Figure(size = (520, 320))
-    ax = Axis(fig[1, 1]; xticks = (1:3, ["Adelie", "Chinstrap", "Gentoo"]), ylabel = "Weight (kg)")
+    ax = Axis(
+        fig[1, 1];
+        xticks = (1:3, ["Adelie", "Chinstrap", "Gentoo"]),
+        ylabel = "Weight (kg)",
+    )
     v = violin!(ax, groups, weights)
     nothing
 end
@@ -40,13 +44,32 @@ pick
 
 # ╔═╡ b10f0001-0001-4000-8000-000000000005
 summary = [
-    (species = "Adelie", n = 100, median = round(median(weights[groups .== 1]); digits = 1)),
-    (species = "Chinstrap", n = 100, median = round(median(weights[groups .== 2]); digits = 1)),
-    (species = "Gentoo", n = 100, median = round(median(weights[groups .== 3]); digits = 1)),
+    (
+        species = "Adelie",
+        n = 100,
+        median = round(median(weights[groups .== 1]); digits = 1),
+    ),
+    (
+        species = "Chinstrap",
+        n = 100,
+        median = round(median(weights[groups .== 2]); digits = 1),
+    ),
+    (
+        species = "Gentoo",
+        n = 100,
+        median = round(median(weights[groups .== 3]); digits = 1),
+    ),
 ]
 
 # ╔═╡ b10f0001-0001-4000-8000-000000000006
-masque(fig, interactables(v; payloads = summary, tooltip = masque"<b>$(species)</b><br>$(n) birds, median $(median) kg"))
+masque(
+    fig,
+    interactables(
+        v;
+        payloads = summary,
+        tooltip = masque"<b>$(species)</b><br>$(n) birds, median $(median) kg",
+    ),
+)
 
 # ╔═╡ b10f0001-0001-4000-8000-000000000007
 masque(fig, interactables(v; select = :many))

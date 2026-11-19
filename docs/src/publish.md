@@ -60,7 +60,10 @@ stops the build at 200 KB, so a page with several large figures goes in
 
 ```julia
 makedocs(;
-    format = Documenter.HTML(; example_size_threshold = nothing, size_threshold_ignore = ["plots.md"]),
+    format = Documenter.HTML(;
+        example_size_threshold = nothing,
+        size_threshold_ignore = ["plots.md"],
+    ),
     ...,
 )
 ```

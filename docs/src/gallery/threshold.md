@@ -33,7 +33,9 @@ begin
     for _ in 1:18
         ci, cj, r = rand(8:152), rand(8:92), rand(3.0:0.5:6.0)
         b = 0.45 + 0.4 * rand()
-        img .+= [b * exp(-((i - ci)^2 + (j - cj)^2) / (2r^2)) for i in 1:160, j in 1:100]
+        img .+= [
+        b * exp(-((i - ci)^2 + (j - cj)^2) / (2r^2)) for i in 1:160, j in 1:100
+    ]
     end
 end
 ```
@@ -45,30 +47,55 @@ each time the line moves:
 ```julia
 begin
     fig = Figure(size = (720, 300))
-    ax_img = Axis(fig[1, 1]; aspect = DataAspect(), title = "cells above the cutoff in red")
+    ax_img = Axis(
+        fig[1, 1];
+        aspect = DataAspect(),
+        title = "cells above the cutoff in red",
+    )
     hidedecorations!(ax_img)
     heatmap!(ax_img, img; colormap = :grays)
-    maskplot = heatmap!(ax_img, img .> 0.4; colormap = [(:red, 0), (:red, 0.55)], colorrange = (0, 1))
+    maskplot = heatmap!(
+        ax_img, img .> 0.4;
+        colormap = [(:red, 0), (:red, 0.55)],
+        colorrange = (0, 1),
+    )
 
-    ax_hist = Axis(fig[1, 2]; xlabel = "brightness", ylabel = "pixels",
-        yscale = log10, title = "drag the cutoff")
+    ax_hist = Axis(
+        fig[1, 2];
+        xlabel = "brightness",
+        ylabel = "pixels",
+        yscale = log10,
+        title = "drag the cutoff",
+    )
     hist!(ax_hist, vec(img); bins = 60, color = :gray60, fillto = 0.5)
     ylims!(ax_hist, 0.8, 5000)
 
-    cutoff = ThresholdInteractable(ax_hist; orientation = :vertical, value = 0.4)
+    cutoff = ThresholdInteractable(
+        ax_hist;
+        orientation = :vertical,
+        value = 0.4,
+    )
     nothing
 end
 ```
 
 ```julia
-@bind level masque(fig, (cutoff = cutoff,); bind = :cutoff,
-    onchange = state -> (maskplot[1] = img .> state.cutoff.value))
+@bind level masque(
+    fig,
+    (cutoff = cutoff,);
+    bind = :cutoff,
+    onchange = state -> (maskplot[1] = img .> state.cutoff.value),
+)
 ```
 
 Finally, use the cutoff in another cell:
 
 ```julia
-Base.Text("$(round(100 * count(>(level.value), img) / length(img); digits = 1))% of the picture is above $(round(level.value; digits = 2))")
+let
+    share = round(100 * count(>(level.value), img) / length(img); digits = 1)
+    at = round(level.value; digits = 2)
+    Base.Text("$(share)% of the picture is above $(at)")
+end
 ```
 
 ## How it works

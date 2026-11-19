@@ -246,16 +246,43 @@ function marqueeMode(manifest: Manifest, state: OverlayState, under: Hit | null,
     return held ? "subtract" : "add"
 }
 
+// Start a pan of `viewLayer` from layout px `at`, whatever drag the press would otherwise
+// start: Shift+drag, a middle-button drag (#642), or a press on the corner pan handle (#644).
+// On an Axis3 it pans the limits instead of orbiting (#321). The pointer is captured by the
+// surface, so the rest of the drag runs through onMove and onUp as any view drag does.
+export function beginPan(ctx: OverlayCtx, state: OverlayState, e: PointerEvent, viewLayer: HitLayer, at: { x: number; y: number }, handle = false): boolean {
+    e.preventDefault()
+    if (state.drag_) return false
+    const g = viewLayer.geometry as ViewGeometry
+    if (g.mode === "pan" && photoHeldByOther(state, viewLayer.id)) return false
+    const base = g.mode === "orbit" && g.limits ? viewDrag.view3Base(state, viewLayer.id, g.limits) : undefined
+    state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], at.x, at.y, e.pointerId, true, base)
+    if (handle && state.drag_.kind === "view") state.drag_.handle_ = true
+    if (g.mode === "pan") armPan(ctx, state, e, viewLayer.id)
+    hideCross(ctx, state)
+    ctx.surface_.classList.add("grabbing")
+    tryCapture(ctx.surface_, e.pointerId)
+    return true
+}
+
 export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): void {
     // A drag is already in progress (e.g. a second concurrent touch) — refuse to let a new
     // pointer overwrite the first one's `drag` and pointer capture mid-gesture.
     if (state.drag_) return
     cancelPendingMove(state)
     state.justDragged_ = false
-    // preventDefault here suppresses the native menu.
-    if (e.button !== 0 || isMacContextClick(e)) {
+    // A middle-button drag pans the view under it, as Shift+drag does (#642). Any other button
+    // but the main one leaves the press to the browser; preventDefault here would suppress the
+    // native menu.
+    const middle = e.button === 1 && !isMacContextClick(e)
+    if ((e.button !== 0 && !middle) || isMacContextClick(e)) {
         if (e.button === 2 || isMacContextClick(e)) passContextToBase(ctx.surface_, e.pointerId)
         return
+    }
+    // A middle press off every view is the browser's (autoscroll, paste): no focus moved.
+    if (middle) {
+        const at = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+        if (!innermostView(ctx.manifest_, at.x, at.y)) return
     }
     // A press focuses the surface, so Escape and the arrows work after a click (#380). The
     // browser would do this itself, but the preventDefault calls below (marquee, pan, drags)
@@ -266,21 +293,13 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
     ctx.surface_.focus({ preventScroll: true })
     const { layout, content } = pointerSpace(ctx, state, e)
     const slop = slopScale(ctx.manifest_, ctx.base_.getBoundingClientRect().width)
-    // Shift+drag forces view (arbitration vs box-select / ROI / threshold).
-    if (e.shiftKey) {
+    // Shift+drag and a middle-button drag force view (arbitration vs box-select / ROI /
+    // threshold).
+    if (e.shiftKey || middle) {
         // The innermost view under the press, as for a plain drag (#559).
         const viewLayer = innermostView(ctx.manifest_, layout.x, layout.y)
         if (viewLayer) {
-            const g = viewLayer.geometry as ViewGeometry
-            if (g.mode === "pan" && photoHeldByOther(state, viewLayer.id)) { e.preventDefault(); return }
-            // On an Axis3, Shift+drag pans the limits instead of orbiting (#321).
-            const base = g.mode === "orbit" && g.limits ? viewDrag.view3Base(state, viewLayer.id, g.limits) : undefined
-            state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], layout.x, layout.y, e.pointerId, true, base)
-            if (g.mode === "pan") armPan(ctx, state, e, viewLayer.id)
-            hideCross(ctx, state)
-            ctx.surface_.classList.add("grabbing")
-            tryCapture(ctx.surface_, e.pointerId)
-            e.preventDefault()
+            beginPan(ctx, state, e, viewLayer, layout)
             return
         }
     }
@@ -409,7 +428,9 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     hideTip(ctx, state); hideViewReadout(ctx); ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     if (d.kind === "view") {
         const dist = Math.hypot(layout.x - d.x0_, layout.y - d.y0_)
-        state.justDragged_ = dist >= viewDrag.VIEW_MIN_PX
+        // The pointer is captured to the surface, so the click after a press on the pan handle lands
+        // here: counting it as a drag keeps it (and a double-click) off the plot.
+        state.justDragged_ = d.handle_ === true || dist >= viewDrag.VIEW_MIN_PX
     } else {
         state.justDragged_ = true
     }

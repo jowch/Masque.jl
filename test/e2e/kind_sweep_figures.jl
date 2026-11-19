@@ -2002,7 +2002,13 @@ function build_kind_sweep()
         # Runs through the zoomed limits with both ends outside them: the part inside is still
         # drawn, so it must still hover.
         ln = lines!(ax, [0, 2.6, 4], [2.8, 2.8, 2.8], [2, 2, 2]; color = :steelblue)
-        masque(fig, interactables(sc; id = :pts), interactables(ln; id = :line), ViewInteractable(ax; id = :view))
+        # Far from the plane through the middle facing the camera: a wheel zoom over it keeps it
+        # inside the box (#643), where a zoom about that plane would carry it out.
+        fr = scatter!(ax, Makie.Point3f[(3.5, 1.0, 3.5)]; markersize = 14, color = :orange)
+        masque(
+            fig, interactables(sc; id = :pts), interactables(ln; id = :line), interactables(fr; id = :front),
+            ViewInteractable(ax; id = :view),
+        )
     end
 
     # Corner view buttons (#525) on a dark figure whose legend takes the top-right corner: the

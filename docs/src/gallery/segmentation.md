@@ -31,7 +31,9 @@ begin
     for _ in 1:18
         ci, cj, r = rand(8:152), rand(8:92), rand(3.0:0.5:6.0)
         b = 0.45 + 0.4 * rand()
-        img .+= [b * exp(-((i - ci)^2 + (j - cj)^2) / (2r^2)) for i in 1:160, j in 1:100]
+        img .+= [
+        b * exp(-((i - ci)^2 + (j - cj)^2) / (2r^2)) for i in 1:160, j in 1:100
+    ]
     end
 end
 ```
@@ -74,7 +76,11 @@ Show the picture, and make a click pick a whole object:
 ```julia
 begin
     fig = Figure(size = (560, 380))
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), title = "click the objects to leave out")
+    ax = Axis(
+        fig[1, 1];
+        aspect = DataAspect(),
+        title = "click the objects to leave out",
+    )
     hidedecorations!(ax)
     hm = heatmap!(ax, img; colormap = :grays)
     nothing
@@ -82,7 +88,12 @@ end
 ```
 
 ```julia
-@bind sel masque(fig, (objects = interactables(hm; select = :many, regions = labels),))
+@bind sel masque(
+    fig,
+    (
+        objects = interactables(hm; select = :many, regions = labels),
+    ),
+)
 ```
 
 Finally, count what is left:
@@ -91,9 +102,14 @@ Finally, count what is left:
 let
     out = sort(sel.objects.regions)
     kept = setdiff(1:n, out)
+    kept_text = if isempty(kept)
+        "no objects kept"
+    else
+        area = round(Int, sum(areas[kept]) / length(kept))
+        "$(length(kept)) of $n objects kept, mean area $(area) pixels"
+    end
     Base.Text(
-        "left out: $(isempty(out) ? "none" : join(out, ", "))\n" *
-            (isempty(kept) ? "no objects kept" : "$(length(kept)) of $n objects kept, mean area $(round(Int, sum(areas[kept]) / length(kept))) pixels")
+        "left out: $(isempty(out) ? "none" : join(out, ", "))\n" * kept_text,
     )
 end
 ```

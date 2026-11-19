@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
-    hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, panLimits3,
+    hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, zoomAnchor3, panLimits3, mark3, markAt3,
     anchorFor, axisFrame, computeAnchoredPlacement, layerPoint, occludedAt, previewWindows, lineReadout, readoutAt, samplePoint,
     closestPointOnPath, slopScale, innermostView,
 } from "../src/geometry"
@@ -796,6 +796,94 @@ describe("view pan / orbit math", () => {
         const deep = zoomLimits3(l, 1e6, l)
         expect(deep[1] - deep[0]).toBeCloseTo(10 / 64)
         expect(zoomLimits3(l, 0)).toEqual(l)
+    })
+    it("zoomLimits3 about an anchor keeps the anchor's share of each range (#641)", () => {
+        const l: [number, number, number, number, number, number] = [0, 10, -1, 1, 100, 200]
+        const a = [8, 0.5, 150]
+        const z = zoomLimits3(l, 2, undefined, a)
+        expect(z).toEqual([4, 9, -0.25, 0.75, 125, 175])
+        for (let i = 0; i < 3; i++) {
+            expect((a[i] - z[2 * i]) / (z[2 * i + 1] - z[2 * i])).toBeCloseTo((a[i] - l[2 * i]) / (l[2 * i + 1] - l[2 * i]))
+        }
+        // The home bound still caps the width; the anchor keeps its share.
+        const deep = zoomLimits3(l, 1e6, l, a)
+        expect(deep[1] - deep[0]).toBeCloseTo(10 / 64)
+        expect((8 - deep[0]) / (deep[1] - deep[0])).toBeCloseTo(0.8)
+        // A non-finite anchor coordinate falls back to the center on that axis.
+        expect(zoomLimits3(l, 2, undefined, [NaN, 0.5, 150])[0]).toBe(2.5)
+    })
+    it("zoomAnchor3 finds the data under a pixel in the plane through the center (#641)", () => {
+        const g = {
+            x: 0, y: 0, w: 1000, h: 500, mode: "orbit" as const,
+            limits: [0, 10, 0, 10, 0, 10] as [number, number, number, number, number, number],
+            panx: [0.01, 0, 0] as [number, number, number], pany: [0, 0, -0.02] as [number, number, number],
+            center: [500, 250] as [number, number],
+        }
+        expect(zoomAnchor3(g, g.limits, 500, 250)).toEqual([5, 5, 5])
+        const a = zoomAnchor3(g, g.limits, 600, 200) as number[]
+        expect(a[0]).toBeCloseTo(6); expect(a[1]).toBeCloseTo(5); expect(a[2]).toBeCloseTo(6)
+        // Limits asked for since the frame: the same pixel, at the same share of the new ranges.
+        const b = zoomAnchor3(g, [10, 20, 0, 10, 0, 20], 600, 200) as number[]
+        expect(b[0]).toBeCloseTo(16); expect(b[2]).toBeCloseTo(12)
+        expect(zoomAnchor3({ ...g, center: undefined }, g.limits, 600, 200)).toBeUndefined()
+    })
+    it("zoomAnchor3 with a mark finds the data under a pixel at the mark's depth (#643)", () => {
+        const g = {
+            x: 0, y: 0, w: 1000, h: 500, mode: "orbit" as const,
+            limits: [0, 10, 0, 10, 0, 10] as [number, number, number, number, number, number],
+            panx: [0.01, 0, 0] as [number, number, number], pany: [0, 0, -0.02] as [number, number, number],
+            center: [500, 250] as [number, number],
+        }
+        // A mark in front of the center plane (y = 2, not 5), drawn at (700, 150).
+        const mark = { p: [7, 2, 7] as [number, number, number], at: [700, 150] as [number, number] }
+        expect(zoomAnchor3(g, g.limits, 700, 150, mark)).toEqual([7, 2, 7])
+        const a = zoomAnchor3(g, g.limits, 704, 148, mark) as number[]
+        expect(a[0]).toBeCloseTo(7.04); expect(a[1]).toBeCloseTo(2); expect(a[2]).toBeCloseTo(7.04)
+        // The same share of limits asked for since the frame.
+        const b = zoomAnchor3(g, [10, 20, 0, 20, 0, 10], 700, 150, mark) as number[]
+        expect(b[0]).toBeCloseTo(17); expect(b[1]).toBeCloseTo(4); expect(b[2]).toBeCloseTo(7)
+        // A mark needs no center; without either there is no anchor.
+        expect(zoomAnchor3({ ...g, center: undefined }, g.limits, 700, 150, mark)).toEqual([7, 2, 7])
+        expect(zoomAnchor3({ ...g, center: undefined }, g.limits, 700, 150, null)).toBeUndefined()
+        // Zooming about it keeps the mark at its share of every range, so it stays put on screen.
+        const z = zoomLimits3(g.limits, 4, g.limits, zoomAnchor3(g, g.limits, 700, 150, mark))
+        for (let i = 0; i < 3; i++) expect((mark.p[i] - z[2 * i]) / (z[2 * i + 1] - z[2 * i])).toBeCloseTo((mark.p[i] - 0) / 10)
+    })
+    it("mark3 reads a point's, a line sample's and a surface vertex's data position (#643)", () => {
+        const base = { axis: "ax", events: ["hover"] }
+        // A point: from `xyz`, else from the payload fields Masque filled (`coords`).
+        const pts: HitLayer = { ...base, id: "p", kind: "circles", geometry: [10, 20, 5, 30, 40, 5], payloads: [{}, {}], xyz: [1, 2, 3, 4, 5, 6] }
+        expect(mark3({ layer: pts, index: 1 })).toEqual({ p: [4, 5, 6], at: [30, 40] })
+        const byPayload: HitLayer = {
+            ...base, id: "p", kind: "circles", geometry: [10, 20, 5], payloads: [{ a: 1, b: 2, c: 3, name: "q" }],
+            coords: { a: "x", b: "y", c: "z" },
+        }
+        expect(mark3({ layer: byPayload, index: 0 })).toEqual({ p: [1, 2, 3], at: [10, 20] })
+        // The field named for the axis wins over another one measured along it.
+        const named: HitLayer = { ...byPayload, payloads: [{ v: 9, x: 1, y: 2, z: 3 }], coords: { v: "x", x: "x", y: "y", z: "z" } }
+        expect(mark3({ layer: named, index: 0 })).toEqual({ p: [1, 2, 3], at: [10, 20] })
+        // A user's own payload, no z: no mark, so the zoom falls back to the center plane.
+        const user: HitLayer = { ...base, id: "p", kind: "circles", geometry: [10, 20, 5], payloads: [{ x: 1, y: 2 }], coords: { x: "x", y: "y" } }
+        expect(mark3({ layer: user, index: 0 })).toBeNull()
+        expect(mark3({ layer: { ...pts, xyz: [NaN, 0, 0, 0, 0, 0] }, index: 0 })).toBeNull()
+        // A line on an Axis3: the sample its readout snapped to, where it is drawn.
+        const line: HitLayer = {
+            ...base, id: "l", kind: "lines", geometry: [[0, 0, 100, 0]], payloads: [{}],
+            points: [[1, 2, 3, 4]], zpoints: [[5, 6]],
+        }
+        expect(mark3({ layer: line, index: 0, pt_: [1, 3, 4, 6] })).toEqual({ p: [3, 4, 6], at: [100, 0] })
+        expect(mark3({ layer: line, index: 0, pt_: [1, 3, 4] })).toBeNull()
+        // A surface vertex.
+        const surf: HitLayer = {
+            ...base, id: "s", kind: "surface", payloads: [],
+            geometry: { ni: 2, nj: 1, i: [0, 1], j: [0], xy: [5, 6, 7, 8], order: [], x: [10, 11], y: [20], z: [30, 31] },
+        }
+        expect(mark3({ layer: surf, index: 1 })).toEqual({ p: [11, 20, 31], at: [7, 8] })
+        // markAt3: only a mark on the named axis.
+        const m: Manifest = { width: 100, height: 100, scaling: 1, layers: [pts], transforms: {} }
+        expect(markAt3(m, "ax", 31, 41, IDENTITY, null)).toEqual({ p: [4, 5, 6], at: [30, 40] })
+        expect(markAt3(m, "other", 31, 41, IDENTITY, null)).toBeNull()
+        expect(markAt3(m, "ax", 90, 90, IDENTITY, null)).toBeNull()
     })
     it("panLimits3 moves the limits against the drag, scaled by any zoom since the basis", () => {
         const g = {

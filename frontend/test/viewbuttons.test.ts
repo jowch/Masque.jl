@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
-import { cropLayer, dataUnder, placeButtons, viewsWithButtons, boxLength, boxBreadth, CORNERS, VIEW_BUTTONS_STYLE, VB_IDLE_OPACITY } from "../src/viewbuttons"
+import { cropLayer, cornerLength, dataUnder, placeButtons, viewsWithButtons, boxLength, boxBreadth, CORNERS, PAN_GAP, VIEW_BUTTONS_STYLE, VB_IDLE_OPACITY } from "../src/viewbuttons"
 import type { AxisTransform, HitLayer, Manifest } from "../src/types"
 import { withFields } from "./fields"
 
@@ -24,7 +24,7 @@ const one = (opts: { occluders?: Array<[number, number, number, number]>; vp?: [
 describe("where the buttons go", () => {
     it("top right of a roomy axis, a 24 px stack", () => {
         const m = one()
-        expect(placeButtons(m, m.layers[0], K, false)).toEqual({ corner: "tr", row: false, size: 24 })
+        expect(placeButtons(m, m.layers[0], K, false)).toMatchObject({ corner: "tr", row: false, size: 24, buttons: ["in", "out", "reset"], pan: false })
     })
 
     it("a legend in the top-right corner sends them top left, then bottom right", () => {
@@ -103,7 +103,7 @@ describe("where the buttons go", () => {
     it("a short axis gets a row, a tiny one none", () => {
         // 200 CSS px tall: a 76 px stack is more than half. 400 wide: the row fits.
         let m = one({ vp: [0, 0, 800, 280] })
-        expect(placeButtons(m, m.layers[0], K, false)).toEqual({ corner: "tr", row: true, size: 24 })
+        expect(placeButtons(m, m.layers[0], K, false)).toMatchObject({ corner: "tr", row: true, size: 24, buttons: ["in", "out", "reset"], pan: false })
         // 60 × 60 CSS px: neither.
         m = one({ vp: [0, 0, 120, 120] })
         expect(placeButtons(m, m.layers[0], K, false)).toBeNull()
@@ -118,10 +118,32 @@ describe("where the buttons go", () => {
         expect(placeButtons(m, m.layers[0], K, true)?.size).toBe(44)
         // 200 CSS px tall: a 136 px stack is too tall, a 136 px row fits in 500 wide.
         m = one({ vp: [0, 0, 1000, 400] })
-        expect(placeButtons(m, m.layers[0], K, true)).toEqual({ corner: "tr", row: true, size: 44 })
+        expect(placeButtons(m, m.layers[0], K, true)).toMatchObject({ corner: "tr", row: true, size: 44, buttons: ["in", "out", "reset"], pan: false })
         // 160 CSS px wide and tall: no 44 px box fits, the 24 px stack does.
         m = one({ vp: [0, 0, 320, 320] })
-        expect(placeButtons(m, m.layers[0], K, true)).toEqual({ corner: "tr", row: false, size: 24 })
+        expect(placeButtons(m, m.layers[0], K, true)).toMatchObject({ corner: "tr", row: false, size: 24, buttons: ["in", "out", "reset"], pan: false })
+    })
+
+    it("an Axis3 view gets the pan handle; as space runs out zoom out goes, then zoom in, then reset (#644)", () => {
+        const orbit = (vp: [number, number, number, number]): Manifest => {
+            const m = one({ vp })
+            Object.assign(m.layers[0].geometry as object, { mode: "orbit", limits: [0, 1, 0, 1, 0, 1] })
+            return m
+        }
+        let m = orbit([100, 100, 1000, 600])
+        expect(placeButtons(m, m.layers[0], K, false)).toMatchObject({ corner: "tr", row: false, size: 24, buttons: ["in", "out", "reset"], pan: true })
+        expect(cornerLength(24, 3, true)).toBe(boxLength(24) + PAN_GAP + boxBreadth(24))
+        expect(cornerLength(24, 0, true)).toBe(boxBreadth(24))
+        // Heights at exactly twice each set's length, and too small for the set before it; wide
+        // enough for a stack, too narrow for a row.
+        const at = (n: number) => 2 * cornerLength(24, n, true) * K
+        for (const [n, buttons] of [[2, ["in", "reset"]], [1, ["reset"]], [0, []]] as const) {
+            m = orbit([0, 0, 120, at(n)])
+            expect(placeButtons(m, m.layers[0], K, false)).toMatchObject({ row: false, buttons, pan: true })
+        }
+        // A 2D view keeps all three and no handle, or nothing.
+        m = one({ vp: [0, 0, 120, at(1)] })
+        expect(placeButtons(m, m.layers[0], K, false)).toBeNull()
     })
 
     it("an inset axis covers its parent's corner; the parent does not cover the inset's", () => {
@@ -242,10 +264,10 @@ describe("the corner buttons on a live widget", () => {
 
     it("the stylesheet: idle opacity, full under the pointer, a tint on the hovered and pressed button", () => {
         expect(VB_IDLE_OPACITY).toBe(0.6)
-        expect(VIEW_BUTTONS_STYLE).toContain(`.masque-vb.show { opacity: ${VB_IDLE_OPACITY};`)
-        expect(VIEW_BUTTONS_STYLE).toContain(".masque-vb.show:hover, .masque-vb.show.full { opacity: 1; }")
-        expect(VIEW_BUTTONS_STYLE).toMatch(/@media \(hover: hover\) \{\s*\.masque-vb button:hover \{ background: color-mix\(in srgb, var\(--masque-tip-bg-resolved\), var\(--masque-tip-color-resolved\) 12%\); \}/)
-        expect(VIEW_BUTTONS_STYLE).toContain(".masque-vb button:active { background: color-mix(in srgb, var(--masque-tip-bg-resolved), var(--masque-tip-color-resolved) 20%); }")
+        expect(VIEW_BUTTONS_STYLE).toContain(`:is(.masque-vb, .masque-vbp).show { opacity: ${VB_IDLE_OPACITY};`)
+        expect(VIEW_BUTTONS_STYLE).toContain(":is(.masque-vb, .masque-vbp).show:hover, :is(.masque-vb, .masque-vbp).show.full { opacity: 1; }")
+        expect(VIEW_BUTTONS_STYLE).toMatch(/@media \(hover: hover\) \{\s*:is\(\.masque-vb, \.masque-vbp\) button:hover \{ background: color-mix\(in srgb, var\(--masque-tip-bg-resolved\), var\(--masque-tip-color-resolved\) 12%\); \}/)
+        expect(VIEW_BUTTONS_STYLE).toContain(":is(.masque-vb, .masque-vbp) button:active { background: color-mix(in srgb, var(--masque-tip-bg-resolved), var(--masque-tip-color-resolved) 20%); }")
     })
 
     it("reset joins only once the view has moved, and leaves after a reset", async () => {
@@ -415,5 +437,85 @@ describe("the corner buttons on a live widget", () => {
         btn(box, "in").click()
         await tick()
         expect(box.classList.contains("show")).toBe(false)
+    })
+    it("the pan handle (#644): hidden on a 2D view; on an Axis3 a press and a drag pan the limits", async () => {
+        let w = setup(manifestOf())
+        expect((w.shadow.querySelector(".masque-vbp") as HTMLElement).hidden).toBe(true)
+        document.body.innerHTML = ""
+        w = setup(manifestOf({ mode: "orbit" }))
+        const { shadow, surface, requestFrame } = w
+        const pan = shadow.querySelector(".masque-vbp") as HTMLElement
+        expect(pan.hidden).toBe(false)
+        expect(pan.dataset.corner).toBe("tr")
+        // Below the stack, 4 px apart, in the same column.
+        expect(pan.style.left).toBe(w.box!.style.left)
+        expect(pan.style.top).toContain(`${8 + boxLength(24) + PAN_GAP}px`)
+        pointer(surface, "pointermove", 300, 200)
+        expect(pan.classList.contains("show")).toBe(true)
+        const grip = pan.querySelector("button") as HTMLElement
+        expect(grip.getAttribute("aria-label")).toBe("Drag to pan")
+        // A click alone does nothing.
+        grip.click()
+        await tick()
+        expect(requestFrame).not.toHaveBeenCalled()
+        pointer(grip, "pointerdown", 580, 70, "mouse", { button: 0 })
+        expect(pan.classList.contains("held")).toBe(true)
+        pointer(surface, "pointermove", 530, 70)
+        pointer(surface, "pointerup", 530, 70)
+        window.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }))
+        await tick()
+        expect(pan.classList.contains("held")).toBe(false)
+        const cs = calls(requestFrame); const last = cs[cs.length - 1]
+        expect(last).toMatchObject({ id: "view", settle: true })
+        expect(last.azimuth).toBeUndefined()
+        // 50 CSS px left = 100 image px; panx is 0.001 per px, so x moves 0.1 the other way.
+        const lim = last.limits as number[]
+        expect(lim[0]).toBeCloseTo(0.1)
+        expect(lim[1]).toBeCloseTo(1.1)
+        expect(w.inputs).toHaveLength(0)
+    })
+
+    it("the pan handle's click and double-click never reach the plot: no clear, no reset (#644)", async () => {
+        const w = setup(manifestOf({ mode: "orbit" }))
+        const { shadow, surface, requestFrame } = w
+        // Pick the point at (50, 50) CSS px.
+        pointer(surface, "pointerdown", 50, 50)
+        pointer(surface, "pointerup", 50, 50)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true, cancelable: true }))
+        await tick()
+        expect(w.inputs).toHaveLength(1)
+        const grip = shadow.querySelector(".masque-vbp button") as HTMLElement
+        pointer(surface, "pointermove", 300, 200)
+        // The surface holds the capture, so the click after each press lands on it.
+        for (let i = 1; i <= 2; i++) {
+            pointer(grip, "pointerdown", 580, 70, "mouse", { button: 0 })
+            pointer(surface, "pointerup", 580, 70)
+            window.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }))
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 580, clientY: 70, bubbles: true, cancelable: true, detail: i }))
+        }
+        surface.dispatchEvent(new MouseEvent("dblclick", { clientX: 580, clientY: 70, bubbles: true, cancelable: true }))
+        await tick()
+        expect(w.inputs).toHaveLength(1)
+        expect(calls(requestFrame).some((c) => c.reset === true)).toBe(false)
+    })
+
+    it("one finger on the pan handle pans the view (#644)", async () => {
+        const w = setup(manifestOf({ mode: "orbit" }))
+        const { shadow, surface, requestFrame } = w
+        const grip = shadow.querySelector(".masque-vbp button") as HTMLElement
+        pointer(grip, "pointerdown", 580, 70, "touch")
+        expect(shadow.querySelector(".masque-vbp")!.classList.contains("held")).toBe(true)
+        pointer(surface, "pointermove", 555, 70, "touch")
+        pointer(surface, "pointermove", 530, 70, "touch")
+        pointer(surface, "pointerup", 530, 70, "touch")
+        window.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1, pointerType: "touch" }))
+        await tick()
+        const cs = calls(requestFrame); const last = cs[cs.length - 1]
+        expect(last).toMatchObject({ id: "view", settle: true })
+        expect(last.azimuth).toBeUndefined()
+        const lim = last.limits as number[]
+        expect(lim[0]).toBeCloseTo(0.1)
+        expect(lim[1]).toBeCloseTo(1.1)
+        expect(w.inputs).toHaveLength(0)
     })
 })

@@ -284,6 +284,11 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     L.ellipses === nothing || (d["ellipses"] = L.ellipses)
     L.zpoints === nothing || (d["zpoints"] = L.zpoints)
     L.drawn === nothing || (d["drawn"] = L.drawn)
+    # A point's data position, unless the payload fields Masque filled with its x, y and z
+    # already carry it: the overlay reads those instead. Masque fills them with plain numbers
+    # on an Axis3, which draws no category or date axis. Dropped again when no view is on the
+    # axis (`_drop_unviewed_xyz!`).
+    L.xyz === nothing || all(dim -> any(kd -> kd[2] === dim, ck), (:x, :y, :z)) || (d["xyz"] = L.xyz)
     spec = tooltip_spec(i)
     spec === true && throw(ArgumentError("tooltip = true is not meaningful — omit `tooltip` for the auto name/value table (the default), pass masque\"…\" for a template, or `false` to suppress."))
     if spec isa Markup
@@ -349,6 +354,16 @@ function _resolve_plot_targets(interactables, pairs)
     end
     isempty(swap) && return interactables, pairs
     return Any[get(swap, i, i) for i in interactables], Tuple{Any, HitLayer}[(get(swap, i, i), L) for (i, L) in pairs]
+end
+
+# A point's data position (`xyz`) serves only a wheel or pinch zoom over it (#643), so a layer
+# on an axis with no view in this manifest drops it.
+function _drop_unviewed_xyz!(built)
+    viewed = Set(d["axis"] for (_, _, d) in built if d["kind"] == "view")
+    for (_, _, d) in built
+        haskey(d, "xyz") && !(d["axis"] in viewed) && delete!(d, "xyz")
+    end
+    return built
 end
 
 # A slice from plots covers the layers `_assemble` found for them unless told otherwise. Keep
@@ -578,6 +593,7 @@ function build_manifest(
     layer_owners = Any[i for (i, _, _) in built]
     _validate_selectors(interactables, layers)
     _drop_absent_default_covers!(built)
+    _drop_unviewed_xyz!(built)
     _validate_slices(layers)
     _validate_links(layer_owners, layers)
     binding = _binding(plan)

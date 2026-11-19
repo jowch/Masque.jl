@@ -63,14 +63,23 @@ begin
     parts = [
         interactables(a; payloads = [(id = "s1",), (id = "s2",)]),
         interactables(b; payloads = [(id = "s3",), (id = "s4",)]),
-        interactables(s; payloads = [(id = "s4",), (id = "s3",), (id = "s2",), (id = "s1",)]),
+        interactables(
+            s;
+            payloads = [(id = "s4",), (id = "s3",), (id = "s2",), (id = "s1",)],
+        ),
     ]
     nothing
 end
 ```
 
 ```julia
-@bind w masque(fig, parts..., (samples = linked(by_group, all_samples; key = :id, select = :many),))
+@bind w masque(
+    fig,
+    parts...,
+    (
+        samples = linked(by_group, all_samples; key = :id, select = :many),
+    ),
+)
 ```
 
 `w.samples` holds the ids, such as `["s2", "s4"]`, and clicking the
@@ -99,7 +108,11 @@ start = last_city[] in city_names ? last_city[] : nothing
 ```
 
 ```julia
-@bind sel masque(fig, (cities = linked(cities; key = :city),); selected = (cities = start,))
+@bind sel masque(
+    fig,
+    (cities = linked(cities; key = :city),);
+    selected = (cities = start,),
+)
 ```
 
 ## Where to go next

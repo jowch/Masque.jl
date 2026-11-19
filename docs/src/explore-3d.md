@@ -32,7 +32,12 @@ its coordinates. To add its name and height, give the scatter one
 payload per station:
 
 ```julia
-sites = interactables(sc; payloads = [(; name = s.name, height = h) for (s, h) in zip(stations, elevation)])
+sites = interactables(
+    sc;
+    payloads = [
+        (; name = s.name, height = h) for (s, h) in zip(stations, elevation)
+    ],
+)
 ```
 
 The tooltip lists the payload's fields above the coordinates, and a
