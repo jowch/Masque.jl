@@ -50,6 +50,29 @@ try {
       return out;
     };
   });
+  // Every layout shift on the page, with the element that moved: the choices block logs the
+  // ones that land while it presses a radio option (#651).
+  await page.addInitScript(() => {
+    window.__shifts = [];
+    const name = (n) => {
+      let el = n?.nodeType === 1 ? n : n?.parentElement;
+      if (!el) return null;
+      // An element in a widget's shadow tree names the widget's host.
+      while (el.getRootNode() instanceof ShadowRoot) el = el.getRootNode().host;
+      const cell = el.closest("pluto-cell");
+      return `${el.tagName.toLowerCase()}${el.closest(".ip-host") ? " in .ip-host" : ""} (cell ${cell?.id?.slice(-4) ?? "-"})`;
+    };
+    try {
+      new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) {
+          window.__shifts.push({
+            t: e.startTime, value: +e.value.toFixed(4),
+            moved: e.sources.map((x) => ({ el: name(x.node), y: [x.previousRect.y, x.currentRect.y].map(Math.round), h: [x.previousRect.height, x.currentRect.height].map(Math.round) })),
+          });
+        }
+      }).observe({ type: "layout-shift", buffered: true });
+    } catch { /* no layout-shift entries in this engine */ }
+  });
   page.on("pageerror", (e) => {
     const shim = SHIM_LEAK.test(e.message);
     const benign = shim && ALLOWED.some((re) => re.test(e.message));
@@ -960,9 +983,10 @@ try {
     // A press on another option takes the ring away; the next arrow key brings it back.
     // ElementHandle.click scrolls the row into view, waits until its box holds still, and lets
     // the press through only if it lands on that row; it retries otherwise. A raw
-    // page.mouse.click at a measured point missed whenever the page moved between measuring
-    // and pressing (WebGL plots above remounting), and the press focused some plot's surface
-    // instead (#651).
+    // page.mouse.click at a measured point sometimes missed on WebGL CI runs and focused a plot
+    // instead (#651). Any layout shift while the press is pending is logged to the run's
+    // summary, so a page that moves under the pointer stays visible on green runs too.
+    const t0 = await page.evaluate(() => performance.now());
     const opt1 = await page.evaluateHandle((k) => {
       const span = document.querySelector(`#coords_${k}`);
       const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -970,7 +994,11 @@ try {
       return sr.querySelectorAll('[data-masque-control="scale"] > label.masque-opt')[1];
     }, key);
     const box = await opt1.boundingBox();
+    if (!box) throw new Error(`${key}: radio option 1 has no box to click (not rendered or not visible)`);
     await opt1.click({ position: { x: box.width - 3, y: box.height / 2 }, timeout: 15000 });
+    // Chromium also reports zero-size entries for elements that did not move: skip those.
+    const shifts = await page.evaluate((t) => window.__shifts.filter((e) => e.t >= t && e.value > 0), t0);
+    if (shifts.length) console.log(`::warning title=keyboard_a11y ${backend} choices::the page moved ${shifts.length} time(s) while the radio click was pending: ${JSON.stringify(shifts.slice(0, 3))}`);
     s = await look();
     if (s.radio !== 1 || !s.checked || s.ring !== "none") {
       // Say where the press went: which element has focus now, and what is under the row.
@@ -980,7 +1008,7 @@ try {
         const a = sr.activeElement ?? document.activeElement;
         return { focus: a ? `${a.tagName}.${a.className?.baseVal ?? a.className}` : null, hit: hit ? `${hit.tagName}.${hit.className?.baseVal ?? hit.className}` : null, row: [b.left, b.top, b.right, b.bottom].map(Math.round), scrollY: Math.round(scrollY) };
       });
-      throw new Error(`${key}: after a click on option 1 the radio is ${JSON.stringify(s)}, want option 1 checked with no ring; ${JSON.stringify(where)}`);
+      throw new Error(`${key}: after a click on option 1 the radio is ${JSON.stringify(s)}, want option 1 checked with no ring; ${JSON.stringify({ ...where, shifts: shifts.slice(0, 3) })}`);
     }
     await opt1.dispose();
     await page.keyboard.press("ArrowUp");
