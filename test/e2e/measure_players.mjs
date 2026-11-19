@@ -2,8 +2,8 @@
 // player draws. Runs on `docs/build` after makedocs and before deploy (docs/make.jl).
 //
 // A player's height depends on the column: its picture scales with the width and its code
-// cells rewrap. So this opens every page with players at several window widths, waits for
-// each iframe to settle at its own height, and writes the heights into the page as container
+// cells rewrap. So this opens every page with players once, widens the window through several
+// widths, waits at each for every iframe to settle at its own height, and writes the heights into the page as container
 // queries on the iframe's `.masque-embed-wrap`, joined by straight lines between the measured
 // widths. The iframe's `height:` in the Markdown is dropped: it was one number for every width.
 //
@@ -55,8 +55,60 @@ function urlOf(file) {
 const heights = new Map();
 const browser = await chromium.launch({ headless: true });
 
-async function measure(file, width) {
-  const context = await browser.newContext({ viewport: { width, height: 900 }, locale: "en-US", timezoneId: "UTC" });
+// Settle every player on the page, then return [id, column width, height, settled at] for
+// each. Runs in the page.
+async function settleAll({ SETTLE_MS, TIMEOUT_MS }) {
+  const frames = Array.from(document.querySelectorAll("iframe[data-masque-embed]"));
+  const t0 = performance.now();
+  const deadline = t0 + TIMEOUT_MS;
+  const settled = (f) => {
+    const doc = f.contentDocument;
+    return doc && doc.URL !== "about:blank" && doc.querySelector("pluto-notebook") &&
+      Array.from(doc.images).every((img) => img.complete || img.offsetParent === null);
+  };
+  const last = new Map(frames.map((f) => [f, { h: -1, since: 0 }]));
+  for (;;) {
+    const now = performance.now();
+    let done = true;
+    for (const f of frames) {
+      const h = f.getBoundingClientRect().height;
+      const s = last.get(f);
+      if (h !== s.h || !settled(f)) last.set(f, { h, since: now });
+      if (!settled(f) || now - last.get(f).since < SETTLE_MS) done = false;
+    }
+    if (done) break;
+    if (now > deadline) {
+      const stuck = frames.filter((f) => !settled(f)).map((f) => f.id);
+      throw new Error(`players did not settle: ${stuck.join(", ") || "(still resizing)"}`);
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return frames.map((f) => {
+    const wrap = f.closest(".masque-embed-wrap");
+    if (!f.id) throw new Error(`a ${f.dataset.masqueEmbed} player has no id`);
+    if (!wrap || getComputedStyle(wrap).display === "none") throw new Error(`${f.id} showed its text twin`);
+    return [f.id, wrap.clientWidth, Math.ceil(f.getBoundingClientRect().height), last.get(f).since - t0];
+  });
+}
+
+function record(file, width, got) {
+  for (const [id, w, h, settledAt] of got) {
+    if (settledAt > LATE_MS) {
+      console.warn(`${relative(root, file)} at ${width} px: ${id} last resized at ${(settledAt / 1000).toFixed(1)} s, its height may be short`);
+    }
+    if (!heights.has(id)) heights.set(id, new Map());
+    heights.get(id).set(w, h);
+  }
+}
+
+// Load the page once at the narrowest window, then widen it one width at a time and let the
+// players settle again at each: booting Pluto's frontend is most of a measurement, and a
+// resize only rewraps. Widening, not narrowing: a Pluto-export player's frame grows with its
+// content but doesn't shrink back. Heights match a fresh load at each width (checked against the
+// one-load-per-width method on every docs page when this changed).
+async function measure(file, widths) {
+  const order = [...widths].sort((a, b) => a - b);
+  const context = await browser.newContext({ viewport: { width: order[0], height: 900 }, locale: "en-US", timezoneId: "UTC" });
   try {
     const page = await context.newPage();
     await page.route(PLUTO_FRONTEND, async (route) => {
@@ -65,45 +117,9 @@ async function measure(file, width) {
       else await route.continue();
     });
     await page.goto(urlOf(file), { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
-    const got = await page.evaluate(async ({ SETTLE_MS, TIMEOUT_MS }) => {
-      const frames = Array.from(document.querySelectorAll("iframe[data-masque-embed]"));
-      const t0 = performance.now();
-      const deadline = t0 + TIMEOUT_MS;
-      const settled = (f) => {
-        const doc = f.contentDocument;
-        return doc && doc.URL !== "about:blank" && doc.querySelector("pluto-notebook") &&
-          Array.from(doc.images).every((img) => img.complete || img.offsetParent === null);
-      };
-      const last = new Map(frames.map((f) => [f, { h: -1, since: 0 }]));
-      for (;;) {
-        const now = performance.now();
-        let done = true;
-        for (const f of frames) {
-          const h = f.getBoundingClientRect().height;
-          const s = last.get(f);
-          if (h !== s.h || !settled(f)) last.set(f, { h, since: now });
-          if (!settled(f) || now - last.get(f).since < SETTLE_MS) done = false;
-        }
-        if (done) break;
-        if (now > deadline) {
-          const stuck = frames.filter((f) => !settled(f)).map((f) => f.id);
-          throw new Error(`players did not settle: ${stuck.join(", ") || "(still resizing)"}`);
-        }
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      return frames.map((f) => {
-        const wrap = f.closest(".masque-embed-wrap");
-        if (!f.id) throw new Error(`a ${f.dataset.masqueEmbed} player has no id`);
-        if (!wrap || getComputedStyle(wrap).display === "none") throw new Error(`${f.id} showed its text twin`);
-        return [f.id, wrap.clientWidth, Math.ceil(f.getBoundingClientRect().height), last.get(f).since - t0];
-      });
-    }, { SETTLE_MS, TIMEOUT_MS });
-    for (const [id, w, h, settledAt] of got) {
-      if (settledAt > LATE_MS) {
-        console.warn(`${relative(root, file)} at ${width} px: ${id} last resized at ${(settledAt / 1000).toFixed(1)} s, its height may be short`);
-      }
-      if (!heights.has(id)) heights.set(id, new Map());
-      heights.get(id).set(w, h);
+    for (const width of order) {
+      await page.setViewportSize({ width, height: 900 });
+      record(file, width, await page.evaluate(settleAll, { SETTLE_MS, TIMEOUT_MS }));
     }
   } finally {
     await context.close();
@@ -111,17 +127,19 @@ async function measure(file, width) {
 }
 
 // A few pages at a time: each player boots Pluto's frontend.
-const jobs = pages.flatMap((file) => WIDTHS.map((width) => [file, width]));
+const jobs = [...pages];
+const t_start = Date.now();
 try {
   const workers = Array.from({ length: 4 }, async () => {
     while (jobs.length) {
-      const [file, width] = jobs.shift();
+      const file = jobs.shift();
+      const run = () => measure(file, WIDTHS);
       // One retry, so one slow boot of Pluto's frontend doesn't hold back the deploy.
-      await measure(file, width).catch((e) => {
-        console.warn(`${relative(root, file)} at ${width} px: ${e.message}; trying once more`);
-        return measure(file, width);
+      await run().catch((e) => {
+        console.warn(`${relative(root, file)}: ${e.message}; trying once more`);
+        return run();
       }).catch((e) => {
-        throw new Error(`${relative(root, file)} at ${width} px: ${e.message}`);
+        throw new Error(`${relative(root, file)}: ${e.message}`);
       });
     }
   });
@@ -130,6 +148,7 @@ try {
   await browser.close();
   server.close();
 }
+console.log(`measured ${pages.length} pages in ${((Date.now() - t_start) / 1000).toFixed(0)} s`);
 
 const px = (x) => `${Math.round(x * 10) / 10}px`;
 
