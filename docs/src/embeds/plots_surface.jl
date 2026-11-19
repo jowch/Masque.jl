@@ -24,7 +24,10 @@ using Masque, CairoMakie, Random
 begin
     xs = range(-2, 2; length = 15)
     ys = range(-2, 2; length = 15)
-    zs = [exp(-(x^2 + y^2)) + 0.5 * exp(-((x - 1)^2 + (y + 1)^2) * 2) for x in xs, y in ys]
+    zs = [
+        exp(-(x^2 + y^2)) + 0.5 * exp(-((x - 1)^2 + (y + 1)^2) * 2)
+            for x in xs, y in ys
+    ]
 
     fig = Figure(size = (520, 380))
     ax = Axis3(

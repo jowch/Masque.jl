@@ -48,8 +48,10 @@ masque(
     interactables(
         c;
         payloads = [
-            (dose = d, patients = n)
-                for (d, n) in zip(["0 mg", "10 mg", "20 mg", "40 mg"], [24, 22, 25, 21])
+            (dose = "0 mg", patients = 24),
+            (dose = "10 mg", patients = 22),
+            (dose = "20 mg", patients = 25),
+            (dose = "40 mg", patients = 21),
         ],
         tooltip = masque"<b>$(dose)</b><br>mean $(midpoint), $(patients) patients",
     ),

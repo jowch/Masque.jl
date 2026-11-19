@@ -27,7 +27,9 @@ Hover the surface to read its height, or a station to see its name, then click a
 
 # ╔═╡ b3d00001-0001-4000-8000-000000000002
 begin
-    hill(x, y) = 900 + 600 * exp(-((x - 1)^2 + (y - 0.5)^2)) + 400 * exp(-((x + 1.2)^2 + (y + 1)^2) / 0.8)
+    hill(x, y) = 900 +
+        600 * exp(-((x - 1)^2 + (y - 0.5)^2)) +
+        400 * exp(-((x + 1.2)^2 + (y + 1)^2) / 0.8)
     xs = range(-3, 3; length = 25)
     ys = range(-3, 3; length = 25)
     stations = [

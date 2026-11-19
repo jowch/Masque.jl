@@ -45,9 +45,9 @@ pick
 
 # ╔═╡ b10f0002-0001-4000-8000-000000000005
 routes = [
-    (route = "A", stops = 12),
-    (route = "B", stops = 18),
-    (route = "C", stops = 9),
+    (route = "Route A", stops = 12),
+    (route = "Route B", stops = 18),
+    (route = "Route C", stops = 9),
 ]
 
 # ╔═╡ b10f0002-0001-4000-8000-000000000006
@@ -56,7 +56,7 @@ masque(
     interactables(
         b;
         payloads = routes,
-        tooltip = masque"<b>Route $(route)</b><br>$(stops) stops, median $(median:.1f) min",
+        tooltip = masque"<b>$(route)</b><br>$(stops) stops, median $(median:.1f) min",
     ),
 )
 

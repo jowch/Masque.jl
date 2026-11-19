@@ -31,7 +31,9 @@ begin
     for _ in 1:18
         ci, cj, r = rand(8:152), rand(8:92), rand(3.0:0.5:6.0)
         b = 0.45 + 0.4 * rand()
-        img .+= [b * exp(-((i - ci)^2 + (j - cj)^2) / (2r^2)) for i in 1:160, j in 1:100]
+        img .+= [
+        b * exp(-((i - ci)^2 + (j - cj)^2) / (2r^2)) for i in 1:160, j in 1:100
+    ]
     end
 end
 ```

@@ -41,7 +41,10 @@ pick
 # ╔═╡ b10f0011-0001-4000-8000-000000000005
 homes = [
     (street = s, rooms = r) for (s, r) in zip(
-            repeat(["Elm St", "Oak Ave", "Pine Rd", "Lake Dr", "Hill Ln", "Park Way"]; outer = 5),
+            repeat(
+                ["Elm St", "Oak Ave", "Pine Rd", "Lake Dr", "Hill Ln", "Park Way"];
+                outer = 5,
+            ),
             round.(Int, size_m2 ./ 25),
         )
 ]

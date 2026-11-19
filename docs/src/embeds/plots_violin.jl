@@ -44,9 +44,21 @@ pick
 
 # ╔═╡ b10f0001-0001-4000-8000-000000000005
 summary = [
-    (species = "Adelie", n = 100, median = round(median(weights[groups .== 1]); digits = 1)),
-    (species = "Chinstrap", n = 100, median = round(median(weights[groups .== 2]); digits = 1)),
-    (species = "Gentoo", n = 100, median = round(median(weights[groups .== 3]); digits = 1)),
+    (
+        species = "Adelie",
+        n = 100,
+        median = round(median(weights[groups .== 1]); digits = 1),
+    ),
+    (
+        species = "Chinstrap",
+        n = 100,
+        median = round(median(weights[groups .== 2]); digits = 1),
+    ),
+    (
+        species = "Gentoo",
+        n = 100,
+        median = round(median(weights[groups .== 3]); digits = 1),
+    ),
 ]
 
 # ╔═╡ b10f0001-0001-4000-8000-000000000006

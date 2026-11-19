@@ -38,7 +38,11 @@ end
 pick
 
 # ╔═╡ b10f0006-0001-4000-8000-000000000005
-in_bin = pick === nothing ? Float64[] : filter(x -> pick.low <= x < pick.high, heights)
+in_bin = if pick === nothing
+    Float64[]
+else
+    filter(x -> pick.low <= x < pick.high, heights)
+end
 
 # ╔═╡ b10f0006-0001-4000-8000-000000000006
 masque(

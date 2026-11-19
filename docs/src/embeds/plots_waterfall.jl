@@ -43,7 +43,7 @@ masque(
     interactables(
         w;
         payloads = [(step = s, balance = b) for (s, b) in zip(steps, cumsum(change))],
-        tooltip = masque"<b>$(step)</b><br>$(value) thousand, balance $(balance) thousand",
+        tooltip = masque"<b>$(step)</b><br>$(value), balance $(balance) thousand",
     ),
 )
 

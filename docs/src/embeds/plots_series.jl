@@ -44,7 +44,7 @@ masque(
     interactables(
         s;
         payloads = [(manager = "Ana",), (manager = "Ben",), (manager = "Chloé",)],
-        tooltip = masque"<b>$(label)</b>, run by $(manager)<br>$(y) units by week $(x)",
+        tooltip = masque"<b>$(label)</b>, run by $(manager)<br>week $(x): $(y) sold",
     ),
 )
 

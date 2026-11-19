@@ -26,7 +26,10 @@ begin
     n = 40_000
     t = 2pi .* rand(rng, n)
     r = 1 .+ 0.15 .* randn(rng, n)
-    pts = Point2f.(r .* cos.(t) .+ 0.3 .* randn(rng, n) .* (rand(rng, n) .< 0.2), r .* sin.(t))
+    pts = Point2f.(
+        r .* cos.(t) .+ 0.3 .* randn(rng, n) .* (rand(rng, n) .< 0.2),
+        r .* sin.(t),
+    )
 
     fig = Figure(size = (520, 320))
     ax = Axis(fig[1, 1]; aspect = DataAspect())

@@ -45,7 +45,11 @@ end
 @bind row masque(fig; bind = linked(p_xy, p_xz))
 
 # ╔═╡ c0a10003-0001-4000-8000-000000000004
-isnothing(row) ? "click a point" : "sample $(row): x = $(xs[row]), y = $(ys[row]), z = $(zs[row])"
+if isnothing(row)
+    "click a point"
+else
+    "sample $(row): x = $(xs[row]), y = $(ys[row]), z = $(zs[row])"
+end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
