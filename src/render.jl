@@ -284,6 +284,9 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     L.ellipses === nothing || (d["ellipses"] = L.ellipses)
     L.zpoints === nothing || (d["zpoints"] = L.zpoints)
     L.drawn === nothing || (d["drawn"] = L.drawn)
+    # A point's data position, unless the payload fields Masque filled with its x, y and z
+    # already carry it: the overlay reads those instead.
+    L.xyz === nothing || all(dim -> any(kd -> kd[2] === dim, ck), (:x, :y, :z)) || (d["xyz"] = L.xyz)
     spec = tooltip_spec(i)
     spec === true && throw(ArgumentError("tooltip = true is not meaningful — omit `tooltip` for the auto name/value table (the default), pass masque\"…\" for a template, or `false` to suppress."))
     if spec isa Markup

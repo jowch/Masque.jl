@@ -5014,6 +5014,34 @@ describe("photographic pan / wheel zoom", () => {
         }
     })
 
+    it("an Axis3 wheel over a mark zooms at the mark's depth (#643)", async () => {
+        vi.useFakeTimers()
+        try {
+            const m = viewManifest("orbit")
+            Object.assign(m.layers[0].geometry as object, {
+                azimuth: 0.4, elevation: 0.5, limits: [0, 10, 0, 10, 0, 10], panx: [0.01, 0, 0], pany: [0, 0, -0.01],
+                center: [400, 400],
+            })
+            // A point at (7, 2, 3), in front of the center plane, drawn under the pointer (image px 600, 400).
+            m.layers.push({ id: "pts", kind: "circles", axis: "ax1", events: ["hover"], payloads: [{}], geometry: [600, 400, 10], xyz: [7, 2, 3] })
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({}))
+            mount(script, m, undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            wheelAt(surface, -120)
+            wheelAt(surface, -120)
+            await vi.advanceTimersByTimeAsync(200)
+            const lim = requestFrame.mock.calls.map((c) => c[0]).filter((c) => c.settle === true)[0].limits as number[]
+            expect(lim[1] - lim[0]).toBeCloseTo(10 * Math.exp(-0.24))
+            // The point keeps its share of every range, so it stays under the pointer and in the box.
+            expect((7 - lim[0]) / (lim[1] - lim[0])).toBeCloseTo(0.7)
+            expect((2 - lim[2]) / (lim[3] - lim[2])).toBeCloseTo(0.2)
+            expect((3 - lim[4]) / (lim[5] - lim[4])).toBeCloseTo(0.3)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it("a middle-button drag pans a 2D view; a middle press off every view leaves the focus alone (#642)", async () => {
         vi.useFakeTimers()
         try {

@@ -79,6 +79,11 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
   the pointer wins before any circle's reach. `nothing` (default) hit-tests the circles alone.
   Built by [`PointInteractable`](@ref) with `radius3d`, whose markers are spheres or
   ellipsoids that each axis stretches on its own.
+- `xyz` — `:circles` on an `Axis3` only, optional: per element, its data position, a flat
+  `Float32[]` of `(x, y, z)`. A wheel or pinch zoom over the point keeps the pointer at its
+  depth. The manifest leaves it out when the payloads' `x`, `y` and `z` fields already hold
+  it. `nothing` (default): the zoom stays on the plane through the limits' center. Built by
+  [`PointInteractable`](@ref).
 """
 struct HitLayer
     id::Symbol
@@ -106,7 +111,12 @@ struct HitLayer
     # edge from sample `k` is cut, `-1` for a gap. `nothing` for a path drawn whole, whose
     # vertex `k` is sample `k`.
     drawn::Union{Nothing, Vector}
+    # :circles on an Axis3: per element, its data position `[x1, y1, z1, x2, …]`, which a
+    # pointer zoom keeps at the point's depth (#643).
+    xyz::Union{Nothing, Vector{Float32}}
 end
+HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses, zpoints, drawn) =
+    HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses, zpoints, drawn, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses) =
     HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses, nothing, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order) =
@@ -718,10 +728,13 @@ function hitlayers(i::PointInteractable, ctx)
         ks = [k for k in eachindex(i.points) if isfinite(g[3k - 2]) && isfinite(g[3k - 1]) && isfinite(depth[k])]
         order = _top_first(ks, depth)
     end
+    # On an Axis3, where each point is: a wheel or pinch zoom over it keeps the pointer at its
+    # depth (#643).
+    xyz = i.ax isa Makie.Axis3 ? Float32[c for p in i.points for c in p] : nothing
     return [
         HitLayer(
             i.id, :circles, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label, i.colors, nothing, nothing, nothing, order,
-            ell,
+            ell, nothing, nothing, xyz,
         ),
     ]
 end

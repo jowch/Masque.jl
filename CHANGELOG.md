@@ -16,7 +16,9 @@ All notable changes to this project are documented here. The format is based on
 ### Changed
 - On an `Axis3`, Ctrl/Cmd+scroll and a pinch zoom around the pointer (or your fingers), as they
   do on a 2D axis, instead of around the middle of the box. `+`, `-` and the corner buttons
-  still zoom around the middle (#641).
+  still zoom around the middle (#641). With the pointer on a point, a line or a surface, the
+  zoom keeps that mark inside the box: before, a mark near the front or back of the box could
+  slide out of it and disappear as you zoomed in (#643).
 
 ## [0.5.3] - 2026-11-17
 

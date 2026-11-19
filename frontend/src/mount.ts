@@ -29,7 +29,7 @@ import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx
 import type { HiGroups, HiSet, OverlayCtx } from "./state"
 import type { Hit, HitLayer, Limits3, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 import { dequantize } from "./wire"
-import { axisFrame, innermostView, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
+import { axisFrame, innermostView, layoutSpaceLayer, markAt3, matrixLimits, previewWindows, slopScale } from "./geometry"
 import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_HINT_MS, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
 
@@ -1400,21 +1400,25 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const g = layer.geometry as ViewGeometry
         const wheel: NonNullable<ViewGeometry["wheel"]> = g.wheel ?? "modifier"
         // An Axis3 view's limits, on screen now.
-        if (g.mode === "orbit") return { id: layer.id, axis: "", limits3: (g.limits ?? null) as Limits3 | null, wheel, layout, g }
-        return { id: layer.id, axis: layer.axis, limits3: null as Limits3 | null, wheel, layout, g }
+        if (g.mode === "orbit") return { id: layer.id, axis: "", limits3: (g.limits ?? null) as Limits3 | null, wheel, layout, g, viewAxis: layer.axis }
+        return { id: layer.id, axis: layer.axis, limits3: null as Limits3 | null, wheel, layout, g, viewAxis: layer.axis }
     }
 
     // Zoom a view by `k` (above 1 zooms in) about the point `viewAt` found, through the
     // photograph and the idle settle a wheel notch uses. A Safari pinch comes here too (#541).
     const zoomView = (hit: NonNullable<ReturnType<typeof viewAt>>, k: number) => {
-        const { id, axis, limits3, layout, g } = hit
+        const { id, axis, limits3, layout, g, viewAxis } = hit
         if (!limits3 && photoHeldByOther(state, id)) return
         if (limits3) {
             const shown = limits3
             // Axis3 (#321): no photograph to scale. Each notch asks for limits scaled about
-            // the data under the pointer (#641); the idle timer settles the last ones at full
-            // resolution.
-            const lim = viewDrag.zoom3(state, id, shown, k, { g, x: layout.x, y: layout.y })
+            // the data under the pointer (#641), at the depth of the mark there (#643); the
+            // idle timer settles the last ones at full resolution. The mark is read off the
+            // frame on screen each notch: zooming keeps it under the pointer, so a burst keeps
+            // finding it.
+            const slop = slopScale(ctx.manifest_, ctx.base_.getBoundingClientRect().width)
+            const mark = markAt3(ctx.manifest_, viewAxis, layout.x, layout.y, state.photo_, state.photoViewId_, slop)
+            const lim = viewDrag.zoom3(state, id, shown, k, { g, x: layout.x, y: layout.y, mark })
             ctx.gesture_.request({ id, limits: lim, settle: false })
             showViewReadout(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_, ctx.manifest_.transforms[axis], ctx.tipExplicit_))
             if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
