@@ -958,20 +958,31 @@ try {
     s = await look();
     if (s.radio !== 0 || !s.checked || s.ring !== "solid") throw new Error(`${key}: after ArrowUp the radio is ${JSON.stringify(s)}, want option 0 checked with a ring`);
     // A press on another option takes the ring away; the next arrow key brings it back.
-    const optionAt = () => page.evaluate((k) => {
+    // ElementHandle.click scrolls the row into view, waits until its box holds still, and lets
+    // the press through only if it lands on that row; it retries otherwise. A raw
+    // page.mouse.click at a measured point missed whenever the page moved between measuring
+    // and pressing (WebGL plots above remounting), and the press focused some plot's surface
+    // instead (#651).
+    const opt1 = await page.evaluateHandle((k) => {
       const span = document.querySelector(`#coords_${k}`);
       const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-      const b = sr.querySelectorAll('[data-masque-control="scale"] > label.masque-opt')[1].getBoundingClientRect();
-      return [b.right - 3, (b.top + b.bottom) / 2];
+      return sr.querySelectorAll('[data-masque-control="scale"] > label.masque-opt')[1];
     }, key);
-    // WebKit has no scroll anchoring, so measure again once the page has settled.
-    await optionAt();
-    await new Promise((r) => setTimeout(r, 500));
-    const opt1 = await optionAt();
-    await page.mouse.click(opt1[0], opt1[1]);
+    const box = await opt1.boundingBox();
+    await opt1.click({ position: { x: box.width - 3, y: box.height / 2 }, timeout: 15000 });
     s = await look();
-    if (s.radio !== 1 || !s.checked || s.ring !== "none") throw new Error(`${key}: after a click on option 1 the radio is ${JSON.stringify(s)}, want option 1 checked with no ring`);
+    if (s.radio !== 1 || !s.checked || s.ring !== "none") {
+      // Say where the press went: which element has focus now, and what is under the row.
+      const where = await opt1.evaluate((el) => {
+        const sr = el.getRootNode(), b = el.getBoundingClientRect();
+        const hit = sr.elementFromPoint(b.right - 3, (b.top + b.bottom) / 2);
+        const a = sr.activeElement ?? document.activeElement;
+        return { focus: a ? `${a.tagName}.${a.className?.baseVal ?? a.className}` : null, hit: hit ? `${hit.tagName}.${hit.className?.baseVal ?? hit.className}` : null, row: [b.left, b.top, b.right, b.bottom].map(Math.round), scrollY: Math.round(scrollY) };
+      });
+      throw new Error(`${key}: after a click on option 1 the radio is ${JSON.stringify(s)}, want option 1 checked with no ring; ${JSON.stringify(where)}`);
+    }
+    await opt1.dispose();
     await page.keyboard.press("ArrowUp");
     s = await look();
     if (s.radio !== 0 || !s.checked || s.ring !== "solid") throw new Error(`${key}: ArrowUp after the click left the radio ${JSON.stringify(s)}, want option 0 checked with a ring`);
