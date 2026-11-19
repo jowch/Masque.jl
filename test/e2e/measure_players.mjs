@@ -65,15 +65,20 @@ function siteStyleHash() {
   if (existsSync(dir)) walk(dir);
   return sha(...files.sort().flatMap((f) => [relative(root, f), readFileSync(f)]));
 }
+// The browser that measures is part of the key: Chromium comes from the Playwright pin, and
+// docs_site.mjs decides which Pluto frontend each player boots.
+const browser = await chromium.launch({ headless: true });
+const here = (name) => readFileSync(fileURLToPath(new URL(name, import.meta.url)));
 const SITE_KEY = CACHE_FILE
-  ? sha(readFileSync(fileURLToPath(import.meta.url)), siteStyleHash())
+  ? sha(browser.version(), here("measure_players.mjs"), here("docs_site.mjs"), here("package.json"), siteStyleHash())
   : "";
 function pageKey(file) {
   const tags = readFileSync(file, "utf8").match(IFRAME_RE) || [];
   const players = tags.map((t) => {
     const name = /data-masque-embed="([^"]+)"/.exec(t)?.[1];
     const p = name && join(root, "embeds", name + ".html");
-    return p && existsSync(p) ? readFileSync(p) : "";
+    if (!p || !existsSync(p)) throw new Error(`${relative(root, file)}: no player file for ${name || t}`);
+    return readFileSync(p);
   });
   return sha(SITE_KEY, ...tags, ...players);
 }
@@ -104,7 +109,6 @@ for (const [file, key] of keys) {
   }
   reuse.add(file);
 }
-const browser = await chromium.launch({ headless: true });
 
 // Settle every player on the page, then return [id, column width, height, settled at] for
 // each. Runs in the page.

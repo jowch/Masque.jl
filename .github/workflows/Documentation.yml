@@ -75,6 +75,18 @@ jobs:
             ${{ runner.temp }}/embed-cache
             ${{ runner.temp }}/heights.json
           key: docs-build-${{ github.run_id }}-${{ github.run_attempt }}
+      # Pull requests restore only the newest, so drop the older ones before they count against
+      # the repo's cache limit with CI's Julia envs.
+      - name: Delete older docs build caches
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: docs-build-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          gh cache list --repo "$GITHUB_REPOSITORY" --key docs-build- --limit 100 --json key --jq '.[].key' |
+            while read -r key; do
+              [ "$key" = "$KEEP" ] || gh cache delete "$key" --repo "$GITHUB_REPOSITORY"
+            done
       - name: Playwright docs player
         working-directory: test/e2e
         run: node docs_player.mjs "$GITHUB_WORKSPACE/docs/build"

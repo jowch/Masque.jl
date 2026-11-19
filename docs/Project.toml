@@ -6,6 +6,9 @@ Masque = "82b01fb5-7eeb-4559-83ea-8d75f85d4328"
 Pluto = "c3e4b0f8-55cb-11ea-2926-15256bba5781"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
+[sources]
+Masque = {path = "/tmp/claude-0/wt-cache"}
+
 [compat]
 CairoMakie = "0.15"
 Documenter = "1"
