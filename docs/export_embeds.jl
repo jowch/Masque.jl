@@ -713,6 +713,8 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       }
       sizeFrame();
       window.addEventListener("load", sizeFrame);
+      // Refit when the column changes width (a turned phone, a resized window).
+      new ResizeObserver(sizeFrame).observe(document.documentElement);
     }
       </script>
     </body>
