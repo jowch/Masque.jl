@@ -32,8 +32,13 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v2
+      # JULIA_CPU_TARGET=generic: runners differ in CPU, and a native pkgimage built on one is
+      # rejected and rebuilt on another, so most runs rebuilt all ~310 packages even when the
+      # cache restored. Generic images load on every runner; the build step runs native.
       - name: Install dependencies
         shell: julia --color=yes --project=docs {0}
+        env:
+          JULIA_CPU_TARGET: generic
         run: |
           using Pkg
           Pkg.develop(PackageSpec(path=pwd()))
@@ -85,7 +90,7 @@ jobs:
         run: |
           gh cache list --repo "$GITHUB_REPOSITORY" --key docs-build- --limit 100 --json key --jq '.[].key' |
             while read -r key; do
-              [ "$key" = "$KEEP" ] || gh cache delete "$key" --repo "$GITHUB_REPOSITORY"
+              [ "$key" = "$KEEP" ] || gh cache delete "$key" --repo "$GITHUB_REPOSITORY" || true
             done
       - name: Playwright docs player
         working-directory: test/e2e
