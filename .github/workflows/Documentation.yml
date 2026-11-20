@@ -52,12 +52,46 @@ jobs:
         run: |
           npm install
           npx playwright install --with-deps chromium
+      # Harvested players and measured heights are reused on pull requests only: main and tag
+      # builds always build them fresh, and main saves them for the pull requests after it, so a
+      # deployed page never comes from the cache. See export_embeds.jl and measure_players.mjs for what each is keyed on.
+      - name: Restore docs build cache
+        if: github.event_name == 'pull_request'
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ runner.temp }}/embed-cache
+            ${{ runner.temp }}/heights.json
+          key: docs-build-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: docs-build-
       - name: Build and deploy
         run: julia --color=yes --project=docs docs/make.jl
         env:
           MASQUE_MEASURE_PLAYERS: 'true'
+          MASQUE_EMBED_CACHE: ${{ (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') && format('{0}/embed-cache', runner.temp) || '' }}
+          MASQUE_HEIGHT_CACHE: ${{ (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') && format('{0}/heights.json', runner.temp) || '' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+      - name: Save docs build cache
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ runner.temp }}/embed-cache
+            ${{ runner.temp }}/heights.json
+          key: docs-build-${{ github.run_id }}-${{ github.run_attempt }}
+      # Pull requests restore only the newest, so drop the older ones before they count against
+      # the repo's cache limit with CI's Julia envs.
+      - name: Delete older docs build caches
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: docs-build-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          gh cache list --repo "$GITHUB_REPOSITORY" --key docs-build- --limit 100 --json key --jq '.[].key' |
+            while read -r key; do
+              [ "$key" = "$KEEP" ] || gh cache delete "$key" --repo "$GITHUB_REPOSITORY" || true
+            done
       - name: Playwright docs player
         working-directory: test/e2e
         run: node docs_player.mjs "$GITHUB_WORKSPACE/docs/build"

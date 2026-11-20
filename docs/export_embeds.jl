@@ -807,6 +807,43 @@ function find_embed_notebooks()
     return sort(filter(p -> endswith(p, ".jl") && startswith(readline(p), "### A Pluto.jl notebook ###"), readdir(d; join = true)))
 end
 
+# The harvest cache (MASQUE_EMBED_CACHE, set by the docs job on pull requests only). A player
+# is reused when nothing that shapes it changed: its notebook, Masque's code and bundle, this
+# harvester, the resolved docs packages and Julia. Each notebook harvests into a directory of
+# its own, so the cached copy holds every file it wrote, `shared/` files included.
+const HARVEST_INPUT_DIRS = ("src", "ext", "assets")
+const HARVEST_INPUT_FILES = ("Project.toml", "docs/Project.toml", "docs/Manifest.toml")
+
+function harvest_inputs_hash(repo = normpath(joinpath(@__DIR__, "..")))
+    files = String[]
+    for d in HARVEST_INPUT_DIRS, (root, _, names) in walkdir(joinpath(repo, d)), n in names
+        push!(files, joinpath(root, n))
+    end
+    append!(files, joinpath.(repo, HARVEST_INPUT_FILES))
+    append!(files, filter(f -> endswith(f, ".jl"), readdir(@__DIR__; join = true)))
+    ctx = SHA.SHA256_CTX()
+    SHA.update!(ctx, codeunits("julia $(VERSION)\n"))
+    for f in sort!(unique!(files))
+        SHA.update!(ctx, codeunits(relpath(f, repo) * "\n"))
+        SHA.update!(ctx, sha256(read(f)))
+    end
+    return bytes2hex(SHA.digest!(ctx))
+end
+
+embed_cache_key(inputs::AbstractString, path::AbstractString) =
+    bytes2hex(sha256(inputs * bytes2hex(sha256(read(path)))))[1:32]
+
+# Copy every file under `src` into `dst`, keeping the tree. `shared/` files are named by their
+# content, so two players writing the same one write the same bytes.
+function merge_tree(src::AbstractString, dst::AbstractString)
+    for (root, _, names) in walkdir(src), n in names
+        to = joinpath(dst, relpath(joinpath(root, n), src))
+        mkpath(dirname(to))
+        cp(joinpath(root, n), to; force = true)
+    end
+    return
+end
+
 function export_embeds(outdir = joinpath(@__DIR__, "src", "embeds"))
     if get(ENV, "MASQUE_SKIP_EMBED_EXPORT", "") == "true"
         @info "MASQUE_SKIP_EMBED_EXPORT set — reusing players already in $outdir"
@@ -815,15 +852,48 @@ function export_embeds(outdir = joinpath(@__DIR__, "src", "embeds"))
     notebooks = find_embed_notebooks()
     isempty(notebooks) && error("no embed notebooks found under docs/src/embeds/")
     mkpath(outdir)
-    @info "Harvesting $(length(notebooks)) embed notebook(s)" names = basename.(notebooks)
+    cache = get(ENV, "MASQUE_EMBED_CACHE", "")
+    inputs = isempty(cache) ? "" : harvest_inputs_hash()
+    @info "Harvesting $(length(notebooks)) embed notebook(s)" names = basename.(notebooks) cache = isempty(cache) ? "off" : cache
+    reused = 0
     for path in notebooks
+        if isempty(cache)
+            t0 = time()
+            info = harvest_embed(path, outdir)
+            log_harvest(path, info, time() - t0)
+            continue
+        end
+        hit = joinpath(cache, embed_cache_key(inputs, path))
+        if isdir(hit)
+            merge_tree(hit, outdir)
+            reused += 1
+            @info "✓ embed $(basename(path)) reused from the harvest cache"
+            continue
+        end
         t0 = time()
-        info = harvest_embed(path, outdir)
-        elapsed = round(time() - t0; digits = 1)
-        size_kb = round(info.size / 1024; digits = 1)
-        extra_kb = round(info.extra / 1024; digits = 1)
-        @info "✓ embed $(basename(path))" harvest = info.harvest elapsed_s = elapsed size_kb = size_kb extra_kb = extra_kb n_states = info.n_states n_snaps = info.n_snaps png_bytes = info.png_b manifest_bytes = info.man_b inlined = info.n_inlined_total
+        mkpath(cache)
+        tmp = mktempdir(cache; cleanup = false)
+        info = harvest_embed(path, tmp)
+        log_harvest(path, info, time() - t0)
+        merge_tree(tmp, outdir)
+        mv(tmp, hit)
     end
+    if !isempty(cache)
+        @info "Harvest cache: reused $(reused) of $(length(notebooks)) player(s)"
+        # Keep only this build's entries, so the saved cache doesn't grow with every change.
+        keep = Set(embed_cache_key(inputs, p) for p in notebooks)
+        for d in readdir(cache)
+            d in keep || rm(joinpath(cache, d); recursive = true, force = true)
+        end
+    end
+    return
+end
+
+function log_harvest(path, info, seconds)
+    elapsed = round(seconds; digits = 1)
+    size_kb = round(info.size / 1024; digits = 1)
+    extra_kb = round(info.extra / 1024; digits = 1)
+    @info "✓ embed $(basename(path))" harvest = info.harvest elapsed_s = elapsed size_kb = size_kb extra_kb = extra_kb n_states = info.n_states n_snaps = info.n_snaps png_bytes = info.png_b manifest_bytes = info.man_b inlined = info.n_inlined_total
     return
 end
 
