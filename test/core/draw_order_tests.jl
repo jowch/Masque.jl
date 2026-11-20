@@ -185,4 +185,20 @@ midpoint(a, b) = ((a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
         translate!(l1, 0, 0, 1)
         @test draw(masque(fig).manifest)["lines"] > draw(masque(fig).manifest)["scatter"]
     end
+
+    @testset "a layer takes its plot's topmost part, whatever order the plot map lists (#658)" begin
+        # The plot map holds a recipe and each of its parts under the layer's id, and an
+        # `IdDict`'s order changes between sessions: the place must not depend on it.
+        fig = Figure(; size = (400, 300))
+        ax = Axis(fig[1, 1])
+        p = poly!(ax, [Rect2f(0, 0, 1, 1)]; strokewidth = 1)
+        mesh_part, stroke_part = Masque._atomic_parts(p)
+        atoms = Masque._painted_atoms(fig)
+        top = findfirst(a -> a === stroke_part, atoms)
+        @test top > findfirst(a -> a === mesh_part, atoms)
+        entries = [p => [:poly], mesh_part => [:poly], stroke_part => [:poly]]
+        for order in (entries, reverse(entries), entries[[1, 3, 2]])
+            @test Masque._draw_order(fig, order) == Dict(:poly => top)
+        end
+    end
 end
