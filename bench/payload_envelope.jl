@@ -331,6 +331,27 @@ let
     end
 end
 
+println("\n=== L. points on Axis3 — data positions (`xyz`) beside bare payloads ===")
+# A wheel or pinch zoom over a point on an Axis3 keeps it at its depth (#643), so the overlay
+# needs each point's data position. The default payloads' `x`, `y`, `z` carry it; a payload that
+# replaces them (a bare value) makes the layer ship `xyz`, three Float32s per point, when a view
+# is on the axis.
+let
+    n = 1_000
+    f = Figure(size = (600, 450)); ax = Axis3(f[1, 1])
+    sc = scatter!(ax, rand(n), rand(n), rand(n))
+    bare = ["p$k" for k in 1:n]
+    for (what, pl, view) in (("default payloads", nothing, true), ("bare, with a view", bare, true), ("bare, no view", bare, false))
+        w = masque(f, interactables(sc; payloads = pl), (view ? [ViewInteractable(ax)] : [])...)
+        layer = only(l for l in w.manifest["layers"] if l["kind"] == "circles")
+        x = get(layer, "xyz", nothing)
+        @printf(
+            "  scatter %d, %-17s  manifest=%6s KB   xyz=%6s KB\n", n, what, kb(mp(w.manifest)),
+            x === nothing ? "-" : kb(mp(x)),
+        )
+    end
+end
+
 println("\n=== L. regions on a grid — each cell's region id, as runs over the cells ===")
 # `regions = R` (#359) ships `regions`, flat `[id, n, …]` pairs over the row-major cells, so it
 # costs about one pair per region boundary crossed along each row. Three shapes: a label image of

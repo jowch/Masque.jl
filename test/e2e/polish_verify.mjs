@@ -1374,6 +1374,69 @@ try {
     if (r.after) throw new Error("view3d/zoom-readout: the readout is still showing after the zoom settled");
     await wheel3(300);
     passed.push("view3d/zoom-readout");
+
+    // #644: the pan handle's look (option C). A round box of its own, 4 px below the stack in
+    // the same column, in the stack's colours, border, shadow and size; idle and full with the
+    // stack; the 20% tint and the grabbing cursor while held.
+    const PAN_IDLE = 0.6; // VB_IDLE_OPACITY in frontend/src/viewbuttons.ts
+    const read3 = () => page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const stack = sr.querySelector(".masque-vb"), pan = sr.querySelector(".masque-vbp");
+      if (!pan || pan.hidden) return null;
+      const rgb = (css) => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = css; c.fillRect(0, 0, 1, 1); return [...c.getImageData(0, 0, 1, 1).data]; };
+      const a = getComputedStyle(stack), b = getComputedStyle(pan), btn = pan.querySelector("button");
+      const ra = stack.getBoundingClientRect(), rb = pan.getBoundingClientRect();
+      return { show: pan.classList.contains("show"), opacity: Number(b.opacity), stackOpacity: Number(a.opacity),
+        same: a.backgroundColor === b.backgroundColor && a.color === b.color && a.borderTopColor === b.borderTopColor && a.boxShadow === b.boxShadow,
+        radius: parseFloat(b.borderTopLeftRadius), w: rb.width, h: rb.height, stackW: ra.width,
+        gap: rb.top - ra.bottom, dx: rb.left - ra.left, icon: btn.querySelector("svg").getBoundingClientRect().width,
+        cursor: getComputedStyle(btn).cursor, held: pan.classList.contains("held"),
+        btnBg: rgb(getComputedStyle(btn).backgroundColor), bg: rgb(b.backgroundColor), ink: rgb(b.color),
+        rect: { x: rb.left, y: rb.top, w: rb.width, h: rb.height } };
+    }, "view3d");
+    const g3c = await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      return { s, x: b.left, y: b.top };
+    }, "view3d");
+    await page.mouse.move(g3c.x + (view3.x + view3.w / 2) * g3c.s, g3c.y + (view3.y + view3.h / 2) * g3c.s);
+    let h3 = null;
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      h3 = await read3();
+      if (h3 && h3.show && Math.abs(h3.opacity - PAN_IDLE) < 0.01) break;
+    }
+    const fail3 = (m) => { throw new Error(`view3d/pan-handle-look: ${m} (${JSON.stringify(h3)})`); };
+    if (!h3) fail3("no pan handle on the Axis3 view");
+    if (!h3.show || Math.abs(h3.opacity - PAN_IDLE) >= 0.01 || Math.abs(h3.stackOpacity - PAN_IDLE) >= 0.01) fail3(`handle and stack not both at the idle ${PAN_IDLE} on the plot`);
+    if (!h3.same) fail3("the handle's colours, border or shadow are not the stack's");
+    if (Math.abs(h3.w - 26) > 0.5 || Math.abs(h3.h - 26) > 0.5 || Math.abs(h3.stackW - 26) > 0.5 || h3.icon !== 14) fail3("the handle is not a 24 px button with a 14 px icon in a 1 px border, as the stack's");
+    if (!(h3.radius >= h3.h / 2)) fail3("the handle is not round");
+    if (Math.abs(h3.gap - 4) > 0.5 || Math.abs(h3.dx) > 0.5) fail3("the handle is not 4 px below the stack in its column");
+    if (h3.cursor !== "grab") fail3(`cursor ${h3.cursor} on the handle, not grab`);
+    await page.mouse.move(h3.rect.x + h3.rect.w / 2, h3.rect.y + h3.rect.h / 2);
+    await new Promise((r) => setTimeout(r, 300));
+    await page.mouse.down();
+    // The tint eases in over the stack's 100 ms; a WebGL page's busy main thread can start that
+    // late, so give it up to 2 s to arrive.
+    let press3 = null;
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      h3 = await read3();
+      press3 = [0, 1, 2].map((c) => h3.bg[c] * 0.8 + h3.ink[c] * 0.2);
+      if ([0, 1, 2].every((c) => Math.abs(h3.btnBg[c] - press3[c]) <= 3)) break;
+    }
+    if (!h3.held || h3.opacity < 0.99 || h3.cursor !== "grabbing") fail3("held: not full, held, with the grabbing cursor");
+    if (![0, 1, 2].every((c) => Math.abs(h3.btnBg[c] - press3[c]) <= 3)) fail3(`the held handle reads ${h3.btnBg}, not the 20% tint ${press3.map(Math.round)}`);
+    await page.mouse.up();
+    await page.mouse.move(1, 1);
+    passed.push("view3d/pan-handle-look");
   }
 
   // #525: the corner view buttons' look. Before the touch checks: CDP touch emulation leaves
@@ -1485,9 +1548,14 @@ try {
       return new Function("box", "rgb", `return (${f})(box, rgb)`)(box, rgb);
     }, [key, fn.toString()]);
     await page.mouse.down();
-    await new Promise((r) => setTimeout(r, 300));
-    const pressed = await vb((box, rgb) => rgb(getComputedStyle(box.querySelector(".masque-vb-out")).backgroundColor));
+    // As for the pan handle below: allow up to 2 s for the tint on a busy WebGL page.
     const press = [0, 1, 2].map((c) => on.bg[c] * 0.8 + on.ink[c] * 0.2);
+    let pressed = null;
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      pressed = await vb((box, rgb) => rgb(getComputedStyle(box.querySelector(".masque-vb-out")).backgroundColor));
+      if ([0, 1, 2].every((c) => Math.abs(pressed[c] - press[c]) <= 3)) break;
+    }
     if (![0, 1, 2].every((c) => Math.abs(pressed[c] - press[c]) <= 3)) fail(`the pressed button reads ${pressed}, not the 20% tint ${press.map(Math.round)}`);
     await page.mouse.up();
     const waitMoved = async (want) => {

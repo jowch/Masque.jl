@@ -90,7 +90,8 @@ directions they share. Only the axes you want to drag from need a
 ```
 
 If the same axis has a threshold line or a brushing box, a plain drag
-moves the line or box, and Shift+drag pans.
+moves the line or box, and Shift+drag pans. A drag with the middle
+mouse button always pans.
 
 To pan from the keyboard, press Tab until the view has focus, then use
 the arrow keys, and `+` / `-` to zoom. See
@@ -113,7 +114,9 @@ a single pick, as any click there does.
 
 While the pointer is over a plot you can pan or orbit, small buttons
 show in a corner: zoom in, zoom out, and, once you have moved the
-view, reset. On an `Axis3` they zoom only. They stay faint until the
+view, reset. On an `Axis3` they zoom around the middle of the box, and
+a round handle beside them pans: press on it and drag, with the mouse or
+one finger. They stay faint until the
 pointer reaches them, so the data under them still shows. They also
 show while the view has keyboard focus, and after you touch the plot
 on a touch screen. They take a corner a legend leaves free, the one
@@ -153,7 +156,12 @@ hover over and click the marks as the view turns.
 ```julia
 begin
     fig = Figure(size = (500, 380))
-    ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "drag to orbit")
+    ax = Axis3(
+        fig[1, 1];
+        azimuth = 0.4,
+        elevation = 0.5,
+        title = "drag to orbit",
+    )
     s = scatter!(
         ax,
         Makie.Point3f[(1, 2, 3), (4, 5, 6), (7, 8, 2)];
@@ -169,13 +177,16 @@ end
 @bind pick masque(fig, orbit)
 ```
 
-Ctrl+scroll (Cmd+scroll on a Mac) to zoom in or out around the middle of
-the axis box, and Shift+drag to pan. `wheel` works as it does on a 2D
-axis. On a touch screen, drag with two fingers to turn the view and
-pinch to zoom; one finger scrolls the page. The box keeps its size while
-the data grows or slides inside it, and marks that leave the box are
-hidden and no longer respond to hover or clicks. A line that crosses the
-edge of the box still responds along the part you can see. A sphere from
+Ctrl+scroll (Cmd+scroll on a Mac) to zoom in or out around the pointer.
+With the pointer on a point, a line or a surface, that mark stays inside
+the box as you zoom in. Shift+drag, or drag with the middle mouse
+button, pans. `wheel` works as it does on a 2D axis. On a touch screen,
+drag with two fingers to turn the view and pinch to zoom around your
+fingers, or drag the round handle beside the corner buttons to pan; one
+finger elsewhere scrolls the page. The box keeps its size while the data
+grows or slides inside it, and marks that leave the box are hidden and
+no longer respond to hover or clicks. A line that crosses the edge of
+the box still responds along the part you can see. A sphere from
 `meshscatter` stops responding once its center leaves the box, even if
 part of it is still showing. From the keyboard, `+` / `-` zoom and Shift
 with an arrow key pans.

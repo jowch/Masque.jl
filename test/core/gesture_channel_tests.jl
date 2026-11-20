@@ -214,6 +214,43 @@ end
         @test qx[2] - q0[2] ≈ 0 atol = 0.5
         @test qy[1] - q0[1] ≈ 0 atol = 0.5
         @test qy[2] - q0[2] ≈ 20 atol = 0.5
+        # `center` is where the limits' center lands (#641).
+        @test g["center"] ≈ [q0[1], q0[2]] atol = 1.0e-3
+
+        # Pointer zoom (#641): limits scaled about the data under a pixel, in the plane through
+        # the center, keep that data at that pixel (the frontend's zoomAnchor3 + zoomLimits3).
+        t = c .+ 30 .* Point3d(g["panx"]...) .- 20 .* Point3d(g["pany"]...)
+        za = Float64[]
+        for i in 1:3
+            lo, hi = lim[2i - 1], lim[2i]
+            push!(za, t[i] + (lo - t[i]) / 2, t[i] + (hi - t[i]) / 2)
+        end
+        w.render_frame(Dict("id" => "view", "limits" => za, "settle" => true))
+        qt = data_to_image_px(ctx, ax, t)
+        @test qt[1] ≈ q0[1] + 30 atol = 0.5
+        @test qt[2] ≈ q0[2] - 20 atol = 0.5
+        w.render_frame(Dict("id" => "view", "limits" => Float64.(lim), "settle" => true))
+
+        # At a mark's depth (#643): the data under a pixel 3 px right of and 2 px above the
+        # point at (1, 1, 1), on the plane through it facing the camera (the frontend's
+        # zoomAnchor3 with mark3), stays at that pixel, and the point stays in the box.
+        circ0 = only(l for l in w.manifest["layers"] if l["kind"] == "circles")
+        @test !haskey(circ0, "xyz")   # the default payloads' x, y and z carry the positions
+        m2 = circ0["geometry"][4:5] ./ circ0["q"]
+        @test m2 ≈ data_to_image_px(ctx, ax, Point3d(1, 1, 1))[1:2] atol = 0.5
+        t = Point3d(1, 1, 1) .+ 3 .* Point3d(g["panx"]...) .- 2 .* Point3d(g["pany"]...)
+        za = Float64[]
+        for i in 1:3
+            lo, hi = lim[2i - 1], lim[2i]
+            push!(za, t[i] + (lo - t[i]) / 2, t[i] + (hi - t[i]) / 2)
+        end
+        w.render_frame(Dict("id" => "view", "limits" => za, "settle" => true))
+        qt = data_to_image_px(ctx, ax, t)
+        @test qt[1] ≈ m2[1] + 3 atol = 0.5
+        @test qt[2] ≈ m2[2] - 2 atol = 0.5
+        fl = ax.finallimits[]
+        @test all(minimum(fl) .< Point3d(1, 1, 1) .< maximum(fl))
+        w.render_frame(Dict("id" => "view", "limits" => Float64.(lim), "settle" => true))
 
         # Zoom: limits around the middle point. The corners fall outside and stop hitting.
         zl = Float64[0.4, 0.6, 0.4, 0.6, 0.4, 0.6]
@@ -232,6 +269,38 @@ end
         w.render_frame(Dict("id" => "view", "azimuth" => 0.9, "elevation" => 0.3, "settle" => false))
         @test collect(maximum(ax.finallimits[])) ≈ [0.6, 0.6, 0.6] atol = 1.0e-6
         @test_throws ArgumentError w.render_frame(Dict("id" => "view", "limits" => [1.0, 0.0, 0, 1, 0, 1]))
+    end
+
+    @testset "Axis3 points ship their data positions when the payloads don't (#643)" begin
+        fig = Figure(size = (400, 400))
+        ax = Axis3(fig[1, 1])
+        pts = Makie.Point3f[(0, 0, 0), (1, 2, 3)]
+        p = scatter!(ax, pts)
+        circles(w) = only(l for l in w.manifest["layers"] if l["kind"] == "circles")
+        built(pl; view = true) = circles(
+            masque(fig, [PointInteractable(ax, pts; payloads = pl); view ? [ViewInteractable(ax)] : []]; auto = false),
+        )
+        @test !haskey(built(nothing), "xyz")
+        @test !haskey(circles(masque(fig, [PointInteractable(ax, p), ViewInteractable(ax)]; auto = false)), "xyz")
+        # A named tuple keeps Masque's x, y and z beside its own fields.
+        @test !haskey(built([(; name = "a"), (; name = "b")]), "xyz")
+        # A bare value has none, and a field of the user's own named x is not the point's x.
+        for pl in (["a", "b"], [(; x = 1, name = "a"), (; x = 1, name = "b")])
+            @test built(pl)["xyz"] == Float32[0, 0, 0, 1, 2, 3]
+            # Only a zoom reads them: without a view on the axis, nothing ships.
+            @test !haskey(built(pl; view = false), "xyz")
+        end
+        # A view on another axis doesn't count.
+        ax2 = Axis3(fig[1, 2])
+        scatter!(ax2, pts)
+        w = masque(fig, [PointInteractable(ax, pts; payloads = ["a", "b"]), ViewInteractable(ax2)]; auto = false)
+        @test !haskey(circles(w), "xyz")
+        # Off an Axis3, never.
+        fig2 = Figure()
+        ax3 = Axis(fig2[1, 1])
+        scatter!(ax3, [1, 2], [3, 4])
+        w2 = masque(fig2, [PointInteractable(ax3, [(1, 3), (2, 4)]; payloads = ["a", "b"]), ViewInteractable(ax3)]; auto = false)
+        @test !haskey(circles(w2), "xyz")
     end
 
     @testset "linkcameras! turns the other panels with the dragged one (#362)" begin

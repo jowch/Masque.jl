@@ -79,6 +79,11 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
   the pointer wins before any circle's reach. `nothing` (default) hit-tests the circles alone.
   Built by [`PointInteractable`](@ref) with `radius3d`, whose markers are spheres or
   ellipsoids that each axis stretches on its own.
+- `xyz` — `:circles` on an `Axis3` only, optional: per element, its data position, a flat
+  `Float32[]` of `(x, y, z)`. A wheel or pinch zoom over the point keeps the pointer at its
+  depth. The manifest leaves it out when the payloads' `x`, `y` and `z` fields already hold
+  it, and when no [`ViewInteractable`](@ref) is on the axis. `nothing` (default): the zoom
+  stays on the plane through the limits' center. Built by [`PointInteractable`](@ref).
 """
 struct HitLayer
     id::Symbol
@@ -106,7 +111,12 @@ struct HitLayer
     # edge from sample `k` is cut, `-1` for a gap. `nothing` for a path drawn whole, whose
     # vertex `k` is sample `k`.
     drawn::Union{Nothing, Vector}
+    # :circles on an Axis3: per element, its data position `[x1, y1, z1, x2, …]`, which a
+    # pointer zoom keeps at the point's depth (#643).
+    xyz::Union{Nothing, Vector{Float32}}
 end
+HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses, zpoints, drawn) =
+    HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses, zpoints, drawn, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses) =
     HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, ellipses, nothing, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order) =
@@ -718,10 +728,13 @@ function hitlayers(i::PointInteractable, ctx)
         ks = [k for k in eachindex(i.points) if isfinite(g[3k - 2]) && isfinite(g[3k - 1]) && isfinite(depth[k])]
         order = _top_first(ks, depth)
     end
+    # On an Axis3, where each point is: a wheel or pinch zoom over it keeps the pointer at its
+    # depth (#643).
+    xyz = i.ax isa Makie.Axis3 ? Float32[c for p in i.points for c in p] : nothing
     return [
         HitLayer(
             i.id, :circles, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label, i.colors, nothing, nothing, nothing, order,
-            ell,
+            ell, nothing, nothing, xyz,
         ),
     ]
 end
@@ -1211,8 +1224,11 @@ p = heatmap!(ax, X, Y, Z)
 GridInteractable(ax, p)
 
 xs = ["a", "b", "c", "d"]; ys = ["p", "q", "r"]  # i runs along x, j along y
-GridInteractable(ax, xedges, yedges, vals; payloads = (i, j) -> (; x = xs[i], y = ys[j]),
-    tooltip = masque"(\$(x), \$(y)) = \$(value)")
+GridInteractable(
+    ax, xedges, yedges, vals;
+    payloads = (i, j) -> (; x = xs[i], y = ys[j]),
+    tooltip = masque"(\$(x), \$(y)) = \$(value)",
+)
 ```
 """
 struct GridInteractable <: AbstractInteractable
@@ -2042,7 +2058,13 @@ l2 = lines!(ax, xs, ys2; label = "b")
 leg = axislegend(ax)
 LegendInteractable(leg)   # `masque` fills in the links
 
-LegendInteractable(leg; targets = Dict("a" => :lines, "b" => [:lines_2, :scatter]))
+LegendInteractable(
+    leg;
+    targets = Dict(
+        "a" => :lines,
+        "b" => [:lines_2, :scatter],
+    ),
+)
 ```
 """
 struct LegendInteractable <: AbstractInteractable
@@ -2106,9 +2128,10 @@ end
     ViewInteractable(ax; id=:view, wheel=nothing, controls=:hover)
 
 Drag-to-pan and wheel zoom (2D `Axis`), or drag-to-orbit, wheel zoom and Shift+drag pan
-(`Axis3`). Produces one `:view` [`HitLayer`](@ref)
-covering `ax`'s whole viewport; it sorts after Tier-0 `:threshold`/`:roi` layers so an ordinary
-drag on those wins without a modifier — **Shift+drag** forces the view gesture even over a
+(`Axis3`). A drag with the middle mouse button pans either. Produces one `:view`
+[`HitLayer`](@ref) covering `ax`'s whole viewport; it sorts after Tier-0 `:threshold`/`:roi`
+layers so an ordinary drag on those wins without a modifier — **Shift+drag** (or a
+middle-button drag) forces the view gesture even over a
 `ThresholdInteractable`/`ROIInteractable` hit.
 
 # Arguments
@@ -2122,7 +2145,8 @@ drag on those wins without a modifier — **Shift+drag** forces the view gesture
   is turned off in Makie (`deregister_interaction!(ax, :scrollzoom)`,
   `deactivate_interaction!(ax, :scrollzoom)`, or both `xzoomlock` and `yzoomlock`), which
   gets `:none`.
-- `controls` — the zoom in, zoom out and reset buttons in a corner of the plot: `:hover`
+- `controls` — the zoom in, zoom out and reset buttons in a corner of the plot, and on an
+  `Axis3` the round pan handle beside them (press on it and drag to pan): `:hover`
   (default) shows them while the pointer is over the plot, while the view has keyboard focus,
   and after a touch on the plot; `:always` keeps them shown; `:none` leaves them out.
 
@@ -2133,10 +2157,12 @@ on an `Axis3`) and pinch-zoom it, whatever `wheel` says; a tap still clicks.
 (docs/dev/architecture/12-gesture-channel.md §12.3) — the bond `masque` returns never carries a
 `:view` [`InteractionEvent`](@ref). Drag frames stream over a `with_js_link` gesture channel
 instead, on both backends: Julia mutates `ax.limits[]` (pan, zoom) or `ax.azimuth[]`/`ax.elevation[]`
-(orbit) and ships a hit manifest for every frame the camera moves. On an `Axis3`, zoom (wheel,
-`+`/`-`) scales the limits about their center and pan (Shift+drag, Shift+arrows) shifts them
-in the screen plane, as Makie's own `Axis3` zoom and translation do; the box keeps its size and
-marks outside the new limits are clipped, so they no longer hover or click. `:cairo` ships that frame as
+(orbit) and ships a hit manifest for every frame the camera moves. On an `Axis3`, the wheel
+and a pinch scale the limits about the data under the pointer (or the fingers), as Makie's
+`zoommode = :cursor` does, `+`/`-` and the corner buttons about their center, and pan
+(Shift+drag, a middle-button drag, Shift+arrows) shifts them in the screen plane, as Makie's
+own `Axis3` translation does; the box keeps its size and marks outside the new limits are
+clipped, so they no longer hover or click. `:cairo` ships that frame as
 a PNG; `:webgl` ships a freshly serialized scene applied to the canvas already on the page.
 In-drag frames render at `px_per_unit = 1`; the release frame renders at the widget's own
 resolution. Because nothing commits, `ax`'s camera stays wherever the gesture left it until the
@@ -2308,13 +2334,18 @@ function hitlayers(i::ViewInteractable, ctx)
         geom["azimuth"] = Float64(i.ax.azimuth[])
         geom["elevation"] = Float64(i.ax.elevation[])
         # Zoom and pan (#321) move the limits, as Makie's own Axis3 scroll zoom and translation
-        # do: JS scales them about their center, or shifts them by `panx`/`pany` per image px.
+        # do: JS scales them about a data point (under the pointer, #641, or their center), or
+        # shifts them by `panx`/`pany` per image px.
         fl = _finallimits(i.ax)
         lo = Float64.(Tuple(fl.origin)); w = Float64.(Tuple(fl.widths))
         geom["limits"] = Float64[lo[1], lo[1] + w[1], lo[2], lo[2] + w[2], lo[3], lo[3] + w[3]]
         panx, pany = _axis3_pan_basis(ctx, i.ax, lo, w)
         geom["panx"] = panx
         geom["pany"] = pany
+        # The limits' center in image px: the wheel and a pinch zoom about the point under the
+        # pointer in the plane facing the camera through it (#641), `center + panx·dx + pany·dy`.
+        c = _proj(ctx, i.ax, lo .+ w ./ 2, nothing)
+        all(isfinite, c) && (geom["center"] = Float64[c[1], c[2]])
     end
     return [HitLayer(i.id, :view, geom, Any[], axis_id(ctx, i.ax), events(i))]
 end
@@ -2896,7 +2927,13 @@ categorical, or if the figure already has a slice on this axis.
 
 # Examples
 ```julia
-SliceInteractable(ax; series = [(; id = :wide, x = xs, y = ys), (; id = :narrow, x = xs, y = zs)])
+SliceInteractable(
+    ax;
+    series = [
+        (; id = :wide, x = xs, y = ys),
+        (; id = :narrow, x = xs, y = zs),
+    ],
+)
 
 d1 = density!(ax, randn(200))
 d2 = density!(ax, randn(200) .+ 2)
@@ -3077,7 +3114,16 @@ Vector{HitLayer}` is called at manifest-build time and its result is used verbat
 ```julia
 FunctionInteractable() do ctx
     q = data_to_image_px(ctx, ax, (1.0, 2.0))
-    [HitLayer(:custom, :circles, [q[1], q[2], 10], [(; label = "manual")], Masque.axis_id(ctx, ax), (:click, :hover))]
+    [
+        HitLayer(
+            :custom,
+            :circles,
+            [q[1], q[2], 10],
+            [(; label = "manual")],
+            Masque.axis_id(ctx, ax),
+            (:click, :hover),
+        ),
+    ]
 end
 ```
 """

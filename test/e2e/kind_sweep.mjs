@@ -2978,9 +2978,11 @@ try {
     }
 
     if (key === "view3d") {
-      // Axis3 zoom and pan (#321). The wheel scales the limits about their center, so the
-      // middle point stays put on screen and the corner leaves the limits: it is clipped from
-      // the picture and must stop hitting. Shift+drag then pans the limits; a plain drag orbits.
+      // Axis3 zoom and pan (#321). A wheel over the limits' center (#641) scales them about it,
+      // so the middle point stays put on screen and the corner leaves the limits: it is clipped
+      // from the picture and must stop hitting. Shift+drag then pans the limits, and so does a
+      // real middle-button drag (#642); a plain drag orbits. After the reset, a wheel over the
+      // line's vertex zooms about it: the vertex stays under the pointer.
       const stamp3 = async () => {
         const raw = await page.evaluate((k) => {
           const span = document.querySelector(`#coords_${k}`);
@@ -3031,7 +3033,7 @@ try {
         const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -600, ctrlKey: true });
         sr.querySelector(".surface").dispatchEvent(ev);
         return ev.defaultPrevented;
-      }, [key, g.x + g.w / 2, g.y + g.h / 2]);
+      }, [key, ...(Array.isArray(g.center) ? g.center : (() => { throw new Error(`${key}: view geometry has no Axis3 center (#641): ${JSON.stringify(g)}`); })())]);
       if (!prevented) throw new Error(`${key}-wheel: the Ctrl+wheel was not taken by the Axis3 view`);
       const w = (l, i) => l[2 * i + 1] - l[2 * i];
       const zs = await waitStamp(s0, "wheel", (st) => Array.isArray(st.limits) && [0, 1, 2].every((i) => w(st.limits, i) < 0.75 * w(lim0, i)));
@@ -3054,19 +3056,160 @@ try {
         [0, 1, 2].every((i) => Math.abs(w(st.limits, i) - w(zs.limits, i)) < 1e-6 * Math.abs(w(zs.limits, i)) + 1e-9) &&
         Math.abs(st.azimuth - zs.azimuth) < 1e-9);
       passed.push(`${key}/shift-drag-pan`);
+      // #642: a real middle-button drag pans as Shift+drag does, and the page doesn't scroll.
+      const toClient = (x, y) => page.evaluate(([k, ix, iy]) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        // Real mouse input lands only inside the window, so bring the plot into it first.
+        const img = host.querySelector("img, canvas");
+        const r0 = img.getBoundingClientRect();
+        if (r0.top < 0 || r0.bottom > window.innerHeight) img.scrollIntoView({ block: "center" });
+        const b = img.getBoundingClientRect();
+        const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        return { x: b.left + ix * s, y: b.top + iy * s };
+      }, [key, x, y]);
+      const mA = await toClient(inP.x, inP.y), mB = await toClient(inP.x + 80, inP.y);
+      const scroll0 = await page.evaluate(() => [window.scrollX, window.scrollY]);
+      await page.mouse.move(mA.x, mA.y);
+      await page.mouse.down({ button: "middle" });
+      for (let t = 0.25; t <= 1.0; t += 0.25) await page.mouse.move(mA.x + (mB.x - mA.x) * t, mA.y);
+      await page.mouse.up({ button: "middle" });
+      const pm = await waitStamp(ps, "middle-drag", (st) => Array.isArray(st.limits) &&
+        st.limits.some((v, i) => Math.abs(v - ps.limits[i]) > 1e-3 * w(ps.limits, Math.floor(i / 2))) &&
+        [0, 1, 2].every((i) => Math.abs(w(st.limits, i) - w(ps.limits, i)) < 1e-6 * Math.abs(w(ps.limits, i)) + 1e-9) &&
+        Math.abs(st.azimuth - ps.azimuth) < 1e-9);
+      const scroll1 = await page.evaluate(() => [window.scrollX, window.scrollY]);
+      if (scroll1[0] !== scroll0[0] || scroll1[1] !== scroll0[1]) throw new Error(`${key}-middle-drag: the page scrolled from ${scroll0} to ${scroll1}`);
+      passed.push(`${key}/middle-drag-pan`);
       await drag(key, inP.x, inP.y, inP.x + 80, inP.y, false);
-      await waitStamp(ps, "orbit", (st) => Math.abs(st.azimuth - ps.azimuth) > 0.05);
+      await waitStamp(pm, "orbit", (st) => Math.abs(st.azimuth - pm.azimuth) > 0.05);
       passed.push(`${key}/drag-orbit`);
       const after = await textOf(`#out_${key}`);
       if (after !== before) throw new Error(`${key}: a view gesture must not commit (${before} -> ${after})`);
       // #524: a double-click on empty plot area turns the camera back and zooms back out.
       const g3 = layer.geometry;
-      const rs = await resetByDoubleClick(key, g3);
+      let rs = await resetByDoubleClick(key, g3);
       if (Math.abs(rs.azimuth - g3.azimuth) > 1e-9 || Math.abs(rs.elevation - g3.elevation) > 1e-9 || !sameLims(rs.limits ?? [], g3.limits)) {
         throw new Error(`${key}-reset: the view came back at ${JSON.stringify(rs)}, not its mount camera ${JSON.stringify({ azimuth: g3.azimuth, elevation: g3.elevation, limits: g3.limits })}`);
       }
       passed.push(`${key}/reset-dblclick`);
-      console.error(`OK  ${key} — wheel zoom ${JSON.stringify(zs.limits)}, clipped corner, pan, orbit, reset`);
+      // #643: a real Ctrl+wheel over the point far from the plane through the middle zooms at
+      // its depth, so it stays inside the box and still answers under the pointer. A zoom about
+      // that plane (#641 alone) would carry it out of the box: checked from the frame's own
+      // geometry, so the check can tell the two apart.
+      const mod = process.platform === "darwin" ? "Meta" : "Control";
+      const front = layers.find((l) => l.id === "front");
+      if (!front) throw new Error(`${key}: no front layer`);
+      const fP = hitPoint(front, 0), fData = [3.5, 1.0, 3.5];
+      const rF0 = await dispatchAt(key, fP.x, fP.y, "pointermove");
+      if (!rF0.show) throw new Error(`${key}-mark-zoom: the front point doesn't answer before the zoom (${JSON.stringify(rF0)})`);
+      const atF = await toClient(fP.x, fP.y);
+      await page.mouse.move(atF.x, atF.y);
+      await page.keyboard.down(mod);
+      await page.mouse.wheel(0, -2400);
+      await page.keyboard.up(mod);
+      const fz = await waitStamp(rs, "mark-zoom", (st) => Array.isArray(st.limits) && w(st.limits, 0) < 0.9 * w(g3.limits, 0));
+      const kf = w(g3.limits, 0) / w(fz.limits, 0);
+      const share = (l, i, v) => (v - l[2 * i]) / w(l, i);
+      const centerShare = [0, 1, 2].map((i) => {
+        const t = g3.limits[2 * i] + w(g3.limits, i) / 2 + g3.panx[i] * (fP.x - g3.center[0]) + g3.pany[i] * (fP.y - g3.center[1]);
+        const nt = share(g3.limits, i, t);
+        return nt + kf * (share(g3.limits, i, fData[i]) - nt);
+      });
+      if (centerShare.every((n) => n > -0.1 && n < 1.1)) throw new Error(`${key}-mark-zoom: a ${kf.toFixed(2)}x zoom about the middle plane would keep the point in or near the box too (shares ${centerShare.map((n) => n.toFixed(2))}), too little to tell the two apart`);
+      const kept = [0, 1, 2].map((i) => share(fz.limits, i, fData[i]));
+      const mount = [0, 1, 2].map((i) => share(g3.limits, i, fData[i]));
+      // The pointer lands within a px of the point's center, not on it, so its place in the box
+      // shifts by that px times the zoom, a small part of what the middle plane would move it.
+      const shift = (n) => Math.max(...n.map((v, i) => Math.abs(v - mount[i])));
+      if (!kept.every((n) => n > 0 && n < 1) || shift(kept) > 0.2 * shift(centerShare)) throw new Error(`${key}-mark-zoom: the point's place in the box moved from ${mount.map((n) => n.toFixed(3))} to ${kept.map((n) => n.toFixed(3))}; about the middle plane it would be ${centerShare.map((n) => n.toFixed(2))}`);
+      const rF1 = await dispatchAt(key, fP.x, fP.y, "pointermove");
+      if (!rF1.show || rF1.text !== rF0.text) throw new Error(`${key}-mark-zoom: after a ${kf.toFixed(2)}x zoom over the front point (about the middle plane it would leave the box, shares ${centerShare.map((n) => n.toFixed(2))}) it answers ${JSON.stringify(rF1)}, not ${JSON.stringify(rF0.text)}`);
+      passed.push(`${key}/mark-zoom`);
+      console.error(`OK  ${key} — a ${kf.toFixed(2)}x zoom over the front point kept it at ${kept.map((n) => n.toFixed(3))} in the box (from ${mount.map((n) => n.toFixed(3))}); about the middle plane it would sit at ${centerShare.map((n) => n.toFixed(2))}`);
+      rs = await resetByDoubleClick(key, g3);
+      // #641: a wheel over the line's vertex, away from the center, zooms about the data there,
+      // so the same vertex still answers under the pointer. A center zoom would carry it
+      // (k − 1) times its distance from the center away.
+      const rV0 = await dispatchAt(key, lineP.x, lineP.y, "pointermove");
+      if (!rV0.show || !/2\.6/.test(rV0.text)) throw new Error(`${key}-pointer-zoom: the line's vertex doesn't answer before the zoom (${JSON.stringify(rV0)})`);
+      const at0 = await toClient(lineP.x, lineP.y);
+      await page.mouse.move(at0.x, at0.y);
+      await page.keyboard.down(mod);
+      await page.mouse.wheel(0, -1200);
+      await page.keyboard.up(mod);
+      const pz = await waitStamp(rs, "pointer-zoom", (st) => Array.isArray(st.limits) && w(st.limits, 0) < 0.9 * w(g3.limits, 0));
+      const kz = w(g3.limits, 0) / w(pz.limits, 0);
+      const drift = Math.hypot(lineP.x - inP.x, lineP.y - inP.y) * (kz - 1);
+      if (!(drift > 12)) throw new Error(`${key}-pointer-zoom: a ${kz.toFixed(2)}x zoom would move the vertex only ${drift.toFixed(1)} px under a center zoom, too little to tell the two apart`);
+      const rV1 = await dispatchAt(key, lineP.x, lineP.y, "pointermove");
+      if (!rV1.show || rV1.text !== rV0.text) throw new Error(`${key}-pointer-zoom: after a ${kz.toFixed(2)}x zoom over the vertex (a center zoom would move it ${drift.toFixed(1)} px) it answers ${JSON.stringify(rV1)}, not ${JSON.stringify(rV0.text)}`);
+      // The hover dot marks the vertex where it is drawn now: still under the pointer, give or
+      // take the whole-pixel rounding of the hit geometry on each frame.
+      const dot = (r) => { const h = r.hi.fill ?? r.hi.edge ?? r.hi.plain; return h && h.cx !== null ? { x: +h.cx, y: +h.cy } : null; };
+      const d0 = dot(rV0), d1 = dot(rV1);
+      if (!d0 || !d1) throw new Error(`${key}-pointer-zoom: no hover dot on the line's vertex (${JSON.stringify({ before: rV0.hi, after: rV1.hi })})`);
+      const moved = Math.hypot(d1.x - d0.x, d1.y - d0.y);
+      if (moved > 4) throw new Error(`${key}-pointer-zoom: the vertex moved ${moved.toFixed(1)} px under the pointer (${JSON.stringify(d0)} -> ${JSON.stringify(d1)}); a center zoom moves it ${drift.toFixed(1)}`);
+      passed.push(`${key}/pointer-zoom`);
+      // #644: the round pan handle beside the corner buttons. A real press on it and a drag pan
+      // the limits (widths and camera kept), whatever is under the pointer as it moves; a click
+      // alone does nothing.
+      const handle = async () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const box = sr.querySelector(".masque-vbp"), stack = sr.querySelector(".masque-vb");
+        if (!box || box.hidden) return null;
+        const r = box.getBoundingClientRect(), q = stack.getBoundingClientRect();
+        return { x: r.left, y: r.top, w: r.width, h: r.height, stackBottom: q.bottom, stackLeft: q.left, held: box.classList.contains("held"), radius: getComputedStyle(box).borderTopLeftRadius };
+      }, key);
+      const ph0 = await handle();
+      if (!ph0) throw new Error(`${key}-pan-handle: no pan handle on the Axis3 view`);
+      const hc = { x: ph0.x + ph0.w / 2, y: ph0.y + ph0.h / 2 };
+      await page.mouse.move(hc.x, hc.y);
+      const st0 = await stamp3();
+      await page.mouse.click(hc.x, hc.y);
+      await new Promise((r) => setTimeout(r, 600));
+      if ((await stamp3())?.n !== st0?.n) throw new Error(`${key}-pan-handle: a click on the handle sent a frame`);
+      await page.mouse.down();
+      if (!(await handle()).held) throw new Error(`${key}-pan-handle: the handle doesn't show held while pressed`);
+      for (let t = 0.25; t <= 1.0; t += 0.25) await page.mouse.move(hc.x - 60 * t, hc.y + 20 * t);
+      await page.mouse.up();
+      const ph = await waitStamp(st0, "pan-handle", (st) => Array.isArray(st.limits) &&
+        st.limits.some((v, i) => Math.abs(v - pz.limits[i]) > 1e-3 * w(pz.limits, Math.floor(i / 2))) &&
+        [0, 1, 2].every((i) => Math.abs(w(st.limits, i) - w(pz.limits, i)) < 1e-6 * Math.abs(w(pz.limits, i)) + 1e-9) &&
+        Math.abs(st.azimuth - pz.azimuth) < 1e-9);
+      if ((await handle()).held) throw new Error(`${key}-pan-handle: the handle still shows held after release`);
+      // The pointer is captured to the surface, so the click after a press lands there: it must
+      // stay the handle's. A click leaves the bond as it was, and a double-click doesn't reset.
+      const ph1 = await handle(), hc1 = { x: ph1.x + ph1.w / 2, y: ph1.y + ph1.h / 2 };
+      const outH = await textOf(`#out_${key}`);
+      await page.mouse.click(hc1.x, hc1.y);
+      await page.mouse.dblclick(hc1.x, hc1.y);
+      await new Promise((r) => setTimeout(r, 800));
+      if ((await stamp3())?.n !== ph.n) throw new Error(`${key}-pan-handle: a click or double-click on the handle sent a frame (${JSON.stringify(await stamp3())})`);
+      if ((await textOf(`#out_${key}`)) !== outH) throw new Error(`${key}-pan-handle: a click on the handle changed the bond (${outH} -> ${await textOf(`#out_${key}`)})`);
+      passed.push(`${key}/pan-handle-click-stays`);
+      // One finger on the handle pans the view, and the page doesn't scroll.
+      const cdpH = await page.context().newCDPSession(page);
+      const scrollH = await page.evaluate(() => [window.scrollX, window.scrollY]);
+      await cdpH.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: hc1.x, y: hc1.y }] });
+      for (let t = 0.2; t <= 1.0001; t += 0.2) {
+        await cdpH.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: hc1.x - 60 * t, y: hc1.y + 40 * t }] });
+        await new Promise((r) => setTimeout(r, 30));
+      }
+      await cdpH.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      const pt = await waitStamp(ph, "pan-handle-touch", (st) => Array.isArray(st.limits) &&
+        st.limits.some((v, i) => Math.abs(v - ph.limits[i]) > 1e-3 * w(ph.limits, Math.floor(i / 2))) &&
+        [0, 1, 2].every((i) => Math.abs(w(st.limits, i) - w(ph.limits, i)) < 1e-6 * Math.abs(w(ph.limits, i)) + 1e-9) &&
+        Math.abs(st.azimuth - ph.azimuth) < 1e-9 && Math.abs(st.elevation - ph.elevation) < 1e-9);
+      const scrollH1 = await page.evaluate(() => [window.scrollX, window.scrollY]);
+      if (scrollH1[0] !== scrollH[0] || scrollH1[1] !== scrollH[1]) throw new Error(`${key}-pan-handle-touch: the page scrolled from ${scrollH} to ${scrollH1}`);
+      await cdpH.detach();
+      passed.push(`${key}/pan-handle`, `${key}/pan-handle-touch`);
+      console.error(`OK  ${key} — wheel zoom ${JSON.stringify(zs.limits)}, clipped corner, pan, middle-drag pan, orbit, reset, pointer zoom ${kz.toFixed(2)}x keeps the vertex within ${moved.toFixed(1)} px (center zoom: ${drift.toFixed(1)}), pan handle moved x by ${(ph.limits[0] - pz.limits[0]).toFixed(3)} (mouse) and ${(pt.limits[0] - ph.limits[0]).toFixed(3)} (touch)`);
       continue;
     }
 

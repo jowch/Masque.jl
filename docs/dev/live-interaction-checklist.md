@@ -176,6 +176,19 @@ figure, lighter on a dark one), and 20% while pressed; hover tints only under
 same way when it joins; no pulse, no slide. A press never reaches the plot: no pick, no clear,
 no pan.
 
+Pan handle (#644, Jonathan picked look C of the mock on 2026-11-18): an `Axis3` view also gets a
+round box of its own (`div.masque-vbp`, radius 999 px) holding one button with a hand icon, in
+the same theme, size, idle opacity, fades and tints as the stack. It sits 4 CSS px
+(`PAN_GAP`) from the stack on its inner side: below it in a top corner, above it bottom right,
+toward the middle in a row; its place counts the stack at full length, so it never moves when
+reset joins. A press on it starts a pan (as Shift+drag), the pointer captured by the plot, until
+it lifts; meanwhile it shows the grabbing cursor and the 20% tint, both boxes are at 100%, and
+the corner shows the limits readout. A click alone does nothing. `touch-action: none` on it, so
+one finger pans. Its label is "Drag to pan", its native tooltip "Drag to pan (or Shift+drag)".
+The fit rule counts the handle: when the corner is too small, zoom out drops first, then zoom
+in, then reset, and the handle last (with no stack left, the handle takes the corner). 2D views
+get no handle.
+
 Band chrome (`SpanInteractable`, #500, Jonathan picked look D on 2026-11-02): two edges drawn
 as threshold lines (same class, width and hover thickening), the area outside the band filled
 with the plot area's colour (the figure background on a colorbar) at 0.65 opacity

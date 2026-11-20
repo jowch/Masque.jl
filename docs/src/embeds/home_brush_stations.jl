@@ -34,7 +34,11 @@ begin
         (name = "Tucson", lon = -110.9, lat = 32.2, region = "Southwest"),
         (name = "Albuquerque", lon = -106.6, lat = 35.1, region = "Southwest"),
     ]
-    group_color = Dict("Cascadia" => "#3d5a80", "Interior" => "#e07a3d", "Southwest" => "#2a9d8f")
+    group_color = Dict(
+        "Cascadia" => "#3d5a80",
+        "Interior" => "#e07a3d",
+        "Southwest" => "#2a9d8f",
+    )
     palette = [group_color[s.region] for s in samples]
     xs = Float64[s.lon for s in samples]
     ys = Float64[s.lat for s in samples]

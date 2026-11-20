@@ -114,7 +114,14 @@ begin
     ax = Axis(fig[1, 1]; title = "New York City", aspect = DataAspect())
     hidedecorations!(ax)
     hidespines!(ax)
-    p = poly!(ax, rings; color = pops, colormap = :deep, colorrange = (4.0e5, 2.7e6), strokecolor = :white, strokewidth = 1.5)
+    p = poly!(
+        ax, rings;
+        color = pops,
+        colormap = :deep,
+        colorrange = (4.0e5, 2.7e6),
+        strokecolor = :white,
+        strokewidth = 1.5,
+    )
     Colorbar(
         fig[1, 2], p;
         label = "Population",

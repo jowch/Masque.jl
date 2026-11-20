@@ -79,7 +79,13 @@ mapped to the names of the plots it should highlight.
 [What `masque(fig)` builds](@ref) lists those names:
 
 ```julia
-LegendInteractable(leg; targets = Dict("a" => :lines, "b" => [:lines_2, :scatter]))
+LegendInteractable(
+    leg;
+    targets = Dict(
+        "a" => :lines,
+        "b" => [:lines_2, :scatter],
+    ),
+)
 ```
 
 A label or plot name that does not exist raises an `ArgumentError`, so

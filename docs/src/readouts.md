@@ -121,7 +121,11 @@ data coordinates. It starts at `value`, and changes when you release
 the line after a drag:
 
 ```julia
-"$(count(>(level.value), ys)) of $(length(ys)) points above $(round(level.value; digits = 2))"
+let
+    above = count(>(level.value), ys)
+    at = round(level.value; digits = 2)
+    "$(above) of $(length(ys)) points above $(at)"
+end
 ```
 
 ```@raw html
@@ -167,7 +171,12 @@ high = ThresholdInteractable(ax; orientation = :horizontal, value = 0.8)
 ```
 
 ```julia
-"$(count(y -> band.low.value < y < band.high.value, ys)) of $(length(ys)) points between $(round(band.low.value; digits = 2)) and $(round(band.high.value; digits = 2))"
+let
+    lo, hi = band.low.value, band.high.value
+    inside = count(y -> lo < y < hi, ys)
+    "$(inside) of $(length(ys)) points between " *
+        "$(round(lo; digits = 2)) and $(round(hi; digits = 2))"
+end
 ```
 
 ```@raw html
@@ -213,7 +222,11 @@ end
 ```
 
 ```julia
-"$(count(>(level.value), z)) of $(length(z)) cells above $(round(level.value; digits = 2))"
+let
+    above = count(>(level.value), z)
+    at = round(level.value; digits = 2)
+    "$(above) of $(length(z)) cells above $(at)"
+end
 ```
 
 ```@raw html
@@ -251,7 +264,11 @@ window = SpanInteractable(ax; span = (2.0, 5.0))
 ```
 
 ```julia
-"$(count(x -> win.lo <= x <= win.hi, xs)) points from $(round(win.lo; digits = 2)) to $(round(win.hi; digits = 2))"
+let
+    inside = count(x -> win.lo <= x <= win.hi, xs)
+    lo, hi = round(win.lo; digits = 2), round(win.hi; digits = 2)
+    "$(inside) points from $(lo) to $(hi)"
+end
 ```
 
 `win.lo` is always the lower value and `win.hi` the higher one;

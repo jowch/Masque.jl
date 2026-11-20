@@ -33,8 +33,18 @@ begin
     zs = [1.2 .+ 0.3 .* randn(80); 2.8 .+ 0.35 .* randn(70)]
 
     fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y", title = "drag the box over a cluster")
-    s = scatter!(ax, xs, ys; color = zs, colormap = :viridis, markersize = 9)
+    ax = Axis(
+        fig[1, 1];
+        xlabel = "x",
+        ylabel = "y",
+        title = "drag the box over a cluster",
+    )
+    s = scatter!(
+        ax, xs, ys;
+        color = zs,
+        colormap = :viridis,
+        markersize = 9,
+    )
 
     samples = [(sample = i, x = xs[i], y = ys[i], z = zs[i]) for i in 1:150]
     pts = interactables(
@@ -63,12 +73,20 @@ begin
     inside = zs[picks]
     cmp = Figure(size = (560, 260))
     cax = Axis(
-        cmp[1, 1]; xlabel = "z", ylabel = "samples",
-        title = isempty(inside) ? "all samples" : "$(length(inside)) samples in the box, against all $(length(zs))"
+        cmp[1, 1];
+        xlabel = "z",
+        ylabel = "samples",
+        title = isempty(inside) ? "all samples" :
+            "$(length(inside)) samples in the box, against all $(length(zs))",
     )
     hist!(cax, zs; bins = edges, color = (:gray, 0.45), label = "all")
     if !isempty(inside)
-        hist!(cax, inside; bins = edges, color = (:darkorange, 0.85), label = "in the box")
+        hist!(
+            cax, inside;
+            bins = edges,
+            color = (:darkorange, 0.85),
+            label = "in the box",
+        )
     end
     axislegend(cax; position = :rt)
     cmp

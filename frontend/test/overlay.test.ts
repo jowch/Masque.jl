@@ -4962,6 +4962,114 @@ describe("photographic pan / wheel zoom", () => {
         }
     })
 
+    it("an Axis3 wheel zooms about the data under the pointer (#641); a middle-button drag pans (#642)", async () => {
+        vi.useFakeTimers()
+        try {
+            const m = viewManifest("orbit")
+            // The pointer (image px 600, 400) is 200 px right of the limits' center: x = 7.
+            Object.assign(m.layers[0].geometry as object, {
+                azimuth: 0.4, elevation: 0.5, limits: [0, 10, 0, 10, 0, 10], panx: [0.01, 0, 0], pany: [0, 0, -0.01],
+                center: [400, 400],
+            })
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({}))
+            mount(script, m, undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            wheelAt(surface, -120)
+            wheelAt(surface, -120)
+            await vi.advanceTimersByTimeAsync(200)
+            const settles = requestFrame.mock.calls.map((c) => c[0]).filter((c) => c.settle === true)
+            expect(settles).toHaveLength(1)
+            const lim = settles[0].limits as number[]
+            expect(lim[1] - lim[0]).toBeCloseTo(10 * Math.exp(-0.24))
+            // x = 7 keeps its share of the x range; y and z sit at the center, which stays.
+            expect((7 - lim[0]) / (lim[1] - lim[0])).toBeCloseTo(0.7)
+            expect(lim[2] + lim[3]).toBeCloseTo(10)
+            expect(lim[4] + lim[5]).toBeCloseTo(10)
+
+            // A middle-button drag 100 image px right pans from the zoomed limits, as Shift+drag does.
+            requestFrame.mockClear()
+            const down = new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true, cancelable: true, button: 1 })
+            surface.dispatchEvent(down)
+            expect(down.defaultPrevented).toBe(true)
+            const md = new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 1 })
+            surface.dispatchEvent(md)
+            expect(md.defaultPrevented).toBe(true)
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 150, clientY: 100, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 150, clientY: 100, bubbles: true, button: 1 }))
+            await vi.advanceTimersByTimeAsync(10)
+            const last = requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0]
+            expect(last).toMatchObject({ id: "view", settle: true })
+            const pan = last.limits as number[]
+            expect(pan[0]).toBeCloseTo(lim[0] - (lim[1] - lim[0]) / 10)
+            expect(last.azimuth).toBeUndefined()
+            // A middle press away from every view is left to the browser.
+            requestFrame.mockClear()
+            const off = new PointerEvent("pointerdown", { clientX: 700, clientY: 100, bubbles: true, cancelable: true, button: 1 })
+            surface.dispatchEvent(off)
+            expect(off.defaultPrevented).toBe(false)
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 700, clientY: 100, bubbles: true, button: 1 }))
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it("an Axis3 wheel over a mark zooms at the mark's depth (#643)", async () => {
+        vi.useFakeTimers()
+        try {
+            const m = viewManifest("orbit")
+            Object.assign(m.layers[0].geometry as object, {
+                azimuth: 0.4, elevation: 0.5, limits: [0, 10, 0, 10, 0, 10], panx: [0.01, 0, 0], pany: [0, 0, -0.01],
+                center: [400, 400],
+            })
+            // A point at (7, 2, 3), in front of the center plane, drawn under the pointer (image px 600, 400).
+            m.layers.push({ id: "pts", kind: "circles", axis: "ax1", events: ["hover"], payloads: [{}], geometry: [600, 400, 10], xyz: [7, 2, 3] })
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({}))
+            mount(script, m, undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            wheelAt(surface, -120)
+            wheelAt(surface, -120)
+            await vi.advanceTimersByTimeAsync(200)
+            const lim = requestFrame.mock.calls.map((c) => c[0]).filter((c) => c.settle === true)[0].limits as number[]
+            expect(lim[1] - lim[0]).toBeCloseTo(10 * Math.exp(-0.24))
+            // The point keeps its share of every range, so it stays under the pointer and in the box.
+            expect((7 - lim[0]) / (lim[1] - lim[0])).toBeCloseTo(0.7)
+            expect((2 - lim[2]) / (lim[3] - lim[2])).toBeCloseTo(0.2)
+            expect((3 - lim[4]) / (lim[5] - lim[4])).toBeCloseTo(0.3)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it("a middle-button drag pans a 2D view; a middle press off every view leaves the focus alone (#642)", async () => {
+        vi.useFakeTimers()
+        try {
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1]) }))
+            mount(script, withLine(viewManifest("pan")), undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            // Off the image: no view, so the press stays the browser's and the surface keeps no focus.
+            const off = new PointerEvent("pointerdown", { clientX: 700, clientY: 100, bubbles: true, cancelable: true, button: 1 })
+            surface.dispatchEvent(off)
+            expect(off.defaultPrevented).toBe(false)
+            expect(surface.classList.contains("pointer-focus")).toBe(false)
+            // 50 CSS px right = 100 image px = a tenth of the 1200 px axis, which spans x 0–10.
+            const down = new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true, cancelable: true, button: 1 })
+            surface.dispatchEvent(down)
+            expect(down.defaultPrevented).toBe(true)
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 150, clientY: 100, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 150, clientY: 100, bubbles: true, button: 1 }))
+            await vi.advanceTimersByTimeAsync(10)
+            const last = requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0]
+            expect(last).toMatchObject({ id: "view", settle: true })
+            expect(last.xmin as number).toBeLessThan(0)
+            expect((last.xmax as number) - (last.xmin as number)).toBeCloseTo(10)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it("an Axis3 frame stamps its limits; a cancelled Shift+drag settles the panned limits", async () => {
         vi.useFakeTimers()
         try {

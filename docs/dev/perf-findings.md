@@ -181,6 +181,18 @@ ship neither: the overlay already treats the last point listed as the one on top
 | meshscatter, 100 points | 5.5 KB | 0.7 KB | 0.1 KB | 0.3 KB |
 | meshscatter, 1 000 points | 54.6 KB | 6.8 KB | 2.7 KB | 2.9 KB |
 
+A wheel or pinch zoom over a point on an `Axis3` keeps it at its depth (2026-11-19 at `9b57bad`,
+#643, Julia 1.13.4), so the overlay needs each point's data position. The default payloads'
+`x`, `y` and `z` carry it and nothing more ships. A payload that replaces them (a bare value)
+makes the layer ship `xyz`, three Float32s per point (~15 B per point, MsgPack's 5 B a float),
+only when a `ViewInteractable` is on the axis (nothing zooms it otherwise):
+
+| Case (600×450 figure, Cairo) | manifest | xyz |
+|---|---:|---:|
+| scatter, 1 000 points, default payloads, with a view | 49.4 KB | – |
+| scatter, 1 000 points, bare payloads, with a view | 27.0 KB | 14.7 KB |
+| scatter, 1 000 points, bare payloads, no view | 12.1 KB | – |
+
 Section J, surface on Axis3 (2026-10-09 at `0e764bb` plus #259, Julia 1.13.1). A `:surface`
 layer ships each shipped point's integer-px `xy` and Float32 `z`, one quad index per quad in
 depth order, and the source row and column indices. A matrix grid adds per-point `x` and `y`; a

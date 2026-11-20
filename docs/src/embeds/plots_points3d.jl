@@ -40,7 +40,14 @@ end
 pick
 
 # ╔═╡ b10f001f-0001-4000-8000-000000000005
-masque(fig, interactables(sc; payloads = [(patient = "P$(i)",) for i in 1:40], tooltip = masque"<b>$(patient)</b><br>response $(z:.2f)"))
+masque(
+    fig,
+    interactables(
+        sc;
+        payloads = [(patient = "P$(i)",) for i in 1:40],
+        tooltip = masque"<b>$(patient)</b><br>response $(z:.2f)",
+    ),
+)
 
 # ╔═╡ b10f001f-0001-4000-8000-000000000006
 begin
@@ -48,7 +55,11 @@ begin
     fig2 = Figure(size = (520, 380))
     ax2 = Axis3(fig2[1, 1])
     lines!(ax2, cos.(t), sin.(t), t ./ 4pi; linewidth = 2)
-    meshscatter!(ax2, cos.(t[1:20:end]), sin.(t[1:20:end]), t[1:20:end] ./ 4pi; markersize = 0.06, color = :orange)
+    meshscatter!(
+        ax2, cos.(t[1:20:end]), sin.(t[1:20:end]), t[1:20:end] ./ 4pi;
+        markersize = 0.06,
+        color = :orange,
+    )
     masque(fig2)
 end
 

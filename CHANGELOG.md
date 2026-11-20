@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-19
+
+### Added
+- A drag with the middle mouse button pans a view, on a 2D `Axis` and on an `Axis3`, as
+  Shift+drag does (#642).
+- An `Axis3` view's corner buttons have a round pan handle beside them: press on it and drag,
+  with the mouse or one finger, to pan the view. On a small plot zoom out and zoom in make room
+  for it first (#644).
+
+### Changed
+- On an `Axis3`, Ctrl/Cmd+scroll and a pinch zoom around the pointer (or your fingers), as they
+  do on a 2D axis, instead of around the middle of the box. `+`, `-` and the corner buttons
+  still zoom around the middle (#641). With the pointer on a point, a line or a surface, the
+  zoom keeps that mark inside the box: before, a mark near the front or back of the box could
+  slide out of it and disappear as you zoomed in (#643).
+
 ## [0.5.3] - 2026-11-17
 
 ### Added
@@ -1017,7 +1033,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/jowch/Masque.jl/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/jowch/Masque.jl/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/jowch/Masque.jl/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/jowch/Masque.jl/compare/v0.5.0...v0.5.1

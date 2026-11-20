@@ -25,8 +25,17 @@ begin
     flow(x, y) = Point2f(-y + 0.3x, x - 0.2y)
 
     fig = Figure(size = (520, 320))
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), xlabel = "x (km)", ylabel = "y (km)")
-    sp = streamplot!(ax, flow, -2 .. 2, -1.5 .. 1.5; colormap = :viridis, gridsize = (12, 12))
+    ax = Axis(
+        fig[1, 1];
+        aspect = DataAspect(),
+        xlabel = "x (km)",
+        ylabel = "y (km)",
+    )
+    sp = streamplot!(
+        ax, flow, -2 .. 2, -1.5 .. 1.5;
+        colormap = :viridis,
+        gridsize = (12, 12),
+    )
     nothing
 end
 
@@ -37,7 +46,10 @@ end
 pick
 
 # ╔═╡ b10f0022-0001-4000-8000-000000000005
-masque(fig, interactables(sp; tooltip = masque"flow at $(x:.1f), $(y:.1f) km"))
+masque(
+    fig,
+    interactables(sp; tooltip = masque"flow at $(x:.1f), $(y:.1f) km"),
+)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
