@@ -218,7 +218,9 @@ end
 
 # Each layer's place in the order the backend draws the figure: the figure's atomic plots in
 # plot order, then sorted by their z translation, as CairoMakie draws them. A layer takes the
-# place of its plot's last atomic part, the one drawn on top. The overlay's fade reads it to
+# place of its plot's last atomic part, the one drawn on top. `plotmap` also lists each of the
+# plot's parts under the layer's id, in an order that changes between sessions, so the
+# topmost place over all of them is taken (#658). The overlay's fade reads it to
 # tell which of two crossing marks is on top (#462); the manifest's own order is the hit-test
 # precedence, which a hand-written list sets.
 function _draw_order(fig, plotmap)
@@ -232,7 +234,7 @@ function _draw_order(fig, plotmap)
         k = maximum((get(place, a, 0) for a in parts); init = 0)
         k == 0 && continue
         for id in ids
-            occursin(':', string(id)) || (out[id] = k)
+            occursin(':', string(id)) || (out[id] = max(get(out, id, 0), k))
         end
     end
     return out
