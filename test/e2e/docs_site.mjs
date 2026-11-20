@@ -39,17 +39,23 @@ export function serve(dir, rewrite = null) {
 // Pluto's static export loads its editor from jsDelivr. On the docs CI runner
 // that document reaches readyState "complete" and still never creates
 // .ip-host. The same file boots when those scripts load. Serve the copy
-// already in the Julia depot (the harvest that wrote the HTML used it).
+// already in the Julia depot (the harvest that wrote the HTML used it), from the
+// Pluto version the URL names: a depot can hold several, and another version's
+// frontend would hide a mismatch. With no local copy of that version the request
+// goes to the network.
 function plutoFrontendDirs() {
   const depots = (process.env.JULIA_DEPOT_PATH || join(homedir(), ".julia")).split(":");
-  const dirs = [];
+  const dirs = new Map();
   for (const depot of depots) {
     if (!depot) continue;
     const root = join(depot, "packages", "Pluto");
     if (!existsSync(root)) continue;
     for (const slug of readdirSync(root)) {
       const dist = join(root, slug, "frontend-dist");
-      if (existsSync(dist)) dirs.push(dist);
+      const project = join(root, slug, "Project.toml");
+      if (!existsSync(dist) || !existsSync(project)) continue;
+      const version = /^version\s*=\s*"([^"]+)"/m.exec(readFileSync(project, "utf8"))?.[1];
+      if (version && !dirs.has(version)) dirs.set(version, dist);
     }
   }
   return dirs;
@@ -60,17 +66,16 @@ const plutoDists = plutoFrontendDirs();
 export const PLUTO_FRONTEND = /https:\/\/cdn\.jsdelivr\.net\/gh\/JuliaPluto\/Pluto\.jl@[^/]+\/frontend-dist\//;
 
 export function localPlutoAsset(url) {
+  const version = /\/Pluto\.jl@v?([^/]+)\/frontend-dist\//.exec(url)?.[1];
+  const dir = version && plutoDists.get(version);
+  if (!dir) return null;
   const marker = "/frontend-dist/";
   const i = url.indexOf(marker);
-  if (i < 0) return null;
   let name = url.slice(i + marker.length).split("?")[0].split("#")[0];
   try { name = decodeURIComponent(name); } catch { return null; }
   if (!name || name.split("/").includes("..")) return null;
-  for (const dir of plutoDists) {
-    const file = normalize(join(dir, name));
-    const prefix = dir.endsWith(sep) ? dir : dir + sep;
-    if (file !== dir && !file.startsWith(prefix)) continue;
-    if (existsSync(file) && statSync(file).isFile()) return file;
-  }
-  return null;
+  const file = normalize(join(dir, name));
+  const prefix = dir.endsWith(sep) ? dir : dir + sep;
+  if (file === dir || !file.startsWith(prefix)) return null;
+  return existsSync(file) && statSync(file).isFile() ? file : null;
 }
