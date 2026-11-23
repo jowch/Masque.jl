@@ -36,11 +36,14 @@ jobs:
         run: echo "MAKIE_COMMIT=$(git -C "$MAKIE_CHECKOUT" rev-parse HEAD)" >> "$GITHUB_ENV"
       - uses: julia-actions/setup-julia@v2
         with:
-          # The package's lower bound. If master drops 1.10, `setup` or `load` says so.
-          version: '1.10'
+          # The latest release, not Masque's 1.10 floor: master may raise its own Julia floor
+          # (WGLMakie master needs 1.11 since MakieOrg/Makie.jl#5584), and on 1.10 that refuses
+          # resolution before any canary runs (#661). The `Compat floor` CI job covers 1.10
+          # against released versions.
+          version: '1'
       - uses: julia-actions/cache@v2
       # Resolution: Masque plus ComputePipeline, Makie, CairoMakie, and WGLMakie from the
-      # checkout. A refusal here means master left Masque's one-minor pin (or Julia 1.10), and
+      # checkout. A refusal here means master left Masque's one-minor pin (or the running Julia), and
       # is reported as that, not as a canary failure.
       - name: Develop Makie master
         run: julia test/upstream/canary.jl setup "$MAKIE_CHECKOUT" "$CANARY_ENV"
