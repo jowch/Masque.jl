@@ -57,6 +57,29 @@
     @test occursin("deserialize_scene", bundle)
     @test occursin("start_renderloop", bundle)
     @test occursin("delete_scene", bundle)
+
+    # #660: `initPlot` in frontend/src/wgl-shim.ts passes `setup_scene_init` its 13 arguments
+    # (WGLMakie 0.13.17 and earlier) or 15 (MakieOrg/Makie.jl#5584 added a leading session id
+    # and `render_on_demand`). Any other count needs a new branch there.
+    sig = match(r"function setup_scene_init\(([^)]*)\)", bundle)
+    @test !isnothing(sig)
+    @test length(split(sig.captures[1], ',')) in (13, 15)
+    @test (length(split(sig.captures[1], ',')) == 15) == occursin(r"\binsert_glyphs as insert_glyphs\b", bundle)
+
+    # #660: a WGLMakie whose plots carry glyph hashes only gets the SDFs in `masque_glyphs`,
+    # in `insert_glyphs`'s `hash => [uv, sdf, width, minimum]` shape; an older one, none.
+    tfig = Figure(; size = (200, 150)); Axis(tfig[1, 1]; title = "Glyphs")
+    Makie.update_state_before_display!(tfig)
+    tpayload = _WGLExt.scene_payload(tfig)
+    if isdefined(WGLMakie, :GlyphSync)
+        glyphs = get(tpayload, "masque_glyphs", nothing)
+        @test glyphs isa AbstractDict && length(glyphs) >= length(unique("Glyphs"))
+        g = first(values(glyphs))
+        @test length(g) == 4 && haskey(g[2], "array") && haskey(g[2], "size")
+        @test all(k -> tryparse(UInt32, k) !== nothing, keys(glyphs))
+    else
+        @test !haskey(tpayload, "masque_glyphs")
+    end
 end
 
 @testset "shim-completeness canary (Bonito/Connection symbols the bundle references)" begin

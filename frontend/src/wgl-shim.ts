@@ -49,6 +49,9 @@ export function makeBonitoShim() {
         lock_loading: (f?: () => void) => { if (f) f() },
         Connection: ConnStub,
         _ConnStub: ConnStub,
+        // WGLMakie (MakieOrg/Makie.jl#5584) releases a figure's WebGL context when Bonito frees
+        // its session. Masque has no sessions and releases contexts itself (the pool below).
+        Sessions: { on_free: () => {} },
     }
 }
 
@@ -130,13 +133,23 @@ interface WglBundle {
     deserialize_scene: (data: unknown, screen: WglScreen) => WglScene
     start_renderloop: (scene: WglScene) => void
     delete_scene?: (id: unknown) => void
-    setup_scene_init: (
-        wrapper: HTMLElement, canvas: HTMLCanvasElement,
-        width: number, height: number, resizeTo: null,
-        pxPerUnit: number, devicePixelRatio: number,
-        realSize: Obs<number[]>, canvasWidth: Obs<number[]>, scene: Obs<unknown>,
-        conn: unknown, fps: number, done: Obs<boolean>,
-    ) => void
+    // Since MakieOrg/Makie.jl#5584: glyph SDFs arrive apart from the scene (#660).
+    insert_glyphs?: (batch: unknown) => void
+    // 13 parameters up to WGLMakie 0.13.17; #5584 added a leading session id and
+    // `render_on_demand` before `done` (15). `initPlot` picks the order by `length`.
+    setup_scene_init: (...args: unknown[]) => void
+}
+
+// Julia's `_glyph_batch` (ext/MasqueWGLMakieExt.jl) puts the scene's glyph SDFs under this key
+// for a WGLMakie that no longer carries them in the plots. They go to the atlas before the
+// scene is built, and the key is stripped so WGLMakie never sees it.
+const GLYPHS_KEY = "masque_glyphs"
+
+export function takeGlyphs(WGL: Pick<WglBundle, "insert_glyphs">, scene: unknown): unknown {
+    if (!scene || typeof scene !== "object" || !(GLYPHS_KEY in scene)) return scene
+    const { [GLYPHS_KEY]: glyphs, ...rest } = scene as Record<string, unknown>
+    if (glyphs && typeof WGL.insert_glyphs === "function") WGL.insert_glyphs(rewrap(glyphs))
+    return rest
 }
 
 interface WglCanvas extends HTMLCanvasElement {
@@ -191,7 +204,7 @@ function replaceScene(canvas: WglCanvas, WGL: WglBundle, scene: unknown, pxPerUn
             screen.renderer.setViewport?.(0, 0, rw, rh)
         }
     }
-    const next = WGL.deserialize_scene(rewrap(scene), screen)
+    const next = WGL.deserialize_scene(rewrap(takeGlyphs(WGL, scene)), screen)
     next.screen = screen
     screen.root_scene = next
     WGL.start_renderloop(next)
@@ -467,8 +480,8 @@ function initPlot(p: Pool, plot: Plot): void {
         const canvas = takeCanvas(plot)
         keepContextMenu(canvas)
         watchLoss(plot, canvas, token)
-        const wrapped = rewrap(plot.scene)
-        plot.WGL.setup_scene_init(
+        const wrapped = rewrap(takeGlyphs(plot.WGL, plot.scene))
+        const args: unknown[] = [
             plot.host, canvas,
             plot.width, plot.height,
             null,
@@ -478,8 +491,11 @@ function initPlot(p: Pool, plot: Plot): void {
             obs(wrapped),
             new (scopedBonito()._ConnStub)(),
             30,
-            obs(false),
-        )
+        ]
+        // render_on_demand stays off: the overlay and animation drivers write to the scene
+        // without asking WGLMakie for a frame, as they did before WGLMakie had the option.
+        if (plot.WGL.setup_scene_init.length >= 15) plot.WGL.setup_scene_init("masque", ...args, false, obs(false))
+        else plot.WGL.setup_scene_init(...args, obs(false))
         lost = plot.token !== token || plot.phase === "placeholder"
         if (lost) return
         // setup_scene_init may write canvas CSS to the framebuffer size (wider than
