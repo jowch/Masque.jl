@@ -14,15 +14,23 @@
 export interface Obs<T = unknown> {
     value: T
     on(f: (v: T) => void): () => void
+    off(f: (v: T) => void): void
     notify(nv?: T): void
 }
 
+// `off` because WGLMakie (MakieOrg/Makie.jl#5584) unsubscribes a disposed plot's and scene's
+// callbacks, which a gesture frame's scene replacement does on every frame (#660).
 export function obs<T>(v: T): Obs<T> {
     const cbs: ((v: T) => void)[] = []
+    const off = (f: (v: T) => void) => {
+        const i = cbs.indexOf(f)
+        if (i >= 0) cbs.splice(i, 1)
+    }
     return {
         value: v,
-        on(f) { cbs.push(f); return () => {} },
-        notify(nv?: T) { if (nv !== undefined) this.value = nv; cbs.forEach((f) => f(this.value)) },
+        on(f) { cbs.push(f); return () => off(f) },
+        off,
+        notify(nv?: T) { if (nv !== undefined) this.value = nv; cbs.slice().forEach((f) => f(this.value)) },
     }
 }
 

@@ -133,6 +133,15 @@ end
     @test missing_obj == Set{String}()    # `Evaluated:` on failure names exactly what's missing
     @test missing_conn == Set{String}()
 
+    # #660: WGLMakie calls `on`, `off` and `notify` on the observables the shim's `obs()` makes
+    # (MakieOrg/Makie.jl#5584 added `off`, to drop a disposed plot's callbacks).
+    obs_fn = match(r"export function obs<T>\(v: T\): Obs<T> \{(.*?)\n\}\n"s, stripped)
+    @test !isnothing(obs_fn)
+    obs_members = Set(m.captures[1] for m in eachmatch(r"^\s*([A-Za-z_]\w*)\s*[,(:]"m, obs_fn.captures[1]))
+    obs_called = Set(m.captures[1] for m in eachmatch(r"(?<![A-Za-z0-9_])\w*[oO]bservable\.(on|off|notify)\(", bundle))
+    @test !isempty(obs_called)
+    @test setdiff(obs_called, obs_members) == Set{String}()
+
     # #175: `_widget_html` scopes the shim by prepending `const Bonito = …` to the bundle, which
     # only shadows a bare `Bonito` identifier. A bundle that reached the global another way
     # (`window.Bonito`, `globalThis.Bonito`, `self.Bonito`), or declared its own top-level
