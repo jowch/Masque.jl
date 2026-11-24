@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-11-24
+
 ### Fixed
 - The same figure now gives the same widget each time it is built. Before, a plot drawn in
   more than one part (a `poly!` with an outline, say) could record its place in the drawing
@@ -1040,7 +1042,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/jowch/Masque.jl/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/jowch/Masque.jl/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/jowch/Masque.jl/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/jowch/Masque.jl/compare/v0.5.1...v0.5.2
