@@ -52,11 +52,12 @@ function numeric_blob!(buf, x)
 end
 
 # Glyph tiles in the scene: (count, packed bytes of each tile's entry) for every
-# `atlas_updates[hash] => [uv, sdf, width, minimum]`.
+# `atlas_updates[hash] => [uv, sdf, width, minimum]`, or, on a WGLMakie whose plots carry glyph
+# hashes only (MakieOrg/Makie.jl#5584), the same entries in `masque_glyphs` (#660).
 function atlas_tiles(x, out = Int[])
     if x isa AbstractDict
         for (k, v) in x
-            if string(k) == "atlas_updates" && v isa AbstractDict
+            if string(k) in ("atlas_updates", "masque_glyphs") && v isa AbstractDict
                 for (h, t) in v
                     push!(out, packed_bytes(h) + packed_bytes(t))
                 end

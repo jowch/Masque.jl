@@ -1,7 +1,8 @@
 name: Upstream canary
 
 # Runs Masque's accessor canaries (test/makie_compat_tests.jl and test/wgl_compat_tests.jl),
-# then the WebGL kind sweep (test/e2e/kind_sweep.mjs), against Makie master, so a change to an internal Masque reads shows up the night it lands
+# then the WebGL kind sweep and polish check (test/e2e/kind_sweep.mjs, polish_verify.mjs),
+# against Makie master, so a change to an internal Masque reads shows up the night it lands
 # rather than when a release moves the compat bound. Advisory: it is not a required check and
 # never runs on pull requests, but a canary failure fails the run (no continue-on-error), so a
 # break is red in the Actions tab. CompatHelper covers released versions; this covers master.
@@ -64,8 +65,9 @@ jobs:
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: julia --project="$CANARY_ENV" test/upstream/canary.jl wgl
       # The accessor canaries are Julia-side only. A break in the browser, such as a new
-      # `setup_scene_init` parameter (#660), shows only when a widget mounts (#663). One driver,
-      # the WebGL kind sweep, as CI's kind-sweep job runs it.
+      # `setup_scene_init` parameter (#660), shows only when a widget mounts (#663). The WebGL kind
+      # sweep and polish check, as CI's kind-sweep job runs them; polish_verify is the one that
+      # looks at what is drawn, which glyphs arriving apart from the scene put at risk.
       - uses: actions/setup-node@v4
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         with:
@@ -94,7 +96,22 @@ jobs:
             sleep 2
           done
           [ -n "$up" ] || { echo "::error title=Pluto never came up::on :1240 against MakieOrg/Makie.jl@$MAKIE_COMMIT"; exit 1; }
-          node kind_sweep.mjs http://127.0.0.1:1240 "$NOTEBOOK" webgl "$RUNNER_TEMP" || {
-            echo "::error title=WebGL kind sweep failed::against MakieOrg/Makie.jl@$MAKIE_COMMIT. The log above names the failing case."
-            exit 1
-          }
+          ARTIFACTS="$RUNNER_TEMP/kind-sweep-artifacts"
+          mkdir -p "$ARTIFACTS"
+          status=0
+          for driver in kind_sweep polish_verify; do
+            node "$driver.mjs" http://127.0.0.1:1240 "$NOTEBOOK" webgl "$ARTIFACTS" || {
+              echo "::error title=WebGL $driver failed::against MakieOrg/Makie.jl@$MAKIE_COMMIT. The log above names the failing case."
+              status=1
+            }
+          done
+          exit $status
+      - name: Upload kind-sweep artifacts
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-kind-sweep-webgl
+          path: |
+            ${{ runner.temp }}/kind-sweep-artifacts
+            test/e2e/pluto.log
+          if-no-files-found: ignore

@@ -35,9 +35,9 @@
     @test length(fig.scene.current_screens) == n0
     @test isempty(ax.scene.current_screens)   # child scenes too (#508)
 
-    # _serialize_scene(scene) directly (not just via scene_payload's _plain wrapper).
+    # _serialize_scene(scene, session) directly (not just via scene_payload's _plain wrapper).
     raw = _WGLExt._headless_screen(fig.scene) do screen
-        _WGLExt._serialize_scene(fig.scene)
+        _WGLExt._serialize_scene(fig.scene, screen.session)
     end
     @test haskey(raw, :plots) || haskey(raw, "plots") || haskey(raw, :children) || haskey(raw, "children")
 
@@ -139,7 +139,10 @@ end
     @test !isnothing(obs_fn)
     obs_members = Set(m.captures[1] for m in eachmatch(r"^\s*([A-Za-z_]\w*)\s*[,(:]"m, obs_fn.captures[1]))
     obs_called = Set(m.captures[1] for m in eachmatch(r"(?<![A-Za-z0-9_])\w*[oO]bservable\.(on|off|notify)\(", bundle))
-    # No emptiness check: the 0.13.14 floor bundle names no `…observable.` receiver at all.
+    # Released bundles (0.13.17 and earlier) name no `…observable.` receiver; one with the
+    # 15-parameter `setup_scene_init` must, or the regex no longer finds its calls.
+    nparams = length(split(match(r"function setup_scene_init\(([^)]*)\)", bundle).captures[1], ','))
+    nparams == 15 && @test !isempty(obs_called)
     @test setdiff(obs_called, obs_members) == Set{String}()
 
     # #175: `_widget_html` scopes the shim by prepending `const Bonito = …` to the bundle, which
@@ -156,6 +159,6 @@ end
     # Negative path for the WGL-only compat block, mirroring test/makie_compat_tests.jl's
     # "accessors rewrap a moved internal" — a shape break must produce the Masque message,
     # not a raw MethodError/FieldError.
-    @test_throws r"^Masque: WGLMakie/Bonito internal `serialize_scene`" _WGLExt._serialize_scene(nothing)
+    @test_throws r"^Masque: WGLMakie/Bonito internal `serialize_scene`" _WGLExt._serialize_scene(nothing, nothing)
     @test_throws r"^Masque: WGLMakie/Bonito internal `headless screen construction`" _WGLExt._headless_screen(identity, nothing)
 end

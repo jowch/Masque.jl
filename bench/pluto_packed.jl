@@ -30,7 +30,7 @@ function numeric_bytes(x)
     return 0
 end
 
-const ATLAS_KEYS = ("glyph_data", "atlas_updates", "atlas")
+const ATLAS_KEYS = ("glyph_data", "atlas_updates", "atlas", "masque_glyphs")
 const SHADER_KEYS = ("vertex_source", "fragment_source")
 
 # Packed bytes of every entry under one of `keys` (key included), anywhere in the tree.

@@ -114,24 +114,20 @@ end
 # No public headless-serialization API exists in WGLMakie; this is the only way to turn a
 # live Scene into a plain, browser-serializable payload. WGLMakie 0.13.17 and earlier take the
 # scene alone; MakieOrg/Makie.jl#5584 made it `serialize_scene(session, scene)` (#660). Julia 1.10
-# stays on the old shape, so both are kept. `session` defaults to the attached headless screen's.
+# stays on the old shape, so both are kept. `session` is the headless screen's (`_headless_screen`).
 const _SERIALIZE_TAKES_SESSION = hasmethod(WGLMakie.serialize_scene, Tuple{Bonito.Session, Makie.Scene})
 
-function _attached_session(scene)
-    for s in scene.current_screens
-        s isa WGLMakie.Screen && s.session isa Bonito.Session && return s.session
-    end
-    return nothing
-end
-
-function _serialize_scene(scene, session = nothing)
+function _serialize_scene(scene, session)
     try
         _SERIALIZE_TAKES_SESSION || return WGLMakie.serialize_scene(scene)
-        session = something(session, _attached_session(scene))
         return WGLMakie.serialize_scene(session, scene)
     catch e
         e isa _WGL_DOWNSTREAM_ERRORS || rethrow()
-        return _wgl_compat_error("serialize_scene", "`WGLMakie.serialize_scene(scene)` to return a plain scene tree")
+        return _wgl_compat_error(
+            "serialize_scene",
+            "`WGLMakie.serialize_scene(scene)` (0.13.17 and earlier) or `WGLMakie.serialize_scene(session, scene)` " *
+                "to return a plain scene tree",
+        )
     end
 end
 
