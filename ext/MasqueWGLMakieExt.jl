@@ -112,13 +112,22 @@ function _detach_screen!(scene, screen)
 end
 
 # No public headless-serialization API exists in WGLMakie; this is the only way to turn a
-# live Scene into a plain, browser-serializable payload.
-function _serialize_scene(scene)
+# live Scene into a plain, browser-serializable payload. WGLMakie 0.13.17 and earlier take the
+# scene alone; MakieOrg/Makie.jl#5584 made it `serialize_scene(session, scene)` (#660). Julia 1.10
+# stays on the old shape, so both are kept. `session` is the headless screen's (`_headless_screen`).
+const _SERIALIZE_TAKES_SESSION = hasmethod(WGLMakie.serialize_scene, Tuple{Bonito.Session, Makie.Scene})
+
+function _serialize_scene(scene, session)
     try
-        return WGLMakie.serialize_scene(scene)
+        _SERIALIZE_TAKES_SESSION || return WGLMakie.serialize_scene(scene)
+        return WGLMakie.serialize_scene(session, scene)
     catch e
         e isa _WGL_DOWNSTREAM_ERRORS || rethrow()
-        return _wgl_compat_error("serialize_scene", "`WGLMakie.serialize_scene(scene)` to return a plain scene tree")
+        return _wgl_compat_error(
+            "serialize_scene",
+            "`WGLMakie.serialize_scene(scene)` (0.13.17 and earlier) or `WGLMakie.serialize_scene(session, scene)` " *
+                "to return a plain scene tree",
+        )
     end
 end
 
@@ -196,7 +205,42 @@ function scene_payload(fig)
     scene = fig.scene
     _drop_stale_renderobjects!(scene)
     return _headless_screen(scene) do screen
-        _plain(_serialize_scene(scene))
+        payload = _plain(_serialize_scene(scene, screen.session))
+        glyphs = _glyph_batch(screen.session)
+        glyphs === nothing || (payload["masque_glyphs"] = glyphs)
+        payload
+    end
+end
+
+# Since MakieOrg/Makie.jl#5584 plots carry glyph hashes only, and WGLMakie sends the SDFs as
+# `Bonito.evaljs` batches on the session, which a NoConnection session never delivers (#660).
+# Rebuild that batch from the session's glyph tracker, in the shape WGLMakie's pull responder
+# sends (`hash => [uv, sdf, width, minimum]`), so the shim hands it to `WGL.insert_glyphs`
+# before the scene is built. `nothing` on WGLMakie 0.13.17 and earlier, whose plots carry SDFs.
+function _glyph_batch(session)
+    sync = try
+        Bonito.get_metadata(Bonito.root_session(session), :wglmakie_glyph_sync, nothing)
+    catch e
+        e isa _WGL_SHAPE_ERRORS || rethrow()
+        return _wgl_compat_error("glyph sync", "`Bonito.get_metadata(root_session(session), :wglmakie_glyph_sync)`")
+    end
+    sync === nothing && return nothing
+    return try
+        atlas = Makie.get_texture_atlas()
+        out = Dict{String, Any}()
+        for (h, (w, mini)) in sync.bbox
+            idx = get(atlas.mapping, h, nothing)
+            idx === nothing && continue
+            uv = atlas.uv_rectangles[idx]
+            out[string(h)] = _plain(Any[uv, Makie.get_glyph_sdf(atlas, h), w, mini])
+        end
+        isempty(out) ? nothing : out
+    catch e
+        e isa _WGL_SHAPE_ERRORS || rethrow()
+        _wgl_compat_error(
+            "glyph batch",
+            "a `GlyphSync` with `bbox::Dict{UInt32, Tuple}` and `Makie.get_glyph_sdf(atlas, hash)`",
+        )
     end
 end
 

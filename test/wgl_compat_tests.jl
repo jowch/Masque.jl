@@ -35,9 +35,9 @@
     @test length(fig.scene.current_screens) == n0
     @test isempty(ax.scene.current_screens)   # child scenes too (#508)
 
-    # _serialize_scene(scene) directly (not just via scene_payload's _plain wrapper).
+    # _serialize_scene(scene, session) directly (not just via scene_payload's _plain wrapper).
     raw = _WGLExt._headless_screen(fig.scene) do screen
-        _WGLExt._serialize_scene(fig.scene)
+        _WGLExt._serialize_scene(fig.scene, screen.session)
     end
     @test haskey(raw, :plots) || haskey(raw, "plots") || haskey(raw, :children) || haskey(raw, "children")
 
@@ -57,6 +57,29 @@
     @test occursin("deserialize_scene", bundle)
     @test occursin("start_renderloop", bundle)
     @test occursin("delete_scene", bundle)
+
+    # #660: `initPlot` in frontend/src/wgl-shim.ts passes `setup_scene_init` its 13 arguments
+    # (WGLMakie 0.13.17 and earlier) or 15 (MakieOrg/Makie.jl#5584 added a leading session id
+    # and `render_on_demand`). Any other count needs a new branch there.
+    sig = match(r"function setup_scene_init\(([^)]*)\)", bundle)
+    @test !isnothing(sig)
+    @test length(split(sig.captures[1], ',')) in (13, 15)
+    @test (length(split(sig.captures[1], ',')) == 15) == occursin(r"\binsert_glyphs as insert_glyphs\b", bundle)
+
+    # #660: a WGLMakie whose plots carry glyph hashes only gets the SDFs in `masque_glyphs`,
+    # in `insert_glyphs`'s `hash => [uv, sdf, width, minimum]` shape; an older one, none.
+    tfig = Figure(; size = (200, 150)); Axis(tfig[1, 1]; title = "Glyphs")
+    Makie.update_state_before_display!(tfig)
+    tpayload = _WGLExt.scene_payload(tfig)
+    if isdefined(WGLMakie, :GlyphSync)
+        glyphs = get(tpayload, "masque_glyphs", nothing)
+        @test glyphs isa AbstractDict && length(glyphs) >= length(unique("Glyphs"))
+        g = first(values(glyphs))
+        @test length(g) == 4 && haskey(g[2], "array") && haskey(g[2], "size")
+        @test all(k -> tryparse(UInt32, k) !== nothing, keys(glyphs))
+    else
+        @test !haskey(tpayload, "masque_glyphs")
+    end
 end
 
 @testset "shim-completeness canary (Bonito/Connection symbols the bundle references)" begin
@@ -110,6 +133,18 @@ end
     @test missing_obj == Set{String}()    # `Evaluated:` on failure names exactly what's missing
     @test missing_conn == Set{String}()
 
+    # #660: WGLMakie calls `on`, `off` and `notify` on the observables the shim's `obs()` makes
+    # (MakieOrg/Makie.jl#5584 added `off`, to drop a disposed plot's callbacks).
+    obs_fn = match(r"export function obs<T>\(v: T\): Obs<T> \{(.*?)\n\}\n"s, stripped)
+    @test !isnothing(obs_fn)
+    obs_members = Set(m.captures[1] for m in eachmatch(r"^\s*([A-Za-z_]\w*)\s*[,(:]"m, obs_fn.captures[1]))
+    obs_called = Set(m.captures[1] for m in eachmatch(r"(?<![A-Za-z0-9_])\w*[oO]bservable\.(on|off|notify)\(", bundle))
+    # Released bundles (0.13.17 and earlier) name no `…observable.` receiver; one with the
+    # 15-parameter `setup_scene_init` must, or the regex no longer finds its calls.
+    nparams = length(split(match(r"function setup_scene_init\(([^)]*)\)", bundle).captures[1], ','))
+    nparams == 15 && @test !isempty(obs_called)
+    @test setdiff(obs_called, obs_members) == Set{String}()
+
     # #175: `_widget_html` scopes the shim by prepending `const Bonito = …` to the bundle, which
     # only shadows a bare `Bonito` identifier. A bundle that reached the global another way
     # (`window.Bonito`, `globalThis.Bonito`, `self.Bonito`), or declared its own top-level
@@ -124,6 +159,6 @@ end
     # Negative path for the WGL-only compat block, mirroring test/makie_compat_tests.jl's
     # "accessors rewrap a moved internal" — a shape break must produce the Masque message,
     # not a raw MethodError/FieldError.
-    @test_throws r"^Masque: WGLMakie/Bonito internal `serialize_scene`" _WGLExt._serialize_scene(nothing)
+    @test_throws r"^Masque: WGLMakie/Bonito internal `serialize_scene`" _WGLExt._serialize_scene(nothing, nothing)
     @test_throws r"^Masque: WGLMakie/Bonito internal `headless screen construction`" _WGLExt._headless_screen(identity, nothing)
 end

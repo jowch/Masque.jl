@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format is based on
 - The same figure now gives the same widget each time it is built. Before, a plot drawn in
   more than one part (a `poly!` with an outline, say) could record its place in the drawing
   order differently from one Julia session to the next (#658).
+- `backend = :webgl` also works with WGLMakie built from Makie master (MakieOrg/Makie.jl#5584).
+  Before, the WebGL widget failed to load there (#660).
 
 ## [0.5.4] - 2026-11-19
 

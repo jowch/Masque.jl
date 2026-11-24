@@ -650,6 +650,13 @@ other numeric vectors, and scalars are the remaining 41–51 KB. The JSON proxy 
 minimum]`. On these scenes one tile's packed entry is 3.9–22.1 KB, a mean of 10–12 KB, and the
 scenes carry 5, 7, and 10 tiles.
 
+**Glyphs on WGLMakie master (#660).** Since MakieOrg/Makie.jl#5584 (unreleased; master
+f67f2618, still versioned 0.13.17) plots carry glyph hashes only, and Masque ships the same
+`[uv, sdf, width, minimum]` entries once per scene under `masque_glyphs`. Re-measured on the #660
+branch on 2026-11-24, Julia 1.13: the atlas share is unchanged (53.2, 87.7 and 125.2 KB; 5, 7 and
+10 tiles), and the packed scenes are 0.22, 0.28 and 0.35 MB, down to 16 KB smaller because master's
+shaders are shorter.
+
 **The bundle ships once per notebook.** `published_to_js` ids are content-addressed, so the one
 cached bundle string has a stable id: Pluto keeps one copy across cells and skips already-known
 ids when a cell re-runs. The browser caches the bundle and shim blob URLs on `window.__MasqueWGL`,

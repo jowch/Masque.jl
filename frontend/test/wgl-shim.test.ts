@@ -72,6 +72,18 @@ describe("obs — the observable shim", () => {
         expect(o.value).toBe(5)
         expect(seen).toEqual([5, 50])
     })
+    it("off(f) and on()'s return both unsubscribe, as WGLMakie's dispose does (#660)", () => {
+        const o = obs(0)
+        const seen: string[] = []
+        const a = () => seen.push("a")
+        const unsubB = o.on(() => seen.push("b"))
+        o.on(a)
+        o.off(a)
+        unsubB()
+        o.on(() => seen.push("c"))
+        o.notify(1)
+        expect(seen).toEqual(["c"])
+    })
     it("notify() with no arg keeps value but still fires", () => {
         const o = obs("a")
         let fired = false
@@ -185,6 +197,41 @@ describe("mountWebGL", () => {
 
         // returned scene is the same rewrapped object passed through
         expect(result.scene.value).toBeInstanceOf(Float32Array)
+    })
+
+    it("passes the session id and render_on_demand to a 15-parameter setup_scene_init, and glyphs first (#660)", async () => {
+        // The bundle from MakieOrg/Makie.jl#5584: a leading session id, `render_on_demand` before
+        // `done`, and glyph SDFs handed over through `insert_glyphs` instead of inside the plots.
+        const head = "export function setup_scene_init(...args) {\n    lastCall = args"
+        expect(fixtureSrc).toContain(head)
+        const v2 = fixtureSrc.replace(head, [
+            "export const glyphBatches = []",
+            "export function insert_glyphs(b) { glyphBatches.push(b); trace.push(\"glyphs\") }",
+            "export let rawCall = null",
+            // Fifteen named parameters, so `length` is 15 as in the real bundle.
+            "export function setup_scene_init(sid, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, rod, p14) {",
+            "    rawCall = [...arguments]",
+            "    const args = [p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p14]",
+            "    lastCall = args",
+        ].join("\n"))
+        const url = `data:text/javascript;charset=utf-8,${encodeURIComponent(v2)}`
+        const { host: wrapper, canvas } = hostCanvas()
+        const scene = { plots: [], masque_glyphs: { "7": [{ __t__: "f32", d: [0, 0, 1, 1] }, { array: { __t__: "f32", d: [0.5] }, size: [1, 1] }] } }
+        const result = await mountWebGL({ canvas, wglBundleUrl: url, scene, width: 64, height: 32, visible: true })
+        const raw = result.WGL.rawCall
+        expect(raw).toHaveLength(15)
+        expect(typeof raw[0]).toBe("string")
+        expect(raw[1]).toBe(wrapper)
+        expect(raw[2]).toBe(canvas)
+        expect(raw[13]).toBe(false)
+        expect(raw[14].value).toBe(false)
+        // The glyphs reach the atlas before the scene is set up, decoded, and the scene
+        // WGLMakie gets no longer carries them.
+        expect(result.WGL.trace.slice(0, 2)).toEqual(["glyphs", "init"])
+        const batch = result.WGL.glyphBatches[0]
+        expect(batch["7"][0]).toBeInstanceOf(Float32Array)
+        expect(batch["7"][1].array).toBeInstanceOf(Float32Array)
+        expect("masque_glyphs" in raw[10].value).toBe(false)
     })
 
     it("creates the scoped shim before the bundle evaluates, as the widget's prelude requires (#175)", async () => {
